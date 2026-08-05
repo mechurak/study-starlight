@@ -13,6 +13,10 @@ hero:
       link: /frontend/
       icon: right-arrow
       variant: minimal
+    - text: Supabase
+      link: /supabase/
+      icon: right-arrow
+      variant: minimal
 ---
 
 import { Card, CardGrid } from '@astrojs/starlight/components';
@@ -29,6 +33,12 @@ import { Card, CardGrid } from '@astrojs/starlight/components';
 		디자인 시스템을 어떻게 토큰 층으로 얹는지.
 
 		[시작하기 →](/frontend/)
+	</Card>
+	<Card title="Supabase — Postgres 위의 백엔드 플랫폼" icon="seti:db">
+		Auth가 발급한 JWT를 RLS가 해석해 행 단위로 판정한다는 한 문장을 축으로,
+		아키텍처부터 Vercel과의 역할 배분·운영·비용까지.
+
+		[시작하기 →](/supabase/)
 	</Card>
 	<Card title="다음 덱" icon="add-document">
 		새 주제는 `src/content/docs/<덱이름>/`에 페이지를 추가하고

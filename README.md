@@ -15,6 +15,9 @@ src/content/docs/
   frontend/                   # Next.js · Tailwind CSS · shadcn/ui
     index.mdx
     00-intro.mdx … 21-wrapup.mdx
+  supabase/                   # Postgres 위의 백엔드 플랫폼 · RLS · Vercel 역할 배분
+    index.mdx
+    00-intro.mdx … 17-wrapup.mdx
 src/styles/custom.css         # 폰트·본문 폭·mermaid 오버플로 커스텀
 ```
 

@@ -1,0 +1,423 @@
+---
+title: "3. 시작하기"
+description: "대시보드에서 5분, 그리고 제대로 된 로컬 개발 환경 — 마이그레이션과 타입 생성까지"
+---
+
+import { Steps, Tabs, TabItem, FileTree, LinkCard } from '@astrojs/starlight/components';
+
+> 대시보드는 탐색과 디버깅용이다. 스키마 변경의 진실은 `migrations/`에 있다
+
+## 두 갈래 시작 경로
+
+```mermaid
+flowchart LR
+    A["대시보드에서 바로"] --> A1["클릭으로 테이블 생성"] --> A2["즉시 API 사용"]
+    B["CLI 로 로컬 시작"] --> B1["supabase start"] --> B2["마이그레이션으로 스키마 관리"] --> B3["db push 로 배포"]
+
+    classDef warn fill:#fef3c7,stroke:#d97706,color:#78350f
+    classDef ok   fill:#dcfce7,stroke:#16a34a,color:#14532d
+    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
+    class A,A1,A2 warn
+    class B ok
+    class B1,B2,B3 mute
+```
+
+**A 경로**는 감을 잡는 데 좋다. 5분이면 동작하는 것을 본다.
+**B 경로**가 실제 개발 방식이다. 스키마가 코드로 남고, 팀과 공유되고, 되돌릴 수 있다.
+
+이 장은 A로 시작해서 B로 넘어간다. **A에서 멈추면 나중에 반드시 아프다.**
+
+## 대시보드로 5분
+
+### 프로젝트 만들기
+
+<Steps>
+
+1. [supabase.com/dashboard](https://supabase.com/dashboard)에서 GitHub 로그인
+
+2. **New project** → 조직 선택
+
+3. 입력할 것 세 가지
+
+   - **Name** — 프로젝트 이름
+   - **Database Password** — Postgres `postgres` 사용자 비밀번호. **여기서 잘 저장해 둘 것**
+   - **Region** — 사용자와 가장 가까운 곳 (한국 서비스면 `Northeast Asia (Seoul)`)
+
+4. 1~2분 기다리면 프로비저닝 완료
+
+</Steps>
+
+:::caution[함정]
+**리전은 나중에 바꿀 수 없다.** 지연 시간에 직접 영향을 주므로 신중하게 고른다.
+Vercel 배포 리전과 가까이 두는 것도 중요하다 — 함수와 DB가 대륙 단위로 떨어지면
+모든 쿼리에 세금이 붙는다 ([12장](/supabase/12-vercel/)).
+:::
+
+### 대시보드 지도
+
+| 메뉴 | 하는 일 | 자주 쓰나 |
+|---|---|---|
+| **Table Editor** | 스프레드시트처럼 테이블 보기/편집 | ◎ |
+| **SQL Editor** | 임의 SQL 실행, 저장된 쿼리 | ◎ |
+| **Authentication** | 사용자 목록, 로그인 제공자 설정, 이메일 템플릿 | ◎ |
+| **Storage** | 버킷과 파일 관리 | ○ |
+| **Database** | 스키마, 함수, 트리거, 확장, 역할, 복제 설정 | ○ |
+| **Edge Functions** | 배포된 함수와 로그 | ○ |
+| **Reports / Logs** | 쿼리 성능, API 로그, 에러 추적 | ○ (문제 생겼을 때) |
+| **Advisors** | 보안·성능 자동 점검 결과 | **◎ 꼭 볼 것** |
+| **Project Settings** | API 키, 연결 문자열, 컴퓨트 설정 | ○ |
+
+### 자격 증명 확인
+
+**Project Settings → API Keys**에서 확인한다.
+
+```bash
+# 프로젝트 URL — 모든 요청의 베이스
+NEXT_PUBLIC_SUPABASE_URL=https://abcdefghijklmno.supabase.co
+
+# publishable key — 브라우저에 노출해도 되는 키
+NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=sb_publishable_xxxxxxxxxxxx
+
+# secret key — 서버에서만. 절대 NEXT_PUBLIC_ 접두사를 붙이지 말 것
+SUPABASE_SECRET_KEY=sb_secret_xxxxxxxxxxxx
+```
+
+- 예전 프로젝트에는 `anon` / `service_role` JWT 키가 보인다. **폐기 예정**이므로 신규는 새 키를 쓴다
+- `NEXT_PUBLIC_` 접두사가 붙은 값은 **브라우저 번들에 그대로 들어간다.**
+  secret key에 붙이면 즉시 사고다
+- 키가 유출됐다면 대시보드에서 회전(rotate)할 수 있다
+
+## 첫 테이블과 첫 쿼리
+
+### SQL로 만드는 습관
+
+Table Editor 클릭보다 SQL로 만드는 습관을 들이자. 나중에 그대로 마이그레이션이 된다.
+
+```sql
+create table public.posts (
+  id          bigint generated always as identity primary key,
+  author_id   uuid not null default auth.uid() references auth.users (id) on delete cascade,
+  title       text not null check (char_length(title) between 1 and 200),
+  body        text,
+  published   boolean not null default false,
+  created_at  timestamptz not null default now()
+);
+
+-- 테이블을 만들면 RLS를 켜는 것까지가 한 세트다
+alter table public.posts enable row level security;
+
+-- 정책이 없으면 아무도 못 읽는다. 최소 정책 두 개
+create policy "누구나 공개 글을 읽는다"
+  on public.posts for select
+  using (published = true);
+
+create policy "본인 글은 본인이 관리한다"
+  on public.posts for all
+  to authenticated
+  using ((select auth.uid()) = author_id)
+  with check ((select auth.uid()) = author_id);
+```
+
+:::tip[핵심]
+`create table` 다음 줄에 `enable row level security`를 쓰는 것을 **손버릇으로 만든다.**
+이 두 문장이 떨어지는 순간이 사고의 출발점이다.
+:::
+
+### supabase-js로 조회하기
+
+```bash
+npm install @supabase/supabase-js
+```
+
+```ts
+// lib/supabase.ts
+import { createClient } from '@supabase/supabase-js'
+
+export const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!,
+)
+```
+
+```ts
+// 조회 — SELECT id, title, created_at FROM posts WHERE published ORDER BY created_at DESC LIMIT 10
+const { data, error } = await supabase
+  .from('posts')
+  .select('id, title, created_at')
+  .eq('published', true)
+  .order('created_at', { ascending: false })
+  .limit(10)
+
+// 삽입 — author_id는 넣지 않는다. 기본값 auth.uid()가 채운다
+const { data: created, error: insertError } = await supabase
+  .from('posts')
+  .insert({ title: '첫 글', body: '내용' })
+  .select()
+  .single()
+```
+
+:::caution[함정]
+**`error`를 항상 확인할 것.** supabase-js는 예외를 던지지 않고 `{ data, error }`를 돌려준다.
+`try/catch`만 두르고 안심하면 실패를 조용히 놓친다.
+:::
+
+이 클라이언트는 **브라우저용**이다. Next.js에서는 이렇게 쓰지 않고
+`@supabase/ssr`을 쓴다 ([13장](/supabase/13-nextjs/)).
+
+## 여기서 멈추면 안 되는 이유
+
+대시보드만 쓰면 곧 이런 상황이 온다.
+
+- "이 컬럼 누가 언제 추가했지?" — 기록이 없다
+- "스테이징이랑 프로덕션 스키마가 다른데요" — 손으로 맞춰야 한다
+- "실수로 프로덕션 테이블을 지웠어요" — 되돌릴 코드가 없다
+- "새로 온 사람이 로컬 환경 세팅을 못 해요" — 재현 가능한 정의가 없다
+
+해법은 하나다. **스키마를 SQL 파일로 버전 관리하고, 로컬에서 먼저 돌린다.**
+그게 CLI가 하는 일이다.
+
+## CLI로 로컬 개발
+
+### 프로젝트 구조
+
+```bash
+supabase init
+```
+
+<FileTree>
+
+- supabase/
+  - config.toml 로컬 스택 설정 — 포트, Auth, 스토리지
+  - migrations/ **스키마 변경 이력. 여기가 진실이다**
+  - functions/ Edge Functions 소스
+  - seed.sql 로컬 DB 초기 데이터
+
+</FileTree>
+
+**`supabase/` 디렉터리는 반드시 git에 커밋한다.** 이게 곧 백엔드 소스 코드다.
+`.gitignore`에는 `supabase/.temp`, `supabase/.branches` 정도만 넣는다.
+
+### 로컬 스택 기동
+
+```bash
+# Docker가 켜져 있어야 한다
+supabase start
+```
+
+```text
+Started supabase local development setup.
+
+         API URL: http://127.0.0.1:54321
+     GraphQL URL: http://127.0.0.1:54321/graphql/v1
+          DB URL: postgresql://postgres:postgres@127.0.0.1:54322/postgres
+      Studio URL: http://127.0.0.1:54323
+     Mailpit URL: http://127.0.0.1:54324
+      JWT secret: super-secret-jwt-token-with-at-least-32-characters-long
+        anon key: eyJhbGciOiJIUzI1NiIs...
+service_role key: eyJhbGciOiJIUzI1NiIs...
+```
+
+**프로덕션과 같은 구성의 스택이 통째로 로컬에 뜬다.** Auth도, Storage도, Realtime도 전부 동작한다.
+로컬 키는 모든 개발자에게 동일한 고정값이라 커밋해도 안전하다.
+
+| 포트 | 서비스 | 설명 |
+|---|---|---|
+| `54321` | API Gateway | `/rest/v1`, `/auth/v1`, `/storage/v1`, `/functions/v1` 전부 여기로 |
+| `54322` | Postgres | `psql`, Prisma, DBeaver로 직접 붙는 주소 |
+| `54323` | Studio | 로컬 대시보드. 원격과 UI가 동일하다 |
+| `54324` | **Mailpit** | 로컬 메일 서버 — 가입 확인 메일, 매직 링크를 여기서 확인 |
+
+`54324`가 특히 유용하다. 이메일 인증이나 매직 링크 플로우를
+**실제 메일 발송 없이** 브라우저에서 그대로 테스트할 수 있다.
+
+## 마이그레이션 흐름
+
+### 마이그레이션 만들기
+
+<Tabs>
+<TabItem label="직접 SQL 쓰기 (권장)">
+
+```bash
+supabase migration new create_posts
+# → supabase/migrations/20260805120000_create_posts.sql 생성
+```
+
+빈 파일이 생기고, 여기에 SQL을 직접 쓴다.
+**의도가 명확한 SQL이 남는다**는 게 이 방식의 장점이다.
+테이블 · RLS · 인덱스를 한 파일 안에서 한 세트로 묶어 쓸 수 있다.
+
+</TabItem>
+<TabItem label="변경 사항 추출하기">
+
+```bash
+supabase db diff -f create_posts
+# → 현재 로컬 DB와 마이그레이션 이력의 차이를 SQL로 추출
+```
+
+로컬 Studio에서 클릭으로 바꾼 뒤 차이를 뽑아낸다.
+정책과 트리거가 여러 개 얽힌 **복잡한 변경을 GUI로 만든 뒤** 꺼낼 때 편하다.
+
+단점은 생성된 SQL이 사람이 읽기에 장황하다는 것.
+추출한 뒤 손으로 다듬는 것을 전제로 쓴다.
+
+</TabItem>
+</Tabs>
+
+어느 쪽이든 결과물은 **`migrations/` 안의 SQL 파일**이고, 이게 진실이다.
+
+### db reset — 재현 가능한 DB
+
+```bash
+supabase db reset
+```
+
+이 명령이 하는 일 —
+
+<Steps>
+
+1. 로컬 DB를 **완전히 비운다**
+
+2. `migrations/` 안의 SQL을 **타임스탬프 순서대로 전부 재실행**한다
+
+3. `seed.sql`(또는 config에 지정한 시드)을 실행한다
+
+</Steps>
+
+:::tip[핵심]
+이 명령이 통과한다는 건 **"빈 DB에서 우리 스키마를 처음부터 만들 수 있다"**는 뜻이다.
+CI에서 이걸 돌리면 마이그레이션이 깨졌는지 자동으로 잡힌다.
+
+**습관: 마이그레이션을 쓴 뒤 커밋 전에 항상 `supabase db reset` 한 번.**
+:::
+
+### seed.sql — 개발용 데이터
+
+```sql
+-- supabase/seed.sql
+insert into auth.users (id, email, encrypted_password, email_confirmed_at, role, aud)
+values (
+  '00000000-0000-0000-0000-000000000001',
+  'dev@example.com',
+  crypt('password123', gen_salt('bf')),
+  now(), 'authenticated', 'authenticated'
+);
+
+insert into public.posts (author_id, title, body, published) values
+  ('00000000-0000-0000-0000-000000000001', '첫 글', '내용', true),
+  ('00000000-0000-0000-0000-000000000001', '초안', '아직 작성 중', false);
+```
+
+- `auth.users` 직접 insert는 시드 편의용이다. GoTrue가 쓰는 토큰 컬럼들이 비어
+  **이 계정으로 로그인은 안 될 수 있다** — 로그인 테스트 계정은 Studio나 `signUp`으로 만든다
+- 시드는 **로컬과 프리뷰 브랜치에만** 적용된다. 프로덕션에는 실행되지 않는다
+- 고정 UUID를 쓰면 테스트 코드에서 참조하기 쉽다
+- 시드가 커지면 여러 파일로 나누고 `config.toml`의 `[db.seed]`에서 glob으로 지정한다
+
+## 원격 연결과 타입 생성
+
+```bash
+# 1) 로그인
+supabase login
+
+# 2) 로컬 디렉터리를 원격 프로젝트에 연결 (project-ref는 대시보드 URL에 있다)
+supabase link --project-ref abcdefghijklmno
+
+# 3) 로컬 마이그레이션을 원격에 적용
+supabase db push
+
+# 반대 방향: 원격에서 이미 손댄 스키마를 로컬로 끌어온다
+supabase db pull
+```
+
+- `db push`는 **아직 적용되지 않은 마이그레이션만** 순서대로 실행한다
+- 원격에서 대시보드로 직접 바꿔 놓은 게 있으면 충돌한다 → `db pull`로 먼저 흡수
+- 실무에서는 `db push`를 사람이 직접 치지 않고 **CI에서 실행**한다 ([14장](/supabase/14-ops/))
+
+### 타입 생성 — 여기서 개발 경험이 갈린다
+
+```bash
+# 로컬 DB 기준
+supabase gen types typescript --local > lib/database.types.ts
+
+# 원격 프로젝트 기준
+supabase gen types typescript --project-id abcdefghijklmno > lib/database.types.ts
+```
+
+```ts
+import type { Database } from './database.types'
+
+const supabase = createClient<Database>(url, key)
+
+const { data } = await supabase.from('posts').select('id, title')
+// data: { id: number; title: string }[] | null  ← 컬럼 이름 오타가 컴파일 에러가 된다
+```
+
+`package.json` 스크립트로 등록해 두고, 스키마를 바꿀 때마다 돌린다.
+
+```json
+{
+  "scripts": {
+    "db:types": "supabase gen types typescript --local > lib/database.types.ts",
+    "db:reset": "supabase db reset && npm run db:types"
+  }
+}
+```
+
+## config.toml
+
+```toml
+[api]
+enabled = true
+port = 54321
+schemas = ["public", "graphql_public"]   # API에 노출할 스키마
+max_rows = 1000                          # 한 번에 반환할 최대 행 수
+
+[db]
+port = 54322
+major_version = 17
+
+[auth]
+site_url = "http://127.0.0.1:3000"
+additional_redirect_urls = ["https://localhost:3000"]
+jwt_expiry = 3600
+enable_signup = true
+
+[auth.email]
+enable_confirmations = false             # 로컬에서는 끄면 편하다
+
+[auth.external.github]
+enabled = true
+client_id = "env(GITHUB_CLIENT_ID)"
+secret = "env(GITHUB_SECRET)"
+```
+
+`max_rows`는 기억해 둘 만하다. 클라이언트가 무한정 데이터를 긁어가는 것을 막는 안전장치다.
+
+## 3장 요약
+
+```mermaid
+flowchart LR
+    A["supabase migration new"] --> B["SQL 작성"]
+    B --> C["supabase db reset<br/>로컬 검증"]
+    C --> D["gen types<br/>타입 갱신"]
+    D --> E["앱 코드 수정 + 테스트"]
+    E --> F["git commit / PR"]
+    F --> G["CI 에서 supabase db push"]
+
+    classDef ok   fill:#dcfce7,stroke:#16a34a,color:#14532d
+    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
+    class C,G ok
+    class A,B,D,E,F mute
+```
+
+- 대시보드는 **탐색과 디버깅용**, 스키마 변경의 진실은 `migrations/`
+- `supabase start` → 프로덕션과 같은 스택이 로컬에 뜬다. Mailpit(`54324`)으로 메일까지 테스트
+- **`db reset`이 통과해야 커밋한다**
+- 타입 생성은 스크립트로 자동화해 둔다
+- 리전과 DB 비밀번호는 프로젝트 생성 시점의 되돌리기 어려운 결정이다
+
+<LinkCard
+  title="4. Postgres 최소 지식"
+  description="Supabase를 잘 쓰기 위해 꼭 필요한 만큼만 — profiles 패턴, 타입, 인덱스, 트랜잭션."
+  href="/supabase/04-postgres/"
+/>

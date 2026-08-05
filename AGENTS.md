@@ -17,10 +17,11 @@ dev 서버는 백그라운드 모드로 띄운다: `astro dev --background`
 |---|---|---|
 | `cka` | 22페이지 (개요 + 21장) | mermaid 189개 + Starlight 컴포넌트 |
 | `frontend` | 23페이지 (개요 + 21장) | mermaid 31개. Next.js·Tailwind·shadcn/ui |
+| `supabase` | 19페이지 (개요 + 17장) | mermaid 35개. Postgres·RLS·Vercel 역할 배분 |
 
-`frontend`는 slidev 덱(`~/workspace/study-decks/decks/frontend`)의 내용을 **참고해 다시 쓴 것**이다.
-저쪽은 슬라이드(라이브 렌더 컴포넌트 데모가 핵심)라 구조가 다르다 — 동기화 대상이 아니다.
-여기가 문서판 원본이다.
+`frontend`와 `supabase`는 slidev 덱(`~/workspace/study-decks/decks/<이름>`)의 내용을
+**참고해 다시 쓴 것**이다. 저쪽은 슬라이드(클릭 애니메이션·라이브 데모가 핵심)라 구조가 다르다 —
+동기화 대상이 아니다. 여기가 문서판 원본이다.
 
 Astro 7 / Starlight 0.41 / starlight-sidebar-topics 0.8 / astro-mermaid 2.1 /
 starlight-theme-rapide 0.5 기준.

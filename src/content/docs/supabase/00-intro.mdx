@@ -1,0 +1,170 @@
+---
+title: "0. 시작하기 전에"
+description: "이 문서를 어떻게 읽을 것인가 — 대상, 범위, 미리 잡아두면 좋은 멘탈 모델과 실습 환경"
+---
+
+import { Card, CardGrid, Steps, LinkCard } from '@astrojs/starlight/components';
+
+> 무엇을 다루고 무엇을 다루지 않는가
+
+## 이 문서는 누구를 위한 것인가
+
+- **웹 개발 경험은 있는데 Supabase는 처음**인 사람
+- Firebase나 직접 만든 Express/Nest 백엔드를 써본 적이 있는 사람 — 비교 지점이 더 잘 보인다
+- Next.js + Vercel 조합을 쓰고 있거나 쓸 계획인 사람 — [12](/supabase/12-vercel/)–[13장](/supabase/13-nextjs/)이 특히 유용하다
+- "BaaS를 쓰고 싶은데 종속성이 걱정된다"는 판단을 앞두고 있는 사람
+
+전제하지 않는 것: Postgres 심화 지식, 데브옵스 경험, Deno 경험.
+전제하는 것: `select`와 `where`가 무엇인지 알고, JavaScript로 HTTP 요청을 보내 본 적이 있다.
+
+### 다루는 것과 다루지 않는 것
+
+<CardGrid>
+<Card title="다룬다" icon="approve-check">
+왜 Supabase를 선택하는가 / 언제 선택하면 안 되는가.
+각 기능의 "실체"가 Postgres에서 무엇인지.
+Auth와 RLS가 맞물리는 방식.
+Vercel과의 역할 배분과 배포 아키텍처.
+실전 운영 — 마이그레이션, 브랜칭, 성능, 비용.
+</Card>
+<Card title="다루지 않는다" icon="close">
+Postgres 튜닝 심화 (vacuum, WAL 파라미터 등).
+Supabase 셀프호스팅 운영.
+모바일 SDK(Flutter, Swift) 상세.
+AI/벡터는 "이런 게 있다" 수준까지만.
+</Card>
+</CardGrid>
+
+## 미리 잡아두면 좋은 멘탈 모델
+
+읽는 내내 이 셋을 배경에 깔아두면 나머지가 훨씬 빨리 붙는다.
+
+### 1. 프레임워크가 아니라 "관리형 Postgres + 주변부"다
+
+새 API를 배우는 게 아니다. 이미 40년 된 데이터베이스를
+**네트워크 너머로 안전하게 여는 방법**을 배우는 것이다.
+그래서 배운 것의 대부분이 Supabase를 떠나도 남는다.
+
+### 2. 권한은 애플리케이션이 아니라 데이터베이스가 판단한다
+
+`if (user.id !== post.authorId) throw` 같은 코드가 SQL 정책(RLS)으로 내려간다.
+이 전환이 가장 큰 사고방식의 변화이고, 이 문서에서 가장 많은 분량을 차지한다.
+
+이게 왜 중요한가 — 접근 경로가 늘어나도(REST, Realtime, GraphQL, Edge Function)
+**규칙은 한 곳에만 존재**하기 때문이다.
+
+### 3. Supabase는 상태를, Vercel은 실행을 맡는다
+
+둘은 경쟁 관계가 아니다. 겹치는 지점은 "서버 코드를 어디에 둘까" 하나뿐이고,
+그건 판단 기준만 세우면 된다. [12장](/supabase/12-vercel/)의 주제다.
+
+## 전체를 관통하는 흐름
+
+```mermaid
+flowchart LR
+    L["로그인"] --> J["Auth 가 JWT 발급<br/>sub = 사용자 UUID"]
+    J --> R["요청에 Bearer 로 실림"]
+    R --> P["PostgREST 가 JWT 를 풀어<br/>Postgres 세션 변수에 주입"]
+    P --> RLS["RLS 정책이<br/>auth.uid() 로 행을 필터"]
+    RLS --> D["허용된 행만 응답"]
+
+    classDef key  fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
+    classDef ok   fill:#dcfce7,stroke:#16a34a,color:#14532d
+    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
+    class RLS key
+    class D ok
+    class L,J,R,P mute
+```
+
+:::tip[핵심]
+막히는 코드를 만나면 먼저 물어본다 —
+**"이 요청은 지금 어떤 Postgres 역할로 실행되고 있는가?"**
+`anon` / `authenticated` / `service_role` 셋 중 하나이고, 그에 따라 보이는 행이 달라진다.
+:::
+
+## 2026년 8월 기준 — 바뀐 것들
+
+이 생태계도 빠르게 움직인다. 검색으로 찾은 글이 이미 낡았을 가능성이 높다.
+각 장에서 다시 짚지만, 지금은 **"내 기억이 낡았을 수 있다"**는 것만 알면 된다.
+
+| 항목 | 지금 | 옛 정보 (자료에 많이 남아 있음) |
+|---|---|---|
+| API 키 | **`sb_publishable_...` / `sb_secret_...`** | `anon key` / `service_role key` (JWT 형태, 폐기 예정) |
+| API 게이트웨이 | **Envoy** | Kong |
+| Next.js 통합 | **`@supabase/ssr`** | `@supabase/auth-helpers-nextjs` |
+| 서버에서 신원 확인 | **`getClaims()`** (서명 로컬 검증) | `getSession()`의 user를 신뢰 |
+| JWT 서명 | **비대칭키(ECC/RSA) + JWKS** | 프로젝트당 대칭키(HS256) 하나 |
+| 커넥션 풀러 | **Supavisor** (transaction 모드 `6543`) | PgBouncer 단독 |
+| 대규모 실시간 | **트리거 + `realtime.broadcast_changes()`** | Postgres Changes만 |
+| 컨테이너 없는 로컬 | (여전히 Docker 필요) | — |
+
+### 자주 나올 용어
+
+| 용어 | 한 줄 설명 |
+|---|---|
+| **PostgREST** | 테이블·뷰·함수를 자동으로 REST API로 노출해 주는 서버 |
+| **RLS** | Row Level Security. 행 단위 접근 제어. Postgres 네이티브 기능 |
+| **JWT** | 로그인 후 발급되는 서명된 토큰. 여기 담긴 `sub`가 곧 사용자 ID |
+| **anon / authenticated / service_role** | 요청이 매핑되는 Postgres 역할 3종 |
+| **publishable / secret key** | 클라이언트에 노출해도 되는 키 / 서버 전용 키 |
+| **Supavisor** | Supabase의 커넥션 풀러. 서버리스에서 필수 |
+| **RPC** | 데이터베이스 함수 호출. `POST /rest/v1/rpc/<이름>` |
+| **migration** | 스키마 변경을 SQL 파일로 버전 관리한 것 |
+
+## 실습 환경
+
+읽기만 해서는 안 붙는다. 로컬 스택을 하나 띄워놓고 보는 것을 전제로 쓰였다.
+
+<Steps>
+
+1. **Node 20 이상**
+
+   ```bash
+   node -v
+   ```
+
+2. **Docker Desktop** — 로컬 Supabase 스택을 컨테이너로 띄우는 데 필요하다
+
+   ```bash
+   docker info
+   ```
+
+3. **Supabase CLI** — 전역 설치보다 **프로젝트 의존성 설치를 권한다**
+
+   ```bash
+   # macOS / Linux
+   brew install supabase/tap/supabase
+
+   # 또는 프로젝트 의존성으로 (공식 문서 권장)
+   npm install supabase --save-dev
+   ```
+
+4. **계정 생성** — [supabase.com](https://supabase.com)에서 GitHub 로그인.
+   **Free 플랜만으로도 이 문서의 거의 모든 내용을 실습할 수 있다**
+
+5. **로컬 스택 기동** — 3장에서 자세히 다루지만, 미리 한 번 띄워보면 감이 온다
+
+   ```bash
+   supabase init && supabase start
+   ```
+
+</Steps>
+
+:::caution[함정]
+CLI를 **팀원마다 다른 버전으로 전역 설치**하면 마이그레이션 동작이 갈라진다.
+`package.json`의 devDependency로 고정해 두면 이 문제가 사라진다.
+:::
+
+## 0장 요약
+
+- 대상은 **웹 개발은 아는데 Supabase가 처음인 사람**이다
+- 멘탈 모델 셋: **관리형 Postgres / 권한은 DB가 판단 / 상태는 Supabase·실행은 Vercel**
+- 관통하는 흐름: **JWT 발급 → 세션 변수 주입 → RLS 판정**
+- `anon key`·`Kong`·`auth-helpers`가 보이는 자료는 **한 세대 이전**이다
+- Docker + CLI + Free 플랜이면 실습 환경은 충분하다
+
+<LinkCard
+  title="1. 왜 Supabase인가"
+  description="선택의 근거를 먼저 세운다 — Firebase와의 결정적 차이, 쓰면 안 되는 경우, 비용 감각."
+  href="/supabase/01-why/"
+/>

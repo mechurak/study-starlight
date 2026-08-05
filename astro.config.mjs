@@ -141,6 +141,55 @@ export default defineConfig({
 								},
 							],
 						},
+						{
+							label: 'Supabase',
+							link: '/supabase/',
+							icon: 'seti:db',
+							items: [
+								'supabase',
+								{
+									label: '시작',
+									items: ['supabase/00-intro', 'supabase/01-why'],
+								},
+								{
+									label: '기반 — Postgres와 개발 환경',
+									items: [
+										'supabase/02-architecture',
+										'supabase/03-start',
+										'supabase/04-postgres',
+									],
+								},
+								{
+									label: '핵심 — 데이터와 권한',
+									items: [
+										'supabase/05-data-api',
+										'supabase/06-auth',
+										'supabase/07-rls',
+									],
+								},
+								{
+									label: '주변 제품',
+									items: [
+										'supabase/08-storage',
+										'supabase/09-realtime',
+										'supabase/10-edge-functions',
+										'supabase/11-extensions',
+									],
+								},
+								{
+									label: '애플리케이션 통합',
+									items: ['supabase/12-vercel', 'supabase/13-nextjs'],
+								},
+								{
+									label: '운영과 규모',
+									items: ['supabase/14-ops', 'supabase/15-perf-cost'],
+								},
+								{
+									label: '마무리',
+									items: ['supabase/16-patterns', 'supabase/17-wrapup'],
+								},
+							],
+						},
 					],
 					{
 						// 랜딩 페이지는 어느 topic에도 속하지 않는다
