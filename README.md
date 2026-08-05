@@ -59,6 +59,14 @@ pnpm preview
 **Cloudflare Pages + GitHub 연동**으로 `main`에 푸시하면 자동 배포된다.
 브랜치를 밀면 그 브랜치의 preview URL이 따로 생긴다.
 
+| | 주소 |
+|---|---|
+| **커스텀 도메인 (정식)** | <https://study.upggu.com> |
+| Pages 기본 도메인 | <https://study-starlight.pages.dev> |
+
+둘 다 살아 있지만 `astro.config.mjs`의 `site`가 커스텀 도메인이라
+**양쪽 모두 canonical이 `study.upggu.com`을 가리킨다** — 검색엔진이 한 주소로 모은다.
+
 ### 최초 연결 (대시보드에서 한 번만)
 
 Git 연결은 OAuth 승인이 필요해서 **대시보드에서만** 할 수 있다 (CLI/API 불가).
@@ -88,11 +96,17 @@ Git 연결은 OAuth 승인이 필요해서 **대시보드에서만** 할 수 있
 - v3 이미지는 **`pnpm-lock.yaml`에서 pnpm 버전을 자동 감지하지 않는다.** 직접 지정해야 한다
 - Node 버전은 `.nvmrc`(현재 `24`)로 고정된다 — 이건 파일이라 대시보드 설정이 필요 없다
 
-### 배포 후
+### 도메인을 바꿀 때
 
-- 기본 도메인은 `https://<프로젝트명>.pages.dev` 다.
-  실제 URL이 다르거나 커스텀 도메인을 붙이면 **`astro.config.mjs`의 `site`를 그 값으로 고친다**
-  (sitemap이 이 값으로 생성된다)
+**`astro.config.mjs`의 `site`를 반드시 같이 고친다.** canonical 링크와 sitemap이
+전부 이 값으로 생성되기 때문에, 안 고치면 새 도메인의 페이지가
+옛 도메인을 canonical로 가리켜 검색엔진이 그쪽을 색인한다.
+
+```bash
+# 배포 후 확인
+curl -s https://study.upggu.com/ | grep -o '<link rel="canonical"[^>]*>'
+curl -s https://study.upggu.com/sitemap-0.xml | grep -o '<loc>[^<]*</loc>' | head -3
+```
 
 ### 로컬에서 직접 올리고 싶을 때
 

@@ -8,9 +8,10 @@ import mermaid from 'astro-mermaid';
 //   1) src/content/docs/<덱이름>/ 에 페이지를 넣고
 //   2) 아래 topics 배열에 항목을 추가한다.
 export default defineConfig({
-	// Cloudflare Pages 기본 도메인. 커스텀 도메인을 붙이면 여기를 바꾼다.
-	// sitemap 생성에 필요하다 (없으면 빌드 시 경고만 나오고 sitemap이 안 생긴다).
-	site: 'https://study-starlight.pages.dev',
+	// 커스텀 도메인. canonical 링크와 sitemap이 전부 이 값으로 생성된다.
+	// 기본 도메인(study-starlight.pages.dev)도 살아 있지만, 여기를 커스텀 도메인으로 둬야
+	// 양쪽 다 canonical이 이쪽을 가리켜 검색엔진이 한 주소로 모은다.
+	site: 'https://study.upggu.com',
 	integrations: [
 		// astro-mermaid는 starlight보다 먼저 와야 ```mermaid 펜스를 가로챈다
 		mermaid({ autoTheme: true }),
