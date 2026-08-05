@@ -1,0 +1,27 @@
+---
+title: 스터디 노트
+description: 주제별 기술 스터디 노트 — 검색하고, 찾아보고, 다시 읽는 자료
+template: splash
+hero:
+  title: 스터디 노트
+  tagline: 주제(덱)별로 정리한 기술 학습 자료. 상단 검색으로 어디서든 바로 찾아갈 수 있다.
+  actions:
+    - text: CKA 시험 대비
+      link: /cka/
+      icon: right-arrow
+---
+
+import { Card, CardGrid } from '@astrojs/starlight/components';
+
+<CardGrid stagger>
+	<Card title="CKA — Kubernetes 관리자 시험" icon="open-book">
+		커리큘럼 5개 도메인을 "무엇이 실제로 일어나는가"로 관통하는 정리.
+		개념 → 명령 → 함정 순서로 반복하고, 장 끝마다 요약을 둔다.
+
+		[시작하기 →](/cka/)
+	</Card>
+	<Card title="다음 덱" icon="add-document">
+		새 주제는 `src/content/docs/<덱이름>/`에 페이지를 추가하고
+		`astro.config.mjs`의 topics에 등록하면 이 목록에 나타난다.
+	</Card>
+</CardGrid>

@@ -1,0 +1,6 @@
+/* mermaid 다이어그램 — 폭이 넘치면 다이어그램 안에서만 가로 스크롤 */
+.mermaid {
+  overflow-x: auto;
+  display: flex;
+  justify-content: center;
+}
