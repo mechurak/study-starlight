@@ -1,8 +1,7 @@
 # Study Notes (Starlight)
 
 여러 기술 주제의 스터디 노트를 [Astro Starlight](https://starlight.astro.build)로 만들어
-하나의 문서 사이트로 배포하는 레포. [study-decks](../study-decks)(Slidev 슬라이드)의
-후속으로, **축적·검색·참조**에 맞는 docs 형태로 정리한다.
+하나의 문서 사이트로 배포하는 레포. **축적·검색·참조**에 맞는 docs 형태로 정리한다.
 
 ## 구조
 
@@ -13,7 +12,7 @@ src/content/docs/
   cka/                        # 덱 하나 = 디렉터리 하나 = topic 하나
     index.mdx                 #   덱 개요 페이지
     00-intro.mdx … 20-wrapup.mdx  #   본문 페이지 (컴포넌트를 쓰므로 전부 .mdx)
-src/styles/custom.css         # 최소 커스텀 (mermaid 오버플로 처리뿐)
+src/styles/custom.css         # 폰트·본문 폭·mermaid 오버플로 커스텀
 ```
 
 - **덱 하나 = topic 하나** — [starlight-sidebar-topics](https://starlight-sidebar-topics.netlify.app)가
@@ -21,6 +20,8 @@ src/styles/custom.css         # 최소 커스텀 (mermaid 오버플로 처리뿐
 - **검색은 Pagefind 내장** — 빌드 시 정적 인덱스가 생성된다. 별도 설정 없음
 - **mermaid는 [astro-mermaid](https://www.npmjs.com/package/astro-mermaid)** — ```` ```mermaid ````
   펜스를 클라이언트에서 렌더하고 라이트/다크 테마를 자동 추적한다
+- **테마는 [starlight-theme-rapide](https://starlight-theme-rapide.vercel.app), 본문 폰트는
+  Pretendard**(셀프호스팅, dynamic subset) — 세부는 CLAUDE.md "현재 상태" 참고
 
 ## 사용법
 
@@ -40,7 +41,10 @@ pnpm preview
 
 ## 문서 작성 규칙
 
-- **raw HTML 태그(`<div>`, `<strong>` 등)는 쓰지 않는다.** 강조는 `**`로 한다
+- **제목 계층으로 목차를 만든다** — h2는 주제 묶음 5~9개, 상세는 h3.
+  우측 목차(TOC)에 h2·h3만 나오므로 h2만 나열하면 평면이 되고, h4는 아예 안 잡힌다
+- **raw HTML 태그(`<div>`, `<strong>` 등)는 본문에 쓰지 않는다.** 강조는 `**`로 한다.
+  시각 효과가 더 필요하면 `src/components/`에 Astro 컴포넌트를 만들어 import한다
 - 시험 포인트·팁은 `:::tip[제목]`, 함정·주의는 `:::caution[제목]` aside를 쓴다
 - 페이지 프론트매터는 `title` / `description` 두 개면 충분하다.
   사이드바 순서·그룹은 `astro.config.mjs`의 topics에서 slug로 관리한다
