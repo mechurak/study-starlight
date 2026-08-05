@@ -1,0 +1,308 @@
+---
+title: "4. 경계 설계"
+description: "use client를 어디에 둘 것인가 — Provider, 서드파티 라이브러리, Context, 서버 전용 코드"
+---
+
+import { Tabs, TabItem, Steps, Card, CardGrid, LinkCard } from '@astrojs/starlight/components';
+
+> 원칙은 하나다 — 경계를 아래로, 작게
+
+서버 컴포넌트가 기본값이라는 건 알겠다. 그런데 **Provider는? 서드파티 라이브러리는? Context는?**
+이 장은 실무에서 반드시 부딪히는 다섯 가지 상황과 각각의 정석 패턴을 다룬다.
+
+이 장의 내용은 **[12장(토큰)](/frontend/12-tokens/)·[16장(자산화)](/frontend/16-asset/)과 함께
+이 덱에서 가장 중요한 세 장**이다.
+
+## 상황 1 — Provider가 필요하다
+
+테마, 쿼리 클라이언트, 세션… Provider는 Context를 쓰므로 **반드시 클라이언트 컴포넌트**다.
+그런데 앱 최상단에 필요하다. 그럼 앱 전체가 클라이언트가 되나?
+
+**아니다.** `children`으로 받으면 그 내용은 여전히 서버에서 렌더된다.
+
+```tsx
+// app/providers.tsx
+'use client'
+
+import { ThemeProvider } from 'next-themes'
+
+export function Providers({ children }: { children: React.ReactNode }) {
+  return <ThemeProvider>{children}</ThemeProvider>
+}
+```
+
+```tsx
+// app/layout.tsx — 서버 컴포넌트로 유지!
+import { Providers } from './providers'
+
+export default function RootLayout({ children }) {
+  return (
+    <html>
+      <body>
+        <Providers>{children}</Providers>
+      </body>
+    </html>
+  )
+}
+```
+
+### 도넛 패턴
+
+이 구조를 도넛(donut)이라고 부른다. **테두리만 클라이언트, 구멍은 서버.**
+
+```mermaid
+flowchart TB
+    P["Providers — 클라이언트 (테두리)"] --> D["Dashboard — 서버 (구멍)"]
+    D --> R["RevenueChart — 서버"]
+    D --> K["DateRangePicker — 클라이언트"]
+
+    classDef warn fill:#fef3c7,stroke:#d97706,color:#78350f
+    classDef ok   fill:#dcfce7,stroke:#16a34a,color:#14532d
+    class P,K warn
+    class D,R ok
+```
+
+:::tip[핵심]
+금지된 것은 **"클라이언트 컴포넌트가 서버 컴포넌트를 import하는 것"**이지
+**"감싸는 것"**이 아니다.
+
+import는 번들러가 정적으로 따라가지만, `children`으로 넘긴 JSX는 **이미 렌더된 결과**다.
+그래서 서버에 남을 수 있다.
+:::
+
+## 상황 2 — 서드파티에 `use client`가 없다
+
+```tsx
+// ❌ 서버 컴포넌트에서 바로 쓰면 터진다
+import { Carousel } from 'some-old-carousel'
+
+export default function Page() {
+  return <Carousel />   // 내부에서 useState를 쓰는데 'use client'가 없음
+}
+```
+
+```tsx
+// ✅ 내 쪽에서 감싸서 경계를 만들어 준다
+// components/carousel.tsx
+'use client'
+export { Carousel } from 'some-old-carousel'
+```
+
+한 줄짜리 re-export 파일이면 충분하다.
+잘 관리되는 라이브러리는 이미 `use client`를 넣어 배포하지만, 오래된 것들은 직접 감싸야 한다.
+
+## 상황 3 — 클라이언트에 데이터가 필요하다
+
+<Tabs>
+<TabItem label="A. props로 내려준다 (기본)">
+
+```tsx
+// app/page.tsx (서버)
+export default async function Page() {
+  const user = await getUser()
+  return <ProfileEditor user={user} />
+}
+```
+
+```tsx
+// components/profile-editor.tsx
+'use client'
+export function ProfileEditor({ user }: { user: User }) {
+  const [name, setName] = useState(user.name)
+  // ...
+}
+```
+
+가장 단순하고 대부분의 경우 이걸로 충분하다.
+단점: 서버가 `getUser()`를 **끝낼 때까지** 아무것도 못 보낸다.
+
+</TabItem>
+<TabItem label="B. Promise를 넘긴다 (스트리밍)">
+
+```tsx
+// 서버 — await하지 않는다
+export default function Page() {
+  const userPromise = getUser()
+  return <ProfileEditor userPromise={userPromise} />
+}
+```
+
+```tsx
+'use client'
+import { use } from 'react'
+
+export function ProfileEditor({ userPromise }) {
+  const user = use(userPromise)      // Suspense와 함께 동작
+}
+```
+
+껍데기를 **먼저 보내고** 데이터는 도착하는 대로 채운다.
+느린 조회가 화면 전체를 막지 않는다. (5장의 Suspense와 짝이다)
+
+</TabItem>
+</Tabs>
+
+## 상황 4 — Context를 쓰고 싶다
+
+결론부터: **서버 컴포넌트 트리에서는 Context를 쓸 수 없다.** 그리고 대안이 대부분 더 낫다.
+
+| 쓰고 싶었던 것 | 서버 우선 대안 |
+|---|---|
+| 현재 사용자 정보 | 서버에서 `getUser()` 호출. `React.cache()`로 중복 제거 |
+| 테마 | CSS 변수 + 쿠키. Provider는 토글 버튼만 감싼다 |
+| 필터·정렬 상태 | **URL의 searchParams.** 공유·뒤로가기가 공짜로 따라온다 |
+| 폼 상태 | 폼 컴포넌트 안에 지역 상태로 |
+| 장바구니 | 클라이언트 Provider가 맞다 (진짜 전역 클라이언트 상태) |
+
+`React.cache()`로 감싼 함수는 **한 요청 안에서** 같은 인자에 대해 한 번만 실행된다.
+서버 컴포넌트 여러 곳에서 `getUser()`를 불러도 DB 조회는 한 번이다. (5장)
+
+### 상태를 URL로 올리기
+
+의외로 많은 클라이언트 상태가 **사실 URL에 있어야 할 것**이다.
+
+<Tabs>
+<TabItem label="❌ useState로 관리">
+
+```tsx
+'use client'
+const [sort, setSort] = useState('new')
+const [page, setPage] = useState(1)
+
+// 새로고침하면 날아감
+// 링크 공유 불가
+// 뒤로가기 동작 안 함
+// 목록 컴포넌트까지 클라이언트가 된다
+```
+
+</TabItem>
+<TabItem label="✅ URL이 상태">
+
+```tsx
+// app/posts/page.tsx (서버)
+export default async function Page({ searchParams }: PageProps<'/posts'>) {
+  const { sort = 'new', page = '1' } = await searchParams
+  const posts = await getPosts(sort, +page)
+  return <PostList posts={posts} />
+}
+```
+
+목록 컴포넌트가 **서버 컴포넌트로 남는다.**
+정렬 버튼만 클라이언트로 만들어 `router.push`하면 된다.
+
+</TabItem>
+</Tabs>
+
+:::tip[핵심]
+**"새로고침해도 남아야 하나? 링크로 공유돼야 하나? 뒤로가기가 동작해야 하나?"**
+셋 중 하나라도 예라면 그건 `useState`가 아니라 URL이다. (19장에서 결정표로 정리한다)
+:::
+
+## 상황 5 — 서버 전용 코드를 지키고 싶다
+
+가장 무서운 사고는 **비밀 키가 브라우저 번들에 섞여 들어가는 것**이다.
+
+```ts
+// lib/data.ts
+import 'server-only'   // 클라이언트에서 import하면 빌드가 실패한다
+
+export async function getSecretData() {
+  const res = await fetch('https://api.internal', {
+    headers: { Authorization: `Bearer ${process.env.API_SECRET}` },
+  })
+  return res.json()
+}
+```
+
+```ts
+// 반대 방향도 있다
+// lib/browser-utils.ts
+import 'client-only'   // 서버에서 import하면 빌드가 실패한다
+export const getLocalDraft = () => localStorage.getItem('draft')
+```
+
+:::caution[함정]
+`NEXT_PUBLIC_` 접두사가 붙은 환경변수만 브라우저로 간다.
+나머지는 서버 전용이지만, **실수로 클라이언트 컴포넌트에서 참조하면 조용히 `undefined`가 될 뿐**
+에러가 나지 않는다. `server-only`가 그 실수를 빌드 타임에 잡아준다.
+:::
+
+## 결정 트리와 흔한 실수
+
+```mermaid
+flowchart TB
+    A{"이 컴포넌트에 상태·이벤트·<br/>브라우저 API 가 필요한가"} -->|아니오| B["서버 컴포넌트<br/>아무것도 안 붙인다 ✅"]
+    A -->|예| C{"그 부분만<br/>떼어낼 수 있는가"}
+    C -->|예| D["떼어낸 조각에만<br/>'use client'"]
+    C -->|아니오| E{"상태를 URL 로<br/>올릴 수 있는가"}
+    E -->|예| F["searchParams 로 옮기고<br/>서버 컴포넌트 유지 ✅"]
+    E -->|아니오| G["클라이언트 컴포넌트로 만들고<br/>데이터는 props 로 받는다"]
+
+    classDef ok   fill:#dcfce7,stroke:#16a34a,color:#14532d
+    classDef warn fill:#fef3c7,stroke:#d97706,color:#78350f
+    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
+    class B,F ok
+    class D,G warn
+    class A,C,E mute
+```
+
+### 자주 하는 실수 모음
+
+- **레이아웃 최상단에 `use client`** — 앱 전체가 클라이언트가 된다. 가장 흔한 사고
+- **함수를 props로 넘김** — `onSubmit={handleSubmit}`은 경계를 못 넘는다
+- **ORM 객체를 그대로 전달** — 직렬화 실패. 평범한 객체로 변환할 것
+- **`use client` 파일에서 `async` 컴포넌트** — 지원되지 않는다
+- **`error.tsx`에 `use client`를 안 붙임** — 반드시 클라이언트 컴포넌트여야 한다
+- **서버 컴포넌트에서 `window` 접근** — `typeof window` 분기는 냄새다. 경계를 잘못 그은 것
+
+## 경계를 검토하는 순서
+
+코드 리뷰나 성능 점검 때 이 순서로 본다.
+
+<Steps>
+
+1. **`use client`가 붙은 파일을 전부 찾는다**
+
+   ```bash
+   grep -rl "use client" app components
+   ```
+
+2. **트리에서 얼마나 위에 있는지 본다**
+
+   `layout.tsx`나 그에 가까운 곳에 있으면 1순위 검토 대상이다.
+
+3. **왜 필요한지 한 줄로 말할 수 있는가**
+
+   "상태가 있다", "onClick이 있다", "Provider다" — 셋 중 하나여야 한다.
+   말이 안 나오면 대부분 빼도 된다.
+
+4. **떼어낼 수 있는 조각이 있는가**
+
+   토글 버튼 하나 때문에 화면 전체가 클라이언트인 경우가 흔하다.
+
+5. **상태가 사실 URL 상태는 아닌가**
+
+   필터·정렬·페이지·탭이면 거의 항상 URL이 맞다.
+
+6. **번들 크기로 확인한다**
+
+   ```bash
+   pnpm build   # 라우트별 First Load JS를 본다 (8장)
+   ```
+
+</Steps>
+
+## 4장 요약
+
+- Provider는 **도넛 패턴** — `children`으로 받으면 안쪽은 서버로 남는다
+- `use client` 없는 라이브러리는 **한 줄 re-export로 감싼다**
+- 클라이언트에 데이터가 필요하면 **props** 또는 **Promise + `use()`**
+- Context를 쓰기 전에 **URL(searchParams)로 올릴 수 있는지** 먼저 본다
+- **`server-only` / `client-only`**로 경계 위반을 빌드 타임에 잡는다
+- 원칙 하나: **경계를 아래로, 작게**
+
+<LinkCard
+  title="5. 데이터 가져오기"
+  description="fetch가 컴포넌트 안으로 들어왔다 — 병렬 조회, 중복 제거, Suspense 스트리밍."
+  href="/frontend/05-data/"
+/>

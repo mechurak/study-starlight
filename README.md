@@ -12,6 +12,9 @@ src/content/docs/
   cka/                        # 덱 하나 = 디렉터리 하나 = topic 하나
     index.mdx                 #   덱 개요 페이지
     00-intro.mdx … 20-wrapup.mdx  #   본문 페이지 (컴포넌트를 쓰므로 전부 .mdx)
+  frontend/                   # Next.js · Tailwind CSS · shadcn/ui
+    index.mdx
+    00-intro.mdx … 21-wrapup.mdx
 src/styles/custom.css         # 폰트·본문 폭·mermaid 오버플로 커스텀
 ```
 

@@ -1,0 +1,157 @@
+---
+title: "21. 마무리"
+description: "가져갈 것 — 장별 한 줄 요약, 자주 틀리는 다섯 가지, 버전 정리"
+---
+
+import { Card, CardGrid, LinkCard } from '@astrojs/starlight/components';
+
+> 시험 직전에 이 장만 다시 봐도 되게
+
+## 세 도구를 한 줄로 다시
+
+- **Next.js** — React를 서버에서도 실행한다. 나머지는 그걸 실용적으로 만드는 부속이다
+- **Tailwind CSS** — CSS를 없애는 게 아니라 **이름 짓기**를 없앤다
+- **shadcn/ui** — 라이브러리가 아니라 **코드 배송 시스템**. 컴포넌트가 내 레포에 온다
+
+공통 태도는 **추상화를 얇게 유지한다**는 것.
+그래서 셋을 겹쳐 써도 서로를 가리지 않는다.
+
+## 가장 중요한 세 장
+
+<CardGrid>
+<Card title="4장 — 경계 설계" icon="puzzle">
+`use client`를 **아래로, 작게**.
+이것만 지켜도 번들과 성능 문제의 대부분이 사라진다.
+
+[다시 보기 →](/frontend/04-boundary/)
+</Card>
+<Card title="12장 — 디자인 토큰" icon="star">
+`:root`에 값, `@theme inline`에 연결, 컴포넌트는 이름만 안다.
+이 구조가 있어야 17장이 가능해진다.
+
+[다시 보기 →](/frontend/12-tokens/)
+</Card>
+<Card title="16장 — 자산화" icon="open-book">
+`ui/` · `shared/` · `_components/` 세 층.
+**`ui/`는 도메인을 모른다.**
+
+[다시 보기 →](/frontend/16-asset/)
+</Card>
+</CardGrid>
+
+## 자주 틀리는 다섯 가지
+
+1. **레이아웃 최상단에 `use client`** → 앱 전체가 클라이언트가 된다
+2. **동적 클래스 이름 조립** → `` `text-${c}-500` ``은 빌드 시점에 존재하지 않는다
+3. **컴포넌트에 원시 색 하드코딩** → 테마 교체가 영영 불가능해진다
+4. **Server Function에 인증 검사 누락** → 그건 공개 엔드포인트다
+5. **`cssVariables: false`로 init** → 되돌리기 매우 어렵다
+
+```mermaid
+flowchart LR
+    A["1. 레이아웃 use client"] --> R1["언제든 고칠 수 있다"]
+    B["2. 동적 클래스 조립"] --> R1
+    D["4. 인증 누락"] --> R2["즉시 고쳐야 한다 ⚠️"]
+    C["3. 원시 색 하드코딩"] --> R3["되돌리기 비쌈 🔒"]
+    E["5. cssVariables: false"] --> R3
+
+    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
+    classDef bad  fill:#fee2e2,stroke:#dc2626,color:#7f1d1d
+    classDef warn fill:#fef3c7,stroke:#d97706,color:#78350f
+    class R1 mute
+    class R2 bad
+    class R3 warn
+    class A,B,C,D,E mute
+```
+
+**3번과 5번은 되돌리기가 특히 비싸다.**
+프로젝트 시작 시점에 한 번만 신경 쓰면 되는 것들이다.
+
+## 장별 한 줄 요약
+
+| 장 | 한 줄 |
+|---|---|
+| [1](/frontend/01-landscape/) 지형도 | 세 도구는 경쟁하지 않는다. 컴포넌트 / 스타일 언어 / 실행 환경 |
+| [2](/frontend/02-rsc/) 서버 컴포넌트 | `use client`는 스위치가 아니라 **경계**다 |
+| [3](/frontend/03-routing/) App Router | 폴더가 URL. layout은 이동해도 리렌더되지 않는다 |
+| [4](/frontend/04-boundary/) 경계 설계 | 경계를 **아래로, 작게**. Provider는 도넛 패턴 |
+| [5](/frontend/05-data/) 데이터 | 쓰는 컴포넌트가 직접 조회한다 → 병렬이 된다 |
+| [6](/frontend/06-cache/) 캐싱 | 기본은 캐시 안 함. `use cache` + `cacheLife`로 명시 |
+| [7](/frontend/07-mutation/) 뮤테이션 | Server Function은 **공개 엔드포인트**다 |
+| [8](/frontend/08-performance/) 성능 | LCP · INP · CLS. 서버 컴포넌트화가 1순위 |
+| [9](/frontend/09-css-history/) CSS의 문제 | 전역 네임스페이스 · 특이도 · 못 지우는 코드 |
+| [10](/frontend/10-tailwind/) Tailwind v4 | 설정이 CSS로. **클래스 이름은 정적이어야 한다** |
+| [11](/frontend/11-tailwind-practice/) 실전 | `cn()` = clsx + tailwind-merge. `@apply`는 안 쓴다 |
+| [12](/frontend/12-tokens/) 토큰 | 값이 아니라 **결정**에 이름을 붙인다 |
+| [13](/frontend/13-shadcn/) shadcn/ui | 라이브러리가 아니라 코드 배송 시스템 |
+| [14](/frontend/14-shadcn-setup/) 설치 | `cssVariables: true`. 나중에 못 바꾼다 |
+| [15](/frontend/15-component-anatomy/) 해부 | cva → cn → props 통과. **원시 색이 없다** |
+| [16](/frontend/16-asset/) 자산화 | 세 층. `ui/`는 도메인을 모른다 |
+| [17](/frontend/17-design-system/) DS 적용 | 대부분 토큰 매핑. ⚠️ 갭이 실제 작업량 |
+| [18](/frontend/18-a11y/) 접근성 | 공짜로 받는 것을 **깨뜨리지 않기** |
+| [19](/frontend/19-forms-state/) 폼·상태 | 서버 / URL / 폼 / UI 네 종류로 나눈다 |
+| [20](/frontend/20-patterns/) 실전 | 작은 화면 하나부터. 전면 전환은 실패한다 |
+
+## 2026년 8월 기준 버전
+
+| | 버전 | 기억할 것 |
+|---|---|---|
+| Next.js | 16.3 | `proxy.ts`, Cache Components, Turbopack 기본 |
+| React | 19.2 | `forwardRef` 불필요, Compiler 1.0 |
+| Tailwind | 4.3 | `@theme`, 설정 파일 없음, oklch |
+| shadcn CLI | 3.x | **Base UI 기본**, 8가지 style, 레지스트리 |
+| Base UI | 1.6+ | `render` 프롭, `Positioner` 분리 |
+
+:::caution[함정]
+검색으로 찾은 자료가 `middleware.ts`, `tailwind.config.js`, `asChild`,
+`forwardRef`, `fetch(url, { next: { revalidate } })`를 쓰고 있다면 **한 세대 이전**이다.
+동작은 하지만 새로 배울 것은 그쪽이 아니다.
+:::
+
+## 다음에 볼 것
+
+<CardGrid>
+<Card title="공식 문서" icon="open-book">
+[nextjs.org/docs](https://nextjs.org/docs) — 특히 Caching, Server Components
+
+[tailwindcss.com/docs](https://tailwindcss.com/docs) — Theme, Functions and Directives
+
+[ui.shadcn.com/docs](https://ui.shadcn.com/docs) — Registry, Theming, **Changelog**
+
+[base-ui.com](https://base-ui.com) — 프리미티브 API
+</Card>
+<Card title="깊이 파볼 주제" icon="rocket">
+부분 프리렌더링(PPR)의 내부 동작.
+
+자체 레지스트리 + CI 연동.
+
+Figma Variables → 토큰 자동 생성.
+
+시각 회귀 테스트 (Playwright + 스냅샷).
+
+React Compiler 적용 결과 측정.
+</Card>
+</CardGrid>
+
+특히 **ui.shadcn.com/docs/changelog**는 주기적으로 볼 가치가 있다.
+이 생태계에서 가장 빠르게 움직이는 부분이다.
+
+## 마지막으로
+
+이 스택의 진짜 이점은 속도가 아니라
+**디자인이 바뀔 때 드는 비용이 작다**는 것이다.
+
+- 제품은 반드시 바뀐다. 브랜드도, 디자이너도, 요구사항도
+- 그때 **파일 하나를 고칠 것인가, 200개를 찾아 고칠 것인가**
+- 토큰 층(12장)과 소유권 모델(16장)이 그 차이를 만든다
+
+:::tip[핵심]
+**같은 컴포넌트, 같은 마크업, 다른 토큰.**
+CSS 변수 몇 줄로 앱 전체의 인상을 바꿀 수 있게 되었다면 이 덱의 목적은 달성된 것이다.
+:::
+
+<LinkCard
+  title="개요로 돌아가기"
+  description="전체 구성과 읽는 법을 다시 본다."
+  href="/frontend/"
+/>

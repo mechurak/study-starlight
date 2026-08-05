@@ -1,0 +1,273 @@
+---
+title: "19. 폼과 상태"
+description: "무엇을 어디에 둘 것인가 — 상태를 네 종류로 나누면 대부분 해결된다"
+---
+
+import { Tabs, TabItem, Card, CardGrid, LinkCard } from '@astrojs/starlight/components';
+
+> "상태 관리 라이브러리 뭐 써요?"는 대부분 분류가 안 된 상태에서 나온다
+
+## 상태를 네 종류로 나눈다
+
+| 종류 | 예 | 어디에 둘까 |
+|---|---|---|
+| **서버 상태** | 글 목록, 사용자 정보 | 서버 컴포넌트 / TanStack Query |
+| **URL 상태** | 필터, 정렬, 페이지, 탭 | **searchParams** |
+| **폼 상태** | 입력 중인 값 | 폼 컴포넌트 지역 상태 |
+| **UI 상태** | 열린 모달, 사이드바 접힘 | `useState` / 소수의 Provider |
+
+이렇게 나누고 나면 **전역 상태 라이브러리가 필요한 경우가 거의 없다.**
+
+<Tabs>
+<TabItem label="❌ 예전 습관 — 전부 전역에">
+
+```ts
+// store.ts
+{
+  user, posts, comments,        // 서버 상태
+  filters, sortBy, page,        // URL 상태
+  formValues, errors,           // 폼 상태
+  isModalOpen, sidebarCollapsed // UI 상태
+}
+```
+
+전부 한 곳에 있으니 무엇이 어디서 바뀌는지 알 수 없다.
+그리고 이 스토어를 읽는 컴포넌트는 **전부 클라이언트가 된다.** (4장)
+
+</TabItem>
+<TabItem label="✅ 종류별로">
+
+```tsx
+// 서버 상태 — 서버 컴포넌트
+const posts = await getPosts()
+
+// URL 상태 — searchParams
+const { sort } = await searchParams
+
+// 폼 상태 — 폼 안에
+const form = useForm()
+
+// UI 상태 — 필요한 곳에
+const [open, setOpen] = useState(false)
+```
+
+</TabItem>
+</Tabs>
+
+## URL 상태를 다루는 법
+
+```tsx
+// 서버 쪽 — 읽기
+export default async function Page({ searchParams }: PageProps<'/posts'>) {
+  const { q = '', sort = 'new', page = '1' } = await searchParams
+  const posts = await getPosts({ q, sort, page: Number(page) })
+  return (
+    <>
+      <Filters />                    {/* 클라이언트 — URL만 조작 */}
+      <PostList posts={posts} />     {/* 서버 */}
+    </>
+  )
+}
+```
+
+```tsx
+// 클라이언트 쪽 — 쓰기
+'use client'
+export function Filters() {
+  const router = useRouter()
+  const params = useSearchParams()
+
+  function setSort(sort: string) {
+    const next = new URLSearchParams(params)
+    next.set('sort', sort)
+    next.delete('page')          // 정렬이 바뀌면 1페이지로
+    router.push(`?${next}`)
+  }
+}
+```
+
+`nuqs` 같은 라이브러리를 쓰면 이 보일러플레이트가 `useQueryState`로 줄어든다.
+
+:::tip[핵심]
+URL 상태의 진짜 이점은 **목록 컴포넌트가 서버 컴포넌트로 남는다**는 것이다.
+필터 UI만 클라이언트가 되고, 데이터를 다루는 부분은 전부 서버에 남는다.
+공유·뒤로가기·새로고침이 공짜로 따라오는 것은 덤이다.
+:::
+
+## 폼 — React Hook Form + zod
+
+shadcn/ui의 `Form` 컴포넌트가 전제하는 조합이다.
+
+```tsx
+import { useForm } from 'react-hook-form'
+import { zodResolver } from '@hookform/resolvers/zod'
+import { z } from 'zod'
+
+const schema = z.object({
+  email: z.string().email('올바른 이메일을 입력하세요'),
+  password: z.string().min(8, '8자 이상이어야 합니다'),
+})
+type Values = z.infer<typeof schema>
+
+export function LoginForm() {
+  const form = useForm<Values>({
+    resolver: zodResolver(schema),
+    defaultValues: { email: '', password: '' },
+  })
+
+  return (
+    <Form {...form}>
+      <form onSubmit={form.handleSubmit(onSubmit)}>{/* FormField들 */}</form>
+    </Form>
+  )
+}
+```
+
+### 스키마를 서버와 공유한다
+
+이것이 이 조합의 진짜 이점이다.
+
+```ts
+// lib/schemas.ts — 양쪽에서 import한다
+export const LoginSchema = z.object({
+  email: z.string().email(),
+  password: z.string().min(8),
+})
+```
+
+```tsx
+// 클라이언트 — 즉각적인 피드백 (UX)
+useForm({ resolver: zodResolver(LoginSchema) })
+```
+
+```ts
+// 서버 — 진짜 방어선 (보안)
+'use server'
+const parsed = LoginSchema.safeParse(input)
+if (!parsed.success) return { error: '...' }
+```
+
+:::caution[함정]
+**클라이언트 검증은 UX, 서버 검증은 보안이다.**
+같은 스키마를 쓰면 둘이 어긋나지 않는다.
+**하나만 한다면 반드시 서버 쪽이다** — 7장에서 봤듯 Server Function은 공개 엔드포인트다.
+:::
+
+### 검증 시점
+
+```mermaid
+flowchart LR
+    T["입력 중<br/>onChange"] --> BAD["다 치기도 전에<br/>빨갛게 된다 ❌"]
+    B["blur 후<br/>mode: 'onBlur'"] --> OK1["필드를 떠날 때 검증 ✅"]
+    S["제출 시<br/>기본값 onSubmit"] --> OK2["가장 보수적 ✅"]
+    S --> R["제출 후에는<br/>onChange 로 전환하면 자연스럽다"]
+
+    classDef bad  fill:#fee2e2,stroke:#dc2626,color:#7f1d1d
+    classDef ok   fill:#dcfce7,stroke:#16a34a,color:#14532d
+    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
+    class BAD bad
+    class OK1,OK2,R ok
+    class T,B,S mute
+```
+
+검증 시점 기본값은 `onSubmit`이다.
+입력하는 동안 빨갛게 되는 것은 대체로 **나쁜 UX**다 — 다 치기도 전에 틀렸다고 알린다.
+`mode: 'onBlur'` 또는 제출 후 `onChange`가 무난하다.
+
+### Server Function과 함께 쓰기
+
+```tsx
+'use client'
+export function LoginForm() {
+  const [state, formAction, isPending] = useActionState(loginAction, {})
+  const form = useForm({ resolver: zodResolver(LoginSchema) })
+
+  return (
+    <Form {...form}>
+      {/* action에 formAction을 넘기면 점진적 향상이 유지된다 */}
+      <form action={formAction} onSubmit={form.handleSubmit(() => {})}>
+        <FormField name="email" render={/* ... */} />
+        {state.error && <p className="text-sm text-destructive">{state.error}</p>}
+        <Button disabled={isPending}>로그인</Button>
+      </form>
+    </Form>
+  )
+}
+```
+
+두 시스템을 겹쳐 쓰는 것은 다소 번거롭다.
+**단순한 폼이면 Server Function + `useActionState`만으로 충분**하고,
+필드가 많고 동적 검증이 복잡할 때 RHF를 더한다.
+
+## 서버 상태를 클라이언트에서 다뤄야 할 때
+
+기준은 하나다 — **폴링·무한스크롤·낙관적 목록 갱신이 필요한가?**
+
+- 아니오 → **서버 컴포넌트.** 라이브러리 필요 없음
+- 예 → **TanStack Query** 또는 SWR
+
+```tsx
+// 서버에서 첫 데이터를 주고, 클라이언트가 이어받는 조합
+export default async function Page() {
+  const initial = await getNotifications()
+  return <NotificationList initialData={initial} />
+}
+```
+
+```tsx
+'use client'
+function NotificationList({ initialData }) {
+  const { data } = useQuery({
+    queryKey: ['notifications'],
+    queryFn: fetchNotifications,
+    initialData,                 // 첫 렌더는 서버 데이터로 — 로딩이 없다
+    refetchInterval: 30_000,
+  })
+}
+```
+
+`initialData`가 핵심이다. **첫 화면에 로딩 스피너가 없다.**
+
+## 전역 클라이언트 상태가 진짜 필요할 때
+
+- 장바구니 (여러 화면에서 읽고 쓴다)
+- 편집기의 실행 취소 스택
+- 실시간 협업 커서 위치
+- 위저드의 여러 단계에 걸친 입력
+
+이럴 때 선택지: **Zustand**(가장 가볍고 RSC와 잘 맞음),
+**Jotai**(원자 단위), **Redux Toolkit**(이미 쓰고 있다면).
+
+:::tip[핵심]
+하지만 먼저 **정말 전역인지** 의심한다.
+"두 컴포넌트가 공유"는 전역이 아니라 **공통 부모**의 문제인 경우가 대부분이다.
+:::
+
+## 결정표
+
+| 질문 | 답 |
+|---|---|
+| 서버에 있는 데이터인가? | 서버 컴포넌트에서 조회 |
+| 새로고침해도 남아야 하나? | URL(searchParams) |
+| 링크로 공유돼야 하나? | URL |
+| 뒤로가기가 동작해야 하나? | URL |
+| 이 컴포넌트만 아는가? | `useState` |
+| 형제 둘이 공유하나? | 공통 부모로 올린다 |
+| 앱 전체가 쓰나? | Provider 또는 Zustand |
+| 실시간 갱신이 필요한가? | TanStack Query |
+
+## 19장 요약
+
+- 상태를 **서버 / URL / 폼 / UI** 네 종류로 나누면 대부분 해결된다
+- 필터·정렬·페이지는 **URL이 정답**이다 — 목록이 서버 컴포넌트로 남는다
+- 폼은 **RHF + zod**, 스키마를 **서버와 공유**한다
+- **클라이언트 검증은 UX, 서버 검증은 보안** — 하나만 한다면 서버
+- 검증 시점은 `onBlur` 또는 제출 후 `onChange`
+- 폴링·무한스크롤이 아니면 **TanStack Query가 필요 없다**
+- 전역 상태는 마지막 수단. 대부분 **공통 부모**로 해결된다
+
+<LinkCard
+  title="20. 실전 패턴"
+  description="프로젝트를 시작하고 유지하는 법 — 체크리스트, 표준 패턴, 안티패턴."
+  href="/frontend/20-patterns/"
+/>

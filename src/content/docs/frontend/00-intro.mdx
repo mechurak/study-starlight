@@ -1,0 +1,166 @@
+---
+title: "0. 시작하기 전에"
+description: "이 덱을 어떻게 읽을 것인가 — 대상, 범위, 미리 잡아두면 좋은 멘탈 모델"
+---
+
+import { Card, CardGrid, Steps, LinkCard } from '@astrojs/starlight/components';
+
+> 무엇을 다루고 무엇을 다루지 않는가
+
+## 이 덱은 누구를 위한 것인가
+
+- **React는 써봤는데** Next.js App Router의 서버/클라이언트 구분이 아직 흐릿한 사람
+- Tailwind를 쓰고는 있지만 "클래스가 길어서 지저분하다"는 찜찜함이 남아 있는 사람
+- shadcn/ui를 **복붙 컴포넌트 모음** 정도로만 알고 있는 사람
+- 팀에 디자인 시스템을 도입해야 하는데 어디서부터 손댈지 모르겠는 사람
+
+전제하지 않는 것: 디자인 감각, CSS 심화 지식, 백엔드 경험.
+전제하는 것: JSX를 읽을 수 있고 `useState`가 무엇인지 안다.
+
+### 다루는 것과 다루지 않는 것
+
+<CardGrid>
+<Card title="다룬다" icon="approve-check">
+세 도구가 각각 **무슨 문제를 풀려고** 나왔는지.
+서버/클라이언트 경계와 캐싱 모델.
+Tailwind가 CSS 방법론 논쟁을 어떻게 끝냈는지.
+shadcn/ui의 소유권 모델과 **컴포넌트가 자산이 되는 경로**.
+기존 디자인 시스템을 토큰 층으로 얹는 실무 절차.
+</Card>
+<Card title="다루지 않는다" icon="close">
+React 기초 문법 (`useState`, props 등).
+디자인 이론, 색채학.
+백엔드·DB 설계.
+테스트 프레임워크 상세.
+React Native, 모바일 앱.
+</Card>
+</CardGrid>
+
+## 미리 잡아두면 좋은 멘탈 모델
+
+읽는 내내 이 셋을 배경에 깔아두면 나머지가 훨씬 빨리 붙는다.
+
+### 1. Next.js는 "React를 서버에서 실행하는 방법"이다
+
+번들 크기, 데이터 워터폴, SEO를 각각 따로 고치던 문제들이 하나의 모델로 합쳐졌다.
+라우팅·번들링·캐싱·배포는 그걸 실용적으로 만들기 위한 부속이다.
+
+### 2. Tailwind는 CSS를 대체하는 게 아니라 "이름 짓기"를 대체한다
+
+`.card__header--active` 같은 이름을 고민하던 시간이 사라진다. 생성되는 CSS는 그대로다.
+
+### 3. shadcn/ui는 라이브러리가 아니라 "코드 배송 시스템"이다
+
+`node_modules`가 아니라 **내 레포에** 컴포넌트 소스가 들어온다.
+이 차이 하나가 커스터마이징·업그레이드·자산화 전부를 바꾼다.
+
+## 전체를 관통하는 질문
+
+```mermaid
+flowchart LR
+    Q["이 코드는<br/>어디서 실행되는가?"] --> B["빌드 타임<br/>Tailwind 클래스 스캔"]
+    Q --> S["서버 요청 시<br/>서버 컴포넌트의 DB 조회"]
+    Q --> C["브라우저<br/>useState 로 열리는 드롭다운"]
+
+    classDef ok   fill:#dcfce7,stroke:#16a34a,color:#14532d
+    classDef key  fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
+    classDef warn fill:#fef3c7,stroke:#d97706,color:#78350f
+    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
+    class B ok
+    class S key
+    class C warn
+    class Q mute
+```
+
+:::tip[핵심]
+**Next.js를 어렵게 느끼는 이유의 90%는 이 세 가지가 한 파일에 섞여 보이기 때문이다.**
+막히는 코드를 만나면 먼저 "이건 셋 중 어디서 도는 코드인가"를 물어본다.
+:::
+
+## 2026년 8월 기준 — 바뀐 것들
+
+이 생태계는 빠르게 움직인다. 검색으로 찾은 글이 이미 낡았을 가능성이 높다.
+각 장에서 다시 짚지만, 지금은 **"내 기억이 낡았을 수 있다"**는 것만 알면 된다.
+
+| 항목 | 지금 | 옛 정보 (자료에 많이 남아 있음) |
+|---|---|---|
+| Next.js 미들웨어 | **`proxy.ts`** | `middleware.ts` (deprecated) |
+| Next.js 캐싱 | **Cache Components + `use cache`** | `fetch(url, { next: { revalidate } })` |
+| Next.js 번들러 | **Turbopack** (기본) | webpack |
+| 부분 프리렌더링 | **기본 동작** | `experimental.ppr` |
+| `params` / `searchParams` | **Promise — `await` 필요** | 동기 객체 |
+| ref 전달 | **`ref`가 그냥 prop** | `forwardRef` |
+| 메모이제이션 | **React Compiler 1.0** | `useMemo` / `useCallback` 수동 |
+| Tailwind 설정 | **CSS의 `@theme`** | `tailwind.config.js` |
+| Tailwind 색 공간 | **oklch** | hex / hsl |
+| shadcn 기본 베이스 | **Base UI** | Radix UI |
+| 합성 프롭 | **`render`** | `asChild` |
+| Server Function 명칭 | **Server Functions** | Server Actions |
+
+### 자주 나올 용어
+
+| 용어 | 한 줄 설명 |
+|---|---|
+| **RSC** | React Server Component. 서버에서만 실행되고 JS가 클라이언트로 안 가는 컴포넌트 |
+| **하이드레이션** | 서버가 보낸 HTML에 클라이언트 JS가 이벤트를 붙여 살아나게 하는 과정 |
+| **유틸리티 클래스** | `p-4`, `text-sm`처럼 CSS 속성 하나에 대응하는 작은 클래스 |
+| **디자인 토큰** | 색·간격·라운드 같은 디자인 결정을 이름 붙여 저장한 값 |
+| **프리미티브** | 스타일 없이 동작·접근성만 제공하는 컴포넌트 (Base UI, Radix, React Aria) |
+| **레지스트리** | shadcn 컴포넌트의 배포 단위. JSON 하나가 컴포넌트 하나 |
+| **cva** | class-variance-authority. variant별 클래스 조합을 관리하는 작은 라이브러리 |
+
+## 실습 환경
+
+읽기만 해서는 안 붙는다. 빈 프로젝트를 하나 띄워놓고 보는 것을 전제로 쓰였다.
+
+<Steps>
+
+1. **Node 20.9 이상** — Next.js 16의 요구사항이다
+
+   ```bash
+   node -v
+   ```
+
+2. **프로젝트 생성** — TypeScript · App Router · `@/*` alias를 전부 켠다
+
+   ```bash
+   pnpm create next-app@latest my-app
+   cd my-app
+   ```
+
+3. **shadcn/ui 초기화** — 여기서 고르는 값 중 일부는 **나중에 못 바꾼다** (14장)
+
+   ```bash
+   pnpm dlx shadcn@latest init
+   ```
+
+4. **첫 컴포넌트**
+
+   ```bash
+   pnpm dlx shadcn@latest add button
+   ```
+
+5. **`app/globals.css`를 열어본다** — init이 넣어준 토큰 블록이 12장의 주제다
+
+</Steps>
+
+:::caution[함정]
+3번의 `init`에서 묻는 `style`·`baseColor`·`cssVariables` 세 가지는
+**나중에 되돌리기가 매우 어렵다.** 특히 `cssVariables`를 `false`로 두면
+17장(디자인 시스템 적용)의 작업이 사실상 불가능해진다.
+지금은 그냥 기본값(`true`)으로 두고, [14장](/frontend/14-shadcn-setup/)에서 이유를 본다.
+:::
+
+## 0장 요약
+
+- 대상은 **React는 아는데 이 셋의 조합이 흐릿한 사람**이다
+- 멘탈 모델 셋: **서버에서 실행 / 이름 짓기를 없앰 / 코드 배송 시스템**
+- 관통하는 질문: **"이 코드는 어디서 실행되는가?"**
+- 이 생태계는 빠르다 — `middleware.ts`·`tailwind.config.js`·`asChild`가 보이면 한 세대 이전
+- `init`의 세 선택(`style`·`baseColor`·`cssVariables`)은 **되돌리기 어렵다**
+
+<LinkCard
+  title="1. 지형도"
+  description="세 도구는 각각 무슨 문제를 풀고 있는가 — 그리고 왜 하필 이 조합인가."
+  href="/frontend/01-landscape/"
+/>

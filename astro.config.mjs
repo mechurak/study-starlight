@@ -87,6 +87,60 @@ export default defineConfig({
 								},
 							],
 						},
+						{
+							label: '프론트엔드',
+							link: '/frontend/',
+							icon: 'laptop',
+							items: [
+								'frontend',
+								{
+									label: '시작',
+									items: ['frontend/00-intro', 'frontend/01-landscape'],
+								},
+								{
+									label: 'Next.js — 실행 환경',
+									items: [
+										'frontend/02-rsc',
+										'frontend/03-routing',
+										'frontend/04-boundary',
+										'frontend/05-data',
+										'frontend/06-cache',
+										'frontend/07-mutation',
+										'frontend/08-performance',
+									],
+								},
+								{
+									label: 'Tailwind CSS — 스타일 언어',
+									items: [
+										'frontend/09-css-history',
+										'frontend/10-tailwind',
+										'frontend/11-tailwind-practice',
+										'frontend/12-tokens',
+									],
+								},
+								{
+									label: 'shadcn/ui — 컴포넌트',
+									items: [
+										'frontend/13-shadcn',
+										'frontend/14-shadcn-setup',
+										'frontend/15-component-anatomy',
+										'frontend/16-asset',
+									],
+								},
+								{
+									label: '시스템으로 만들기',
+									items: [
+										'frontend/17-design-system',
+										'frontend/18-a11y',
+										'frontend/19-forms-state',
+									],
+								},
+								{
+									label: '마무리',
+									items: ['frontend/20-patterns', 'frontend/21-wrapup'],
+								},
+							],
+						},
 					],
 					{
 						// 랜딩 페이지는 어느 topic에도 속하지 않는다

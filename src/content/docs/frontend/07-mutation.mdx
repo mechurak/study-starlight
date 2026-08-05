@@ -1,0 +1,278 @@
+---
+title: "7. 데이터 바꾸기"
+description: "Server Functions와 폼 — 점진적 향상, 낙관적 업데이트, 그리고 보안"
+---
+
+import { Steps, Tabs, TabItem, Card, CardGrid, LinkCard } from '@astrojs/starlight/components';
+
+> 읽기가 서버로 갔다면, 쓰기는?
+
+읽기는 서버 컴포넌트에서 `await db.query()`.
+쓰기는 **Server Function**이다.
+
+- 클라이언트에서 **직접 호출할 수 있는 서버 함수**를 만드는 기능이다
+- `fetch('/api/...')`를 손으로 쓰지 않아도 된다
+- React 19의 기능이고, Next.js가 그 위에 라우팅·재검증을 얹었다
+- 예전 이름은 "Server Actions"였다. 지금 문서는 **Server Functions**로 부른다
+
+## 가장 단순한 형태
+
+```ts
+// app/actions.ts
+'use server'          // 이 파일의 export는 모두 서버 함수가 된다
+
+import { revalidateTag } from 'next/cache'
+
+export async function createPost(formData: FormData) {
+  const title = formData.get('title') as string
+  await db.post.create({ data: { title } })
+  revalidateTag('posts')
+}
+```
+
+```tsx
+// app/new/page.tsx — 서버 컴포넌트. 'use client' 없이 동작한다!
+import { createPost } from '../actions'
+
+export default function NewPost() {
+  return (
+    <form action={createPost}>
+      <input name="title" />
+      <button type="submit">저장</button>
+    </form>
+  )
+}
+```
+
+### 여기서 무슨 일이 일어나는가
+
+```mermaid
+sequenceDiagram
+    participant B as 브라우저
+    participant S as 서버
+    B->>S: form submit → POST (현재 라우트로)
+    Note over S: createPost 실행<br/>DB 쓰기 + revalidateTag
+    S-->>B: 갱신된 RSC 페이로드
+    Note over B: 화면이 새 데이터로 갱신됨<br/>페이지 이동 없음
+```
+
+- 별도 API 라우트가 없다. **함수 참조 자체가 엔드포인트**가 된다
+- 응답으로 **갱신된 UI**가 함께 온다. 별도로 다시 조회할 필요가 없다
+- **JS가 로드되기 전에도 동작한다.** 순수 HTML form POST로 폴백된다
+
+### 점진적 향상
+
+마지막 항목이 Server Function의 가장 저평가된 특징이다.
+
+| 상황 | `<form action={fn}>` | `onSubmit` + `fetch` |
+|---|---|---|
+| 느린 3G에서 JS가 아직 안 옴 | **동작한다** | 아무 일도 안 일어난다 |
+| JS 번들 로드 실패 | **동작한다** | 아무 일도 안 일어난다 |
+| JS 비활성 환경 | **동작한다** | 아무 일도 안 일어난다 |
+
+`onSubmit` 방식에서는 이 셋 모두 **사용자가 버튼을 계속 누르게 된다.**
+
+## 로딩·에러·낙관적 업데이트
+
+### `useActionState`
+
+```ts
+// app/actions.ts
+'use server'
+
+export async function createPost(prevState: State, formData: FormData) {
+  const title = formData.get('title') as string
+  if (!title || title.length < 3) return { error: '제목은 3자 이상이어야 합니다' }
+  await db.post.create({ data: { title } })
+  revalidateTag('posts')
+  return { ok: true }
+}
+```
+
+```tsx
+'use client'
+import { useActionState } from 'react'
+
+export function PostForm() {
+  const [state, formAction, isPending] = useActionState(createPost, {})
+  return (
+    <form action={formAction}>
+      <input name="title" aria-invalid={!!state.error} />
+      {state.error && <p className="text-sm text-destructive">{state.error}</p>}
+      <Button disabled={isPending}>{isPending ? '저장 중…' : '저장'}</Button>
+    </form>
+  )
+}
+```
+
+`aria-invalid`를 붙이는 것에 주목한다 — shadcn/ui의 `Input`은 그 속성 하나로
+테두리가 자동으로 destructive 색이 된다. **접근성 속성이 곧 스타일 훅**이다. (15장·18장)
+
+### `useOptimistic`
+
+서버 응답을 기다리지 않고 **먼저 화면을 바꾼다.** 실패하면 자동으로 되돌아간다.
+
+```tsx
+'use client'
+import { useOptimistic } from 'react'
+
+export function LikeButton({ post, likeAction }) {
+  const [optimisticLikes, addOptimistic] = useOptimistic(
+    post.likes,
+    (current, delta: number) => current + delta
+  )
+
+  return (
+    <form action={async () => {
+      addOptimistic(1)        // 즉시 반영
+      await likeAction(post.id)
+    }}>
+      <button>♥ {optimisticLikes}</button>
+    </form>
+  )
+}
+```
+
+:::tip[핵심]
+좋아요, 투표, 체크박스처럼 **거의 항상 성공하는** 동작에 쓴다.
+결제처럼 **실패가 의미 있는** 동작에는 쓰지 않는다 —
+"성공했다가 취소되는" 화면은 실패를 그냥 보여주는 것보다 나쁘다.
+:::
+
+## Server Function은 공개 엔드포인트다
+
+이건 "서버에서 실행되니 안전한 함수"가 **아니다.**
+누구나 호출할 수 있는 **HTTP 엔드포인트**다.
+
+- 함수 참조가 클라이언트로 가면서 **고유 ID가 부여**된다. 그 ID로 직접 POST할 수 있다
+- 폼을 화면에 안 보여준다고 해서 호출을 막을 수 없다
+- `proxy.ts`의 matcher는 **Server Function 호출을 보장해 주지 않는다** (3장)
+
+:::caution[함정]
+**모든 Server Function은 자기 안에서 인증·인가·검증을 다시 해야 한다.**
+"이 폼은 관리자만 볼 수 있으니까 괜찮다"는 추론은 성립하지 않는다.
+:::
+
+### 안전한 템플릿
+
+```ts
+'use server'
+import { z } from 'zod'
+import { auth } from '@/lib/auth'
+
+const UpdatePostSchema = z.object({
+  id: z.string().uuid(),
+  title: z.string().min(3).max(200),
+})
+
+export async function updatePost(_: State, formData: FormData) {
+  // 1. 인증 — 누구인가
+  const session = await auth()
+  if (!session) return { error: '로그인이 필요합니다' }
+
+  // 2. 검증 — 입력이 형식에 맞는가
+  const parsed = UpdatePostSchema.safeParse(Object.fromEntries(formData))
+  if (!parsed.success) return { error: '입력이 올바르지 않습니다' }
+
+  // 3. 인가 — 이 사람이 이 리소스를 바꿔도 되는가
+  const post = await db.post.findUnique({ where: { id: parsed.data.id } })
+  if (post?.authorId !== session.user.id) return { error: '권한이 없습니다' }
+
+  // 4. 실행
+  await db.post.update({ where: { id: parsed.data.id }, data: parsed.data })
+  revalidateTag('posts')
+  return { ok: true }
+}
+```
+
+```mermaid
+flowchart LR
+    R["Server Function 호출"] --> A{"1. 인증<br/>누구인가"}
+    A -->|"없음"| X1["거부 ❌"]
+    A -->|"있음"| V{"2. 검증<br/>형식이 맞는가"}
+    V -->|"실패"| X2["거부 ❌"]
+    V -->|"통과"| Z{"3. 인가<br/>이 리소스를 바꿔도 되나"}
+    Z -->|"아니오"| X3["거부 ❌"]
+    Z -->|"예"| E["4. 실행 + 재검증 ✅"]
+
+    classDef ok   fill:#dcfce7,stroke:#16a34a,color:#14532d
+    classDef bad  fill:#fee2e2,stroke:#dc2626,color:#7f1d1d
+    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
+    class E ok
+    class X1,X2,X3 bad
+    class R,A,V,Z mute
+```
+
+**인증 → 검증 → 인가 → 실행.** 이 네 단계를 모든 Server Function에서 반복한다.
+
+### 반복을 줄이기
+
+```ts
+// lib/safe-action.ts
+export function authedAction<S extends z.ZodType, R>(
+  schema: S,
+  handler: (input: z.infer<S>, user: User) => Promise<R>
+) {
+  return async (formData: FormData) => {
+    const session = await auth()
+    if (!session) throw new Error('UNAUTHORIZED')
+    const parsed = schema.safeParse(Object.fromEntries(formData))
+    if (!parsed.success) throw new Error('INVALID_INPUT')
+    return handler(parsed.data, session.user)
+  }
+}
+```
+
+직접 만들어도 되고, **next-safe-action**이나 **zsa** 같은 라이브러리를 써도 된다.
+중요한 건 **"검사를 빼먹을 수 없는 구조"**를 만드는 것이다.
+
+## 변경 후에 할 일
+
+<CardGrid>
+<Card title="revalidateTag('posts')" icon="approve-check">
+그 데이터를 쓰는 **모든 캐시**를 무효화한다. 가장 흔한 선택.
+</Card>
+<Card title="revalidatePath('/posts')" icon="document">
+**특정 경로만** 갱신한다. 영향 범위가 좁을 때.
+</Card>
+<Card title="redirect('/posts/123')" icon="right-arrow">
+생성 후 **상세 페이지로 이동**할 때.
+</Card>
+<Card title="반환값 + useOptimistic" icon="rocket">
+즉시 반영이 중요한 **소규모 변경**.
+</Card>
+</CardGrid>
+
+:::caution[함정]
+가장 흔한 실수는 **변경 후 아무것도 안 해서 화면이 그대로인 것**이다.
+DB는 바뀌었는데 사용자는 "저장이 안 됐다"고 느끼고 다시 누른다.
+:::
+
+## Server Function vs Route Handler
+
+| | Server Function | Route Handler |
+|---|---|---|
+| 호출 주체 | 내 앱의 폼·버튼 | 외부 시스템, 모바일 앱 |
+| 형태 | 함수 호출 | HTTP 요청 |
+| 타입 | **양 끝이 자동으로 이어짐** | 직접 맞춰야 함 |
+| 점진적 향상 | 됨 | 안 됨 |
+| 웹훅 수신 | 부적합 | 적합 |
+| 파일 업로드 | 됨 (FormData) | 됨 |
+
+기준은 하나다 — **"이걸 우리 앱 밖에서도 부를 일이 있는가?"**
+없다면 Server Function이다.
+
+## 7장 요약
+
+- `'use server'`로 **클라이언트에서 직접 부르는 서버 함수**를 만든다
+- `<form action={fn}>`은 **JS 없이도 동작**한다 (점진적 향상)
+- `useActionState`로 로딩·에러, `useOptimistic`으로 즉시 반영
+- **Server Function은 공개 엔드포인트다** — 인증·검증·인가를 함수 안에서 다시 한다
+- 변경 후에는 반드시 **`revalidateTag` / `revalidatePath` / `redirect`** 중 하나를 한다
+- 외부에서 부를 일이 있으면 Route Handler, 없으면 Server Function
+
+<LinkCard
+  title="8. 성능"
+  description="측정할 수 있는 것만 고친다 — LCP · INP · CLS와 번들 줄이기."
+  href="/frontend/08-performance/"
+/>

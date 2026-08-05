@@ -1,0 +1,93 @@
+---
+title: 개요
+description: 프론트엔드 실전 스택 — Next.js · Tailwind CSS · shadcn/ui를 무엇을 어떤 순서로 읽을 것인가
+---
+
+import { Card, CardGrid, LinkCard } from '@astrojs/starlight/components';
+
+> Next.js · Tailwind CSS · shadcn/ui — 세 도구가 각각 무엇을 푸는가
+
+React는 써봤지만 App Router의 서버/클라이언트 구분이 흐릿한 사람,
+Tailwind를 쓰면서도 "클래스가 길어서 지저분하다"는 찜찜함이 남은 사람,
+shadcn/ui를 복붙 컴포넌트 모음 정도로만 알고 있는 사람을 위한 자료다.
+
+**Next.js 16.3 · React 19.2 · Tailwind CSS 4.3 · shadcn CLI 3.x** 기준으로 쓰였다.
+
+## 구성
+
+세 도구는 경쟁하지 않는다. **컴포넌트 / 스타일 언어 / 실행 환경**이라는 서로 다른 층에 있다.
+덱도 그 층을 따라간다.
+
+```mermaid
+flowchart LR
+    I["0~1장<br/>읽는 법 · 지형도"] --> N["2~8장<br/>Next.js<br/>실행 환경"]
+    N --> T["9~12장<br/>Tailwind CSS<br/>스타일 언어"]
+    T --> S["13~16장<br/>shadcn/ui<br/>컴포넌트"]
+    S --> D["17~19장<br/>디자인 시스템 · 접근성 · 폼"]
+    D --> E["20~21장<br/>실전 패턴 · 마무리"]
+
+    classDef key  fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
+    classDef ok   fill:#dcfce7,stroke:#16a34a,color:#14532d
+    classDef warn fill:#fef3c7,stroke:#d97706,color:#78350f
+    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
+    class N key
+    class T ok
+    class S warn
+    class I,D,E mute
+```
+
+| 장 | 주제 | 층 |
+|---|---|---|
+| [0](/frontend/00-intro/)–[1](/frontend/01-landscape/) | 읽는 법 · 세 도구의 지형도 | — |
+| [2](/frontend/02-rsc/)–[8](/frontend/08-performance/) | 서버 컴포넌트 · 라우팅 · 경계 · 데이터 · 캐싱 · 뮤테이션 · 성능 | Next.js |
+| [9](/frontend/09-css-history/)–[12](/frontend/12-tokens/) | CSS의 문제 · Tailwind v4 · 실전 규칙 · 디자인 토큰 | Tailwind CSS |
+| [13](/frontend/13-shadcn/)–[16](/frontend/16-asset/) | 소유권 모델 · 설치 · 컴포넌트 해부 · 자산화 | shadcn/ui |
+| [17](/frontend/17-design-system/)–[19](/frontend/19-forms-state/) | 디자인 시스템 적용 · 접근성 · 폼과 상태 | 시스템화 |
+| [20](/frontend/20-patterns/)–[21](/frontend/21-wrapup/) | 실전 패턴 · 안티패턴 · 정리 | — |
+
+## 전체를 관통하는 두 문장
+
+이 덱에는 처음부터 끝까지 따라다니는 질문이 하나 있다 —
+**"이 코드는 어디서 실행되는가?"** (빌드 타임 / 서버 요청 시 / 브라우저)
+Next.js를 어렵게 느끼는 이유의 대부분은 이 셋이 한 파일에 섞여 보이기 때문이다.
+
+그리고 이 스택을 고르는 이유는 속도가 아니다.
+**디자인이 바뀔 때 드는 비용이 작다**는 것이다.
+그 비용을 결정하는 것이 [12장의 토큰 층](/frontend/12-tokens/)과
+[16장의 소유권 모델](/frontend/16-asset/)이다.
+
+## 읽는 법
+
+<CardGrid>
+<Card title="표시 약속" icon="information">
+`:::tip` 박스는 **핵심 원칙**,
+`:::caution` 박스는 **자주 겪는 함정**이다.
+</Card>
+<Card title="가장 중요한 세 장" icon="star">
+[4장 경계 설계](/frontend/04-boundary/) ·
+[12장 디자인 토큰](/frontend/12-tokens/) ·
+[16장 자산화](/frontend/16-asset/).
+급하면 이 셋만 읽어도 된다.
+</Card>
+<Card title="손을 움직일 것" icon="rocket">
+`create-next-app` + `shadcn init`으로 빈 프로젝트를 하나 띄워두고
+읽는 것을 전제로 쓰였다.
+</Card>
+<Card title="버전에 민감하다" icon="warning">
+이 생태계는 빠르게 움직인다.
+검색으로 찾은 글이 이미 한 세대 이전일 수 있다 —
+[0장의 대조표](/frontend/00-intro/#2026년-8월-기준--바뀐-것들)를 먼저 볼 것.
+</Card>
+</CardGrid>
+
+:::caution[함정]
+`middleware.ts`, `tailwind.config.js`, `asChild`, `forwardRef`,
+`fetch(url, { next: { revalidate } })` — 이 다섯 개가 나오는 자료는 **한 세대 이전**이다.
+동작은 하지만 새로 배울 것은 그쪽이 아니다.
+:::
+
+<LinkCard
+  title="0. 시작하기 전에"
+  description="이 덱을 어떻게 읽을 것인가 — 대상 독자, 다루는 범위, 2026년 8월 기준으로 바뀐 것들."
+  href="/frontend/00-intro/"
+/>

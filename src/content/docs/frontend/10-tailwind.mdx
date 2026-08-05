@@ -1,0 +1,239 @@
+---
+title: "10. Tailwind CSS v4"
+description: "CSS 자체가 설정 파일이 되었다 — @theme, 네임스페이스, 변형, 정적 클래스 제약"
+---
+
+import { Tabs, TabItem, Card, CardGrid, LinkCard } from '@astrojs/starlight/components';
+
+> `tailwind.config.js`가 사라졌다
+
+## 설치 — 이게 전부다
+
+```bash
+pnpm add tailwindcss @tailwindcss/postcss postcss
+```
+
+```js
+// postcss.config.mjs
+const config = {
+  plugins: {
+    '@tailwindcss/postcss': {},
+  },
+}
+export default config
+```
+
+```css
+/* app/globals.css */
+@import "tailwindcss";
+```
+
+**`tailwind.config.js`가 없다.** v4에서는 설정이 CSS 안으로 들어왔다.
+v3의 `@tailwind base; @tailwind components; @tailwind utilities;` 세 줄도
+`@import "tailwindcss"` 한 줄로 대체됐다.
+
+### v3에서 온 사람이 놀라는 것
+
+| | v3 | v4 |
+|---|---|---|
+| 설정 파일 | `tailwind.config.js` | **CSS의 `@theme`** |
+| 진입점 | `@tailwind` 3줄 | `@import "tailwindcss"` |
+| PostCSS 플러그인 | `tailwindcss` + `autoprefixer` | `@tailwindcss/postcss` 하나 |
+| content 경로 지정 | 직접 배열로 | **자동 탐지** |
+| 색 공간 | rgb / hsl | **oklch** |
+| 커스텀 값 접근 | JS import | **CSS 변수로 항상 노출** |
+| 빌드 엔진 | PostCSS 기반 | Rust 기반 (Oxide) |
+
+v3 설정 파일이 필요하면 `@config "../tailwind.config.js";`로 불러올 수 있다.
+마이그레이션 중간 단계용이다.
+
+## `@theme` — 토큰이 곧 유틸리티
+
+```css
+@import "tailwindcss";
+
+@theme {
+  --color-brand-500: oklch(0.72 0.11 178);
+}
+```
+
+이 한 줄이 세 가지를 동시에 만든다.
+
+- `bg-brand-500`, `text-brand-500`, `border-brand-500`, `fill-brand-500`… **유틸리티 전부**
+- `var(--color-brand-500)` — 일반 **CSS 변수**로도 쓸 수 있다
+- 자동완성 — 에디터가 이 값을 알게 된다
+
+:::tip[핵심]
+`:root`에 변수를 정의하는 것과 다르다.
+**`@theme`은 유틸리티 클래스를 생성한다.** 유틸리티가 필요 없으면 `:root`를 쓴다.
+12장에서 이 둘을 층으로 나눠 쓰는 방법이 나온다.
+:::
+
+### 네임스페이스가 곧 규칙
+
+이름 앞부분이 **어떤 유틸리티가 만들어질지**를 결정한다.
+
+| 네임스페이스 | 생성되는 것 |
+|---|---|
+| `--color-*` | `bg-*`, `text-*`, `border-*`, `fill-*`, `ring-*` |
+| `--spacing-*` | `p-*`, `m-*`, `gap-*`, `w-*`, `h-*` |
+| `--font-*` | `font-sans`, `font-serif` |
+| `--text-*` | `text-sm`, `text-xl` (크기) |
+| `--radius-*` | `rounded-*` |
+| `--shadow-*` | `shadow-*` |
+| `--breakpoint-*` | `sm:`, `md:`, `lg:` 변형 |
+| `--container-*` | `@sm:`, `@md:` 컨테이너 쿼리 변형 |
+| `--animate-*` | `animate-*` |
+
+### 왜 oklch인가
+
+v4의 기본 팔레트는 hex나 hsl이 아니라 **oklch**로 되어 있다.
+
+- **인지적 균일성** — `oklch(0.5 ...)`인 두 색은 사람 눈에 실제로 같은 밝기다
+- hsl은 그렇지 않다. `hsl(60 100% 50%)`(노랑)이 `hsl(240 100% 50%)`(파랑)보다 훨씬 밝다
+- 그래서 hsl로 만든 팔레트는 **명도 계단이 들쭉날쭉**해진다
+- oklch는 **P3 같은 넓은 색역**도 표현할 수 있다
+
+실무적 이득은 **스케일을 프로그래밍으로 생성해도 자연스럽다**는 것이다.
+L값만 일정하게 낮추면 균일한 팔레트가 나온다. 12장에서 다시 쓴다.
+
+## 변형(variant) — 조건부 스타일
+
+```html
+<button class="bg-zinc-900 hover:bg-zinc-700 focus-visible:ring-2
+               disabled:opacity-50 dark:bg-white dark:text-zinc-900
+               md:px-6 lg:px-8">
+```
+
+| 변형 | 의미 |
+|---|---|
+| `hover:` `focus:` `active:` | 상태 의사 클래스 |
+| `focus-visible:` | **키보드 포커스에만** (18장에서 중요해진다) |
+| `sm:` `md:` `lg:` `xl:` | 최소 폭 (모바일 우선) |
+| `dark:` | 다크 모드 |
+| `group-hover:` | **부모**에 호버했을 때 |
+| `peer-checked:` | **형제**가 체크됐을 때 |
+| `data-[state=open]:` | 임의의 data 속성 |
+| `has-[:checked]:` | 자식 조건 (CSS `:has()`) |
+| `@md:` | **컨테이너** 크기 기준 |
+
+### 반응형은 모바일 우선
+
+`md:grid-cols-2`는 "md에서만"이 아니라 **"md 이상에서"**다.
+
+```html
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+```
+
+기본값이 모바일이고, 브레이크포인트가 커질수록 덮어쓴다.
+**`sm:` 없이 쓴 클래스가 모바일 스타일**이라는 점을 놓치면 반응형이 거꾸로 짜인다.
+
+### group과 peer
+
+부모/형제 상태에 반응하는 것을 **JS 없이** 한다.
+
+```html
+<!-- group: 부모에 호버하면 자식이 반응한다 -->
+<a class="group flex items-center gap-2 rounded-md p-3 hover:bg-zinc-100">
+  <span class="text-zinc-500 group-hover:text-zinc-900">아이콘</span>
+  <span class="group-hover:translate-x-1 transition">더보기</span>
+</a>
+
+<!-- peer: 앞의 형제 상태를 뒤의 형제가 읽는다 -->
+<input type="checkbox" class="peer sr-only" id="agree" />
+<label for="agree"
+  class="border peer-checked:border-indigo-500 peer-checked:bg-indigo-50">
+  동의합니다
+</label>
+```
+
+`data-[state=open]:rotate-180` 같은 변형은 **Base UI/Radix가 붙여주는 data 속성**과 짝을 이룬다.
+shadcn/ui 컴포넌트가 이 패턴을 광범위하게 쓴다. (15장)
+
+## 임의 값 — 스케일 밖으로 나가야 할 때
+
+```html
+<div class="top-[117px] grid-cols-[1fr_500px_2fr] bg-[#1da1f2]">
+<div class="w-[calc(100%-2rem)] text-[color:var(--brand)]">
+<div class="[mask-image:linear-gradient(to_bottom,black,transparent)]">
+```
+
+- 대괄호 안에 **아무 CSS 값**이나 넣을 수 있다. 공백은 밑줄 `_`로
+- 마지막 형태는 **임의 속성** — Tailwind에 유틸리티가 없는 CSS 속성도 쓸 수 있다
+- 하지만 **자주 쓰면 냄새**다. 반복된다면 `@theme`에 토큰으로 승격시킨다
+
+좋은 신호는 임의 값이 **한 번만** 나타나는 것.
+나쁜 신호는 `bg-[#1da1f2]`가 12군데에 흩어져 있는 것이다.
+
+## 반드시 알아야 할 제약 — 클래스는 정적이어야 한다
+
+Tailwind는 **소스 파일을 텍스트로 스캔**해서 필요한 CSS를 만든다.
+그래서 문자열을 조립하면 찾지 못한다.
+
+```tsx
+// ❌ 절대 동작하지 않는다 — 빌드 시 이런 문자열이 존재하지 않는다
+<div className={`text-${color}-500`} />
+<div className={`p-${size}`} />
+```
+
+```tsx
+// ✅ 완전한 클래스 이름을 나열한다
+const colorClass = {
+  red: 'text-red-500',
+  blue: 'text-blue-500',
+}[color]
+
+// ✅ 또는 CSS 변수로 넘긴다 (동적 값이 진짜 필요할 때)
+const barStyle = { '--bar-width': `${percent}%` } as React.CSSProperties
+<div style={barStyle} className="w-[var(--bar-width)]" />
+```
+
+:::caution[함정]
+Tailwind를 처음 쓰는 사람이 **거의 반드시** 한 번은 겪는 문제다.
+더 나쁜 것은 **개발 중엔 되는 것처럼 보이다가 프로덕션 빌드에서 스타일이 사라지는** 경우다 —
+다른 파일에 우연히 그 클래스 문자열이 있었다가 리팩터링으로 사라지면 벌어진다.
+
+1장에서 말한 "이 코드는 어디서 실행되는가"가 여기서 답이 된다.
+**Tailwind의 스캔은 빌드 타임이라 런타임 값을 알 수 없다.**
+:::
+
+## 다크 모드와 자주 쓰는 유틸리티
+
+```css
+/* v4에서는 다크 모드 전략도 CSS로 선언한다. 기본값은 prefers-color-scheme */
+@custom-variant dark (&:where(.dark, .dark *));
+```
+
+직접 토글하게 하려면 위처럼 클래스 기반으로 바꾸고 `next-themes`를 쓴다.
+다만 12장을 보고 나면 알게 되겠지만 —
+**토큰을 제대로 설계하면 `dark:` 변형을 거의 안 쓰게 된다.**
+
+### 알아두면 좋은 유틸리티
+
+| 유틸리티 | 하는 일 |
+|---|---|
+| `space-y-4` | 자식들 사이에만 세로 간격 (첫 요소 위엔 없음) |
+| `divide-y` | 자식들 사이에 구분선 |
+| `truncate` | 한 줄 말줄임 (`overflow`+`text-overflow`+`whitespace`) |
+| `line-clamp-3` | 3줄 말줄임 |
+| `sr-only` | 화면엔 안 보이고 **스크린리더에만** 읽힘 (18장) |
+| `size-9` | `w-9 h-9` |
+| `inset-0` | `top/right/bottom/left: 0` |
+| `aspect-video` | 16:9 비율 유지 |
+| `field-sizing-content` | 입력 내용에 맞춰 textarea 자동 크기 |
+
+## 10장 요약
+
+- v4는 **설정 파일이 사라지고** CSS의 `@theme`이 그 역할을 한다
+- `@theme`의 변수는 **유틸리티 + CSS 변수**를 동시에 만든다
+- 네임스페이스(`--color-*`, `--spacing-*`…)가 어떤 유틸리티가 생길지 결정한다
+- 색 공간은 **oklch** — 명도 계단이 균일해서 팔레트 생성이 쉽다
+- 변형은 `hover:` `md:` `dark:` `group-` `peer-` `data-[]` `has-[]` `@md:`
+- **클래스 이름은 반드시 정적**이어야 한다. 문자열 조립은 동작하지 않는다
+- 임의 값 `[...]`은 탈출구지만, 반복되면 토큰으로 승격시킨다
+
+<LinkCard
+  title="11. Tailwind 실전"
+  description="긴 클래스와 함께 살아가는 법 — 정렬 자동화, cn(), cva, @apply 금지."
+  href="/frontend/11-tailwind-practice/"
+/>
