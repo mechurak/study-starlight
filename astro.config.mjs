@@ -2,6 +2,7 @@
 import { defineConfig } from 'astro/config';
 import starlight from '@astrojs/starlight';
 import starlightSidebarTopics from 'starlight-sidebar-topics';
+import starlightThemeRapide from 'starlight-theme-rapide';
 import mermaid from 'astro-mermaid';
 
 // 덱 하나 = topic 하나. 새 덱을 추가할 때는
@@ -21,8 +22,13 @@ export default defineConfig({
 			locales: {
 				root: { label: '한국어', lang: 'ko' },
 			},
-			customCss: ['./src/styles/custom.css'],
+			customCss: [
+				// 한글 폰트 — dynamic subset이라 페이지에 쓰인 글자의 조각만 내려받는다
+				'pretendard/dist/web/variable/pretendardvariable-dynamic-subset.css',
+				'./src/styles/custom.css',
+			],
 			plugins: [
+				starlightThemeRapide(),
 				starlightSidebarTopics(
 					[
 						{

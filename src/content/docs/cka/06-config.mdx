@@ -37,7 +37,9 @@ Kubernetes가 주는 두 가지 그릇 —
 **만들기 + 세 가지 주입 방식**만 확실하면 된다.
 :::
 
-## ConfigMap 만들기
+## ConfigMap
+
+### ConfigMap 만들기
 
 ```bash
 # 1) 값을 직접
@@ -63,7 +65,7 @@ kubectl get cm app-config -o yaml
 kubectl describe cm app-config
 ```
 
-## ConfigMap 매니페스트
+### ConfigMap 매니페스트
 
 ```yaml
 apiVersion: v1
@@ -109,7 +111,7 @@ flowchart LR
     class M1,M2,M3,E,F mute
 ```
 
-## 주입 방식 1 — 개별 환경변수
+### 주입 방식 1 — 개별 환경변수
 
 ```yaml
 containers:
@@ -133,7 +135,7 @@ Pod이 `CreateContainerConfigError`면
 **ConfigMap/Secret 이름 오타나 키 오타**다. `describe`의 Events에 정확히 어떤 이름을 못 찾았는지 나온다.
 :::
 
-## 주입 방식 2 — 전부 환경변수로
+### 주입 방식 2 — 전부 환경변수로
 
 ```yaml
 containers:
@@ -160,7 +162,7 @@ kubectl set env deploy/web LOG_LEVEL=info        # 직접
 kubectl set env deploy/web LOG_LEVEL-            # 제거
 ```
 
-## 주입 방식 3 — 볼륨으로 마운트
+### 주입 방식 3 — 볼륨으로 마운트
 
 ```yaml
 spec:
@@ -189,7 +191,7 @@ spec:
 `/etc/nginx` 에 통째로 마운트하면 기존 설정이 전부 사라진다.
 :::
 
-## subPath — 파일 하나만 얹기
+### subPath — 파일 하나만 얹기
 
 <Tabs>
 <TabItem label="디렉터리 마운트 (기본)">
@@ -259,7 +261,9 @@ flowchart LR
 kubectl rollout restart deploy/web
 ```
 
-## Secret — ConfigMap과 무엇이 다른가
+## Secret
+
+### Secret — ConfigMap과 무엇이 다른가
 
 ```yaml
 apiVersion: v1
@@ -291,7 +295,7 @@ kubectl create secret tls web-tls --cert=./tls.crt --key=./tls.key
 | `kubernetes.io/tls` | TLS 인증서 (Ingress에서 쓴다) |
 | `kubernetes.io/service-account-token` | SA 토큰 (14장) |
 
-## base64는 암호화가 아니다
+### base64는 암호화가 아니다
 
 ```bash
 kubectl get secret db-secret -o jsonpath='{.data.password}' | base64 -d
@@ -339,7 +343,7 @@ resources:
 설정 후 기존 Secret을 다시 암호화하려면
 `kubectl get secrets -A -o json | kubectl replace -f -` 를 한 번 돌린다.
 
-## imagePullSecrets
+### imagePullSecrets
 
 ```yaml
 spec:
@@ -362,7 +366,9 @@ kubectl patch sa default -p '{"imagePullSecrets":[{"name":"regcred"}]}'
 `describe`의 Events에 **어느 쪽인지 문장으로 나온다.**
 :::
 
-## requests와 limits
+## 리소스 관리
+
+### requests와 limits
 
 ```yaml
 resources:
@@ -401,7 +407,7 @@ request 합이 이미 Allocatable에 닿았기 때문이다.
 `kubectl describe node`의 `Allocated resources`를 봐야 한다.
 :::
 
-## CPU와 메모리의 단위
+### CPU와 메모리의 단위
 
 **이 비대칭이 실무 감각의 핵심이다.**
 
@@ -427,7 +433,7 @@ flowchart LR
 메모리 limit을 올리는 것이 정답이다. `describe pod`의 **Last State** 섹션에 나온다.
 :::
 
-## QoS 클래스 — 누가 먼저 쫓겨나는가
+### QoS 클래스 — 누가 먼저 쫓겨나는가
 
 노드에 자원이 부족하면 kubelet이 Pod을 축출(evict)한다. 순서는 QoS가 정한다.
 
@@ -463,7 +469,9 @@ kubectl get pod web -o jsonpath='{.status.qosClass}'
 
 중요한 워크로드를 Guaranteed로 만들려면 requests와 limits를 똑같이 쓰면 된다.
 
-## LimitRange — 네임스페이스의 기본값과 상한
+## 네임스페이스 단위 제약
+
+### LimitRange — 네임스페이스의 기본값과 상한
 
 ```yaml
 apiVersion: v1
@@ -492,7 +500,7 @@ spec:
 - 이미 떠 있는 Pod에는 **소급 적용되지 않는다**
 - `type`은 `Container` / `Pod` / `PersistentVolumeClaim`
 
-## ResourceQuota — 네임스페이스 총량 제한
+### ResourceQuota — 네임스페이스 총량 제한
 
 ```yaml
 apiVersion: v1

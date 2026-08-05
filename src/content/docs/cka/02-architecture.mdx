@@ -26,7 +26,7 @@ import { Steps, Card, CardGrid, Tabs, TabItem, FileTree } from '@astrojs/starlig
 컨트롤 플레인 노드에도 **kubelet과 kube-proxy는 있다.**
 컨트롤 플레인 컴포넌트 자체가 Pod으로 돌기 때문이다 — 뒤에서 다룬다.
 
-## 전체 그림
+### 전체 그림
 
 ```mermaid
 flowchart LR
@@ -63,7 +63,9 @@ flowchart LR
 **화살표 방향이 핵심이다.** 모든 컴포넌트가 **API 서버를 향한다.**
 API 서버가 다른 컴포넌트를 호출하지 않는다.
 
-## kube-apiserver — 유일한 관문
+## 컨트롤 플레인 컴포넌트
+
+### kube-apiserver — 유일한 관문
 
 - 클러스터의 **모든 읽기·쓰기가 여기를 통과**한다. 예외 없다
 - 상태를 직접 갖지 않는다 — **stateless**. etcd에만 쓴다
@@ -81,7 +83,7 @@ API 서버가 다른 컴포넌트를 호출하지 않는다.
 API 서버부터 본다. `crictl ps` 로 컨테이너 단에서 확인 (18장).
 :::
 
-## etcd — 유일한 저장소
+### etcd — 유일한 저장소
 
 - **분산 key-value 저장소.** 클러스터의 모든 오브젝트가 여기 있다
 - Raft 합의 알고리즘 → **홀수 노드(3, 5)로 구성**한다. 과반이 살아야 쓰기가 된다
@@ -100,7 +102,7 @@ etcd 백업/복구는 **거의 확실히 나온다.**
 15장에서 명령 전체를 다룬다. 지금은 "여기에 전부 들어 있다"만 기억하면 된다.
 :::
 
-## kube-scheduler — 자리를 정할 뿐이다
+### kube-scheduler — 자리를 정할 뿐이다
 
 ```mermaid
 flowchart LR
@@ -133,7 +135,7 @@ flowchart LR
 "스케줄러 고장" 문제의 확인 방법이 이것이다. (7장)
 :::
 
-## kube-controller-manager — 루프들의 모음
+### kube-controller-manager — 루프들의 모음
 
 ```mermaid
 flowchart LR
@@ -166,7 +168,9 @@ flowchart LR
 **"컨트롤러가 죽었다"의 증상은 각기 다르다.** Deployment를 만들어도 Pod이 안 생기면
 컨트롤러 매니저, Pod은 생겼는데 Pending이면 스케줄러다.
 
-## kubelet — 노드의 대리인
+## 노드 컴포넌트
+
+### kubelet — 노드의 대리인
 
 - 노드마다 **하나씩** 돈다. **Pod이 아니라 systemd 서비스**다
 - API 서버에서 **"내 노드에 배정된 Pod"** 목록을 받아온다
@@ -180,7 +184,7 @@ kubelet은 클러스터 안의 Pod이 **아니다.**
 `systemctl restart kubelet` 해야 한다. 트러블슈팅에서 매우 자주 쓴다.
 :::
 
-## kube-proxy — Service를 노드의 규칙으로 번역한다
+### kube-proxy — Service를 노드의 규칙으로 번역한다
 
 ```mermaid
 flowchart LR
@@ -209,7 +213,7 @@ kube-proxy가 죽어도 **기존 연결은 유지**되고
 "IP로는 되는데 서비스 이름으로는 안 된다"의 후보 중 하나. (9장)
 :::
 
-## 컨테이너 런타임 (CRI)
+### 컨테이너 런타임 (CRI)
 
 - kubelet은 **CRI(Container Runtime Interface)** 라는 gRPC 규약으로 런타임과 대화한다
 - 현재 표준은 **containerd**. (CRI-O도 쓰인다)
@@ -263,7 +267,7 @@ ls /etc/kubernetes/manifests/
 파일을 밖으로 옮기면 해당 컴포넌트가 **멈춘다** (디버깅에 유용).
 :::
 
-## 스태틱 Pod의 특징
+### 스태틱 Pod의 특징
 
 - 이름 뒤에 **노드 이름이 자동으로 붙는다** — `kube-apiserver-controlplane`
 - API 서버에는 **읽기 전용 미러 Pod**으로 보인다
@@ -307,7 +311,7 @@ flowchart LR
 **이 순서를 알면 에러 코드로 원인을 짚을 수 있다.**
 `401` = 인증, `403` = RBAC, 그 외 거부 = admission (14장에서 자세히).
 
-## 저장된 다음 — 컨트롤러들의 릴레이
+### 저장된 다음 — 컨트롤러들의 릴레이
 
 ```mermaid
 sequenceDiagram
@@ -371,7 +375,7 @@ flowchart LR
 - `apiVersion`이 `v1`이면 **core 그룹**(그룹 이름이 없다), `apps/v1`이면 `apps` 그룹
 - 이 구조가 같으니 **처음 보는 리소스도 읽는 법은 똑같다**
 
-## API 그룹과 리소스 탐색
+### API 그룹과 리소스 탐색
 
 ```bash
 kubectl api-resources                    # 전체 리소스 목록 (약칭·그룹·네임스페이스 여부)
@@ -464,7 +468,7 @@ kubectl get pods --show-labels
 `kubectl get pods -l env=prod --no-headers | wc -l` 로 끝난다.
 :::
 
-## 필드 셀렉터와 소유 관계
+### 필드 셀렉터와 소유 관계
 
 ```bash
 kubectl get pods --field-selector status.phase=Running

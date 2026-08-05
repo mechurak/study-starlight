@@ -80,7 +80,9 @@ kubectl get <리소스> -n <ns>
 가장 흔하고 가장 비싼 실수. 지문의 첫 줄을 무조건 먼저 실행하는 습관을 들일 것.
 :::
 
-## 생성 치트시트 — 워크로드
+## 치트시트
+
+### 생성 치트시트 — 워크로드
 
 ```bash
 # Pod
@@ -105,7 +107,7 @@ k create job manual --from=cronjob/nightly
 k create cronjob nightly --image=busybox --schedule="0 3 * * *" -- echo backup
 ```
 
-## 생성 치트시트 — 네트워크 · 설정
+### 생성 치트시트 — 네트워크 · 설정
 
 ```bash
 # Service
@@ -132,7 +134,7 @@ k create ns dev
 k create quota dev-quota --hard=cpu=4,memory=8Gi,pods=20 -n dev
 ```
 
-## 생성 치트시트 — RBAC
+### 생성 치트시트 — RBAC
 
 ```bash
 # ServiceAccount
@@ -155,7 +157,7 @@ k auth can-i create deploy -n dev --as=system:serviceaccount:dev:deploy-bot
 k auth can-i --list -n dev
 ```
 
-## 조회 치트시트
+### 조회 치트시트
 
 ```bash
 # 기본
@@ -182,7 +184,7 @@ k get pods --field-selector spec.nodeName=node01
 k get events --field-selector type=Warning
 ```
 
-## 진단 치트시트
+### 진단 치트시트
 
 ```bash
 # 순서: describe → logs → yaml
@@ -208,7 +210,7 @@ k run tmp --image=busybox:1.36 --rm -it --restart=Never -- nslookup web-svc
 k run tmp --image=busybox:1.36 --rm -it --restart=Never -- wget -qO- http://web-svc
 ```
 
-## 클러스터 운영 치트시트
+### 클러스터 운영 치트시트
 
 ```bash
 # 노드 관리
@@ -233,7 +235,7 @@ sudo kubeadm certs check-expiration
 sudo kubeadm certs renew all
 ```
 
-## etcd 백업·복구 — 통째로 외울 것
+### etcd 백업·복구 — 통째로 외울 것
 
 ```bash
 # 경로 확인 (추측하지 말 것)
@@ -327,7 +329,9 @@ k diff -f web.yaml
 | HPA 구성 | metrics-server + requests |
 | 노드 drain / 스케줄 제어 | `--ignore-daemonsets` |
 
-## 시간 관리
+## 점수를 지키는 법
+
+### 시간 관리
 
 ```mermaid
 flowchart LR
@@ -365,7 +369,7 @@ flowchart LR
 그리고 **완벽주의를 버려라.** 66%면 합격이다.
 어려운 두 문제를 포기하고 나머지를 확실히 하는 편이 낫다.
 
-## 가장 비싼 실수들
+### 가장 비싼 실수들
 
 <CardGrid>
 <Card title="컨텍스트 전환 안 함" icon="error">
@@ -398,7 +402,7 @@ flowchart LR
 
 **위 8개 중 앞의 두 개가 압도적으로 많다.** 이것만 안 해도 합격선에 가까워진다.
 
-## 검산 습관
+### 검산 습관
 
 ```bash
 # 만들었으면 본다

@@ -57,7 +57,9 @@ flowchart LR
 VPA·CA는 개념만 알면 된다. **metrics-server 설치**가 함께 나올 수 있다.
 :::
 
-## metrics-server가 먼저다
+## 메트릭 파이프라인
+
+### metrics-server가 먼저다
 
 HPA는 메트릭이 없으면 **아무것도 하지 않는다.**
 
@@ -90,7 +92,7 @@ kubectl patch deploy metrics-server -n kube-system --type=json \
 ```
 :::
 
-## 메트릭은 어디서 오는가
+### 메트릭은 어디서 오는가
 
 ```mermaid
 flowchart LR
@@ -113,7 +115,9 @@ flowchart LR
 - **메모리에만 저장**한다. 과거 데이터가 없다 — 모니터링 도구가 아니다
 - 장기 메트릭이나 커스텀 메트릭이 필요하면 **Prometheus + adapter**를 쓴다
 
-## HPA 만들기
+## HPA
+
+### HPA 만들기
 
 ```bash
 kubectl autoscale deploy web --min=2 --max=10 --cpu-percent=70
@@ -142,7 +146,7 @@ spec:
           averageUtilization: 70
 ```
 
-## HPA가 개수를 정하는 방식
+### HPA가 개수를 정하는 방식
 
 ```mermaid
 flowchart LR
@@ -175,7 +179,7 @@ flowchart LR
 **requests가 없으면 HPA는 `<unknown>` 을 표시하고 아무것도 못 한다.**
 :::
 
-## HPA 상태 읽기
+### HPA 상태 읽기
 
 ```bash
 kubectl get hpa
@@ -221,7 +225,7 @@ HPA 문제에서 `<unknown>`이 보이면 순서대로 확인한다.\
 ① `kubectl top pods` 가 되는가 → ② Deployment에 `resources.requests.cpu`가 있는가
 :::
 
-## 여러 메트릭 쓰기
+### 여러 메트릭 쓰기
 
 ```yaml
 metrics:
@@ -265,7 +269,7 @@ flowchart LR
 - 여러 메트릭이 있으면 **각각 계산해서 가장 큰 값을 택한다**
 - 즉 **하나라도 넘치면 늘어난다.** 축소는 전부 여유가 있어야 한다
 
-## behavior — 확장·축소 속도 제어
+### behavior — 확장·축소 속도 제어
 
 ```yaml
 spec:

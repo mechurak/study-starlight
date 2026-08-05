@@ -51,7 +51,9 @@ flowchart LR
 **파란 것은 네임스페이스 안**(Pod·PVC), **노란 것은 클러스터 스코프**(PV·StorageClass)다.
 이 경계가 곧 뒤에 나올 **개발자와 관리자의 경계**이기도 하다.
 
-## emptyDir — Pod과 함께 사는 임시 공간
+## Pod 수명에 묶인 볼륨
+
+### emptyDir — Pod과 함께 사는 임시 공간
 
 ```yaml
 spec:
@@ -95,7 +97,7 @@ flowchart LR
     class C1,C2,C3 mute
 ```
 
-## hostPath — 노드의 디렉터리
+### hostPath — 노드의 디렉터리
 
 ```yaml
 volumes:
@@ -147,7 +149,7 @@ flowchart LR
 - **관리자는 실제 저장소를 준비한다.** 또는 StorageClass로 자동 생성되게 한다
 - 이 분리 덕분에 **같은 매니페스트가 온프렘과 클라우드에서 모두 동작**한다
 
-## PersistentVolume
+### PersistentVolume
 
 ```yaml
 apiVersion: v1
@@ -175,7 +177,7 @@ kubectl get pv
 # pv-data   10Gi      RWO           Retain          Bound      default/data   manual
 ```
 
-## PersistentVolumeClaim
+### PersistentVolumeClaim
 
 ```yaml
 apiVersion: v1
@@ -207,7 +209,7 @@ spec:
         claimName: data
 ```
 
-## 바인딩 규칙
+### 바인딩 규칙
 
 PVC가 만들어지면 컨트롤러가 조건에 맞는 PV를 찾는다. **네 관문을 전부 통과해야** 묶인다.
 
@@ -241,7 +243,7 @@ flowchart LR
 "PV는 Available인데 PVC가 Pending"의 단골 원인이다.
 :::
 
-## accessModes
+### accessModes
 
 | 모드 | 약칭 | 의미 |
 |---|---|---|
@@ -286,7 +288,7 @@ flowchart TB
 
 accessMode는 **스토리지의 실제 능력을 강제하지 않는다.** 바인딩 조건으로만 쓰인다.
 
-## PV의 생애 — 상태가 어떻게 움직이는가
+### PV의 생애 — 상태가 어떻게 움직이는가
 
 ```mermaid
 stateDiagram-v2
@@ -311,7 +313,7 @@ stateDiagram-v2
 | `Released` | PVC가 삭제됐지만 아직 회수되지 않았다 |
 | `Failed` | 자동 회수에 실패했다 |
 
-## reclaimPolicy — PVC를 지우면 데이터는?
+### reclaimPolicy — PVC를 지우면 데이터는?
 
 | 정책 | PVC 삭제 시 |
 |---|---|
@@ -373,7 +375,7 @@ kubectl get sc
 # standard (default) rancher.io/local-path Delete         WaitForFirstConsumer
 ```
 
-## volumeBindingMode — 언제 묶을 것인가
+### volumeBindingMode — 언제 묶을 것인가
 
 <Tabs>
 <TabItem label="Immediate">
@@ -427,7 +429,7 @@ PVC가 `Pending`이고 메시지가
 **고장이 아니다.** Pod을 만들면 바인딩된다. 이걸 문제로 착각하지 말 것.
 :::
 
-## 볼륨 확장
+### 볼륨 확장
 
 ```bash
 # StorageClass에 allowVolumeExpansion: true 가 있어야 한다
@@ -578,7 +580,9 @@ volumes:
 
 `projected`의 `serviceAccountToken`이 **현재 SA 토큰의 표준 주입 방식**이다 (14장).
 
-## 진단 절차
+## 진단과 실습
+
+### 진단 절차
 
 증상은 둘 중 하나다. **어느 쪽인지부터 가른다.**
 
@@ -631,7 +635,7 @@ sudo journalctl -u kubelet | grep -i mount
 | `FailedMount: timeout expired waiting` | 스토리지 백엔드 연결 문제 |
 | `MountVolume.SetUp failed ... not found` | ConfigMap/Secret이 없다 |
 
-## RWO 볼륨 + Deployment의 함정
+### RWO 볼륨 + Deployment의 함정
 
 `Deployment` + `RWO PVC` + `RollingUpdate` 조합은 **거의 항상 막힌다.**
 왜 교착이 되는지는 시간순으로 보면 명확하다.
@@ -680,7 +684,7 @@ NFS·CephFS·EFS로 바꾸면 **여러 노드에서 동시 마운트**가 된다
 **"RWO인데 두 노드에서 쓰려 한다"**로 바로 판정하면 된다.
 :::
 
-## 정적 프로비저닝 실습 흐름
+### 정적 프로비저닝 실습 흐름
 
 <Steps>
 

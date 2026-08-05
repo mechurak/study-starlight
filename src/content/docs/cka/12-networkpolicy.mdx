@@ -76,7 +76,9 @@ ls /etc/cni/net.d/
 `cni plugin not initialized` 면 CNI가 설치되지 않았거나 Pod이 죽은 것이다.
 :::
 
-## NetworkPolicy 구조
+## 정책의 기본
+
+### NetworkPolicy 구조
 
 ```yaml
 apiVersion: networking.k8s.io/v1
@@ -122,7 +124,7 @@ flowchart LR
     class Q3,Q4 mute
 ```
 
-## 세 가지 규칙을 먼저 외우자
+### 세 가지 규칙을 먼저 외우자
 
 <CardGrid>
 <Card title="1 · 걸리는 순간 기본 거부" icon="padlock">
@@ -159,7 +161,7 @@ flowchart LR
 이 셋을 알면 대부분의 혼란이 정리된다.
 특히 **"막는 정책"을 쓰려 하지 말 것** — 막는 방법은 **허용하지 않는 것**뿐이다.
 
-## 전부 차단하기
+### 전부 차단하기
 
 ```yaml
 apiVersion: networking.k8s.io/v1
@@ -198,7 +200,9 @@ spec:
 
 </Steps>
 
-## 출발지를 지정하는 세 가지
+## 규칙 작성
+
+### 출발지를 지정하는 세 가지
 
 ```yaml
 ingress:
@@ -234,7 +238,7 @@ flowchart LR
 - 모든 네임스페이스에는 **`kubernetes.io/metadata.name`** 라벨이 자동으로 붙어 있다 — 이걸로 지정하면 편하다
 - `ipBlock`은 **Pod IP가 아니라 패킷의 소스 IP** 기준이다
 
-## 가장 많이 틀리는 것 — AND와 OR
+### 가장 많이 틀리는 것 — AND와 OR
 
 <Tabs>
 <TabItem label="OR — 하이픈이 둘">
@@ -298,7 +302,7 @@ flowchart LR
 시험에서 실수하기 가장 쉬운 지점이니 **작성 후 반드시 눈으로 확인**할 것.
 :::
 
-## egress와 DNS
+### egress와 DNS
 
 ```yaml
 spec:
@@ -346,7 +350,7 @@ flowchart LR
 egress 정책을 쓸 때는 **DNS 허용을 세트로** 기억할 것.
 :::
 
-## 포트 지정과 주의점
+### 포트 지정과 주의점
 
 ```yaml
 ports:

@@ -76,7 +76,7 @@ flowchart LR
 affinity는 **Pod이 노드를 고르는 것**, taint는 **노드가 Pod을 거부하는 것**.
 둘은 함께 쓰여야 완성된다.
 
-## nodeName — 스케줄러 건너뛰기
+### nodeName — 스케줄러 건너뛰기
 
 ```yaml
 spec:
@@ -93,7 +93,7 @@ spec:
 또한 이 사실 자체가 **"Pending의 원인이 스케줄러인지"를 판별하는 방법**이다.
 :::
 
-## nodeSelector — 가장 단순한 방법
+### nodeSelector — 가장 단순한 방법
 
 ```bash
 kubectl label node node01 disktype=ssd
@@ -115,7 +115,7 @@ spec:
 `kubernetes.io/hostname`, `kubernetes.io/os`,
 `topology.kubernetes.io/zone`, `node-role.kubernetes.io/control-plane`.
 
-## nodeAffinity — 표현력 있는 버전
+### nodeAffinity — 표현력 있는 버전
 
 <Tabs>
 <TabItem label="required — 못 맞추면 Pending">
@@ -172,7 +172,7 @@ flowchart LR
     class R,P,I mute
 ```
 
-## 긴 이름 읽는 법과 연산자
+### 긴 이름 읽는 법과 연산자
 
 `requiredDuringScheduling` + `IgnoredDuringExecution`\
 = **"배치할 때는 반드시, 실행 중에는 무시"**
@@ -210,7 +210,7 @@ flowchart TB
 공식 문서 `assign pod node` 페이지에서 **복사해서 값만 바꾸는 게** 정답이다.
 :::
 
-## podAffinity / podAntiAffinity
+### podAffinity / podAntiAffinity
 
 ```yaml
 spec:
@@ -351,7 +351,9 @@ flowchart LR
 toleration만으로는 "그 노드로 간다"가 보장되지 않는다.
 :::
 
-## 시스템이 자동으로 붙이는 taint
+## 노드 장애와 유지보수
+
+### 시스템이 자동으로 붙이는 taint
 
 | taint | 언제 |
 |---|---|
@@ -389,7 +391,7 @@ kubectl taint node controlplane node-role.kubernetes.io/control-plane:NoSchedule
 ```
 :::
 
-## cordon · drain · uncordon
+### cordon · drain · uncordon
 
 ```mermaid
 stateDiagram-v2
@@ -430,7 +432,9 @@ kubectl drain node01 \
 `--ignore-daemonsets`를 빼면 **거의 항상 에러가 난다.** 습관으로 붙일 것. (15장)
 :::
 
-## topologySpreadConstraints — 균등 분산
+## 그 밖의 배치 제어
+
+### topologySpreadConstraints — 균등 분산
 
 ```yaml
 spec:
@@ -470,7 +474,7 @@ flowchart LR
 podAntiAffinity보다 **표현이 정확하고 계산이 싸다.**
 "노드/존에 고르게 퍼뜨려라"가 목적이라면 이쪽이 정답이다.
 
-## PriorityClass와 선점(preemption)
+### PriorityClass와 선점(preemption)
 
 ```yaml
 apiVersion: scheduling.k8s.io/v1
@@ -509,7 +513,7 @@ sequenceDiagram
 
 축출된 Pod은 `describe`에 `Preempted by ...` 로 기록된다.
 
-## 여러 스케줄러 쓰기
+### 여러 스케줄러 쓰기
 
 ```yaml
 spec:

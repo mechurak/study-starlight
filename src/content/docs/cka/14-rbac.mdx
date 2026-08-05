@@ -60,7 +60,9 @@ flowchart LR
     class M mute
 ```
 
-## 인증 방식들
+## 인증 — 사용자와 ServiceAccount
+
+### 인증 방식들
 
 <CardGrid>
 <Card title="클라이언트 인증서" icon="padlock">
@@ -105,7 +107,7 @@ flowchart LR
 
 그래서 **"사용자를 만든다"는 곧 "인증서를 발급한다"**는 뜻이다.
 
-## 사용자 인증서 만들기 (CSR API)
+### 사용자 인증서 만들기 (CSR API)
 
 <Steps>
 
@@ -166,7 +168,7 @@ sequenceDiagram
     Note over U: 여기까지는 인증만 · 권한은 아직 0
 ```
 
-## kubeconfig에 등록하기
+### kubeconfig에 등록하기
 
 ```bash
 kubectl config set-credentials dev \
@@ -194,7 +196,7 @@ CSR 생성·승인은 **출제 빈도가 높다.**
 인증(누구인가)과 인가(무엇을 할 수 있는가)는 별개다. RoleBinding을 따로 만들어야 한다.
 :::
 
-## ServiceAccount — Pod의 신원
+### ServiceAccount — Pod의 신원
 
 ```bash
 kubectl create sa deploy-bot
@@ -235,7 +237,7 @@ kubectl exec -it web -- ls /var/run/secrets/kubernetes.io/serviceaccount/
 
 API를 호출하지 않는 앱이라면 `automountServiceAccountToken: false`가 안전하다.
 
-## SA 토큰의 현재 방식
+### SA 토큰의 현재 방식
 
 <Tabs>
 <TabItem label="지금 — TokenRequest">
@@ -320,7 +322,7 @@ flowchart LR
 
 NetworkPolicy와 같은 철학이다 — **"막는다"가 아니라 "허용하지 않는다"**.
 
-## Role
+### Role
 
 ```yaml
 apiVersion: rbac.authorization.k8s.io/v1
@@ -346,7 +348,7 @@ kubectl create role pod-reader --verb=get,list,watch --resource=pods -n dev
 kubectl create role pod-reader --verb=get --resource=pods --resource-name=web -n dev
 ```
 
-## verbs와 apiGroups
+### verbs와 apiGroups
 
 **주요 verb**
 
@@ -378,7 +380,7 @@ kubectl api-resources                    # APIVERSION 열에서 그룹을 확인
 kubectl api-resources --api-group=apps
 ```
 
-## 하위 리소스를 잊지 말 것
+### 하위 리소스를 잊지 말 것
 
 일부 동작은 **별도의 하위 리소스**로 취급된다.
 
@@ -417,7 +419,7 @@ flowchart LR
   verbs: ["create"]           # exec은 create 동사다
 ```
 
-## RoleBinding
+### RoleBinding
 
 ```yaml
 apiVersion: rbac.authorization.k8s.io/v1
@@ -451,7 +453,7 @@ kubectl create rolebinding sa-binding --role=pod-reader --serviceaccount=dev:dep
 바꾸려면 바인딩을 지우고 다시 만들어야 한다.
 :::
 
-## ClusterRole과 ClusterRoleBinding
+### ClusterRole과 ClusterRoleBinding
 
 ```bash
 kubectl create clusterrole node-reader --verb=get,list,watch --resource=nodes
@@ -481,7 +483,7 @@ rules:
     verbs: ["get"]
 ```
 
-## 조합 — 이 그림이 전부다
+### 조합 — 이 그림이 전부다
 
 ```mermaid
 flowchart TD
@@ -519,7 +521,7 @@ ClusterRole 하나 + 각 네임스페이스에 RoleBinding으로 푼다.
 Role을 네임스페이스마다 복사하는 것보다 빠르고 정확하다.
 :::
 
-## 내장 ClusterRole
+### 내장 ClusterRole
 
 ```bash
 kubectl get clusterroles
@@ -555,7 +557,7 @@ kubectl create rolebinding dev-edit --clusterrole=edit --user=bob -n dev
 `system:` 접두사가 붙은 것들은 컴포넌트용이다 (`system:node`, `system:kube-scheduler` …).
 **수정하지 말 것.**
 
-## 집계 ClusterRole
+### 집계 ClusterRole
 
 ```yaml
 apiVersion: rbac.authorization.k8s.io/v1

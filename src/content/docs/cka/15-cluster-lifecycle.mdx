@@ -22,7 +22,9 @@ import { Steps, Card, CardGrid, Tabs, TabItem, FileTree } from '@astrojs/starlig
 **찾아가는 경로 자체를 연습**해두면 시험장에서 그대로 쓸 수 있다.
 :::
 
-## 클러스터가 만들어지는 전체 흐름
+## 클러스터 설치
+
+### 클러스터가 만들어지는 전체 흐름
 
 한 장으로 보면 어디서 무엇이 걸리는지가 보인다.
 
@@ -48,7 +50,7 @@ flowchart LR
 
 **노란 칸(CNI)이 가장 자주 빠뜨리는 단계**다. 여기가 비면 노드가 영원히 `NotReady`다.
 
-## 노드 준비 — kubeadm 이전에 해야 할 것
+### 노드 준비 — kubeadm 이전에 해야 할 것
 
 <Steps>
 
@@ -87,7 +89,7 @@ flowchart LR
 `journalctl -u kubelet`에 그대로 찍힌다. 노드 트러블슈팅에서 자주 나온다.
 :::
 
-## 컨테이너 런타임과 kubeadm 설치
+### 컨테이너 런타임과 kubeadm 설치
 
 ```bash
 # containerd 설치 후 — SystemdCgroup을 켜야 한다
@@ -115,7 +117,7 @@ sudo apt-mark hold kubelet kubeadm kubectl      # 자동 업그레이드 방지
 containerd의 `SystemdCgroup = true`와 kubelet 설정이 **둘 다 systemd**여야 한다.
 :::
 
-## kubeadm init
+### kubeadm init
 
 ```bash
 sudo kubeadm init \
@@ -153,7 +155,7 @@ flowchart LR
 HA로 갈 가능성이 조금이라도 있으면 처음부터 넣어야 한다.
 :::
 
-## init이 만들어놓는 것 — 파일의 지도
+### init이 만들어놓는 것 — 파일의 지도
 
 <FileTree>
 
@@ -191,7 +193,7 @@ HA로 갈 가능성이 조금이라도 있으면 처음부터 넣어야 한다.
 **어디를 열어야 하는지 헤매지 않는다.** (18장)
 :::
 
-## CNI 설치 — 이걸 안 하면 노드가 NotReady
+### CNI 설치 — 이걸 안 하면 노드가 NotReady
 
 ```bash
 kubectl get nodes
@@ -218,7 +220,7 @@ Calico 기본은 `192.168.0.0/16`, Flannel은 `10.244.0.0/16`이다.
 안 맞으면 Pod은 뜨는데 **통신이 안 된다** — 진단하기 까다로운 유형이다.
 :::
 
-## 워커 노드 조인
+### 워커 노드 조인
 
 ```bash
 # init 출력에 있던 명령을 워커에서 실행
@@ -246,7 +248,9 @@ openssl x509 -pubkey -in /etc/kubernetes/pki/ca.crt \
 해시를 손으로 계산하는 명령은 외울 필요 없다.
 :::
 
-## 버전 스큐 규칙 — 업그레이드 순서의 근거
+## 업그레이드와 인증서
+
+### 버전 스큐 규칙 — 업그레이드 순서의 근거
 
 **apiserver가 기준점**이고, 나머지는 그보다 낮을 수만 있다.
 
@@ -288,7 +292,7 @@ flowchart TD
 **한 단계만** 요구하는 이유다.
 :::
 
-## 업그레이드 — 노드 유형별 절차
+### 업그레이드 — 노드 유형별 절차
 
 **7단계가 똑같고, 3번만 다르다.**
 
@@ -422,7 +426,7 @@ flowchart TD
 패키지 설치는 **대상 노드에 ssh해서** 한다. 어디서 무엇을 치는지 헷갈리기 쉽다.
 :::
 
-## 업그레이드 순서 요약 — 이것만 외우면 된다
+### 업그레이드 순서 요약 — 이것만 외우면 된다
 
 ```mermaid
 flowchart LR
@@ -447,7 +451,7 @@ flowchart LR
 kubectl get nodes          # 전부 새 VERSION 인지 확인 — 이게 채점 기준이다
 ```
 
-## 인증서 관리
+### 인증서 관리
 
 ```bash
 sudo kubeadm certs check-expiration
@@ -491,7 +495,9 @@ flowchart LR
 **`$HOME/.kube/config`도 다시 복사**해야 한다 (`admin.conf`가 갱신되므로).
 :::
 
-## etcd 접근 준비
+## etcd 백업과 복구
+
+### etcd 접근 준비
 
 ```bash
 kubectl get pods -n kube-system -l component=etcd
@@ -515,7 +521,7 @@ sudo etcdctl \
 문제마다 경로가 다를 수 있다. `grep` 한 번이면 된다.
 :::
 
-## etcd 백업
+### etcd 백업
 
 <Steps>
 
@@ -556,7 +562,7 @@ sudo etcdctl \
 `apt install etcd-client` 하거나, etcd Pod 안에서 `kubectl exec`로 실행한다.
 :::
 
-## etcd 복구
+### etcd 복구
 
 복구는 **파일을 푸는 일과, etcd Pod이 그 파일을 보게 하는 일** 둘로 나뉜다.
 
@@ -613,7 +619,7 @@ flowchart LR
 
 </Steps>
 
-## 복구에서 자주 틀리는 지점
+### 복구에서 자주 틀리는 지점
 
 :::caution[함정 1]
 `--data-dir`을 **기존 `/var/lib/etcd`로 지정**하면
@@ -636,7 +642,9 @@ flowchart LR
 바로 안 뜨면 `sudo crictl ps -a | grep etcd` 로 컨테이너 상태를 본다.
 :::
 
-## HA 컨트롤 플레인 — 두 가지 토폴로지
+## HA와 클러스터 운영
+
+### HA 컨트롤 플레인 — 두 가지 토폴로지
 
 <Tabs>
 <TabItem label="Stacked etcd (kubeadm 기본)">
@@ -731,7 +739,7 @@ kubeadm token create --print-join-command --certificate-key $(kubeadm init phase
 # → 여기에 --control-plane 을 붙이면 컨트롤 플레인으로 조인한다
 ```
 
-## etcd 멤버 관리
+### etcd 멤버 관리
 
 ```bash
 sudo ETCDCTL_API=3 etcdctl --endpoints=https://127.0.0.1:2379 \
@@ -755,7 +763,7 @@ sudo ETCDCTL_API=3 etcdctl --endpoints=https://127.0.0.1:2379 \
 **짝수는 의미가 없다.** 4대는 3대와 내결함성이 같으면서 쓰기 지연만 늘어난다.
 그래서 항상 **3 또는 5**다.
 
-## 노드 추가와 제거
+### 노드 추가와 제거
 
 ```bash
 # 추가
@@ -792,7 +800,7 @@ flowchart LR
 - **`kubeadm reset`** 이 실제로 설정과 데이터를 지운다
 - 컨트롤 플레인 노드를 뺄 때는 **etcd 멤버에서도 제거**해야 한다 (`etcdctl member remove`)
 
-## kubelet 설정 바꾸기
+### kubelet 설정 바꾸기
 
 ```bash
 # kubelet 설정 파일

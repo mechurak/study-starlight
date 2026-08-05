@@ -40,7 +40,9 @@ flowchart TB
 이 구조 덕분에 **같은 API로 온프렘과 클라우드가 모두 동작**한다.
 그리고 **"플러그인이 없으면 아무것도 안 된다"**는 트러블슈팅 포인트가 생긴다.
 
-## CRI — 컨테이너 런타임
+## 세 가지 플러그인 인터페이스
+
+### CRI — 컨테이너 런타임
 
 - kubelet ↔ 런타임 사이의 **gRPC 규약**이다
 - 소켓 경로: `unix:///run/containerd/containerd.sock`
@@ -64,7 +66,7 @@ sudo crictl rmi --prune              # 안 쓰는 이미지 정리
 컨트롤 플레인 트러블슈팅에서 반드시 쓴다. `docker` 명령은 없다고 생각할 것.
 :::
 
-## CNI — Pod 네트워크
+### CNI — Pod 네트워크
 
 kubelet이 Pod 샌드박스를 만들 때 **CNI 플러그인을 실행**한다.
 
@@ -101,7 +103,7 @@ flowchart LR
 **엉뚱한 플러그인이 동작**하는 사고가 있다.
 :::
 
-## CSI — 스토리지
+### CSI — 스토리지
 
 ```bash
 kubectl get csidrivers
@@ -149,7 +151,9 @@ kubectl get pods -n kube-system | grep csi
 kubectl logs -n kube-system <csi-controller-pod> -c csi-provisioner
 ```
 
-## CRD — 새로운 리소스 만들기
+## CRD와 오퍼레이터
+
+### CRD — 새로운 리소스 만들기
 
 ```yaml
 apiVersion: apiextensions.k8s.io/v1
@@ -179,7 +183,7 @@ spec:
         - { name: Schedule, type: string, jsonPath: .spec.schedule }
 ```
 
-## CRD를 만들면 무슨 일이 생기나
+### CRD를 만들면 무슨 일이 생기나
 
 ```mermaid
 flowchart LR
@@ -222,7 +226,7 @@ spec:
 그 컨트롤러가 곧 **오퍼레이터**다.
 :::
 
-## 오퍼레이터 — CRD + 컨트롤러
+### 오퍼레이터 — CRD + 컨트롤러
 
 **운영자의 지식을 코드로 옮긴 컨트롤러.**\
 "이 상태여야 한다"를 CR로 선언하면, 오퍼레이터가 그 상태를 만들고 유지한다.
@@ -248,7 +252,7 @@ flowchart LR
 | CloudNativePG | `Cluster` (Postgres 클러스터) |
 | Istio | `VirtualService`, `Gateway` |
 
-## 오퍼레이터 설치와 확인
+### 오퍼레이터 설치와 확인
 
 ```bash
 # 대개 Helm 또는 매니페스트 하나로 설치된다
@@ -309,7 +313,7 @@ kubectl get events -n <ns> --sort-by=.lastTimestamp
 `kubectl get crd` · `kubectl explain` · `describe`로 접근하는 습관이면 충분하다.
 :::
 
-## CRD 다룰 때 주의점
+### CRD 다룰 때 주의점
 
 :::caution[함정 1]
 **CRD를 지우면 그 종류의 CR이 전부 삭제된다.**

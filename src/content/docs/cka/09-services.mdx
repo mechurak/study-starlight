@@ -135,7 +135,7 @@ flowchart LR
 
 `port` = Service의 포트 · `targetPort` = Pod의 포트 · `nodePort` = 노드의 포트
 
-## targetPort는 이름으로도 쓸 수 있다
+### targetPort는 이름으로도 쓸 수 있다
 
 ```yaml
 # Pod
@@ -202,7 +202,7 @@ kubectl get endpoints web-svc
 비어 있다면 원인은 셋: ① 셀렉터 라벨 불일치 ② Pod이 Ready가 아님 ③ Pod이 아예 없음
 :::
 
-## EndpointSlice — Endpoints의 후계자
+### EndpointSlice — Endpoints의 후계자
 
 - 옛 `Endpoints`는 **오브젝트 하나에 모든 IP**를 담았다 → Pod이 수천 개면 갱신 비용이 폭발
 - `EndpointSlice`는 **100개씩 쪼개서** 담는다. 지금은 이쪽이 실제 데이터 소스다
@@ -235,7 +235,9 @@ flowchart LR
     class RP mute
 ```
 
-## NodePort
+## 그 밖의 타입과 변형
+
+### NodePort
 
 ```yaml
 spec:
@@ -278,7 +280,7 @@ curl http://<노드IP>:30080
 시험에서 특정 포트를 지정하라고 하면 범위 안인지 먼저 확인하자.
 :::
 
-## LoadBalancer와 ExternalName
+### LoadBalancer와 ExternalName
 
 ```yaml
 # LoadBalancer
@@ -319,7 +321,7 @@ spec:
 클러스터 안에서 `my-db.default.svc.cluster.local` 을 조회하면
 `db.example.com` 으로 CNAME이 돌아온다. **셀렉터도 엔드포인트도 없다.**
 
-## 셀렉터 없는 Service — 외부를 클러스터 이름으로
+### 셀렉터 없는 Service — 외부를 클러스터 이름으로
 
 ```yaml
 apiVersion: v1
@@ -363,7 +365,7 @@ flowchart LR
 - 클러스터 밖의 DB를 **`external-db`라는 이름으로** 부를 수 있다
 - 나중에 DB를 클러스터 안으로 옮겨도 **앱은 그대로**다 — 마이그레이션 기법
 
-## headless Service
+### headless Service
 
 <Tabs>
 <TabItem label="일반 ClusterIP">
@@ -425,7 +427,9 @@ flowchart LR
 셀렉터도 없고 `clusterIP: None`이면 DNS는 `ExternalName`이나
 수동 엔드포인트를 따라간다.
 
-## kube-proxy 모드
+## 동작 방식과 옵션
+
+### kube-proxy 모드
 
 | 모드 | 방식 | 특징 |
 |---|---|---|
@@ -442,7 +446,7 @@ kubectl logs -n kube-system -l k8s-app=kube-proxy --tail=20
 **어느 모드든 동작은 같다.** 트래픽 경로가 아니라
 **규칙을 심는 방식**이 다를 뿐이다.
 
-## sessionAffinity와 externalTrafficPolicy
+### sessionAffinity와 externalTrafficPolicy
 
 ```yaml
 spec:
@@ -505,7 +509,7 @@ Pod 없는 노드는 응답하지 않는다.
 대신 각 노드에 Pod이 있어야 하니 **DaemonSet과 함께** 쓰는 것이 정석.
 :::
 
-## 여러 포트를 가진 Service
+### 여러 포트를 가진 Service
 
 ```yaml
 spec:
@@ -531,7 +535,9 @@ spec:
 kubectl create svc clusterip web-svc --tcp=80:8080 --tcp=443:8443
 ```
 
-## Service 진단 절차
+## 진단
+
+### Service 진단 절차
 
 <Steps>
 
@@ -576,7 +582,7 @@ kubectl create svc clusterip web-svc --tcp=80:8080 --tcp=443:8443
 
 </Steps>
 
-## 어디서 끊겼는지 판별하기
+### 어디서 끊겼는지 판별하기
 
 ```mermaid
 flowchart TD

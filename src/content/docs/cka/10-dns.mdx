@@ -125,7 +125,7 @@ flowchart TD
 외부 도메인 응답이 느린 흔한 원인이다. 끝에 점을 찍으면(`api.example.com.`) 바로 조회한다.
 :::
 
-## dnsPolicy와 dnsConfig
+### dnsPolicy와 dnsConfig
 
 ```yaml
 spec:
@@ -223,7 +223,7 @@ flowchart LR
 - **`forward`** 가 그 밖의 도메인을 노드의 리졸버로 넘긴다
 - `reload` 덕분에 ConfigMap을 고치면 **재시작 없이 반영**된다 (몇십 초)
 
-## 특정 도메인을 다른 곳으로 보내기
+### 특정 도메인을 다른 곳으로 보내기
 
 ```
 # Corefile에 스탠자를 추가한다
@@ -283,7 +283,7 @@ hosts {
 이 이름은 **어느 클러스터에나 항상 존재**하므로 기준점으로 쓰기 좋다.
 :::
 
-## DNS 증상별 원인
+### DNS 증상별 원인
 
 ```mermaid
 flowchart TD

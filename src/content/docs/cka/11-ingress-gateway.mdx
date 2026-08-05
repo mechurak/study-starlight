@@ -60,7 +60,7 @@ flowchart LR
 - 실제 라우팅은 **Ingress 컨트롤러 Pod**(nginx 등)이 한다
 - **컨트롤러가 없으면 Ingress를 만들어도 아무 일도 안 일어난다**
 
-## Ingress 리소스
+### Ingress 리소스
 
 ```yaml
 apiVersion: networking.k8s.io/v1
@@ -92,7 +92,7 @@ kubectl create ingress web --class=nginx \
   --rule="shop.example.com/api*=api-svc:8080" --rule="shop.example.com/*=web-svc:80"
 ```
 
-## pathType — 세 가지
+### pathType — 세 가지
 
 ```mermaid
 flowchart LR
@@ -129,7 +129,7 @@ kubectl get ingress
 kubectl describe ingress web       # Rules와 Events, 백엔드 상태를 본다
 ```
 
-## IngressClass — 어느 컨트롤러가 처리하나
+### IngressClass — 어느 컨트롤러가 처리하나
 
 ```yaml
 apiVersion: networking.k8s.io/v1
@@ -172,7 +172,7 @@ kubectl get ingressclass
 "Ingress를 만들었는데 아무 일도 안 일어난다"의 1번 원인.
 :::
 
-## Ingress TLS
+### Ingress TLS
 
 ```bash
 kubectl create secret tls web-tls --cert=./tls.crt --key=./tls.key
@@ -215,7 +215,7 @@ flowchart LR
 - Secret은 **`kubernetes.io/tls` 타입**이어야 하고 **Ingress와 같은 네임스페이스**에 있어야 한다
 - TLS는 컨트롤러에서 종료(terminate)되고, 백엔드로는 평문으로 간다
 
-## 기본 백엔드와 애노테이션
+### 기본 백엔드와 애노테이션
 
 ```yaml
 spec:
@@ -283,7 +283,7 @@ kubectl get crd | grep gateway
 kubectl api-resources | grep gateway.networking
 ```
 
-## 세 개의 리소스와 세 개의 역할
+### 세 개의 리소스와 세 개의 역할
 
 ```mermaid
 flowchart TB
@@ -310,7 +310,7 @@ flowchart TB
 | **Gateway** | 클러스터 운영자 | 어떤 포트·프로토콜·호스트를 열 것인가 |
 | **HTTPRoute** | 앱 개발자 | 그 안에서 어떻게 라우팅할 것인가 |
 
-## Gateway
+### Gateway
 
 ```yaml
 apiVersion: gateway.networking.k8s.io/v1
@@ -339,7 +339,7 @@ spec:
 
 **`allowedRoutes`가 핵심이다.** 운영자가 "어느 네임스페이스가 이 Gateway에 붙을 수 있는지"를 통제한다.
 
-## HTTPRoute
+### HTTPRoute
 
 ```yaml
 apiVersion: gateway.networking.k8s.io/v1
@@ -369,7 +369,7 @@ spec:
           port: 80
 ```
 
-## 가중치 분배와 필터 — 애노테이션 없이
+### 가중치 분배와 필터 — 애노테이션 없이
 
 ```yaml
 rules:
@@ -416,7 +416,7 @@ flowchart LR
 
 Ingress에서 컨트롤러별 애노테이션이었던 것들이 **전부 스펙 안에 있다.**
 
-## 네임스페이스를 넘을 때 — ReferenceGrant
+### 네임스페이스를 넘을 때 — ReferenceGrant
 
 HTTPRoute가 **다른 네임스페이스의 Service**를 백엔드로 쓰려면 그쪽의 허가가 필요하다.
 
@@ -453,7 +453,7 @@ flowchart LR
 - **참조당하는 쪽이 허가한다** — 몰래 트래픽을 뺏어가지 못하게 하는 설계
 - TLS 인증서 Secret을 다른 네임스페이스에서 참조할 때도 필요하다
 
-## Route 종류들
+### Route 종류들
 
 | 리소스 | 프로토콜 | 상태 |
 |---|---|---|
