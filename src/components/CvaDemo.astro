@@ -1,0 +1,165 @@
+---
+/*
+  cva(class-variance-authority)가 하는 일을 인터랙티브로 보여준다.
+  variant/size를 고르면 → 생성되는 클래스 문자열 → 실제 렌더 결과가 동시에 바뀐다.
+*/
+import UiSurface from './UiSurface.astro';
+
+const variants = ['default', 'secondary', 'destructive', 'outline', 'ghost'];
+const sizes = ['sm', 'default', 'lg'];
+---
+
+<div data-cva-demo>
+  <div class="controls">
+    <div class="grp">
+      <span class="glabel">variant</span>
+      {variants.map((v, i) => (
+        <button class:list={['pick', { on: i === 0 }]} data-variant={v}>{v}</button>
+      ))}
+    </div>
+    <div class="grp">
+      <span class="glabel">size</span>
+      {sizes.map((s) => (
+        <button class:list={['pick', { on: s === 'default' }]} data-size={s}>{s}</button>
+      ))}
+    </div>
+  </div>
+
+  <div class="out">
+    <div class="col">
+      <div class="note">생성된 className</div>
+      <code class="classout" data-classout></code>
+    </div>
+    <div class="col">
+      <div class="note">렌더 결과</div>
+      <UiSurface>
+        <div class="center">
+          <button class="ui-btn ui-btn--default" data-target>버튼</button>
+        </div>
+      </UiSurface>
+    </div>
+  </div>
+</div>
+
+<style>
+  .controls {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    margin-bottom: 0.7rem;
+  }
+  .grp {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+    align-items: center;
+  }
+  .glabel {
+    font-family: ui-monospace, monospace;
+    font-size: 0.7rem;
+    opacity: 0.55;
+    width: 3.6rem;
+  }
+  .pick {
+    font-size: 0.74rem;
+    padding: 0.12rem 0.6rem;
+    border-radius: 5px;
+    border: 1px solid var(--sl-color-gray-4, #d4d4d8);
+    background: transparent;
+    color: inherit;
+    cursor: pointer;
+  }
+  .pick.on {
+    background: #4f46e5;
+    border-color: #4f46e5;
+    color: #fff;
+    font-weight: 600;
+  }
+  .out {
+    display: grid;
+    grid-template-columns: 1.35fr 1fr;
+    gap: 0.9rem;
+    align-items: start;
+  }
+  @media (max-width: 40rem) {
+    .out {
+      grid-template-columns: 1fr;
+    }
+  }
+  .col {
+    min-width: 0;
+  }
+  .note {
+    font-size: 0.72rem;
+    opacity: 0.6;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+    font-weight: 600;
+    margin-bottom: 0.3rem;
+  }
+  .classout {
+    display: block;
+    font-family: ui-monospace, monospace;
+    font-size: 0.7rem;
+    line-height: 1.7;
+    background: var(--sl-color-gray-6, #f4f4f5);
+    border-radius: 6px;
+    padding: 0.6rem 0.7rem;
+    word-break: break-all;
+  }
+  .center {
+    display: flex;
+    justify-content: center;
+  }
+</style>
+
+<script>
+  const base =
+    'inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors';
+  const variantClasses: Record<string, string> = {
+    default: 'bg-primary text-primary-foreground shadow hover:bg-primary/90',
+    secondary: 'bg-secondary text-secondary-foreground hover:bg-secondary/80',
+    destructive: 'bg-destructive text-destructive-foreground hover:bg-destructive/90',
+    outline: 'border border-input bg-background hover:bg-accent',
+    ghost: 'hover:bg-accent hover:text-accent-foreground',
+  };
+  const sizeClasses: Record<string, string> = {
+    sm: 'h-8 rounded-md px-3 text-xs',
+    default: 'h-9 px-4 py-2',
+    lg: 'h-10 rounded-md px-8',
+  };
+
+  document.querySelectorAll<HTMLElement>('[data-cva-demo]').forEach((root) => {
+    let variant = 'default';
+    let size = 'default';
+    const out = root.querySelector<HTMLElement>('[data-classout]');
+    const target = root.querySelector<HTMLElement>('[data-target]');
+
+    const render = () => {
+      if (out) out.textContent = `${base} ${variantClasses[variant]} ${sizeClasses[size]}`;
+      if (target) {
+        target.className = [
+          'ui-btn',
+          `ui-btn--${variant}`,
+          size !== 'default' && `ui-btn--${size}`,
+        ]
+          .filter(Boolean)
+          .join(' ');
+      }
+      root.querySelectorAll<HTMLElement>('[data-variant]').forEach((b) => {
+        b.classList.toggle('on', b.dataset.variant === variant);
+      });
+      root.querySelectorAll<HTMLElement>('[data-size]').forEach((b) => {
+        b.classList.toggle('on', b.dataset.size === size);
+      });
+    };
+
+    root.querySelectorAll<HTMLElement>('[data-variant]').forEach((b) => {
+      b.addEventListener('click', () => { variant = b.dataset.variant || 'default'; render(); });
+    });
+    root.querySelectorAll<HTMLElement>('[data-size]').forEach((b) => {
+      b.addEventListener('click', () => { size = b.dataset.size || 'default'; render(); });
+    });
+    render();
+  });
+</script>

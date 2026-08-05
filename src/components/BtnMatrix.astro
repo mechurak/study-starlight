@@ -1,0 +1,92 @@
+---
+/* shadcn/ui Button의 variant × size 조합을 실물로 렌더한다. */
+import UiSurface from './UiSurface.astro';
+
+interface Props {
+  theme?: string;
+  sizes?: boolean;
+  label?: string;
+}
+const { theme = 'auto', sizes = true, label = '' } = Astro.props;
+
+const variants = [
+  ['default', 'Default'],
+  ['secondary', 'Secondary'],
+  ['destructive', 'Destructive'],
+  ['outline', 'Outline'],
+  ['ghost', 'Ghost'],
+  ['link', 'Link'],
+];
+---
+
+<UiSurface theme={theme} label={label}>
+  <div class="row">
+    {variants.map(([v, text]) => (
+      <div class="cell">
+        <div class="btnbox">
+          <button class={`ui-btn ui-btn--${v}`}>{text}</button>
+        </div>
+        <code class="tag">variant="{v}"</code>
+      </div>
+    ))}
+  </div>
+  {sizes && (
+    <div>
+      <div class="ui-separator" />
+      <div class="row">
+        <div class="cell">
+          <div class="btnbox"><button class="ui-btn ui-btn--default ui-btn--sm">Small</button></div>
+          <code class="tag">size="sm"</code>
+        </div>
+        <div class="cell">
+          <div class="btnbox"><button class="ui-btn ui-btn--default">Default</button></div>
+          <code class="tag">size="default"</code>
+        </div>
+        <div class="cell">
+          <div class="btnbox"><button class="ui-btn ui-btn--default ui-btn--lg">Large</button></div>
+          <code class="tag">size="lg"</code>
+        </div>
+        <div class="cell">
+          <div class="btnbox"><button class="ui-btn ui-btn--outline ui-btn--icon">★</button></div>
+          <code class="tag">size="icon"</code>
+        </div>
+        <div class="cell">
+          <div class="btnbox"><button class="ui-btn ui-btn--default" disabled>Disabled</button></div>
+          <code class="tag">disabled</code>
+        </div>
+        <div class="cell">
+          <div class="btnbox"><button class="ui-btn ui-btn--outline" data-focus>Focused</button></div>
+          <code class="tag">:focus-visible</code>
+        </div>
+      </div>
+    </div>
+  )}
+</UiSurface>
+
+<style>
+  .row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.9rem 1.1rem;
+    align-items: flex-start;
+  }
+  .cell {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.25rem;
+  }
+  .btnbox {
+    height: 2.7rem;
+    display: flex;
+    align-items: center;
+  }
+  .tag {
+    font-size: 0.66rem;
+    font-family: ui-monospace, monospace;
+    opacity: 0.55;
+    background: none;
+    padding: 0;
+    color: inherit;
+  }
+</style>

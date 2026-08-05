@@ -4,6 +4,8 @@ description: "라이브러리가 아니다 — 소유권 모델, 레지스트리
 ---
 
 import { Tabs, TabItem, Card, CardGrid, LinkCard } from '@astrojs/starlight/components';
+import BtnMatrix from '../../../components/BtnMatrix.astro';
+import GalleryDemo from '../../../components/GalleryDemo.astro';
 
 > "This is not a component library. It's how you build your component library."
 
@@ -28,6 +30,11 @@ pnpm dlx shadcn@latest add button
 - `node_modules`에는 프리미티브 패키지만 들어간다
 - `components/ui/button.tsx`는 **내 코드**다. git에 커밋된다
 - 마음대로 고쳐도 된다. 아무것도 깨지지 않는다
+
+그렇게 복사돼 온 `button.tsx` 하나가 렌더하는 것 —
+variant와 size 축이 독립적으로 조합된다. (해부는 [15장](/frontend/15-component-anatomy/))
+
+<BtnMatrix />
 
 ### 전통적 라이브러리와의 비교
 
@@ -147,6 +154,10 @@ Pagination, Resizable, Scroll Area, Carousel · Alert, Toast, Sonner
 
 70개가 넘는다. 그 밖에 **Blocks**(로그인 화면, 대시보드 등 완성된 조합)와
 **Charts**(Recharts 래퍼)도 제공된다.
+
+Tabs·Input·Button·Table·Avatar·Badge·Separator·Alert를 조합하면 이런 화면이 된다 —
+
+<GalleryDemo />
 
 ## 트레이드오프를 정직하게
 

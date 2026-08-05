@@ -4,6 +4,9 @@ description: "CSS 자체가 설정 파일이 되었다 — @theme, 네임스페�
 ---
 
 import { Tabs, TabItem, Card, CardGrid, LinkCard } from '@astrojs/starlight/components';
+import ScaleViz from '../../../components/ScaleViz.astro';
+import ColorScale from '../../../components/ColorScale.astro';
+import ResponsiveDemo from '../../../components/ResponsiveDemo.astro';
 
 > `tailwind.config.js`가 사라졌다
 
@@ -85,6 +88,35 @@ v3 설정 파일이 필요하면 `@config "../tailwind.config.js";`로 불러올
 | `--container-*` | `@sm:`, `@md:` 컨테이너 쿼리 변형 |
 | `--animate-*` | `animate-*` |
 
+### 기본 스케일을 눈으로 보기
+
+표의 숫자가 실제로 어떤 크기인지 — 기본 테마의 스케일을 실물로 렌더한 것이다.
+
+<Tabs>
+<TabItem label="간격">
+
+<ScaleViz kind="spacing" />
+
+숫자 1 = 4px. 스케일이 위로 갈수록 성기게 벌어진다 — 큰 간격일수록 후보가 적어야 고르기 쉽다.
+
+</TabItem>
+<TabItem label="라운드">
+
+<ScaleViz kind="radius" />
+
+</TabItem>
+<TabItem label="그림자">
+
+<ScaleViz kind="shadow" />
+
+</TabItem>
+<TabItem label="타이포">
+
+<ScaleViz kind="text" />
+
+</TabItem>
+</Tabs>
+
 ### 왜 oklch인가
 
 v4의 기본 팔레트는 hex나 hsl이 아니라 **oklch**로 되어 있다.
@@ -93,6 +125,14 @@ v4의 기본 팔레트는 hex나 hsl이 아니라 **oklch**로 되어 있다.
 - hsl은 그렇지 않다. `hsl(60 100% 50%)`(노랑)이 `hsl(240 100% 50%)`(파랑)보다 훨씬 밝다
 - 그래서 hsl로 만든 팔레트는 **명도 계단이 들쭉날쭉**해진다
 - oklch는 **P3 같은 넓은 색역**도 표현할 수 있다
+
+기본 팔레트를 나란히 놓으면 그 균일함이 보인다 —
+**어느 계열이든 같은 단계는 같은 밝기**라서, 500을 500으로 바꿔치기해도 대비가 유지된다.
+
+<ColorScale name="zinc — 기본 중립색" colors={['#fafafa','#f4f4f5','#e4e4e7','#d4d4d8','#a1a1aa','#71717a','#52525b','#3f3f46','#27272a','#18181b','#09090b']} />
+<ColorScale name="indigo" colors={['#eef2ff','#e0e7ff','#c7d2fe','#a5b4fc','#818cf8','#6366f1','#4f46e5','#4338ca','#3730a3','#312e81','#1e1b4b']} />
+<ColorScale name="emerald" colors={['#ecfdf5','#d1fae5','#a7f3d0','#6ee7b7','#34d399','#10b981','#059669','#047857','#065f46','#064e3b','#022c22']} />
+<ColorScale name="rose" colors={['#fff1f2','#ffe4e6','#fecdd3','#fda4af','#fb7185','#f43f5e','#e11d48','#be123c','#9f1239','#881337','#4c0519']} />
 
 실무적 이득은 **스케일을 프로그래밍으로 생성해도 자연스럽다**는 것이다.
 L값만 일정하게 낮추면 균일한 팔레트가 나온다. 12장에서 다시 쓴다.
@@ -124,6 +164,10 @@ L값만 일정하게 낮추면 균일한 팔레트가 나온다. 12장에서 다
 ```html
 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
 ```
+
+이 한 줄이 각 브레이크포인트에서 확정되는 레이아웃 —
+
+<ResponsiveDemo />
 
 기본값이 모바일이고, 브레이크포인트가 커질수록 덮어쓴다.
 **`sm:` 없이 쓴 클래스가 모바일 스타일**이라는 점을 놓치면 반응형이 거꾸로 짜인다.

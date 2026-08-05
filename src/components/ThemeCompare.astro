@@ -1,0 +1,57 @@
+---
+/*
+  같은 컴포넌트 트리를 여러 토큰 세트로 나란히 렌더한다.
+  "디자인 시스템 교체 = 토큰 교체"라는 주장을 눈으로 확인시키는 용도.
+*/
+import LoginCard from './LoginCard.astro';
+
+interface Props {
+  themes?: string[];
+  labels?: string[];
+  compact?: boolean;
+}
+const {
+  themes = ['shadcn', 'material', 'radix', 'corporate'],
+  labels,
+  compact = false,
+} = Astro.props;
+
+const fallback: Record<string, string> = {
+  shadcn: 'shadcn/ui 기본 (zinc)',
+  material: 'Material Design 3',
+  radix: 'Radix Colors (indigo)',
+  corporate: '사내 엔터프라이즈',
+  dark: 'shadcn dark',
+};
+---
+
+<div class="cmp">
+  {themes.map((t, i) => (
+    <div class="col">
+      <div class="cap">{(labels && labels[i]) || fallback[t] || t}</div>
+      <LoginCard theme={t} compact={compact} />
+    </div>
+  ))}
+</div>
+
+<style>
+  .cmp {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
+    gap: 0.9rem;
+    margin: 1rem 0;
+  }
+  .col {
+    min-width: 0;
+  }
+  .cap {
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    opacity: 0.6;
+    margin-bottom: 0.35rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+</style>

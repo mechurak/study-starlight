@@ -1,0 +1,68 @@
+---
+/* 색 스케일(50~950)을 스와치로 렌더. 토큰·팔레트 설계 설명용. */
+interface Props {
+  name?: string;
+  colors: string[];
+  steps?: string[];
+  note?: string;
+}
+const {
+  name = '',
+  colors,
+  steps = ['50', '100', '200', '300', '400', '500', '600', '700', '800', '900', '950'],
+  note = '',
+} = Astro.props;
+
+// 배경 밝기에 따라 라벨 색을 뒤집는다
+function labelColor(hex: string) {
+  const h = hex.replace('#', '');
+  const r = parseInt(h.slice(0, 2), 16);
+  const g = parseInt(h.slice(2, 4), 16);
+  const b = parseInt(h.slice(4, 6), 16);
+  return (r * 299 + g * 587 + b * 114) / 1000 > 140 ? 'rgba(0,0,0,.55)' : 'rgba(255,255,255,.8)';
+}
+---
+
+<div class="wrap">
+  {name && <div class="name">{name}</div>}
+  <div class="row">
+    {colors.map((c, i) => (
+      <div class="swatch" style={`background:${c};color:${labelColor(c)}`}>{steps[i]}</div>
+    ))}
+  </div>
+  {note && <div class="note">{note}</div>}
+</div>
+
+<style>
+  .wrap {
+    margin: 0.6rem 0;
+  }
+  .name {
+    font-size: 0.74rem;
+    font-weight: 700;
+    font-family: ui-monospace, monospace;
+    opacity: 0.7;
+    margin-bottom: 0.2rem;
+  }
+  .row {
+    display: grid;
+    grid-auto-flow: column;
+    grid-auto-columns: 1fr;
+    gap: 3px;
+  }
+  .swatch {
+    height: 2.6rem;
+    border-radius: 4px;
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    font-size: 9px;
+    font-family: ui-monospace, monospace;
+    padding-bottom: 2px;
+  }
+  .note {
+    font-size: 0.72rem;
+    opacity: 0.6;
+    margin-top: 0.2rem;
+  }
+</style>

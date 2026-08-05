@@ -1,0 +1,64 @@
+---
+/*
+  background/foreground 짝 토큰을 실물 색으로 보여준다.
+  "바탕색을 정하면 그 위의 글자색이 따라온다"의 시각화.
+*/
+import UiSurface from './UiSurface.astro';
+
+const pairs = [
+  ['primary', 'bg-primary', 'text-primary-foreground'],
+  ['secondary', 'bg-secondary', 'text-secondary-foreground'],
+  ['muted', 'bg-muted', 'text-muted-foreground'],
+  ['destructive', 'bg-destructive', 'text-white'],
+];
+---
+
+<div class="grid">
+  {pairs.map(([name, bg, fg]) => (
+    <UiSurface label={name} padded={false}>
+      <div class={`pair pair--${name}`}>
+        <code>{bg}</code>
+        <code>{fg}</code>
+      </div>
+    </UiSurface>
+  ))}
+</div>
+
+<style>
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
+    gap: 0.7rem;
+    margin: 1rem 0;
+  }
+  .pair {
+    border-radius: calc(var(--ui-radius) - 2px);
+    padding: 0.8rem 0.9rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+  }
+  .pair code {
+    font-family: ui-monospace, monospace;
+    font-size: 0.72rem;
+    background: none;
+    padding: 0;
+    color: inherit;
+  }
+  .pair--primary {
+    background: var(--ui-primary);
+    color: var(--ui-primary-foreground);
+  }
+  .pair--secondary {
+    background: var(--ui-secondary);
+    color: var(--ui-secondary-foreground);
+  }
+  .pair--muted {
+    background: var(--ui-muted);
+    color: var(--ui-muted-foreground);
+  }
+  .pair--destructive {
+    background: var(--ui-destructive);
+    color: #fff;
+  }
+</style>

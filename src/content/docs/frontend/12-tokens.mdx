@@ -4,6 +4,8 @@ description: "디자인 시스템의 실체 — 값이 아니라 결정에 이�
 ---
 
 import { Tabs, TabItem, Steps, Card, CardGrid, LinkCard } from '@astrojs/starlight/components';
+import TokenPairsDemo from '../../../components/TokenPairsDemo.astro';
+import ThemeCompare from '../../../components/ThemeCompare.astro';
 
 > "디자인 시스템을 도입한다"는 말의 90%는 토큰 이야기다
 
@@ -131,6 +133,9 @@ flowchart LR
 ```
 
 컴포넌트는 `bg-primary text-primary-foreground`를 **항상 함께** 쓴다.
+네 짝을 실물 색으로 보면 —
+
+<TokenPairsDemo />
 
 ## 두 층으로 나눠 쓰기
 
@@ -213,6 +218,9 @@ flowchart LR
 - 컴포넌트 코드에 `dark:` 변형이 **거의 등장하지 않는다**
 
 라이트와 다크에서 **마크업과 클래스는 완전히 동일**하다. 바뀌는 것은 변수 값뿐이다.
+아래 두 카드는 **같은 컴포넌트**다 — 렌더 직전에 값만 갈렸다.
+
+<ThemeCompare themes={['shadcn', 'dark']} labels={[':root 값', '.dark 값 — 마크업 동일']} compact />
 
 :::tip[핵심]
 이것이 14장에서 `cssVariables: true`를 반드시 켜라고 하는 이유다.
@@ -238,6 +246,10 @@ flowchart LR
 `--radius` 하나를 `0.125rem`으로 바꾸면 **앱 전체가 각져지고**,
 `1.25rem`으로 바꾸면 Material 스타일이 된다.
 **변수 한 줄로 앱의 인상이 바뀐다.**
+
+<ThemeCompare themes={['corporate', 'shadcn', 'material']} labels={['--radius: 0.125rem', '--radius: 0.5rem', '--radius: 1.25rem']} compact />
+
+(색·폰트도 함께 바뀐 프리셋이지만, **모서리만 따라가며 봐도** 인상 차이의 대부분이 radius다.)
 
 ### 그 밖의 토큰 종류
 

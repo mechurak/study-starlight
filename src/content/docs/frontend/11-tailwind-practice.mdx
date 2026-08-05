@@ -4,6 +4,8 @@ description: "긴 클래스와 함께 살아가는 다섯 가지 규칙 — 정�
 ---
 
 import { Steps, Tabs, TabItem, Card, CardGrid, LinkCard } from '@astrojs/starlight/components';
+import ClassAnatomy from '../../../components/ClassAnatomy.astro';
+import CvaDemo from '../../../components/CvaDemo.astro';
 
 > 긴 클래스는 문장이 아니라 표로 읽는다
 
@@ -21,6 +23,10 @@ hover:bg-primary/90 focus-visible:ring-2          ← 상태
 disabled:opacity-50
 transition-colors                                 ← 애니메이션
 ```
+
+같은 문자열에 색을 입히면 그룹이 한눈에 들어온다 —
+
+<ClassAnatomy groups={[['레이아웃','inline-flex items-center justify-center gap-2'],['크기','h-9 px-4 py-2'],['타이포','text-sm font-medium whitespace-nowrap'],['색상','bg-primary text-primary-foreground'],['테두리','rounded-md border border-transparent'],['상태','hover:bg-primary/90 focus-visible:ring-2 disabled:opacity-50'],['애니메이션','transition-colors']]} />
 
 클래스를 **항상 같은 순서**로 쓰면 눈이 자동으로 그룹을 나눈다.
 그 순서를 사람이 지키는 대신 **도구가 강제**하게 만드는 것이 첫 번째 규칙이다.
@@ -152,6 +158,11 @@ const badgeVariants = cva(
 
 `variant`와 `size`처럼 축이 여럿이면 **독립적으로 조합**된다 —
 `variant: 'outline', size: 'sm'` 같은 조합을 따로 정의하지 않아도 된다.
+
+cva가 하는 일을 직접 만져보면 이렇다 —
+**고른 조합 → 생성되는 className → 렌더 결과**가 한 번에 바뀐다.
+
+<CvaDemo />
 
 ### `compoundVariants` — 조합에만 적용되는 규칙
 

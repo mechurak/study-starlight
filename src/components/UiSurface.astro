@@ -1,0 +1,462 @@
+---
+/*
+  문서 안에 "실물 UI"를 얹는 표면. shadcn/ui 풍 컴포넌트 레이어(.ui-*)의 스타일을
+  이 파일 하나에 캡슐화한다 — 다른 데모 컴포넌트는 전부 이 컴포넌트를 감싸서 쓴다.
+
+  theme:
+    - 'auto'(기본) — 사이트 라이트/다크를 따라간다
+    - 'shadcn' | 'material' | 'radix' | 'corporate' | 'dark' — 고정 프리셋.
+      "같은 마크업, 다른 토큰" 비교용이라 사이트 테마와 무관하게 고정된다.
+*/
+interface Props {
+  theme?: string;
+  label?: string;
+  padded?: boolean;
+}
+const { theme = 'auto', label = '', padded = true } = Astro.props;
+---
+
+<div class="ui-surface-wrap">
+  {label && <div class="ui-surface-label">{label}</div>}
+  <div class:list={['ui', { 'ui-surface': padded }]} data-ui-theme={theme}>
+    <slot />
+  </div>
+</div>
+
+<style>
+  .ui-surface-wrap {
+    min-width: 0;
+  }
+  .ui-surface-label {
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    opacity: 0.55;
+    margin-bottom: 0.35rem;
+  }
+</style>
+
+<style is:global>
+  /*
+    실제 shadcn/ui가 쓰는 토큰 이름에 --ui- 접두사만 붙였다.
+    모든 셀렉터가 .ui 밑에만 걸리므로 문서 본문 스타일과 충돌하지 않는다.
+  */
+  .ui {
+    --ui-background: #ffffff;
+    --ui-foreground: #09090b;
+    --ui-card: #ffffff;
+    --ui-card-foreground: #09090b;
+    --ui-primary: #18181b;
+    --ui-primary-foreground: #fafafa;
+    --ui-secondary: #f4f4f5;
+    --ui-secondary-foreground: #18181b;
+    --ui-muted: #f4f4f5;
+    --ui-muted-foreground: #71717a;
+    --ui-accent: #f4f4f5;
+    --ui-accent-foreground: #18181b;
+    --ui-destructive: #ef4444;
+    --ui-destructive-foreground: #fafafa;
+    --ui-border: #e4e4e7;
+    --ui-input: #e4e4e7;
+    --ui-ring: #a1a1aa;
+    --ui-radius: 0.5rem;
+    --ui-font: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+    --ui-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+    --ui-shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+    --ui-btn-weight: 500;
+    --ui-btn-tracking: 0;
+
+    color: var(--ui-foreground);
+    background: var(--ui-background);
+    font-family: var(--ui-font);
+    font-size: 14px;
+    line-height: 1.45;
+    border-radius: calc(var(--ui-radius) + 4px);
+  }
+
+  .ui-surface {
+    padding: 1rem 1.1rem;
+    border: 1px solid var(--ui-border);
+    box-shadow: var(--ui-shadow);
+  }
+
+  /* --- 테마 프리셋: 같은 마크업, 다른 디자인 시스템 --------------------- */
+
+  /* Material Design 3 — 보라 계열, 큰 라운드 */
+  .ui[data-ui-theme='material'] {
+    --ui-background: #fef7ff;
+    --ui-foreground: #1d1b20;
+    --ui-card: #fef7ff;
+    --ui-card-foreground: #1d1b20;
+    --ui-primary: #6750a4;
+    --ui-primary-foreground: #ffffff;
+    --ui-secondary: #e8def8;
+    --ui-secondary-foreground: #1d192b;
+    --ui-muted: #f3edf7;
+    --ui-muted-foreground: #49454f;
+    --ui-accent: #e8def8;
+    --ui-accent-foreground: #1d192b;
+    --ui-destructive: #b3261e;
+    --ui-border: #cac4d0;
+    --ui-input: #cac4d0;
+    --ui-ring: #6750a4;
+    --ui-radius: 1.25rem;
+    --ui-font: Roboto, ui-sans-serif, system-ui, sans-serif;
+    --ui-shadow: 0 1px 3px 1px rgb(0 0 0 / 0.15);
+    --ui-btn-tracking: 0.01em;
+  }
+
+  /* Radix Colors — indigo 스케일, 낮은 채도 배경 */
+  .ui[data-ui-theme='radix'] {
+    --ui-background: #fdfdfe;
+    --ui-foreground: #1c2024;
+    --ui-card: #ffffff;
+    --ui-card-foreground: #1c2024;
+    --ui-primary: #3e63dd;
+    --ui-primary-foreground: #ffffff;
+    --ui-secondary: #e6edfe;
+    --ui-secondary-foreground: #1f2d5c;
+    --ui-muted: #f0f4ff;
+    --ui-muted-foreground: #60646c;
+    --ui-accent: #e6edfe;
+    --ui-accent-foreground: #1f2d5c;
+    --ui-destructive: #e5484d;
+    --ui-border: #d9e2fc;
+    --ui-input: #d9e2fc;
+    --ui-ring: #3e63dd;
+    --ui-radius: 0.375rem;
+    --ui-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.04);
+  }
+
+  /* 사내 SI/엔터프라이즈 계열 — 각진 모서리, 진한 파랑 */
+  .ui[data-ui-theme='corporate'] {
+    --ui-background: #ffffff;
+    --ui-foreground: #101828;
+    --ui-card: #ffffff;
+    --ui-card-foreground: #101828;
+    --ui-primary: #1450a3;
+    --ui-primary-foreground: #ffffff;
+    --ui-secondary: #eef2f6;
+    --ui-secondary-foreground: #1450a3;
+    --ui-muted: #f2f4f7;
+    --ui-muted-foreground: #667085;
+    --ui-accent: #eef2f6;
+    --ui-accent-foreground: #1450a3;
+    --ui-destructive: #d92d20;
+    --ui-border: #d0d5dd;
+    --ui-input: #d0d5dd;
+    --ui-ring: #1450a3;
+    --ui-radius: 0.125rem;
+    --ui-font: 'Segoe UI', 'Pretendard Variable', ui-sans-serif, system-ui, sans-serif;
+    --ui-shadow: none;
+    --ui-btn-weight: 600;
+  }
+
+  /* shadcn dark 토큰 — 고정 프리셋과 auto의 다크 값이 같다 */
+  .ui[data-ui-theme='dark'],
+  :root[data-theme='dark'] .ui[data-ui-theme='auto'] {
+    --ui-background: #09090b;
+    --ui-foreground: #fafafa;
+    --ui-card: #09090b;
+    --ui-card-foreground: #fafafa;
+    --ui-primary: #fafafa;
+    --ui-primary-foreground: #18181b;
+    --ui-secondary: #27272a;
+    --ui-secondary-foreground: #fafafa;
+    --ui-muted: #27272a;
+    --ui-muted-foreground: #a1a1aa;
+    --ui-accent: #27272a;
+    --ui-accent-foreground: #fafafa;
+    --ui-destructive: #7f1d1d;
+    --ui-destructive-foreground: #fafafa;
+    --ui-border: #27272a;
+    --ui-input: #27272a;
+    --ui-ring: #d4d4d8;
+    --ui-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.4);
+  }
+
+  /* --- 컴포넌트 --------------------------------------------------------- */
+
+  .ui *,
+  .ui *::before,
+  .ui *::after {
+    box-sizing: border-box;
+  }
+
+  /* Button */
+  .ui-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    white-space: nowrap;
+    border-radius: calc(var(--ui-radius) - 2px);
+    border: 1px solid transparent;
+    font-size: 0.875rem;
+    font-weight: var(--ui-btn-weight);
+    letter-spacing: var(--ui-btn-tracking);
+    height: 2.25rem;
+    padding: 0 1rem;
+    cursor: pointer;
+    transition: background-color 0.15s, color 0.15s, box-shadow 0.15s;
+    font-family: inherit;
+  }
+  .ui[data-ui-theme='material'] .ui-btn {
+    border-radius: 100px;
+    height: 2.5rem;
+    padding: 0 1.5rem;
+  }
+  .ui-btn--default {
+    background: var(--ui-primary);
+    color: var(--ui-primary-foreground);
+    box-shadow: var(--ui-shadow);
+  }
+  .ui-btn--default:hover {
+    filter: brightness(1.25);
+  }
+  .ui-btn--secondary {
+    background: var(--ui-secondary);
+    color: var(--ui-secondary-foreground);
+  }
+  .ui-btn--destructive {
+    background: var(--ui-destructive);
+    color: #fff;
+  }
+  .ui-btn--outline {
+    background: var(--ui-background);
+    color: var(--ui-foreground);
+    border-color: var(--ui-input);
+    box-shadow: var(--ui-shadow);
+  }
+  .ui-btn--outline:hover {
+    background: var(--ui-accent);
+    color: var(--ui-accent-foreground);
+  }
+  .ui-btn--ghost {
+    background: transparent;
+    color: var(--ui-foreground);
+  }
+  .ui-btn--ghost:hover {
+    background: var(--ui-accent);
+  }
+  .ui-btn--link {
+    background: transparent;
+    color: var(--ui-primary);
+    text-decoration: underline;
+    text-underline-offset: 4px;
+    padding: 0;
+    height: auto;
+  }
+  .ui-btn--sm {
+    height: 2rem;
+    padding: 0 0.75rem;
+    font-size: 0.8125rem;
+  }
+  .ui-btn--lg {
+    height: 2.5rem;
+    padding: 0 2rem;
+  }
+  .ui-btn--icon {
+    width: 2.25rem;
+    padding: 0;
+  }
+  .ui-btn:disabled {
+    opacity: 0.5;
+    pointer-events: none;
+  }
+  .ui-btn:focus-visible,
+  .ui-btn[data-focus] {
+    outline: 2px solid var(--ui-ring);
+    outline-offset: 2px;
+  }
+
+  /* Input / Label */
+  .ui-label {
+    display: block;
+    font-size: 0.8125rem;
+    font-weight: 500;
+    margin-bottom: 0.375rem;
+  }
+  .ui-input {
+    display: flex;
+    width: 100%;
+    height: 2.25rem;
+    border-radius: calc(var(--ui-radius) - 2px);
+    border: 1px solid var(--ui-input);
+    background: var(--ui-background);
+    color: var(--ui-foreground);
+    padding: 0 0.75rem;
+    font-size: 0.875rem;
+    font-family: inherit;
+    box-shadow: var(--ui-shadow);
+  }
+  .ui-input::placeholder {
+    color: var(--ui-muted-foreground);
+  }
+  .ui-input:focus {
+    outline: 2px solid var(--ui-ring);
+    outline-offset: 1px;
+  }
+  .ui-input[aria-invalid='true'] {
+    border-color: var(--ui-destructive);
+    outline-color: var(--ui-destructive);
+  }
+  .ui-error {
+    font-size: 0.75rem;
+    color: var(--ui-destructive);
+    margin-top: 0.3rem;
+    font-weight: 500;
+  }
+
+  /* Card */
+  .ui-card {
+    border-radius: var(--ui-radius);
+    border: 1px solid var(--ui-border);
+    background: var(--ui-card);
+    color: var(--ui-card-foreground);
+    box-shadow: var(--ui-shadow);
+  }
+  .ui[data-ui-theme='material'] .ui-card {
+    border-color: transparent;
+    background: #f7f2fa;
+  }
+  .ui-card__header {
+    padding: 1rem 1.25rem 0.5rem;
+  }
+  .ui-card__title {
+    font-weight: 600;
+    font-size: 1rem;
+    letter-spacing: -0.01em;
+  }
+  .ui-card__desc {
+    font-size: 0.8125rem;
+    color: var(--ui-muted-foreground);
+    margin-top: 0.2rem;
+  }
+  .ui-card__content {
+    padding: 0.5rem 1.25rem 1rem;
+  }
+  .ui-card__footer {
+    padding: 0 1.25rem 1.1rem;
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+  }
+
+  /* Badge */
+  .ui-badge {
+    display: inline-flex;
+    align-items: center;
+    border-radius: 9999px;
+    border: 1px solid transparent;
+    padding: 0.1rem 0.6rem;
+    font-size: 0.72rem;
+    font-weight: 600;
+    line-height: 1.4;
+  }
+  .ui-badge--default {
+    background: var(--ui-primary);
+    color: var(--ui-primary-foreground);
+  }
+  .ui-badge--secondary {
+    background: var(--ui-secondary);
+    color: var(--ui-secondary-foreground);
+  }
+  .ui-badge--outline {
+    color: var(--ui-foreground);
+    border-color: var(--ui-border);
+  }
+
+  /* Alert */
+  .ui-alert {
+    border-radius: var(--ui-radius);
+    border: 1px solid var(--ui-border);
+    padding: 0.75rem 1rem;
+    display: flex;
+    gap: 0.7rem;
+    align-items: flex-start;
+  }
+  .ui-alert__title {
+    font-weight: 600;
+    font-size: 0.875rem;
+  }
+  .ui-alert__desc {
+    font-size: 0.8125rem;
+    opacity: 0.85;
+  }
+
+  /* Tabs */
+  .ui-tabs {
+    display: inline-flex;
+    background: var(--ui-muted);
+    border-radius: calc(var(--ui-radius) - 2px);
+    padding: 3px;
+    gap: 2px;
+  }
+  .ui-tabs__trigger {
+    padding: 0.25rem 0.75rem;
+    border-radius: calc(var(--ui-radius) - 4px);
+    font-size: 0.8125rem;
+    font-weight: 500;
+    white-space: nowrap;
+    color: var(--ui-muted-foreground);
+    border: none;
+    background: transparent;
+    cursor: pointer;
+    font-family: inherit;
+  }
+  .ui-tabs__trigger[data-active='true'] {
+    background: var(--ui-background);
+    color: var(--ui-foreground);
+    box-shadow: var(--ui-shadow);
+  }
+
+  /* Table */
+  .ui-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.8125rem;
+  }
+  .ui-table th {
+    text-align: left;
+    font-weight: 500;
+    color: var(--ui-muted-foreground);
+    padding: 0.5rem 0.75rem;
+    border-bottom: 1px solid var(--ui-border);
+  }
+  .ui-table td {
+    padding: 0.5rem 0.75rem;
+    border-bottom: 1px solid var(--ui-border);
+  }
+
+  /* Avatar / Separator / Progress */
+  .ui-avatar {
+    width: 2.25rem;
+    height: 2.25rem;
+    border-radius: 9999px;
+    background: var(--ui-muted);
+    color: var(--ui-muted-foreground);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.75rem;
+    font-weight: 600;
+    flex-shrink: 0;
+  }
+  .ui-separator {
+    height: 1px;
+    background: var(--ui-border);
+    margin: 0.6rem 0;
+  }
+  .ui-progress {
+    height: 0.5rem;
+    border-radius: 9999px;
+    background: var(--ui-muted);
+    overflow: hidden;
+  }
+  .ui-progress__bar {
+    height: 100%;
+    background: var(--ui-primary);
+  }
+</style>

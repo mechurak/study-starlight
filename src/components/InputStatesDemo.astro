@@ -1,0 +1,28 @@
+---
+/*
+  aria-invalid="true" 속성 하나로 스타일이 따라 바뀌는 것을 보여준다.
+  "접근성 속성이 곧 스타일 훅"의 실물.
+*/
+import UiSurface from './UiSurface.astro';
+---
+
+<div class="grid">
+  <UiSurface label="기본">
+    <label class="ui-label">이메일</label>
+    <input class="ui-input" value="dev@example" readonly />
+  </UiSurface>
+  <UiSurface label='aria-invalid="true" 만 추가'>
+    <label class="ui-label">이메일</label>
+    <input class="ui-input" value="dev@example" aria-invalid="true" readonly />
+    <div class="ui-error">올바른 이메일 형식이 아닙니다</div>
+  </UiSurface>
+</div>
+
+<style>
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
+    gap: 0.9rem;
+    margin: 1rem 0;
+  }
+</style>

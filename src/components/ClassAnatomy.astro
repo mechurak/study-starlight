@@ -1,0 +1,80 @@
+---
+/*
+  긴 유틸리티 클래스 문자열이 사실은 몇 개의 "관심사"로 나뉜다는 것을 색으로 보여준다.
+  groups: [[그룹명, '클래스 클래스 …'], ...]
+*/
+interface Props {
+  groups: [string, string][];
+}
+const { groups } = Astro.props;
+
+// [라이트 bg, 라이트 fg, 다크 bg, 다크 fg]
+const palette: Record<string, [string, string, string, string]> = {
+  레이아웃: ['#e0e7ff', '#3730a3', '#312e81', '#c7d2fe'],
+  크기: ['#dbeafe', '#1e40af', '#1e3a8a', '#bfdbfe'],
+  간격: ['#dcfce7', '#166534', '#14532d', '#bbf7d0'],
+  타이포: ['#fef3c7', '#92400e', '#78350f', '#fde68a'],
+  색상: ['#fce7f3', '#9d174d', '#831843', '#fbcfe8'],
+  테두리: ['#ede9fe', '#5b21b6', '#4c1d95', '#ddd6fe'],
+  상태: ['#ffe4e6', '#9f1239', '#881337', '#fecdd3'],
+  반응형: ['#ccfbf1', '#115e59', '#134e4a', '#99f6e4'],
+  애니메이션: ['#f3e8ff', '#6b21a8', '#581c87', '#e9d5ff'],
+};
+const fallbackColors: [string, string, string, string] = ['#f4f4f5', '#3f3f46', '#3f3f46', '#d4d4d8'];
+const colorsOf = (name: string) => palette[name] || fallbackColors;
+---
+
+<div class="anat">
+  {groups.map(([name, classes]) => (
+    <div class="grow" style={`--g-bg:${colorsOf(name)[0]};--g-fg:${colorsOf(name)[1]};--g-bg-dark:${colorsOf(name)[2]};--g-fg-dark:${colorsOf(name)[3]}`}>
+      <span class="gname">{name}</span>
+      <span class="cls">
+        {classes.split(' ').map((c) => <code>{c}</code>)}
+      </span>
+    </div>
+  ))}
+</div>
+
+<style>
+  .anat {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    margin: 1rem 0;
+  }
+  .grow {
+    display: flex;
+    align-items: baseline;
+    gap: 0.55rem;
+  }
+  .gname {
+    font-size: 0.7rem;
+    font-weight: 700;
+    padding: 0.1rem 0.5rem;
+    border-radius: 4px;
+    width: 5rem;
+    flex-shrink: 0;
+    text-align: center;
+    background: var(--g-bg);
+    color: var(--g-fg);
+  }
+  .cls {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.25rem;
+    min-width: 0;
+  }
+  .cls code {
+    font-family: ui-monospace, monospace;
+    font-size: 0.72rem;
+    padding: 0.06rem 0.4rem;
+    border-radius: 4px;
+    background: var(--g-bg);
+    color: var(--g-fg);
+  }
+  :global([data-theme='dark']) .gname,
+  :global([data-theme='dark']) .cls code {
+    background: var(--g-bg-dark);
+    color: var(--g-fg-dark);
+  }
+</style>

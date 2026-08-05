@@ -4,6 +4,7 @@ description: "components.json이 모든 것을 결정한다 — 되돌릴 수 �
 ---
 
 import { Steps, Tabs, TabItem, FileTree, LinkCard } from '@astrojs/starlight/components';
+import ColorScale from '../../../components/ColorScale.astro';
 
 > `init`에서 고르는 것 중 셋은 나중에 못 바꾼다
 
@@ -144,6 +145,10 @@ init 직후 `globals.css`를 열어보면 학습 효과가 크다.
 | `stone` | 따뜻한 기. 부드러움 |
 | `neutral` | 순수 무채색 |
 | `mauve` / `olive` / `mist` / `taupe` | 미세한 색조가 섞인 중립색 |
+
+<ColorScale name="zinc — 완전 중립 · 가장 무난" colors={['#fafafa','#f4f4f5','#e4e4e7','#d4d4d8','#a1a1aa','#71717a','#52525b','#3f3f46','#27272a','#18181b','#09090b']} />
+<ColorScale name="slate — 푸른 기 · 차분하고 테크틱" colors={['#f8fafc','#f1f5f9','#e2e8f0','#cbd5e1','#94a3b8','#64748b','#475569','#334155','#1e293b','#0f172a','#020617']} />
+<ColorScale name="stone — 따뜻한 기 · 부드러움" colors={['#fafaf9','#f5f5f4','#e7e5e4','#d6d3d1','#a8a29e','#78716c','#57534e','#44403c','#292524','#1c1917','#0c0a09']} />
 
 브랜드 색이 따뜻하면 `stone`/`taupe`, 차가우면 `zinc`/`mist` 쪽이 어울린다.
 
