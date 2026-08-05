@@ -37,6 +37,9 @@ mermaid 다이어그램 **약 175개**와 Starlight 컴포넌트를 얹었다 �
   topic 밖 페이지를 새로 만들면 여기에 추가해야 경고가 안 난다.
 - **`pnpm-workspace.yaml`은 워크스페이스가 아니라 `allowBuilds`(esbuild·sharp) 설정용**이다.
   지우면 설치 시 빌드 스크립트가 막힌다.
+  **`allowBuilds`는 pnpm 10.26.0부터의 문법**이다 (그 전에는 `onlyBuiltDependencies`).
+  더 낮은 pnpm에서 설치하면 필드가 무시되고 **sharp가 안 빌드돼 `astro build`가 깨진다** —
+  CI(Cloudflare 기본 이미지는 pnpm 10.11.1)에서 실제로 걸리는 지점이라 `PNPM_VERSION`을 박아야 한다.
 - **`CLAUDE.md`는 `AGENTS.md`로의 심링크**다. 수정은 AGENTS.md에 한다.
 
 ## 콘텐츠 규칙 (cka 이관하며 정한 것)
