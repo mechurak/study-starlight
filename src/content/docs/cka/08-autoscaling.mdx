@@ -3,17 +3,54 @@ title: "8. 오토스케일링"
 description: "부하에 따라 개수를 바꾼다"
 ---
 
+import { Steps, Card, CardGrid, Tabs, TabItem } from '@astrojs/starlight/components';
+
 > 부하에 따라 개수를 바꾼다
 
 ## 세 가지 오토스케일링
+
+<CardGrid>
+<Card title="HPA — Pod 개수" icon="random">
+Horizontal Pod Autoscaler.
+**기본 내장.** 커리큘럼이 말하는 건 사실상 이것.
+</Card>
+<Card title="VPA — Pod 크기" icon="setting">
+Vertical Pod Autoscaler.
+requests/limits를 조정. **별도 설치**(CRD).
+</Card>
+<Card title="Cluster Autoscaler — 노드 개수" icon="server">
+Pending Pod이 있으면 노드를 늘린다.
+**클라우드 제공자별 설치.**
+</Card>
+</CardGrid>
+
+셋은 계층이 다르다. **차례로 물려 있다.**
+
+```mermaid
+flowchart LR
+    LOAD["부하 증가"] --> HPA["HPA<br/>Pod 개수를 늘린다"]
+    HPA --> Q{"노드에 자리가<br/>있는가"}
+    Q -->|"있다"| OK["새 Pod 이 뜬다 ✅"]
+    Q -->|"없다"| PEND["Pod 이 Pending"]
+    PEND --> CA["Cluster Autoscaler<br/>노드를 늘린다"]
+    CA --> OK
+    VPA["VPA<br/>Pod 하나의 크기를 키운다"] -.->|"다른 축이다"| HPA
+
+    classDef key fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
+    classDef ok fill:#dcfce7,stroke:#16a34a,color:#14532d
+    classDef warn fill:#fef3c7,stroke:#d97706,color:#78350f
+    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
+    class HPA,CA key
+    class OK ok
+    class PEND warn
+    class LOAD,Q,VPA mute
+```
 
 | 이름 | 무엇을 늘리나 | 어디에 있나 |
 |---|---|---|
 | **HPA** (Horizontal Pod Autoscaler) | **Pod 개수** | 기본 내장 |
 | **VPA** (Vertical Pod Autoscaler) | Pod의 requests/limits | 별도 설치 |
 | **Cluster Autoscaler** | **노드 개수** | 클라우드 제공자별 설치 |
-
-셋은 계층이 다르다. **HPA가 Pod을 늘리다 자리가 없으면 → Cluster Autoscaler가 노드를 늘린다.**
 
 :::tip[시험]
 커리큘럼의 "워크로드 오토스케일링 구성"은 사실상 **HPA**다.
@@ -57,13 +94,19 @@ kubectl patch deploy metrics-server -n kube-system --type=json \
 
 ```mermaid
 flowchart LR
-    K["kubelet<br/>(cAdvisor)"] --> MS["metrics-server"]
-    MS -->|"metrics.k8s.io<br/>API 등록"| API["kube-apiserver"]
+    K["kubelet<br/>cAdvisor"] --> MS["metrics-server<br/>메모리에만 저장"]
+    MS -->|"metrics.k8s.io<br/>APIService 등록"| API["kube-apiserver"]
     API --> HPA["HPA 컨트롤러"]
     API --> TOP["kubectl top"]
     HPA -->|"replicas 조정"| D["Deployment"]
+    PROM["장기·커스텀 메트릭이 필요하면<br/>Prometheus + adapter"] -.-> API
 
-    style MS fill:#dbeafe,stroke:#326ce5
+    classDef key fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
+    classDef warn fill:#fef3c7,stroke:#d97706,color:#78350f
+    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
+    class MS key
+    class PROM warn
+    class K,API,HPA,TOP,D mute
 ```
 
 - metrics-server는 **APIService로 등록**된다 (`metrics.k8s.io`) — 그래서 `kubectl top`이 동작한다
@@ -101,11 +144,27 @@ spec:
 
 ## HPA가 개수를 정하는 방식
 
-목표 개수 = ceil( 현재 개수 × (현재 지표 / 목표 지표) )
+```mermaid
+flowchart LR
+    M["현재 지표<br/>CPU 평균 90%"] --> C["ceil( 현재 개수 × 현재지표 / 목표지표 )"]
+    T["목표 지표<br/>70%"] --> C
+    R["현재 3개"] --> C
+    C --> CALC["3 × 90/70 = 3.86"] --> UP["올림 → 4개"]
+    TOL["비율이 0.9 ~ 1.1 이면<br/>움직이지 않는다 · tolerance"] -.->|"진동 방지"| C
 
-예: 현재 3개, CPU 평균 사용률 90%, 목표 70%
+    classDef key fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
+    classDef ok fill:#dcfce7,stroke:#16a34a,color:#14532d
+    classDef warn fill:#fef3c7,stroke:#d97706,color:#78350f
+    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
+    class C key
+    class UP ok
+    class TOL warn
+    class M,T,R,CALC mute
+```
 
-3 × (90 / 70) = 3.86 → 올림 → **4개**
+**목표 개수 = ceil( 현재 개수 × (현재 지표 / 목표 지표) )**
+
+예: 현재 3개, CPU 평균 사용률 90%, 목표 70% → 3 × (90 / 70) = 3.86 → 올림 → **4개**
 
 - 비율이 **0.9~1.1 사이면 움직이지 않는다** (tolerance) — 진동 방지
 - 기본 15초마다 평가한다 (컨트롤러 매니저의 `--horizontal-pod-autoscaler-sync-period`)
@@ -122,6 +181,25 @@ spec:
 kubectl get hpa
 # NAME  REFERENCE        TARGETS         MINPODS  MAXPODS  REPLICAS  AGE
 # web   Deployment/web   cpu: 45%/70%    2        10       3         5m
+```
+
+```mermaid
+flowchart TD
+    T{"TARGETS 표시"}
+    T -->|"45%/70%"| OK["정상 동작 중 ✅"]
+    T -->|"unknown/70%"| U{"원인 둘 중 하나"}
+    U --> U1["① kubectl top pods 가 되는가<br/>→ metrics-server 확인"]
+    U --> U2["② Deployment 에 resources.requests.cpu 가 있는가<br/>→ 없으면 계산 불가"]
+    T -->|"none"| N["대상 워크로드를 못 찾는다<br/>scaleTargetRef 확인"]
+
+    classDef ok fill:#dcfce7,stroke:#16a34a,color:#14532d
+    classDef bad fill:#fee2e2,stroke:#dc2626,color:#7f1d1d
+    classDef warn fill:#fef3c7,stroke:#d97706,color:#78350f
+    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
+    class OK ok
+    class N bad
+    class U1,U2 warn
+    class T,U mute
 ```
 
 | TARGETS 표시 | 뜻 |
@@ -168,6 +246,22 @@ metrics:
         averageValue: "1000"
 ```
 
+```mermaid
+flowchart LR
+    M1["CPU 계산 → 4개"] --> MAX{"가장 큰 값을 택한다"}
+    M2["메모리 계산 → 6개"] --> MAX
+    M3["커스텀 계산 → 3개"] --> MAX
+    MAX --> R["6개로 확장"]
+    NOTE["하나라도 넘치면 늘어난다<br/>축소는 전부 여유가 있어야 한다"] -.- MAX
+
+    classDef key fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
+    classDef ok fill:#dcfce7,stroke:#16a34a,color:#14532d
+    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
+    class MAX key
+    class R ok
+    class M1,M2,M3,NOTE mute
+```
+
 - 여러 메트릭이 있으면 **각각 계산해서 가장 큰 값을 택한다**
 - 즉 **하나라도 넘치면 늘어난다.** 축소는 전부 여유가 있어야 한다
 
@@ -194,20 +288,36 @@ spec:
           periodSeconds: 60
 ```
 
+```mermaid
+flowchart LR
+    UP["scaleUp<br/>stabilizationWindow 0"] --> F["빠르게 늘린다 ⚡"]
+    DOWN["scaleDown<br/>stabilizationWindow 300"] --> S["5분 관찰 후 천천히 줄인다 🐢"]
+    DIS["selectPolicy: Disabled"] -.->|"그 방향으로는 아예 안 움직인다"| BOTH["scaleUp 또는 scaleDown"]
+
+    classDef ok fill:#dcfce7,stroke:#16a34a,color:#14532d
+    classDef warn fill:#fef3c7,stroke:#d97706,color:#78350f
+    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
+    class F ok
+    class S warn
+    class UP,DOWN,DIS,BOTH mute
+```
+
 - **기본은 "빠르게 늘리고 천천히 줄인다"** — 축소 안정화 창이 300초다
 - `selectPolicy: Disabled` 로 두면 **그 방향으로는 아예 안 움직인다**
 
 ## VPA와 Cluster Autoscaler
 
-**VPA**
+<Tabs>
+<TabItem label="VPA — Pod 크기">
 
 - Pod의 **requests/limits를 자동 조정**
 - 별도 설치(CRD). 기본 내장이 아니다
 - 모드: `Off`(추천만) / `Initial` / `Auto`
 - 예전에는 적용에 Pod 재생성이 필요했다
-  → **in-place resize(v1.35 GA)** 로 개선되는 중
+  → **in-place resize(v1.35 GA)** 로 개선되는 중 (4장)
 
-**Cluster Autoscaler**
+</TabItem>
+<TabItem label="Cluster Autoscaler — 노드 개수">
 
 - **Pending Pod이 있으면 노드를 늘린다**
 - 노드가 오래 비어 있으면 줄인다
@@ -215,12 +325,30 @@ spec:
   (EKS: 노드그룹, 또는 **Karpenter**)
 - 온프레미스에서는 대개 못 쓴다
 
+</TabItem>
+</Tabs>
+
 :::caution[함정]
 **HPA와 VPA를 같은 워크로드에 함께 쓰면 충돌한다**
 (둘 다 CPU를 보고 서로 반대로 움직인다). 함께 쓰려면 VPA는 메모리만, HPA는 CPU만 맡긴다.
 :::
 
 ## HPA에서 자주 걸리는 것들
+
+```mermaid
+flowchart LR
+    S["kubectl scale deploy web --replicas=8"] --> HPA["HPA 가 붙어 있다"]
+    HPA -->|"다음 평가 주기 · 15초"| BACK["계산값으로 되돌린다 ❌"]
+    FIX1["HPA 를 지운다"] -.-> OK["수동 스케일이 유지된다"]
+    FIX2["minReplicas 를 바꾼다"] -.-> OK
+
+    classDef bad fill:#fee2e2,stroke:#dc2626,color:#7f1d1d
+    classDef ok fill:#dcfce7,stroke:#16a34a,color:#14532d
+    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
+    class BACK bad
+    class OK ok
+    class S,HPA,FIX1,FIX2 mute
+```
 
 :::caution[함정 1]
 **HPA가 있는데 `kubectl scale`을 쓰면**

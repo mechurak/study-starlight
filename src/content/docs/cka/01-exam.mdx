@@ -3,24 +3,26 @@ title: "1. CKA 시험 해부"
 description: "무엇이 나오고, 어떻게 채점되는가"
 ---
 
+import { Steps, Card, CardGrid, Tabs, TabItem, LinkCard, Badge } from '@astrojs/starlight/components';
+
 > 무엇이 나오고, 어떻게 채점되는가
 
 ## CKA는 어떤 시험인가
 
-**형식**
-
-- **2시간**, 원격 감독(웹캠 필수)
-- **15~20개**의 수행형 과제
-- 합격선 **66%**
-- 문제는 **순서 무관** — 아무거나 먼저 풀어도 된다
-- 재응시 1회 무료 포함
-
-**환경**
-
-- 브라우저 안의 **리눅스 데스크톱 + 터미널**
-- 진짜 클러스터 여러 개를 준다
-- 문제마다 **`kubectl config use-context ...`** 를 먼저 실행
-- 노드 접속은 **`ssh <노드이름>`**, 권한은 **`sudo -i`**
+<CardGrid>
+<Card title="형식" icon="document">
+**2시간**, 원격 감독(웹캠 필수).
+**15~20개**의 수행형 과제.
+합격선 **66%**. 문제는 **순서 무관**.
+재응시 1회 무료 포함.
+</Card>
+<Card title="환경" icon="laptop">
+브라우저 안의 **리눅스 데스크톱 + 터미널**.
+진짜 클러스터 여러 개를 준다.
+문제마다 **`kubectl config use-context ...`** 를 먼저 실행.
+노드 접속은 **`ssh <노드이름>`**, 권한은 **`sudo -i`**.
+</Card>
+</CardGrid>
 
 :::caution[함정]
 클러스터가 여러 개다. 컨텍스트를 안 바꾸고 풀면
@@ -28,6 +30,30 @@ description: "무엇이 나오고, 어떻게 채점되는가"
 :::
 
 ## 도메인과 배점
+
+```mermaid
+flowchart LR
+    T["Troubleshooting<br/>30%<br/>18장"]
+    C["Cluster Architecture<br/>25%<br/>14~17장"]
+    N["Services & Networking<br/>20%<br/>9~12장"]
+    W["Workloads & Scheduling<br/>15%<br/>4~8장"]
+    S["Storage<br/>10%<br/>13장"]
+    T --- C
+    C --- N
+    N --- W
+    W --- S
+    SUM["T + C = 55%<br/>여기가 승부처다"] -.- T
+    SUM -.- C
+
+    classDef big fill:#fee2e2,stroke:#dc2626,color:#7f1d1d
+    classDef mid fill:#fef3c7,stroke:#d97706,color:#78350f
+    classDef small fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
+    classDef note fill:#dcfce7,stroke:#16a34a,color:#14532d
+    class T,C big
+    class N,W mid
+    class S small
+    class SUM note
+```
 
 | 비중 | 도메인 | 이 덱의 장 |
 |---|---|---|
@@ -43,7 +69,9 @@ description: "무엇이 나오고, 어떻게 채점되는가"
 
 ## 도메인별 실제 출제 항목 (커리큘럼 원문 정리)
 
-**Cluster Architecture (25%)**
+<Tabs>
+<TabItem label="Cluster Architecture 25%">
+
 - RBAC 관리
 - 클러스터 설치를 위한 인프라 준비
 - **kubeadm으로 클러스터 생성·관리**
@@ -53,19 +81,17 @@ description: "무엇이 나오고, 어떻게 채점되는가"
 - 확장 인터페이스(CNI, CSI, CRI) 이해
 - **CRD 이해, 오퍼레이터 설치·구성**
 
-**Storage (10%)**
-- StorageClass와 동적 프로비저닝
-- 볼륨 타입·접근 모드·reclaim 정책
-- PV / PVC 관리
+</TabItem>
+<TabItem label="Troubleshooting 30%">
 
-**Workloads and Scheduling (15%)**
-- Deployment 롤링 업데이트·롤백
-- ConfigMap·Secret으로 앱 설정
-- **워크로드 오토스케일링 구성**
-- 자가치유 배포의 기본 요소
-- **Pod admission과 스케줄링(limits, node affinity 등)**
+- 클러스터·노드 / 클러스터 컴포넌트 진단
+- 리소스 사용량 모니터링
+- **컨테이너 출력 스트림 관리·평가**
+- 서비스·네트워킹 진단
 
-**Servicing and Networking (20%)**
+</TabItem>
+<TabItem label="Networking 20%">
+
 - Pod 간 연결성 이해
 - NetworkPolicy 정의·적용
 - ClusterIP / NodePort / LoadBalancer와 엔드포인트
@@ -73,15 +99,47 @@ description: "무엇이 나오고, 어떻게 채점되는가"
 - Ingress 컨트롤러와 Ingress 리소스
 - CoreDNS 이해·사용
 
-**Troubleshooting (30%)**
-- 클러스터·노드 / 클러스터 컴포넌트 진단
-- 리소스 사용량 모니터링
-- **컨테이너 출력 스트림 관리·평가**
-- 서비스·네트워킹 진단
+</TabItem>
+<TabItem label="Workloads 15% · Storage 10%">
+
+**Workloads and Scheduling (15%)**
+
+- Deployment 롤링 업데이트·롤백
+- ConfigMap·Secret으로 앱 설정
+- **워크로드 오토스케일링 구성**
+- 자가치유 배포의 기본 요소
+- **Pod admission과 스케줄링(limits, node affinity 등)**
+
+**Storage (10%)**
+
+- StorageClass와 동적 프로비저닝
+- 볼륨 타입·접근 모드·reclaim 정책
+- PV / PVC 관리
+
+</TabItem>
+</Tabs>
 
 ## 커리큘럼에서 읽어야 할 신호
 
 굵게 표시한 항목들이 **최근 개정에서 들어오거나 강조된 것**들이다.
+
+```mermaid
+flowchart LR
+    NEW["최근 개정에서 강조된 것"]
+    NEW --> G["Gateway API<br/>Ingress 만 알면 안 된다 · 11장"]
+    NEW --> H["Helm / Kustomize<br/>설치·값 오버라이드 · 16장"]
+    NEW --> C["CRD와 오퍼레이터<br/>설치하고 상태 확인 · 17장"]
+    NEW --> A["워크로드 오토스케일링<br/>HPA + metrics-server · 8장"]
+    NEW --> L["컨테이너 출력 스트림<br/>로그 전반 · 18장"]
+    OLD["오래된 자료의 함정"] -.->|"Docker · PodSecurityPolicy 를 다루고<br/>Gateway API 가 없다 ❌"| NEW
+
+    classDef key fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
+    classDef bad fill:#fee2e2,stroke:#dc2626,color:#7f1d1d
+    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
+    class NEW key
+    class OLD bad
+    class G,H,C,A,L mute
+```
 
 - **Gateway API** — Ingress만 알면 안 된다. CRD 기반이라 설치부터 다르다 (11장)
 - **Helm / Kustomize** — "컴포넌트 설치" 맥락. 차트 작성이 아니라 **설치·값 오버라이드** (16장)
@@ -116,7 +174,22 @@ description: "무엇이 나오고, 어떻게 채점되는가"
 - **복사/붙여넣기는 `Ctrl+Shift+C` / `Ctrl+Shift+V`** — 터미널 안에서는 `Ctrl+C`가 안 된다
 - **`Insert` 키가 막혀 있다** — vim에서 삽입 모드는 `i`, 빠져나오기는 `Esc`
 - 문제 지문에서 명령을 복사할 때 **줄바꿈이 깨지는 일**이 있다. 붙여넣고 눈으로 확인
-- 노드 작업 후에는 **반드시 `exit`** 해서 원래 셸로 돌아올 것 (다음 문제를 노드에서 풀면 안 된다)
+- 노드 작업 후에는 **반드시 `exit`** 해서 원래 셸로 돌아올 것
+
+```mermaid
+flowchart LR
+    Q1["문제 N"] --> SSH["ssh node01"] --> WORK["노드에서 작업"]
+    WORK -->|"exit 했다 ✅"| BACK["원래 셸<br/>다음 문제 정상"]
+    WORK -->|"exit 을 잊었다 ❌"| STUCK["노드 셸에 남는다<br/>kubectl 이 다른 kubeconfig 를 보거나 아예 없다"]
+    STUCK --> WHY["'갑자기 명령이 안 먹는다' 의 90%"]
+
+    classDef ok fill:#dcfce7,stroke:#16a34a,color:#14532d
+    classDef bad fill:#fee2e2,stroke:#dc2626,color:#7f1d1d
+    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
+    class BACK ok
+    class STUCK,WHY bad
+    class Q1,SSH,WORK mute
+```
 
 :::caution[함정]
 `ssh node01` 후 `exit`을 잊고 다음 문제를 풀면
@@ -135,16 +208,19 @@ set shiftwidth=2
 set number
 ```
 
-**이동**
-- `gg` / `G` — 처음 / 끝
-- `:42` — 42번 줄로
-- `/문자열` + `n` — 검색
-
-**편집**
-- `dd` / `3dd` — 줄 삭제
-- `yy` + `p` — 줄 복사·붙여넣기
-- `u` / `Ctrl+r` — 실행 취소 / 되돌리기
-- `V` + `>` — 블록 들여쓰기
+<CardGrid>
+<Card title="이동" icon="right-arrow">
+`gg` / `G` — 처음 / 끝
+`:42` — 42번 줄로
+`/문자열` + `n` — 검색
+</Card>
+<Card title="편집" icon="pencil">
+`dd` / `3dd` — 줄 삭제
+`yy` + `p` — 줄 복사·붙여넣기
+`u` / `Ctrl+r` — 실행 취소 / 되돌리기
+`V` + `>` — 블록 들여쓰기
+</Card>
+</CardGrid>
 
 :::tip[시험]
 `set expandtab`이 없으면 탭 문자가 들어가
@@ -155,11 +231,25 @@ set number
 
 시험 중 브라우저에서 **아래만** 열 수 있다.
 
-- `kubernetes.io/docs/` — 공식 문서 (검색 기능도 사용 가능)
-- `kubernetes.io/blog/`
-- `helm.sh/docs/`
-- `gateway-api.sigs.k8s.io/`
-- 문제의 Quick Reference 박스가 주는 링크
+```mermaid
+flowchart LR
+    OK["열 수 있다 ✅"] --> O1["kubernetes.io/docs/<br/>검색 기능 포함"]
+    OK --> O2["kubernetes.io/blog/"]
+    OK --> O3["helm.sh/docs/"]
+    OK --> O4["gateway-api.sigs.k8s.io/"]
+    OK --> O5["문제의 Quick Reference 링크"]
+    NG["열면 안 된다 ❌"] --> N1["GitHub"]
+    NG --> N2["StackOverflow"]
+    NG --> N3["블로그 전부"]
+    NOTE["검색은 되지만<br/>외부 사이트 클릭에 주의"] -.- NG
+
+    classDef ok fill:#dcfce7,stroke:#16a34a,color:#14532d
+    classDef bad fill:#fee2e2,stroke:#dc2626,color:#7f1d1d
+    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
+    class OK,O1,O2,O3,O4,O5 ok
+    class NG,N1,N2,N3 bad
+    class NOTE mute
+```
 
 :::caution[함정]
 **공식 문서 검색 결과 중 외부 사이트는 열면 안 된다.**
@@ -191,6 +281,22 @@ GitHub, StackOverflow, 블로그 전부 금지다. 검색은 되지만 클릭에
 
 ## 채점은 결과만 본다
 
+```mermaid
+flowchart LR
+    M1["kubectl create 로 만들었다"] --> R["클러스터의 최종 상태"]
+    M2["YAML 파일로 만들었다"] --> R
+    M3["kubectl edit 으로 고쳤다"] --> R
+    R --> SCORE["자동 검증 스크립트가 채점<br/>어떻게 만들었는지는 상관없다"]
+    SCORE --> PART["부분 점수가 있다<br/>맞춘 요구만큼 받는다"]
+
+    classDef key fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
+    classDef ok fill:#dcfce7,stroke:#16a34a,color:#14532d
+    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
+    class R key
+    class PART ok
+    class M1,M2,M3,SCORE mute
+```
+
 - 채점은 **자동화된 검증 스크립트**가 클러스터의 최종 상태를 본다
 - **어떻게 만들었는지는 상관없다** — `kubectl create`든 YAML 파일이든 동일
 - 그러니 **YAML 파일을 예쁘게 만들 이유가 없다.** 상태만 맞으면 된다
@@ -209,12 +315,21 @@ GitHub, StackOverflow, 블로그 전부 금지다. 검색은 되지만 클릭에
 - **1분 문제**: 라벨 붙이기, Pod 하나 만들기, 노드 cordon
 - **10~15분 문제**: 클러스터 업그레이드, etcd 복구, 고장난 컨트롤 플레인 수리
 
-**권장 흐름**
+<Steps>
 
-1. 전체를 **한 번 훑으며** 쉬운 것부터 처리 (배점이 문제마다 표시된다)
-2. 막히면 **플래그 걸고 즉시 넘어간다.** 5분 룰
-3. 남은 시간에 플래그로 돌아온다
-4. **마지막 10분은 검산** — 컨텍스트 실수, 네임스페이스 실수 확인
+1. **전체를 한 번 훑으며 쉬운 것부터 처리**
+
+   배점이 문제마다 표시된다. 3분 안에 풀리는 것을 먼저 끝낸다.
+
+2. **막히면 플래그 걸고 즉시 넘어간다** — 5분 룰
+
+3. **남은 시간에 플래그로 돌아온다**
+
+4. **마지막 10분은 검산**
+
+   컨텍스트 실수, 네임스페이스 실수를 확인한다.
+
+</Steps>
 
 :::caution[함정]
 배점이 높다고 먼저 풀지 말 것.
@@ -244,4 +359,8 @@ GitHub, StackOverflow, 블로그 전부 금지다. 검색은 되지만 클릭에
 - 채점은 **최종 상태만** 본다 → 명령형 우선, YAML은 필요할 때만
 - 노드에서 나올 때 **`exit`**, vim은 **`expandtab`**
 
-다음 장부터 본론이다. **클러스터가 실제로 어떻게 생겼는지**부터.
+<LinkCard
+  title="2. 클러스터 아키텍처"
+  description="다음 장부터 본론이다. 클러스터가 실제로 어떻게 생겼는지부터."
+  href="/cka/02-architecture/"
+/>

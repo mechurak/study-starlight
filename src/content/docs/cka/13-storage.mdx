@@ -3,6 +3,8 @@ title: "13. 스토리지"
 description: "컨테이너가 죽어도 남는 데이터"
 ---
 
+import { Steps, Card, CardGrid, Tabs, TabItem } from '@astrojs/starlight/components';
+
 > 컨테이너가 죽어도 남는 데이터
 
 ## 볼륨이 필요한 이유
@@ -13,11 +15,41 @@ description: "컨테이너가 죽어도 남는 데이터"
 
 Kubernetes는 이걸 **세 층**으로 푼다.
 
-| 층 | 무엇 |
-|---|---|
-| **Volume** | Pod 스펙 안의 마운트. Pod과 수명을 같이한다 |
-| **PersistentVolume (PV)** | Pod과 독립적인 저장 공간. 클러스터 리소스 |
-| **PersistentVolumeClaim (PVC)** | "이만큼의 저장소를 달라"는 요청 |
+<CardGrid>
+<Card title="Volume" icon="document">
+Pod 스펙 **안**의 마운트.
+Pod과 수명을 같이한다.
+</Card>
+<Card title="PersistentVolume (PV)" icon="database">
+Pod과 **독립**된 저장 공간.
+클러스터 스코프 리소스다.
+</Card>
+<Card title="PersistentVolumeClaim (PVC)" icon="approve-check">
+"이만큼의 저장소를 달라"는 **요청**.
+네임스페이스에 속한다.
+</Card>
+</CardGrid>
+
+세 층이 어떻게 이어지는가 —
+
+```mermaid
+flowchart LR
+    POD["Pod<br/>spec.volumes"] --> V["Volume<br/>emptyDir · hostPath<br/>configMap · secret"]
+    POD --> PVC["PersistentVolumeClaim<br/>10Gi · RWO 주세요"]
+    PVC -->|"바인딩 1:1"| PV["PersistentVolume<br/>실제 저장 공간"]
+    SC["StorageClass<br/>프로비저너"] -.->|"동적 생성"| PV
+    PV --> BACK[("NFS · EBS · CSI<br/>hostPath …")]
+
+    classDef ns fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
+    classDef cluster fill:#fef3c7,stroke:#d97706,color:#78350f
+    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
+    class POD,V,PVC ns
+    class PV,SC cluster
+    class BACK mute
+```
+
+**파란 것은 네임스페이스 안**(Pod·PVC), **노란 것은 클러스터 스코프**(PV·StorageClass)다.
+이 경계가 곧 뒤에 나올 **개발자와 관리자의 경계**이기도 하다.
 
 ## emptyDir — Pod과 함께 사는 임시 공간
 
@@ -46,6 +78,22 @@ spec:
 - **Pod이 노드에 배정될 때 생기고, Pod이 사라지면 함께 사라진다**
 - **컨테이너 재시작으로는 안 없어진다** — 사이드카 패턴의 기반
 - `medium: Memory`는 빠르지만 **Pod의 메모리 limit에 포함**된다
+
+수명의 경계가 어디인지가 전부다.
+
+```mermaid
+flowchart LR
+    C1["컨테이너 재시작"] --> K1["emptyDir 유지 ✅"]
+    C2["Pod 삭제 · 재스케줄"] --> K2["emptyDir 소멸 ❌"]
+    C3["노드 재부팅"] --> K3["emptyDir 소멸 ❌"]
+
+    classDef ok fill:#dcfce7,stroke:#16a34a,color:#14532d
+    classDef bad fill:#fee2e2,stroke:#dc2626,color:#7f1d1d
+    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
+    class K1 ok
+    class K2,K3 bad
+    class C1,C2,C3 mute
+```
 
 ## hostPath — 노드의 디렉터리
 
@@ -76,19 +124,23 @@ volumes:
 
 ```mermaid
 flowchart LR
-    subgraph A["클러스터 관리자"]
-      SC["StorageClass"]
-      PV["PersistentVolume<br/>실제 저장소"]
+    subgraph A["클러스터 관리자 — 무엇이 있는가"]
+      SC["StorageClass<br/>프로비저너 · 파라미터"]
+      PV["PersistentVolume<br/>capacity · accessModes<br/>reclaimPolicy"]
     end
-    subgraph B["앱 개발자"]
-      PVC["PersistentVolumeClaim<br/>10Gi, RWO 주세요"]
-      POD["Pod"]
+    subgraph B["앱 개발자 — 무엇이 필요한가"]
+      PVC["PersistentVolumeClaim<br/>10Gi · RWO"]
+      POD["Pod<br/>claimName: data"]
     end
-    PVC -->|"바인딩"| PV
     POD --> PVC
+    PVC -->|"바인딩"| PV
+    PVC -.->|"클래스 요청"| SC
     SC -.->|"동적 생성"| PV
 
-    style PVC fill:#dbeafe,stroke:#326ce5
+    classDef admin fill:#fef3c7,stroke:#d97706,color:#78350f
+    classDef dev fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
+    class SC,PV admin
+    class PVC,POD dev
 ```
 
 - **앱 개발자는 저장소가 NFS인지 EBS인지 몰라도 된다.** "10Gi, RWO"만 요청한다
@@ -157,12 +209,27 @@ spec:
 
 ## 바인딩 규칙
 
-PVC가 만들어지면 컨트롤러가 조건에 맞는 PV를 찾는다.
+PVC가 만들어지면 컨트롤러가 조건에 맞는 PV를 찾는다. **네 관문을 전부 통과해야** 묶인다.
 
-1. `storageClassName`이 **일치**하는가
-2. `accessModes`를 **만족**하는가
-3. 용량이 **요청 이상**인가
-4. (셀렉터가 있으면) 라벨이 맞는가
+```mermaid
+flowchart LR
+    PVC["새 PVC"] --> Q1{"storageClassName<br/>일치?"}
+    Q1 -->|아니오| X["Pending<br/>바인딩 안 됨"]
+    Q1 -->|예| Q2{"accessModes<br/>만족?"}
+    Q2 -->|아니오| X
+    Q2 -->|예| Q3{"용량이<br/>요청 이상?"}
+    Q3 -->|아니오| X
+    Q3 -->|예| Q4{"셀렉터가 있으면<br/>라벨 일치?"}
+    Q4 -->|아니오| X
+    Q4 -->|예| B["Bound ✅"]
+
+    classDef ok fill:#dcfce7,stroke:#16a34a,color:#14532d
+    classDef bad fill:#fee2e2,stroke:#dc2626,color:#7f1d1d
+    classDef key fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
+    class B ok
+    class X bad
+    class PVC key
+```
 
 **1:1 관계다.** 바인딩된 PV는 다른 PVC가 쓸 수 없다.
 그리고 **5Gi를 요청했는데 10Gi PV에 묶이면 10Gi 전부를 쓴다** — 남는 5Gi는 낭비된다.
@@ -183,6 +250,31 @@ PVC가 만들어지면 컨트롤러가 조건에 맞는 PV를 찾는다.
 | `ReadWriteMany` | **RWX** | **여러 노드**에서 읽기·쓰기 |
 | `ReadWriteOncePod` | RWOP | **Pod 하나**만 읽기·쓰기 |
 
+**RWO의 경계는 노드다.** 그림으로 보면 헷갈릴 일이 없다.
+
+```mermaid
+flowchart TB
+    subgraph NA["노드 A"]
+      P1["Pod 1"]
+      P2["Pod 2"]
+    end
+    subgraph NB["노드 B"]
+      P3["Pod 3"]
+    end
+    VOL[("RWO PV 하나")]
+
+    P1 -->|"마운트 ✅"| VOL
+    P2 -->|"같은 노드라 가능 ✅"| VOL
+    P3 -.->|"Multi-Attach error ❌"| VOL
+
+    classDef ok fill:#dcfce7,stroke:#16a34a,color:#14532d
+    classDef bad fill:#fee2e2,stroke:#dc2626,color:#7f1d1d
+    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
+    class P1,P2 ok
+    class P3 bad
+    class VOL mute
+```
+
 :::caution[함정]
 **RWO는 "Pod 하나"가 아니라 "노드 하나"다.**
 같은 노드에 있는 여러 Pod은 동시에 마운트할 수 있다.
@@ -193,6 +285,31 @@ PVC가 만들어지면 컨트롤러가 조건에 맞는 PV를 찾는다.
 블록 스토리지(EBS, GCE PD)는 RWO만 가능하다. RWX는 **NFS·CephFS·EFS 같은 파일 스토리지**가 필요하다.
 
 accessMode는 **스토리지의 실제 능력을 강제하지 않는다.** 바인딩 조건으로만 쓰인다.
+
+## PV의 생애 — 상태가 어떻게 움직이는가
+
+```mermaid
+stateDiagram-v2
+    [*] --> Available: PV 생성 또는 동적 프로비저닝
+    Available --> Bound: 조건에 맞는 PVC 등장
+    Bound --> Released: PVC 삭제 · reclaimPolicy Retain
+    Bound --> [*]: PVC 삭제 · reclaimPolicy Delete
+    Released --> Available: claimRef 를 지운다 · 수동
+    Released --> Failed: 자동 회수 실패
+    Failed --> [*]: 관리자가 정리
+
+    note right of Released
+      자동으로 재사용되지 않는다.
+      옛 PVC 정보가 spec.claimRef 에 남아 있기 때문.
+    end note
+```
+
+| 상태 | 의미 |
+|---|---|
+| `Available` | 비어 있고 바인딩 가능 |
+| `Bound` | PVC에 묶여 있다 |
+| `Released` | PVC가 삭제됐지만 아직 회수되지 않았다 |
+| `Failed` | 자동 회수에 실패했다 |
 
 ## reclaimPolicy — PVC를 지우면 데이터는?
 
@@ -215,15 +332,6 @@ kubectl patch pv pv-data -p '{"spec":{"claimRef":null}}'
 # → 상태가 Available로 돌아간다
 ```
 :::
-
-## PV의 상태
-
-| 상태 | 의미 |
-|---|---|
-| `Available` | 비어 있고 바인딩 가능 |
-| `Bound` | PVC에 묶여 있다 |
-| `Released` | PVC가 삭제됐지만 아직 회수되지 않았다 |
-| `Failed` | 자동 회수에 실패했다 |
 
 ```bash
 kubectl get pv
@@ -267,21 +375,51 @@ kubectl get sc
 
 ## volumeBindingMode — 언제 묶을 것인가
 
-**`Immediate`**
+<Tabs>
+<TabItem label="Immediate">
 
-PVC가 생기는 즉시 PV를 만들고 묶는다.
+PVC가 생기는 **즉시** PV를 만들고 묶는다. 스케줄러는 그다음에 움직인다.
 
-**문제** — 볼륨이 zone A에 생겼는데
-Pod은 zone B에 스케줄될 수 있다.
-그러면 마운트가 실패한다.
+```mermaid
+flowchart LR
+    PVC["PVC 생성"] --> BIND["즉시 바인딩<br/>zone A 에 볼륨 생성"]
+    BIND --> SCH["나중에 Pod 스케줄"]
+    SCH --> Z["zone B 노드에 배정"]
+    Z --> F["마운트 실패 ❌<br/>볼륨이 다른 zone 에 있다"]
 
-**`WaitForFirstConsumer`**
+    classDef bad fill:#fee2e2,stroke:#dc2626,color:#7f1d1d
+    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
+    class F bad
+    class PVC,BIND,SCH,Z mute
+```
 
-**Pod이 스케줄될 때까지 기다렸다가**
-그 노드에 맞는 볼륨을 만든다.
+**문제** — 볼륨이 zone A에 생겼는데 Pod은 zone B에 스케줄될 수 있다. 그러면 마운트가 실패한다.
 
-토폴로지 제약이 있는 환경(멀티 AZ,
-로컬 디스크)에서 **사실상 필수**다.
+</TabItem>
+<TabItem label="WaitForFirstConsumer">
+
+**Pod이 스케줄될 때까지 기다렸다가** 그 노드에 맞는 볼륨을 만든다.
+
+```mermaid
+flowchart LR
+    PVC["PVC 생성"] --> W["Pending<br/>waiting for first consumer"]
+    W --> POD["Pod 생성"]
+    POD --> SCH["스케줄러가 노드 결정<br/>zone B"]
+    SCH --> BIND["그 zone 에 볼륨을 만들고 바인딩"]
+    BIND --> OK["마운트 성공 ✅"]
+
+    classDef ok fill:#dcfce7,stroke:#16a34a,color:#14532d
+    classDef warn fill:#fef3c7,stroke:#d97706,color:#78350f
+    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
+    class OK ok
+    class W warn
+    class PVC,POD,SCH,BIND mute
+```
+
+토폴로지 제약이 있는 환경(멀티 AZ, 로컬 디스크)에서 **사실상 필수**다.
+
+</TabItem>
+</Tabs>
 
 :::tip[시험]
 PVC가 `Pending`이고 메시지가
@@ -322,6 +460,24 @@ spec:
             storage: 10Gi
 ```
 
+**Pod마다 PVC가 하나씩** 생긴다. 이름이 고정이라 Pod이 죽었다 살아나도 같은 볼륨으로 돌아온다.
+
+```mermaid
+flowchart LR
+    STS["StatefulSet db<br/>volumeClaimTemplates: data"]
+    STS --> P0["db-0"] --> C0["PVC data-db-0"] --> V0[("PV")]
+    STS --> P1["db-1"] --> C1["PVC data-db-1"] --> V1[("PV")]
+    STS --> P2["db-2"] --> C2["PVC data-db-2"] --> V2[("PV")]
+    DEL["StatefulSet 삭제"] -.->|"PVC 는 남는다"| C0
+
+    classDef key fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
+    classDef warn fill:#fef3c7,stroke:#d97706,color:#78350f
+    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
+    class STS key
+    class C0,C1,C2 warn
+    class P0,P1,P2,V0,V1,V2,DEL mute
+```
+
 - **Pod마다 PVC가 하나씩** 생긴다: `data-db-0`, `data-db-1`, …
 - Pod이 죽었다 살아나도 **같은 PVC를 다시 붙인다** (이름이 고정이므로)
 - **StatefulSet을 지워도 PVC는 남는다.** 데이터 보호가 기본 동작이다
@@ -342,6 +498,41 @@ kubectl delete pvc data-db-0        # 정말 지우려면 명시적으로
 - 예전에는 스토리지 드라이버가 **Kubernetes 코드 안에** 있었다 (in-tree)
 - 지금은 전부 **CSI 드라이버**로 분리되었다. 벤더가 독립적으로 배포한다
 - in-tree 플러그인은 대부분 **제거**되었고 CSI로 마이그레이션되었다
+
+```mermaid
+flowchart TB
+    API["kube-apiserver"]
+    KL["kubelet<br/>노드마다"]
+
+    subgraph CTRL["Controller 플러그인 — 클러스터에 하나"]
+      PROV["provisioner<br/>PV 생성·삭제"]
+      ATT["attacher<br/>노드에 attach"]
+      RES["resizer<br/>확장"]
+      SNAP["snapshotter<br/>스냅샷"]
+      DRV1["CSI 드라이버"]
+    end
+
+    subgraph NODEP["Node 플러그인 — DaemonSet, 노드마다 하나"]
+      REG["node-driver-registrar"]
+      DRV2["CSI 드라이버<br/>실제 마운트"]
+    end
+
+    API --> PROV
+    API --> ATT
+    API --> RES
+    API --> SNAP
+    PROV --> DRV1
+    ATT --> DRV1
+    KL --> DRV2
+    REG --> KL
+
+    classDef key fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
+    classDef side fill:#f1f5f9,stroke:#94a3b8,color:#334155
+    classDef drv fill:#fef3c7,stroke:#d97706,color:#78350f
+    class API,KL key
+    class PROV,ATT,RES,SNAP,REG side
+    class DRV1,DRV2 drv
+```
 
 ```bash
 kubectl get csidrivers
@@ -389,6 +580,34 @@ volumes:
 
 ## 진단 절차
 
+증상은 둘 중 하나다. **어느 쪽인지부터 가른다.**
+
+```mermaid
+flowchart TD
+    S{"어디서 멈췄나"}
+    S -->|"PVC 가 Pending"| A["kubectl describe pvc<br/>★ Events 를 읽는다"]
+    S -->|"Pod 이 ContainerCreating"| B["kubectl describe pod<br/>★ Events 를 읽는다"]
+
+    A --> A1{"메시지"}
+    A1 -->|"waiting for first consumer"| OK["정상 · Pod 을 만들면 바인딩된다"]
+    A1 -->|"no persistent volumes available"| A2{"조건에 맞는 PV 가 있는가"}
+    A1 -->|"storageclass not found"| A3["StorageClass 이름 오타<br/>kubectl get sc"]
+    A2 -->|"없다"| A4["PV 를 만들거나 SC 로 동적 생성"]
+    A2 -->|"Available 인데 안 묶인다"| A5["조건 불일치<br/>storageClassName · accessModes · 용량"]
+
+    B --> B1{"메시지"}
+    B1 -->|"Multi-Attach error"| B2["RWO 를 두 노드에서<br/>→ Recreate 또는 StatefulSet"]
+    B1 -->|"FailedMount timeout expired"| B3["스토리지 백엔드 연결 문제"]
+    B1 -->|"MountVolume.SetUp failed not found"| B4["ConfigMap/Secret 이 없다"]
+
+    classDef ok fill:#dcfce7,stroke:#16a34a,color:#14532d
+    classDef bad fill:#fee2e2,stroke:#dc2626,color:#7f1d1d
+    classDef key fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
+    class OK ok
+    class A3,A4,A5,B2,B3,B4 bad
+    class A,B key
+```
+
 ```bash
 # PVC가 Pending
 kubectl describe pvc data                 # ★ Events
@@ -415,18 +634,46 @@ sudo journalctl -u kubelet | grep -i mount
 ## RWO 볼륨 + Deployment의 함정
 
 `Deployment` + `RWO PVC` + `RollingUpdate` 조합은 **거의 항상 막힌다.**
+왜 교착이 되는지는 시간순으로 보면 명확하다.
+
+```mermaid
+sequenceDiagram
+    participant D as Deployment · RollingUpdate
+    participant O as 노드 A · 옛 Pod
+    participant N as 노드 B · 새 Pod
+    participant V as RWO PV
+
+    O->>V: 이미 마운트 중
+    D->>N: 새 Pod 생성
+    N->>V: 마운트 시도
+    V--xN: Multi-Attach error
+    Note over N: ContainerCreating 에서 멈춘다
+    Note over D: 새 Pod 이 Ready 여야 옛 Pod 을 죽인다
+    Note over O,N: 서로를 기다린다 — 교착
+```
 
 1. 새 Pod이 다른 노드에 스케줄된다
 2. 옛 Pod이 아직 볼륨을 잡고 있다
 3. 새 Pod: **`Multi-Attach error`** → `ContainerCreating`에서 멈춘다
 4. 옛 Pod은 새 Pod이 Ready가 될 때까지 안 죽는다 → **교착**
 
-**해결**
+**해결 — 넷 중 하나**
 
-- `strategy.type: Recreate` 로 바꾼다 (옛 Pod을 먼저 죽인다)
-- 또는 `replicas: 1`을 유지하고 `maxSurge: 0`
-- 또는 **StatefulSet**을 쓴다 (Pod마다 PVC가 따로)
-- 또는 **RWX 스토리지**를 쓴다
+<CardGrid>
+<Card title="strategy: Recreate" icon="random">
+옛 Pod을 **먼저 죽이고** 새 Pod을 만든다.
+가장 간단하다. 짧은 다운타임을 받아들이는 셈.
+</Card>
+<Card title="maxSurge: 0" icon="setting">
+`replicas: 1`을 유지하고 새 Pod을 **덧붙이지 않게** 한다.
+</Card>
+<Card title="StatefulSet" icon="database">
+**Pod마다 PVC가 따로** 생기므로 애초에 충돌하지 않는다.
+</Card>
+<Card title="RWX 스토리지" icon="server">
+NFS·CephFS·EFS로 바꾸면 **여러 노드에서 동시 마운트**가 된다.
+</Card>
+</CardGrid>
 
 :::tip[시험]
 `Multi-Attach error` 를 보면
@@ -435,32 +682,46 @@ sudo journalctl -u kubelet | grep -i mount
 
 ## 정적 프로비저닝 실습 흐름
 
-```bash
-# 1) PV 생성 (관리자)
-cat <<'EOF' | kubectl apply -f -
-apiVersion: v1
-kind: PersistentVolume
-metadata:
-  name: pv-manual
-spec:
-  capacity: { storage: 1Gi }
-  accessModes: ["ReadWriteOnce"]
-  persistentVolumeReclaimPolicy: Retain
-  storageClassName: manual
-  hostPath: { path: /mnt/data }
-EOF
+<Steps>
 
-# 2) PVC 생성 (개발자)
-kubectl create -f pvc.yaml
-kubectl get pvc                # Bound 확인
+1. **PV 생성** — 관리자의 몫
 
-# 3) Pod에서 사용
-kubectl get pod web -o jsonpath='{.spec.volumes}'
+   ```bash
+   cat <<'EOF' | kubectl apply -f -
+   apiVersion: v1
+   kind: PersistentVolume
+   metadata:
+     name: pv-manual
+   spec:
+     capacity: { storage: 1Gi }
+     accessModes: ["ReadWriteOnce"]
+     persistentVolumeReclaimPolicy: Retain
+     storageClassName: manual
+     hostPath: { path: /mnt/data }
+   EOF
+   ```
 
-# 4) 정리 후 확인
-kubectl delete pvc data
-kubectl get pv                 # Retain이면 Released 로 남는다
-```
+2. **PVC 생성** — 개발자의 몫. `Bound`가 되는지 확인한다
+
+   ```bash
+   kubectl create -f pvc.yaml
+   kubectl get pvc                # Bound 확인
+   ```
+
+3. **Pod에서 사용**
+
+   ```bash
+   kubectl get pod web -o jsonpath='{.spec.volumes}'
+   ```
+
+4. **정리 후 확인** — `Retain`이면 PV가 `Released`로 남는다
+
+   ```bash
+   kubectl delete pvc data
+   kubectl get pv                 # Retain이면 Released 로 남는다
+   ```
+
+</Steps>
 
 ## 13장 요약
 

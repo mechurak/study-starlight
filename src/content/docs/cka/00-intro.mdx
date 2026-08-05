@@ -3,25 +3,52 @@ title: "0. 시작하기 전에"
 description: "이 덱을 어떻게 읽을 것인가"
 ---
 
+import { Steps, Card, CardGrid, Tabs, TabItem, LinkCard } from '@astrojs/starlight/components';
+
 > 이 덱을 어떻게 읽을 것인가
 
 ## 이 덱이 하려는 것
 
-"이 명령을 외운다"가 아니라\
+"이 명령을 외운다"가 아니라
 **"이 명령을 쳤을 때 클러스터 안에서 무슨 일이 벌어지는가"**를 남긴다.
 
 - CKA는 **실기 시험**이다. 객관식이 아니라 진짜 클러스터를 고친다
 - 그래서 암기는 오래 못 간다 — **동작 모델**이 있어야 처음 보는 문제도 푼다
 - 반대로 동작 모델만 있고 손이 느리면 **시간에 진다**. 둘 다 필요하다
 
-그래서 이 덱은 **개념 → 실제 동작 → 명령 → 함정** 순서로 반복한다.
+```mermaid
+flowchart LR
+    C["개념<br/>무엇인가"] --> A["실제 동작<br/>안에서 무슨 일이"] --> CMD["명령<br/>어떻게 하나"] --> P["함정<br/>어디서 틀리나"]
+    P -.->|"다음 주제에서 반복"| C
+
+    classDef key fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
+    classDef bad fill:#fee2e2,stroke:#dc2626,color:#7f1d1d
+    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
+    class A key
+    class P bad
+    class C,CMD mute
+```
 
 ## 대상 독자
 
-- `kubectl get pod`은 쳐봤고, Deployment가 뭔지는 안다
-- 그런데 **"Pod이 Pending인데 왜 그런지"** 를 30초 안에 못 짚는다
-- etcd 백업·복구, kubeadm 업그레이드처럼 **평소에 안 하는 작업**이 불안하다
-- 실무는 EKS/GKE 같은 관리형이라 **컨트롤 플레인을 만져본 적이 없다**
+<CardGrid>
+<Card title="이 정도는 안다" icon="approve-check">
+`kubectl get pod`은 쳐봤고,
+Deployment가 뭔지는 안다.
+</Card>
+<Card title="그런데 여기서 막힌다" icon="question">
+**"Pod이 Pending인데 왜 그런지"** 를
+30초 안에 못 짚는다.
+</Card>
+<Card title="이건 불안하다" icon="warning">
+etcd 백업·복구, kubeadm 업그레이드처럼
+**평소에 안 하는 작업**.
+</Card>
+<Card title="이게 가장 큰 문제" icon="error">
+실무는 EKS/GKE 같은 관리형이라
+**컨트롤 플레인을 만져본 적이 없다.**
+</Card>
+</CardGrid>
 
 전부 해당된다면 정확히 이 덱의 대상이다.
 특히 마지막 항목 — **CKA 배점의 25%가 관리형에서 못 만지는 영역**이다.
@@ -39,23 +66,47 @@ description: "이 덱을 어떻게 읽을 것인가"
 | 18 | 트러블슈팅 | Troubleshooting (30%) |
 | 19~20 | 시험 전략 · 마무리 | — |
 
-**배점 순서와 학습 순서는 다르다.** 트러블슈팅이 30%지만 마지막에 있는 이유는,
-앞의 전부를 알아야 진단이 되기 때문이다.
+**배점 순서와 학습 순서는 다르다.**
+
+```mermaid
+flowchart LR
+    B["기초<br/>2~3장"] --> W["워크로드<br/>4~8장"] --> N["네트워크<br/>9~12장"] --> S["스토리지<br/>13장"] --> C["클러스터<br/>14~17장"] --> T["트러블슈팅<br/>18장 · 30%"]
+    T -.->|"앞의 전부가 재료다<br/>그래서 마지막"| B
+
+    classDef key fill:#fee2e2,stroke:#dc2626,color:#7f1d1d
+    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
+    class T key
+    class B,W,N,S,C mute
+```
+
+트러블슈팅이 30%지만 마지막에 있는 이유는, 앞의 전부를 알아야 진단이 되기 때문이다.
 
 ## 이 덱 전체를 관통하는 한 문장
 
-Kubernetes의 모든 것은\
+Kubernetes의 모든 것은
 **"선언된 상태"와 "실제 상태"의 차이를 줄이는 루프**다.
 
-- 당신은 `spec`(원하는 상태)을 쓴다
-- 컨트롤러가 `status`(실제 상태)를 보고 차이를 좁힌다
-- **문제가 생겼다 = 루프가 어딘가에서 막혔다**
+```mermaid
+flowchart LR
+    SPEC["spec<br/>당신이 쓴 원하는 상태"] --> CTRL["컨트롤러<br/>차이를 관찰한다"]
+    CTRL -->|"차이만큼 행동"| REAL["실제 클러스터"]
+    REAL --> STATUS["status<br/>실제 상태"]
+    STATUS --> CTRL
+    STUCK["문제가 생겼다<br/>= 루프가 어딘가에서 막혔다"] -.-> CTRL
+
+    classDef key fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
+    classDef ok fill:#dcfce7,stroke:#16a34a,color:#14532d
+    classDef bad fill:#fee2e2,stroke:#dc2626,color:#7f1d1d
+    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
+    class SPEC key
+    class STATUS ok
+    class STUCK bad
+    class CTRL,REAL mute
+```
 
 트러블슈팅 30%가 결국 이 한 문장이다. **"어느 루프가 어디서 멈췄나"**를 찾는 것.
 
 ## 표기 약속
-
-**슬라이드 안 표시**
 
 :::tip[시험]
 이 형태로 출제된다, 또는 시간을 아끼는 방법
@@ -84,6 +135,22 @@ YAML은 시험에서 그대로 쓸 수 있게 **축약 없이** 적었다.
 | 0→1 클러스터 구축 | **VM 2대** (Multipass/UTM 등) | `kubeadm init` 을 한 번은 직접 해봐야 한다 |
 | 시험 직전 모의고사 | **killer.sh** | 시험 등록 시 2세션 포함. 실제보다 어렵다 |
 
+```mermaid
+flowchart LR
+    Q{"무엇을 연습하나"}
+    Q -->|"워크로드 · 네트워크 · RBAC"| KIND["kind<br/>빠르게 뜬다 ✅"]
+    Q -->|"업그레이드 · etcd · 컨트롤 플레인"| KC["killercoda<br/>진짜 kubeadm 노드 ✅"]
+    Q -->|"0에서 클러스터 만들기"| VM["VM 2대<br/>kubeadm init 직접"]
+    KIND -.->|"노드가 컨테이너라<br/>apt install kubeadm 흐름이 다르다 ❌"| KC
+
+    classDef ok fill:#dcfce7,stroke:#16a34a,color:#14532d
+    classDef bad fill:#fee2e2,stroke:#dc2626,color:#7f1d1d
+    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
+    class KIND,KC ok
+    class VM mute
+    class Q mute
+```
+
 :::caution[함정]
 kind는 `kubeadm upgrade` 연습에 부적합하다.
 노드가 컨테이너라 `apt install kubeadm` 흐름이 실제와 다르다. 업그레이드는 killercoda에서.
@@ -110,5 +177,8 @@ kind는 `kubeadm upgrade` 연습에 부적합하다.
 - 모든 장을 관통하는 축: **"선언된 상태 ↔ 실제 상태를 좁히는 루프"**
 - 읽기만 하면 안 된다. **kind + killercoda**를 옆에 띄워두고 볼 것
 
-다음 장에서 **시험 자체**를 먼저 해부한다.
-무엇이 나오는지 모르면 무엇을 공부할지도 못 정한다.
+<LinkCard
+  title="1. CKA 시험 해부"
+  description="무엇이 나오는지 모르면 무엇을 공부할지도 못 정한다. 시험 자체를 먼저 해부한다."
+  href="/cka/01-exam/"
+/>

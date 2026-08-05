@@ -3,11 +3,32 @@ title: "17. 확장 인터페이스와 오퍼레이터"
 description: "CRI · CNI · CSI · CRD"
 ---
 
+import { Steps, Card, CardGrid, Tabs, TabItem } from '@astrojs/starlight/components';
+
 > CRI · CNI · CSI · CRD
 
 ## Kubernetes는 껍데기다
 
 핵심 기능 중 상당수가 **인터페이스만 정의되어 있고 구현은 밖에 있다.**
+
+```mermaid
+flowchart TB
+    K8S["Kubernetes 코어<br/>인터페이스만 정의한다"]
+    K8S --> CRI["CRI<br/>컨테이너 실행"] --> I1["containerd · CRI-O"]
+    K8S --> CNI["CNI<br/>Pod 네트워크·IP"] --> I2["Calico · Cilium · Flannel"]
+    K8S --> CSI["CSI<br/>볼륨 생성·마운트"] --> I3["EBS CSI · Ceph · local-path"]
+    K8S --> CRD["CRD + 컨트롤러<br/>새로운 리소스 종류"] --> I4["cert-manager · Prometheus Operator"]
+    NONE["플러그인이 없으면<br/>아무것도 안 된다 ⚠️"] -.- K8S
+
+    classDef core fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
+    classDef iface fill:#fef3c7,stroke:#d97706,color:#78350f
+    classDef warn fill:#fee2e2,stroke:#dc2626,color:#7f1d1d
+    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
+    class K8S core
+    class CRI,CNI,CSI,CRD iface
+    class NONE warn
+    class I1,I2,I3,I4 mute
+```
 
 | 인터페이스 | 무엇을 위임하나 | 구현체 예 |
 |---|---|---|
@@ -47,9 +68,26 @@ sudo crictl rmi --prune              # 안 쓰는 이미지 정리
 
 kubelet이 Pod 샌드박스를 만들 때 **CNI 플러그인을 실행**한다.
 
-- 설정: **`/etc/cni/net.d/`** (JSON 파일. 사전순 첫 번째를 쓴다)
-- 바이너리: **`/opt/cni/bin/`**
-- 하는 일: 인터페이스 생성 → **IP 할당(IPAM)** → 라우팅 설정
+```mermaid
+flowchart LR
+    KL["kubelet"] -->|"ADD 호출"| CNI["CNI 플러그인"]
+    CONF["/etc/cni/net.d/<br/>JSON 설정 · 사전순 첫 번째를 쓴다"] -.-> CNI
+    BIN["/opt/cni/bin/<br/>바이너리"] -.-> CNI
+    CNI --> S1["① 인터페이스 생성"]
+    S1 --> S2["② IP 할당 · IPAM"]
+    S2 --> S3["③ 라우팅 설정"]
+    S3 --> OK["Pod 이 통신 가능 ✅"]
+    FAIL["CNI 가 없거나 고장"] -.->|"ContainerCreating 에서 멈춘다<br/>노드는 NotReady ❌"| CNI
+
+    classDef key fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
+    classDef ok fill:#dcfce7,stroke:#16a34a,color:#14532d
+    classDef bad fill:#fee2e2,stroke:#dc2626,color:#7f1d1d
+    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
+    class CNI key
+    class OK ok
+    class FAIL bad
+    class KL,CONF,BIN,S1,S2,S3 mute
+```
 
 **모든 CNI가 지켜야 하는 규칙**
 
@@ -74,13 +112,34 @@ kubectl get volumeattachments
 
 CSI 드라이버는 보통 **두 부분**으로 배포된다.
 
-| 구성 | 형태 | 하는 일 |
-|---|---|---|
-| **Controller 플러그인** | Deployment | 볼륨 생성·삭제·확장·스냅샷 |
-| **Node 플러그인** | DaemonSet | 노드에서 attach·mount |
+<CardGrid>
+<Card title="Controller 플러그인 — Deployment" icon="setting">
+볼륨 생성·삭제·확장·스냅샷.
+클러스터에 하나.
+</Card>
+<Card title="Node 플러그인 — DaemonSet" icon="server">
+노드에서 attach·mount.
+노드마다 하나.
+</Card>
+</CardGrid>
 
 주변에 **sidecar 컨테이너**들이 붙는다 —
 `external-provisioner`, `external-attacher`, `external-resizer`, `external-snapshotter`, `node-driver-registrar`
+
+```mermaid
+flowchart LR
+    PVC["PVC 가 Pending"] --> Q{"StorageClass 는 있는가"}
+    Q -->|없다| A1["StorageClass 를 만든다"]
+    Q -->|있다| A2["프로비저너 Pod 이 살아 있는가<br/>kubectl get pods -n kube-system | grep csi"]
+    A2 --> A3["로그 확인<br/>kubectl logs … -c csi-provisioner"]
+
+    classDef key fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
+    classDef bad fill:#fee2e2,stroke:#dc2626,color:#7f1d1d
+    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
+    class A2 key
+    class A1 bad
+    class PVC,Q,A3 mute
+```
 
 PVC가 `Pending`인데 StorageClass는 있다면
 **프로비저너 Pod이 살아 있는지**부터 확인한다.
@@ -122,16 +181,31 @@ spec:
 
 ## CRD를 만들면 무슨 일이 생기나
 
+```mermaid
+flowchart LR
+    CRD["CRD 적용"] --> EP["API 서버에 새 엔드포인트<br/>/apis/ops.example.com/v1/backups"]
+    EP --> A["kubectl get/create/delete backup<br/>즉시 동작 ✅"]
+    EP --> B["kubectl explain backup.spec<br/>스키마가 있으니 동작 ✅"]
+    EP --> C["검증도 API 서버가 해준다 ✅"]
+    EP --> D["그런데 아무 일도 일어나지 않는다 ⚠️<br/>보고 행동하는 컨트롤러가 없다"]
+    D --> OP["→ 그 컨트롤러가 오퍼레이터"]
+
+    classDef ok fill:#dcfce7,stroke:#16a34a,color:#14532d
+    classDef warn fill:#fef3c7,stroke:#d97706,color:#78350f
+    classDef key fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
+    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
+    class A,B,C ok
+    class D warn
+    class OP key
+    class CRD,EP mute
+```
+
 ```bash
 kubectl apply -f backup-crd.yaml
 kubectl get crd
 kubectl api-resources | grep backups
 kubectl explain backup.spec              # ★ 스키마가 있으니 explain도 동작한다
 ```
-
-- API 서버에 **새 엔드포인트가 생긴다**: `/apis/ops.example.com/v1/backups`
-- `kubectl get/create/delete backup` 이 **즉시 동작**한다
-- **검증(schema)도 API 서버가 해준다**
 
 ```yaml
 apiVersion: ops.example.com/v1
@@ -155,12 +229,16 @@ spec:
 
 ```mermaid
 flowchart LR
-    U["사용자"] -->|"CR 생성"| API["kube-apiserver"]
-    API -->|"watch"| OP["Operator Pod"]
-    OP -->|"Deployment·Service·PVC 생성"| API
-    OP -->|"status 갱신"| API
+    U["사용자"] -->|"CR 생성<br/>kind: Certificate"| API["kube-apiserver"]
+    API -->|"watch"| OP["Operator Pod<br/>cert-manager"]
+    OP -->|"Secret · Ingress 등 생성"| API
+    OP -->|"status.conditions 갱신"| API
+    API -->|"describe 로 읽는다"| U
 
-    style OP fill:#dbeafe,stroke:#326ce5
+    classDef key fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
+    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
+    class OP key
+    class U,API mute
 ```
 
 | 오퍼레이터 | CR 예 |
@@ -176,14 +254,48 @@ flowchart LR
 # 대개 Helm 또는 매니페스트 하나로 설치된다
 helm install cert-manager jetstack/cert-manager \
   --namespace cert-manager --create-namespace --set crds.enabled=true
-
-# 설치 확인 3단계
-kubectl get crd | grep cert-manager                   # ① CRD가 등록됐는가
-kubectl get pods -n cert-manager                      # ② 컨트롤러가 도는가
-kubectl get clusterrole,clusterrolebinding | grep cert-manager   # ③ 권한이 있는가
 ```
 
+**설치 확인은 3단계다.**
+
+<Steps>
+
+1. **CRD가 등록됐는가**
+
+   ```bash
+   kubectl get crd | grep cert-manager
+   ```
+
+2. **컨트롤러가 도는가**
+
+   ```bash
+   kubectl get pods -n cert-manager
+   ```
+
+3. **권한이 있는가**
+
+   ```bash
+   kubectl get clusterrole,clusterrolebinding | grep cert-manager
+   ```
+
+</Steps>
+
 **CR을 만들었는데 아무 일도 안 일어날 때**
+
+```mermaid
+flowchart TD
+    S["CR 을 만들었는데 반응이 없다"] --> C1["① describe 의 status.conditions 와 Events"]
+    C1 -->|"단서가 없다"| C2["② 오퍼레이터 로그"]
+    C2 -->|"단서가 없다"| C3["③ 오퍼레이터 Pod 이 살아 있는가"]
+    C3 -->|"죽었다"| C4["Pod 로그 · RBAC 확인"]
+    C1 -.-> CMD1["kubectl describe certificate my-cert"]
+    C2 -.-> CMD2["kubectl logs -n cert-manager deploy/cert-manager --tail=100"]
+
+    classDef key fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
+    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
+    class C1 key
+    class S,C2,C3,C4,CMD1,CMD2 mute
+```
 
 ```bash
 kubectl describe certificate my-cert          # ★ status.conditions 와 Events
@@ -219,6 +331,21 @@ CRD의 **버전을 올릴 때** conversion webhook이 없으면
 :::
 
 ## 그 밖의 확장 지점
+
+```mermaid
+flowchart LR
+    API["kube-apiserver"]
+    API --> W["Admission webhook<br/>요청을 가로채 고치거나 거부 · 14장"]
+    API --> AG["API Aggregation<br/>별도 API 서버를 /apis 아래에<br/>metrics-server 가 이 방식"]
+    KL["kubelet"] --> DP["Device Plugin<br/>GPU 등을 노드 리소스로 노출"]
+    SCH["scheduler"] --> EX["Scheduler Extender<br/>다중 스케줄러 · 7장"]
+    CLOUD["Cloud Controller Manager<br/>클라우드별 노드·LB·라우트"] --> API
+
+    classDef key fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
+    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
+    class API,KL,SCH key
+    class W,AG,DP,EX,CLOUD mute
+```
 
 | 확장 | 무엇 |
 |---|---|

@@ -3,6 +3,8 @@ title: "14. 인증 · 인가 · RBAC"
 description: "누가 무엇을 할 수 있는가"
 ---
 
+import { Steps, Card, CardGrid, Tabs, TabItem } from '@astrojs/starlight/components';
+
 > 누가 무엇을 할 수 있는가
 
 ## 요청이 통과해야 하는 세 관문
@@ -10,13 +12,23 @@ description: "누가 무엇을 할 수 있는가"
 ```mermaid
 flowchart LR
     R["요청"] --> A["① Authentication<br/>너는 누구인가"]
-    A --> Z["② Authorization<br/>해도 되는가"]
+    A -->|"실패 401"| X1["Unauthorized"]
+    A --> Z["② Authorization<br/>해도 되는가 · RBAC"]
+    Z -->|"실패 403"| X2["Forbidden"]
     Z --> M["③ Admission<br/>이 내용이 규칙에 맞는가"]
-    M --> E[("etcd")]
+    M -->|"위반"| X3["다양한 에러"]
+    M --> E[("etcd 저장")]
 
-    style A fill:#dbeafe,stroke:#326ce5
-    style Z fill:#fef3c7,stroke:#d97706
-    style M fill:#e9d5ff,stroke:#9333ea
+    classDef authn fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
+    classDef authz fill:#fef3c7,stroke:#d97706,color:#78350f
+    classDef adm fill:#ede9fe,stroke:#7c3aed,color:#4c1d95
+    classDef bad fill:#fee2e2,stroke:#dc2626,color:#7f1d1d
+    classDef ok fill:#dcfce7,stroke:#16a34a,color:#14532d
+    class A authn
+    class Z authz
+    class M adm
+    class X1,X2,X3 bad
+    class E ok
 ```
 
 | 단계 | 실패 시 | 뜻 |
@@ -31,17 +43,61 @@ flowchart LR
 → 필요한 **주체 / 동사 / 리소스 / 네임스페이스**가 전부 문장 안에 있다.
 :::
 
+에러 문장을 RBAC 필드로 옮기면 그대로 답이 된다.
+
+```mermaid
+flowchart LR
+    M["User dev cannot list resource pods<br/>in API group  in the namespace prod"]
+    M --> S["dev → subjects.name"]
+    M --> V["list → rules.verbs"]
+    M --> RS["pods → rules.resources"]
+    M --> G["'' → rules.apiGroups"]
+    M --> NS["prod → RoleBinding 의 namespace"]
+
+    classDef key fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
+    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
+    class S,V,RS,G,NS key
+    class M mute
+```
+
 ## 인증 방식들
 
-| 방식 | 대상 | 비고 |
-|---|---|---|
-| **클라이언트 인증서** | 사람(관리자) | kubeadm의 `admin.conf`가 이것 |
-| **ServiceAccount 토큰** | Pod 안의 워크로드 | JWT |
-| **OIDC** | 사람 (조직 SSO) | 실무 표준 |
-| **Webhook** | 외부 시스템 위임 | EKS의 IAM 연동 등 |
-| Bootstrap 토큰 | 노드 조인 | `kubeadm join` 때 |
+<CardGrid>
+<Card title="클라이언트 인증서" icon="padlock">
+사람(관리자)용.
+kubeadm의 `admin.conf`가 이것이다.
+</Card>
+<Card title="ServiceAccount 토큰" icon="document">
+Pod 안의 워크로드용. JWT.
+</Card>
+<Card title="OIDC" icon="external">
+사람 · 조직 SSO. 실무 표준.
+</Card>
+<Card title="Webhook" icon="link">
+외부 시스템에 위임.
+EKS의 IAM 연동 등.
+</Card>
+</CardGrid>
 
-**중요:** **Kubernetes에는 "User" 오브젝트가 없다.**
+Bootstrap 토큰은 노드 조인 전용이다 (`kubeadm join` 때).
+
+**중요: Kubernetes에는 "User" 오브젝트가 없다.**
+
+```mermaid
+flowchart LR
+    CRT["클라이언트 인증서"] --> CN["CN 필드<br/>= 사용자 이름"]
+    CRT --> O["O 필드<br/>= 그룹"]
+    CN --> API["API 서버가 문자열로 인식"]
+    O --> API
+    NO["kubectl get users"] -.->|"그런 명령은 없다 ❌"| X["User 오브젝트 부재"]
+
+    classDef key fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
+    classDef bad fill:#fee2e2,stroke:#dc2626,color:#7f1d1d
+    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
+    class CN,O key
+    class X bad
+    class CRT,API,NO mute
+```
 
 - `kubectl get users` 같은 것은 존재하지 않는다
 - 사용자는 **인증서의 CN 필드**나 **OIDC 토큰의 클레임**에서 문자열로 나온다
@@ -51,32 +107,63 @@ flowchart LR
 
 ## 사용자 인증서 만들기 (CSR API)
 
-```bash
-# 1) 키와 CSR 생성
-openssl genrsa -out dev.key 2048
-openssl req -new -key dev.key -out dev.csr -subj "/CN=dev/O=developers"
-#                                                  ^사용자    ^그룹
+<Steps>
 
-# 2) Kubernetes CSR 오브젝트로 제출
-cat <<EOF | kubectl apply -f -
-apiVersion: certificates.k8s.io/v1
-kind: CertificateSigningRequest
-metadata:
-  name: dev
-spec:
-  request: $(cat dev.csr | base64 | tr -d '\n')
-  signerName: kubernetes.io/kube-apiserver-client
-  expirationSeconds: 86400
-  usages: ["client auth"]
-EOF
+1. **키와 CSR 생성** — `CN`이 사용자, `O`가 그룹이다
 
-# 3) 승인
-kubectl get csr
-kubectl certificate approve dev
-kubectl certificate deny dev            # 거부할 때
+   ```bash
+   openssl genrsa -out dev.key 2048
+   openssl req -new -key dev.key -out dev.csr -subj "/CN=dev/O=developers"
+   #                                                  ^사용자    ^그룹
+   ```
 
-# 4) 서명된 인증서 꺼내기
-kubectl get csr dev -o jsonpath='{.status.certificate}' | base64 -d > dev.crt
+2. **Kubernetes CSR 오브젝트로 제출**
+
+   ```bash
+   cat <<EOF | kubectl apply -f -
+   apiVersion: certificates.k8s.io/v1
+   kind: CertificateSigningRequest
+   metadata:
+     name: dev
+   spec:
+     request: $(cat dev.csr | base64 | tr -d '\n')
+     signerName: kubernetes.io/kube-apiserver-client
+     expirationSeconds: 86400
+     usages: ["client auth"]
+   EOF
+   ```
+
+3. **승인**
+
+   ```bash
+   kubectl get csr
+   kubectl certificate approve dev
+   kubectl certificate deny dev            # 거부할 때
+   ```
+
+4. **서명된 인증서 꺼내기**
+
+   ```bash
+   kubectl get csr dev -o jsonpath='{.status.certificate}' | base64 -d > dev.crt
+   ```
+
+</Steps>
+
+```mermaid
+sequenceDiagram
+    participant U as 사용자
+    participant K as kubectl
+    participant API as kube-apiserver
+    participant CA as 클러스터 CA
+    U->>U: openssl 로 key + csr 생성 (CN=dev, O=developers)
+    U->>API: CertificateSigningRequest 제출
+    Note over API: status: Pending
+    K->>API: kubectl certificate approve dev
+    API->>CA: 서명 요청
+    CA-->>API: 서명된 인증서
+    API-->>U: status.certificate (base64)
+    U->>U: kubeconfig 에 등록
+    Note over U: 여기까지는 인증만 · 권한은 아직 0
 ```
 
 ## kubeconfig에 등록하기
@@ -121,6 +208,22 @@ spec:
   automountServiceAccountToken: false     # 토큰을 안 넣는다
 ```
 
+```mermaid
+flowchart LR
+    SA["ServiceAccount<br/>deploy-bot"] --> POD["Pod<br/>serviceAccountName: deploy-bot"]
+    POD --> VOL["projected 볼륨<br/>/var/run/secrets/kubernetes.io/serviceaccount/"]
+    VOL --> F1["token"]
+    VOL --> F2["ca.crt"]
+    VOL --> F3["namespace"]
+    F1 --> API["kube-apiserver 호출 시<br/>Bearer 토큰으로"]
+    KL["kubelet"] -.->|"만료 전 자동 갱신"| F1
+
+    classDef key fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
+    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
+    class SA,F1 key
+    class POD,VOL,F2,F3,API,KL mute
+```
+
 - **모든 네임스페이스에 `default` SA가 자동으로** 만들어진다
 - Pod에 SA를 지정하지 않으면 `default`가 붙는다
 - 토큰은 `/var/run/secrets/kubernetes.io/serviceaccount/` 에 마운트된다
@@ -134,8 +237,10 @@ API를 호출하지 않는 앱이라면 `automountServiceAccountToken: false`가
 
 ## SA 토큰의 현재 방식
 
-- **예전**: SA를 만들면 만료 없는 토큰 Secret이 자동으로 생겼다
-- **지금**: **TokenRequest API**로 **수명이 있는 토큰**이 projected 볼륨으로 주입된다
+<Tabs>
+<TabItem label="지금 — TokenRequest">
+
+- **TokenRequest API**로 **수명이 있는 토큰**이 projected 볼륨으로 주입된다
 - kubelet이 만료 전에 **자동으로 갱신**한다
 
 ```bash
@@ -144,7 +249,11 @@ kubectl create token deploy-bot
 kubectl create token deploy-bot --duration=24h
 ```
 
-만료 없는 토큰이 꼭 필요하면 Secret을 직접 만든다.
+</TabItem>
+<TabItem label="예전 — 만료 없는 Secret">
+
+예전에는 SA를 만들면 만료 없는 토큰 Secret이 자동으로 생겼다.
+지금도 꼭 필요하면 직접 만들 수 있다.
 
 ```yaml
 apiVersion: v1
@@ -156,21 +265,55 @@ metadata:
 type: kubernetes.io/service-account-token
 ```
 
-CI/CD 등 클러스터 밖에서 쓸 토큰이 이 경우다. 다만 **수명 없는 자격증명**이라 관리가 필요하다.
+CI/CD 등 클러스터 밖에서 쓸 토큰이 이 경우다.
+다만 **수명 없는 자격증명**이라 관리가 필요하다.
+
+</TabItem>
+</Tabs>
 
 ## RBAC의 네 리소스
 
-**권한을 정의한다**
+**핵심 구조는 하나다 — 주체 → 바인딩 → 역할 → 리소스.**
 
-- **`Role`** — 네임스페이스 안에서
-- **`ClusterRole`** — 클러스터 전체에서
+```mermaid
+flowchart LR
+    subgraph SUBJ["주체 (subjects)"]
+      U["User<br/>인증서 CN"]
+      G["Group<br/>인증서 O"]
+      S["ServiceAccount"]
+    end
+    subgraph BIND["연결 (Binding)"]
+      RB["RoleBinding<br/>네임스페이스 안"]
+      CRB["ClusterRoleBinding<br/>클러스터 전체"]
+    end
+    subgraph ROLE["권한 정의 (Role)"]
+      R["Role<br/>네임스페이스 안"]
+      CR["ClusterRole<br/>클러스터 전체"]
+    end
+    RES["리소스 + 동사<br/>pods · get,list,watch"]
 
-**권한을 부여한다**
+    U --> RB
+    G --> RB
+    S --> RB
+    U --> CRB
+    RB -->|roleRef| R
+    RB -->|roleRef| CR
+    CRB -->|roleRef| CR
+    R --> RES
+    CR --> RES
 
-- **`RoleBinding`** — 네임스페이스 안에서
-- **`ClusterRoleBinding`** — 클러스터 전체에서
+    classDef subj fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
+    classDef bind fill:#fef3c7,stroke:#d97706,color:#78350f
+    classDef role fill:#dcfce7,stroke:#16a34a,color:#14532d
+    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
+    class U,G,S subj
+    class RB,CRB bind
+    class R,CR role
+    class RES mute
+```
 
-**규칙은 하나다: 역할(Role)이 권한을 정의하고, 바인딩(Binding)이 주체에게 연결한다.**
+**권한을 정의한다** — `Role`(네임스페이스 안) · `ClusterRole`(클러스터 전체)\
+**권한을 부여한다** — `RoleBinding`(네임스페이스 안) · `ClusterRoleBinding`(클러스터 전체)
 
 - RBAC은 **누적(additive)** 이다. **거부 규칙이 없다**
 - 어느 규칙에도 안 걸리면 **기본 거부**
@@ -239,6 +382,22 @@ kubectl api-resources --api-group=apps
 
 일부 동작은 **별도의 하위 리소스**로 취급된다.
 
+```mermaid
+flowchart LR
+    P["pods 에 get·list 권한"] --> OK["kubectl get pods ✅"]
+    P -.->|"이것만으로는 안 된다 ❌"| L["kubectl logs"]
+    L --> NEED1["pods/log 가 따로 필요"]
+    P -.->|"안 된다 ❌"| E["kubectl exec"]
+    E --> NEED2["pods/exec · verb 는 create"]
+
+    classDef ok fill:#dcfce7,stroke:#16a34a,color:#14532d
+    classDef bad fill:#fee2e2,stroke:#dc2626,color:#7f1d1d
+    classDef key fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
+    class OK ok
+    class L,E bad
+    class NEED1,NEED2 key
+```
+
 | 하고 싶은 것 | 필요한 리소스 |
 |---|---|
 | `kubectl logs` | **`pods/log`** |
@@ -301,9 +460,20 @@ kubectl create clusterrolebinding ops-nodes --clusterrole=node-reader --user=ops
 
 **ClusterRole이 필요한 경우**
 
-1. **클러스터 스코프 리소스** — Node, PersistentVolume, StorageClass, Namespace, ClusterRole
-2. **여러 네임스페이스에 같은 권한**을 재사용할 때
-3. `/healthz` 같은 **비(非)리소스 URL**
+<CardGrid>
+<Card title="클러스터 스코프 리소스" icon="server">
+Node, PersistentVolume, StorageClass,
+Namespace, ClusterRole — 네임스페이스가 없는 것들.
+</Card>
+<Card title="여러 네임스페이스 재사용" icon="random">
+같은 권한 정의를 여러 곳에서
+RoleBinding으로 붙여 쓴다.
+</Card>
+<Card title="비(非)리소스 URL" icon="link">
+`/healthz`, `/metrics` 같은
+리소스가 아닌 경로.
+</Card>
+</CardGrid>
 
 ```yaml
 rules:
@@ -311,7 +481,27 @@ rules:
     verbs: ["get"]
 ```
 
-## 조합 — 이 표가 전부다
+## 조합 — 이 그림이 전부다
+
+```mermaid
+flowchart TD
+    Q1{"roleRef 가 무엇인가"}
+    Q1 -->|Role| Q2{"바인딩 종류"}
+    Q1 -->|ClusterRole| Q3{"바인딩 종류"}
+    Q2 -->|RoleBinding| A1["그 네임스페이스 안에서만 ✅"]
+    Q2 -->|ClusterRoleBinding| A2["불가능 · 허용되지 않는다 ❌"]
+    Q3 -->|RoleBinding| A3["그 네임스페이스 안에서만<br/>★ 권한 정의를 재사용 ✅"]
+    Q3 -->|ClusterRoleBinding| A4["모든 네임스페이스<br/>+ 클러스터 스코프 ✅"]
+
+    classDef ok fill:#dcfce7,stroke:#16a34a,color:#14532d
+    classDef star fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
+    classDef bad fill:#fee2e2,stroke:#dc2626,color:#7f1d1d
+    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
+    class A1,A4 ok
+    class A3 star
+    class A2 bad
+    class Q1,Q2,Q3 mute
+```
 
 | roleRef | 바인딩 종류 | 결과 |
 |---|---|---|
@@ -320,7 +510,7 @@ rules:
 | `ClusterRole` | `ClusterRoleBinding` | **모든 네임스페이스 + 클러스터 스코프** |
 | `Role` | `ClusterRoleBinding` | **불가능** — 허용되지 않는다 |
 
-**두 번째 줄이 핵심이다.** ClusterRole을 RoleBinding으로 묶으면
+**세 번째 줄(파란 칸)이 핵심이다.** ClusterRole을 RoleBinding으로 묶으면
 **권한 범위는 그 네임스페이스로 좁혀진다.**
 
 :::tip[시험]
@@ -334,6 +524,20 @@ Role을 네임스페이스마다 복사하는 것보다 빠르고 정확하다.
 ```bash
 kubectl get clusterroles
 kubectl describe clusterrole view
+```
+
+```mermaid
+flowchart LR
+    CA["cluster-admin<br/>전부 · * on *"] --> AD["admin<br/>네임스페이스 안의 거의 전부"]
+    AD --> ED["edit<br/>대부분 읽기·쓰기<br/>RBAC 은 못 만짐"]
+    ED --> VI["view<br/>읽기 전용<br/>Secret 은 못 봄"]
+
+    classDef top fill:#fee2e2,stroke:#dc2626,color:#7f1d1d
+    classDef mid fill:#fef3c7,stroke:#d97706,color:#78350f
+    classDef low fill:#dcfce7,stroke:#16a34a,color:#14532d
+    class CA top
+    class AD,ED mid
+    class VI low
 ```
 
 | 이름 | 권한 |
@@ -364,6 +568,20 @@ rules:
   - apiGroups: ["monitoring.coreos.com"]
     resources: ["prometheuses"]
     verbs: ["get", "list", "watch"]
+```
+
+```mermaid
+flowchart LR
+    NEW["새 ClusterRole<br/>라벨: aggregate-to-view=true"] --> AGG["view 의 aggregationRule 이<br/>이 라벨을 수집"]
+    AGG --> VIEW["ClusterRole view<br/>규칙이 자동으로 합쳐진다"]
+    VIEW --> USERS["기존 view 사용자 전원에게<br/>즉시 반영 ✅"]
+
+    classDef key fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
+    classDef ok fill:#dcfce7,stroke:#16a34a,color:#14532d
+    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
+    class NEW key
+    class USERS ok
+    class AGG,VIEW mute
 ```
 
 - 라벨을 붙이면 **기존 `view`/`edit`/`admin`에 규칙이 자동으로 합쳐진다**
@@ -422,6 +640,25 @@ kubectl run tmp --image=curlimages/curl --rm -it --restart=Never \
 
 인가를 통과한 뒤 **내용을 검사하거나 고치는** 단계다.
 
+```mermaid
+flowchart LR
+    Z["인가 통과"] --> MU["Mutating<br/>요청을 고친다"]
+    MU --> VA["Validating<br/>거부하거나 통과시킨다"]
+    VA --> E[("etcd")]
+    MU -.-> M1["DefaultStorageClass<br/>ServiceAccount 주입"]
+    VA -.-> V1["ResourceQuota · PodSecurity<br/>LimitRanger"]
+    VA -->|"위반"| X["거부"]
+
+    classDef mut fill:#ede9fe,stroke:#7c3aed,color:#4c1d95
+    classDef val fill:#fef3c7,stroke:#d97706,color:#78350f
+    classDef bad fill:#fee2e2,stroke:#dc2626,color:#7f1d1d
+    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
+    class MU,M1 mut
+    class VA,V1 val
+    class X bad
+    class Z,E mute
+```
+
 | 종류 | 하는 일 | 예 |
 |---|---|---|
 | **Mutating** | 요청을 **고친다** | `DefaultStorageClass`, `ServiceAccount` 주입 |
@@ -448,20 +685,53 @@ sudo grep enable-admission-plugins /etc/kubernetes/manifests/kube-apiserver.yaml
 
 ## RBAC 진단 순서
 
-```bash
-# 1) 에러 메시지를 정확히 읽는다 — 필요한 정보가 다 있다
-# Error from server (Forbidden): pods is forbidden:
-#   User "dev" cannot list resource "pods" in API group "" in the namespace "prod"
+<Steps>
 
-# 2) 실제로 안 되는지 확인
-kubectl auth can-i list pods -n prod --as=dev
+1. **에러 메시지를 정확히 읽는다** — 필요한 정보가 다 있다
 
-# 3) 바인딩이 있는지
-kubectl get rolebinding,clusterrolebinding -A -o wide | grep dev
+   ```
+   Error from server (Forbidden): pods is forbidden:
+     User "dev" cannot list resource "pods" in API group "" in the namespace "prod"
+   ```
 
-# 4) 역할의 내용 확인
-kubectl describe role pod-reader -n prod
-kubectl describe clusterrole view
+2. **실제로 안 되는지 확인**
+
+   ```bash
+   kubectl auth can-i list pods -n prod --as=dev
+   ```
+
+3. **바인딩이 있는지**
+
+   ```bash
+   kubectl get rolebinding,clusterrolebinding -A -o wide | grep dev
+   ```
+
+4. **역할의 내용 확인**
+
+   ```bash
+   kubectl describe role pod-reader -n prod
+   kubectl describe clusterrole view
+   ```
+
+</Steps>
+
+```mermaid
+flowchart TD
+    S{"403 이 났다"}
+    S --> C1{"바인딩이 대상<br/>네임스페이스에 있는가"}
+    C1 -->|없다| F1["RoleBinding 은 대상 네임스페이스에<br/>있어야 한다"]
+    C1 -->|있다| C2{"apiGroup 이 맞는가"}
+    C2 -->|"틀렸다"| F2["apps vs 빈 문자열<br/>Deployment 는 apps"]
+    C2 -->|맞다| C3{"하위 리소스가<br/>필요한 동작인가"}
+    C3 -->|"그렇다"| F3["pods/log · pods/exec 를 추가"]
+    C3 -->|아니다| C4{"주체 표기가 맞는가"}
+    C4 -->|"SA 인데 형식이 틀림"| F4["system:serviceaccount:ns:name"]
+    C4 -->|맞다| F5["roleRef 를 고치려 했는가<br/>→ 변경 불가 · 지우고 다시"]
+
+    classDef bad fill:#fee2e2,stroke:#dc2626,color:#7f1d1d
+    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
+    class F1,F2,F3,F4,F5 bad
+    class S,C1,C2,C3,C4 mute
 ```
 
 | 흔한 원인 | 확인 |

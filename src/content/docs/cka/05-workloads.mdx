@@ -3,6 +3,8 @@ title: "5. 워크로드 컨트롤러"
 description: "Pod을 직접 만들지 않는 이유"
 ---
 
+import { Steps, Card, CardGrid, Tabs, TabItem } from '@astrojs/starlight/components';
+
 > Pod을 직접 만들지 않는 이유
 
 ## 컨트롤러가 필요한 이유
@@ -16,12 +18,47 @@ Pod을 직접 만들면 —
 컨트롤러는 **"몇 개가 어떤 모습으로 있어야 하는가"**를 선언받고,
 그 상태를 **계속 유지**한다. 이것이 자가치유(self-healing)의 실체다.
 
+```mermaid
+flowchart LR
+    SPEC["원하는 상태<br/>replicas: 3"] --> LOOP{"컨트롤 루프"}
+    ACT["실제 상태<br/>Pod 2개"] --> LOOP
+    LOOP -->|"차이만큼 행동"| ACT2["Pod 1개 생성"]
+    ACT2 --> ACT
+
+    classDef key fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
+    classDef ok fill:#dcfce7,stroke:#16a34a,color:#14532d
+    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
+    class SPEC key
+    class ACT2 ok
+    class LOOP,ACT mute
+```
+
 :::tip[시험]
 커리큘럼의 "자가치유 배포의 기본 요소(primitives)"가 이 장 전체다.
 Deployment / DaemonSet / StatefulSet / Job 을 **언제 쓰는지**가 핵심.
 :::
 
 ## 어떤 컨트롤러를 쓸 것인가
+
+```mermaid
+flowchart TD
+    Q1{"작업이 끝나는가"}
+    Q1 -->|"끝난다"| Q2{"일정에 따라<br/>반복하는가"}
+    Q2 -->|아니오| JOB["Job"]
+    Q2 -->|예| CJ["CronJob"]
+    Q1 -->|"계속 돈다"| Q3{"노드마다<br/>하나씩 필요한가"}
+    Q3 -->|예| DS["DaemonSet"]
+    Q3 -->|아니오| Q4{"각 인스턴스가 고유한<br/>신원·저장소·순서가 필요한가"}
+    Q4 -->|예| STS["StatefulSet"]
+    Q4 -->|아니오| DEP["Deployment ★ 기본"]
+
+    classDef key fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
+    classDef alt fill:#fef3c7,stroke:#d97706,color:#78350f
+    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
+    class DEP key
+    class DS,STS,JOB,CJ alt
+    class Q1,Q2,Q3,Q4 mute
+```
 
 | 필요한 것 | 컨트롤러 |
 |---|---|
@@ -67,9 +104,24 @@ spec:
 
 ## ReplicaSet의 무서운 성질
 
-- ReplicaSet은 **셀렉터에 맞는 Pod을 자기 것으로 "입양"한다**
-- 이미 있던 Pod에 라벨이 맞으면 **개수에 포함**시킨다 — 새로 안 만든다
-- 반대로 관리 중인 Pod의 **라벨을 바꿔버리면** 관리에서 벗어나고, ReplicaSet은 **새 Pod을 만든다**
+**셀렉터에 맞기만 하면 자기가 안 만든 Pod도 자기 것으로 센다.**
+
+```mermaid
+flowchart LR
+    RS["ReplicaSet<br/>selector app=web · replicas 3"]
+    RS -->|"내가 만든 것"| P1["Pod A · app=web"]
+    RS -->|"내가 만든 것"| P2["Pod B · app=web"]
+    EXIST["이미 있던 Pod C<br/>app=web"] -->|"입양된다 ⚠️<br/>개수에 포함"| RS
+    P1 -->|"라벨을 바꾸면"| ESC["app=web-debug<br/>관리에서 벗어난다"]
+    ESC -.->|"부족분을 새로 만든다"| RS
+
+    classDef key fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
+    classDef warn fill:#fef3c7,stroke:#d97706,color:#78350f
+    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
+    class RS key
+    class EXIST,ESC warn
+    class P1,P2 mute
+```
 
 ```bash
 # 관리에서 떼어내 디버깅하는 기법
@@ -87,14 +139,21 @@ kubectl label pod web-abc-123 app=web-debug --overwrite
 
 ```mermaid
 flowchart LR
-    D["Deployment<br/>web"] --> RS1["ReplicaSet<br/>web-5d4f (v1)<br/>replicas: 0"]
-    D --> RS2["ReplicaSet<br/>web-7b9c (v2)<br/>replicas: 3"]
+    D["Deployment web"] --> RS1["ReplicaSet web-5d4f · v1<br/>replicas 0"]
+    D --> RS2["ReplicaSet web-7b9c · v2<br/>replicas 3"]
     RS2 --> P1["Pod"]
     RS2 --> P2["Pod"]
     RS2 --> P3["Pod"]
+    RS1 -.->|"롤백의 재료로 남는다"| UNDO["kubectl rollout undo"]
 
-    style D fill:#dbeafe,stroke:#326ce5
-    style RS2 fill:#dcfce7,stroke:#16a34a
+    classDef key fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
+    classDef ok fill:#dcfce7,stroke:#16a34a,color:#14532d
+    classDef old fill:#fef3c7,stroke:#d97706,color:#78350f
+    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
+    class D key
+    class RS2 ok
+    class RS1,UNDO old
+    class P1,P2,P3 mute
 ```
 
 - 템플릿을 바꾸면 **새 ReplicaSet을 만들고**, 옛 것을 0으로 줄이며 새 것을 올린다
@@ -135,29 +194,51 @@ spec:
 
 ## 롤링 업데이트의 두 손잡이
 
-**`maxSurge`**
+<Tabs>
+<TabItem label="RollingUpdate (기본)">
 
-목표 개수보다 **더 만들 수 있는 수**
+```mermaid
+flowchart LR
+    S["replicas 4<br/>maxSurge 1 · maxUnavailable 1"] --> R["살아 있는 Pod 은<br/>3 ~ 5 개 사이를 오간다"]
+    MS["maxSurge<br/>목표보다 더 만들 수 있는 수"] -.->|"0 이면 절대 초과하지 않는다"| R
+    MU["maxUnavailable<br/>없어도 되는 수"] -.->|"0 이면 용량이 절대 줄지 않는다"| R
+    BOTH["둘 다 0"] -->|"만들 수도 지울 수도 없다"| STUCK["롤아웃이 시작조차 안 된다 ❌"]
 
-- 크면 빠르지만 자원을 더 쓴다
-- `0`이면 절대 초과하지 않는다
+    classDef key fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
+    classDef bad fill:#fee2e2,stroke:#dc2626,color:#7f1d1d
+    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
+    class MS,MU key
+    class STUCK bad
+    class S,R,BOTH mute
+```
 
-**`maxUnavailable`**
+무중단으로 조금씩 교체한다. 기본 전략이다.
 
-**없어도 되는 수**
+</TabItem>
+<TabItem label="Recreate">
 
-- `0`이면 용량이 절대 줄지 않는다
-- 크면 빠르지만 순간 용량이 준다
+```mermaid
+flowchart LR
+    A["옛 Pod 전부 삭제"] --> B["다운타임 발생 ⚠️"] --> C["새 Pod 전부 생성"]
+    R1["RWO 볼륨을 공유할 때"] -.-> A
+    R2["버전 공존이 불가능할 때"] -.-> A
 
-`replicas: 4`, `maxSurge: 1`, `maxUnavailable: 1` 이면 → 살아 있는 Pod은 **3~5개** 사이를 오간다.
+    classDef warn fill:#fef3c7,stroke:#d97706,color:#78350f
+    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
+    class B warn
+    class A,C,R1,R2 mute
+```
+
+전부 죽이고 전부 새로 만든다. 다운타임이 있지만
+**RWO 볼륨을 공유하거나 버전 공존이 불가능할 때** 필요하다 (13장).
+
+</TabItem>
+</Tabs>
 
 :::caution[함정]
 **둘 다 0으로 두면 롤아웃이 시작조차 안 된다.**
 새로 만들 수도(surge 0), 지울 수도(unavailable 0) 없기 때문이다. API가 이를 거부한다.
 :::
-
-**`Recreate`** — 전부 죽이고 전부 새로 만든다. 다운타임이 있지만
-**RWO 볼륨을 공유하거나 버전 공존이 불가능할 때** 필요하다.
 
 ## 롤아웃 다루기
 
@@ -195,6 +276,19 @@ kubectl rollout history deploy/web
 
 ```bash
 kubectl annotate deploy/web kubernetes.io/change-cause="nginx 1.28로 업그레이드"
+```
+
+**`undo`는 "돌아가는" 게 아니라 앞으로 나아간다.**
+
+```mermaid
+flowchart LR
+    R1["리비전 1<br/>nginx:1.27"] --> R2["리비전 2<br/>nginx:1.28"] --> R3["리비전 3<br/>nginx:1.29"]
+    R3 -->|"undo --to-revision=2"| R4["리비전 4<br/>내용은 2와 같다"]
+
+    classDef key fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
+    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
+    class R4 key
+    class R1,R2,R3 mute
 ```
 
 :::caution[함정]
@@ -252,6 +346,25 @@ spec:
           image: fluent-bit:3.0
 ```
 
+```mermaid
+flowchart TB
+    DS["DaemonSet log-agent<br/>★ replicas 가 없다"]
+    DS --> N1["node01 → Pod"]
+    DS --> N2["node02 → Pod"]
+    DS --> N3["node03 → Pod"]
+    DS -.->|"toleration 이 없으면 안 뜬다 ❌"| CP["controlplane<br/>NoSchedule taint"]
+    NEW["node04 추가"] -->|"자동으로 하나 더"| DS
+
+    classDef key fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
+    classDef bad fill:#fee2e2,stroke:#dc2626,color:#7f1d1d
+    classDef ok fill:#dcfce7,stroke:#16a34a,color:#14532d
+    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
+    class DS key
+    class CP bad
+    class NEW ok
+    class N1,N2,N3 mute
+```
+
 - **`replicas`가 없다.** 개수는 노드 수가 정한다
 - 노드가 추가되면 **자동으로 하나 더** 생긴다
 - 쓰임: 로그 수집기, 모니터링 에이전트, **kube-proxy**, **CNI 플러그인**
@@ -306,13 +419,37 @@ spec:
 
 ## StatefulSet이 주는 세 가지 보장
 
-**1. 안정적인 이름** — `db-0`, `db-1`, `db-2`. 재시작해도 **이름이 그대로**다
+```mermaid
+flowchart LR
+    STS["StatefulSet db"]
+    STS --> P0["db-0"] --> V0[("PVC data-db-0")]
+    STS --> P1["db-1"] --> V1[("PVC data-db-1")]
+    STS --> P2["db-2"] --> V2[("PVC data-db-2")]
+    ORD["생성 0 → 1 → 2<br/>삭제 2 → 1 → 0"] -.-> STS
+    DNS["db-0.db-headless.…<br/>Pod 별 안정적 DNS"] -.-> P0
 
-**2. 안정적인 저장소** — `data-db-0`, `data-db-1` … PVC가 Pod 이름에 묶인다.
-`db-0`이 죽었다 살아나면 **같은 PVC를 다시 붙인다**
+    classDef key fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
+    classDef vol fill:#fef3c7,stroke:#d97706,color:#78350f
+    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
+    class STS key
+    class V0,V1,V2 vol
+    class P0,P1,P2,ORD,DNS mute
+```
 
-**3. 순서 보장** — 생성은 `0 → 1 → 2`, 삭제는 `2 → 1 → 0`.
-앞 Pod이 Ready가 되어야 다음이 시작한다
+<CardGrid>
+<Card title="1 · 안정적인 이름" icon="approve-check">
+`db-0`, `db-1`, `db-2`.
+재시작해도 **이름이 그대로**다.
+</Card>
+<Card title="2 · 안정적인 저장소" icon="database">
+`data-db-0`, `data-db-1` … PVC가 Pod 이름에 묶인다.
+`db-0`이 죽었다 살아나면 **같은 PVC를 다시 붙인다.**
+</Card>
+<Card title="3 · 순서 보장" icon="list-format">
+생성은 `0 → 1 → 2`, 삭제는 `2 → 1 → 0`.
+앞 Pod이 Ready가 되어야 다음이 시작한다.
+</Card>
+</CardGrid>
 
 ```bash
 kubectl get pvc
@@ -366,6 +503,17 @@ spec:
   podManagementPolicy: OrderedReady   # OrderedReady(기본) | Parallel
 ```
 
+```mermaid
+flowchart LR
+    U["업데이트 시작"] --> P2["db-2 먼저"] --> P1["db-1"] --> P0["db-0 마지막"]
+    PART["partition: 2"] -.->|"인덱스 2 이상만 바뀐다<br/>db-1 · db-0 은 그대로"| P2
+
+    classDef key fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
+    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
+    class PART key
+    class U,P0,P1,P2 mute
+```
+
 - 업데이트는 **큰 번호부터 역순**으로 진행된다 (`2 → 1 → 0`)
 - `partition: N` 이면 **N 이상 인덱스만** 바뀐다 — 단계적 배포에 쓴다
 - `podManagementPolicy: Parallel` 이면 **순서 없이 동시에** 생성/삭제 (기동이 빠르다)
@@ -406,12 +554,18 @@ kubectl create job manual --from=cronjob/nightly     # CronJob을 즉시 한 번
 
 ## Job 파라미터가 실제로 뜻하는 것
 
-| 조합 | 결과 |
-|---|---|
-| `completions` 없음 | Pod 하나가 성공하면 끝 |
-| `completions: 5`, `parallelism: 1` | 순차로 5번 |
-| `completions: 5`, `parallelism: 5` | 5개 동시에 |
-| `parallelism` 만 설정 | 워커 큐 방식 — 하나가 성공하면 전체 완료 |
+```mermaid
+flowchart LR
+    C1["completions 없음"] --> R1["Pod 하나가 성공하면 끝"]
+    C2["completions 5<br/>parallelism 1"] --> R2["순차로 5번"]
+    C3["completions 5<br/>parallelism 5"] --> R3["5개 동시에"]
+    C4["parallelism 만 설정"] --> R4["워커 큐 방식<br/>하나가 성공하면 전체 완료"]
+
+    classDef key fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
+    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
+    class R1,R2,R3,R4 key
+    class C1,C2,C3,C4 mute
+```
 
 **`completionMode: Indexed`** 를 쓰면 각 Pod에 **인덱스(0, 1, 2 …)** 가 붙는다.
 `JOB_COMPLETION_INDEX` 환경변수와 Pod 이름 접미사로 들어온다 — 데이터를 나눠 처리할 때 쓴다.
@@ -455,12 +609,38 @@ kubectl patch cronjob nightly -p '{"spec":{"suspend":true}}'
 
 ## CronJob에서 헷갈리는 것들
 
+**3단 소유 사슬이다.** Pod을 찾으려면 두 단계를 내려가야 한다.
+
+```mermaid
+flowchart LR
+    CJ["CronJob nightly<br/>schedule 0 3 * * *"] -->|"일정마다 생성"| J["Job nightly-28901234"]
+    J -->|"생성"| P["Pod nightly-28901234-x7k2p"]
+    TZ["timeZone 미지정<br/>→ 기본 UTC ⚠️"] -.-> CJ
+
+    classDef key fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
+    classDef warn fill:#fef3c7,stroke:#d97706,color:#78350f
+    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
+    class CJ key
+    class TZ warn
+    class J,P mute
+```
+
+`concurrencyPolicy` — 이전 Job이 아직 도는데 다음 일정이 오면?
+
+```mermaid
+flowchart LR
+    Q{"concurrencyPolicy"}
+    Q -->|"Allow · 기본"| A["겹쳐도 그냥 실행"]
+    Q -->|Forbid| B["새 Job 을 건너뛴다"]
+    Q -->|Replace| C["이전 것을 죽이고 새로 시작"]
+
+    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
+    classDef warn fill:#fef3c7,stroke:#d97706,color:#78350f
+    class A mute
+    class B,C warn
+```
+
 - **시간대 기본은 UTC**다 (컨트롤러 매니저 기준). `timeZone` 필드로 명시하는 게 안전하다
-- `concurrencyPolicy`
-  - `Allow` — 겹쳐도 그냥 실행 (기본)
-  - `Forbid` — 이전 Job이 안 끝났으면 **건너뛴다**
-  - `Replace` — 이전 것을 **죽이고** 새로 시작
-- CronJob → Job → Pod 의 **3단 소유 사슬**이다. Pod을 찾으려면 두 단계를 내려가야 한다
 
 ```bash
 kubectl get cronjob nightly
@@ -488,6 +668,23 @@ spec:
       app: web
 ```
 
+```mermaid
+flowchart LR
+    V["자발적 중단<br/>kubectl drain · 노드 업그레이드"] --> PDB{"PDB 검사<br/>minAvailable 충족?"}
+    PDB -->|"충족"| OK["축출 허용 ✅"]
+    PDB -->|"위반"| WAIT["drain 이 멈춰서 기다린다 ⏳"]
+    IV["비자발적 중단<br/>노드 장애 · 커널 패닉"] -.->|"막지 못한다 ❌"| GONE["그냥 죽는다"]
+
+    classDef ok fill:#dcfce7,stroke:#16a34a,color:#14532d
+    classDef warn fill:#fef3c7,stroke:#d97706,color:#78350f
+    classDef bad fill:#fee2e2,stroke:#dc2626,color:#7f1d1d
+    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
+    class OK ok
+    class WAIT warn
+    class GONE bad
+    class V,IV,PDB mute
+```
+
 - **`kubectl drain`이나 노드 업그레이드 같은 "자발적 중단"에서** 최소 가용 수를 지킨다
 - 노드 장애 같은 **비자발적 중단은 막지 못한다**
 - PDB가 막으면 `drain`이 **멈춰서 기다린다**
@@ -500,13 +697,21 @@ spec:
 
 ## 자가치유는 어디까지 되나
 
-| 상황 | 결과 |
-|---|---|
-| 컨테이너가 죽었다 | kubelet이 **같은 노드에서** 재시작 |
-| Pod이 삭제됐다 | ReplicaSet이 **새 Pod을 만든다** (이름·IP가 바뀐다) |
-| 노드가 `NotReady`가 됐다 | 약 5분 후 Pod을 축출하고 **다른 노드에** 새로 만든다 |
-| 노드가 영구히 죽었다 | 위와 같다. 단 **StatefulSet은 자동으로 안 옮긴다** |
-| 앱이 살아 있는데 응답을 안 한다 | **livenessProbe가 없으면 아무 일도 안 일어난다** |
+```mermaid
+flowchart LR
+    E1["컨테이너가 죽었다"] --> A1["kubelet 이 같은 노드에서 재시작 ✅"]
+    E2["Pod 이 삭제됐다"] --> A2["ReplicaSet 이 새 Pod 생성 ✅<br/>이름·IP 가 바뀐다"]
+    E3["노드가 NotReady"] --> A3["약 5분 후 축출<br/>다른 노드에 새로 만든다 ✅"]
+    E4["노드가 영구히 죽었다"] --> A4["위와 같다<br/>단 StatefulSet 은 자동으로 안 옮긴다 ⚠️"]
+    E5["앱이 살아 있는데 응답을 안 한다"] --> A5["livenessProbe 가 없으면<br/>아무 일도 안 일어난다 ❌"]
+
+    classDef ok fill:#dcfce7,stroke:#16a34a,color:#14532d
+    classDef warn fill:#fef3c7,stroke:#d97706,color:#78350f
+    classDef bad fill:#fee2e2,stroke:#dc2626,color:#7f1d1d
+    class A1,A2,A3 ok
+    class A4 warn
+    class A5 bad
+```
 
 마지막 줄이 중요하다. **Kubernetes는 "프로세스가 살아 있는가"만 본다.**
 "제대로 동작하는가"는 프로브를 통해 **당신이 알려줘야** 한다.

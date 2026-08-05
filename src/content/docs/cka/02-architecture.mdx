@@ -3,27 +3,25 @@ title: "2. 클러스터 아키텍처"
 description: "무엇이 어디서 돌고 있는가"
 ---
 
+import { Steps, Card, CardGrid, Tabs, TabItem, FileTree } from '@astrojs/starlight/components';
+
 > 무엇이 어디서 돌고 있는가
 
 ## 클러스터는 두 층으로 되어 있다
 
-**컨트롤 플레인 (Control Plane)**
-
+<CardGrid>
+<Card title="컨트롤 플레인 (Control Plane)" icon="setting">
 클러스터의 **뇌**. "무엇이 있어야 하는가"를 결정한다.
 
-- `kube-apiserver`
-- `etcd`
-- `kube-scheduler`
-- `kube-controller-manager`
-- `cloud-controller-manager` (클라우드일 때)
-
-**노드 (Node) / 데이터 플레인**
-
+`kube-apiserver` · `etcd` · `kube-scheduler` ·
+`kube-controller-manager` · `cloud-controller-manager`(클라우드일 때)
+</Card>
+<Card title="노드 (Node) / 데이터 플레인" icon="laptop">
 실제로 **컨테이너를 돌리는 곳**.
 
-- `kubelet`
-- `kube-proxy`
-- 컨테이너 런타임 (containerd 등)
+`kubelet` · `kube-proxy` · 컨테이너 런타임(containerd 등)
+</Card>
+</CardGrid>
 
 컨트롤 플레인 노드에도 **kubelet과 kube-proxy는 있다.**
 컨트롤 플레인 컴포넌트 자체가 Pod으로 돌기 때문이다 — 뒤에서 다룬다.
@@ -54,8 +52,12 @@ flowchart LR
     KL --> API
     KP --> API
 
-    style API fill:#dbeafe,stroke:#326ce5
-    style ETCD fill:#fef3c7,stroke:#d97706
+    classDef key fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
+    classDef store fill:#fef3c7,stroke:#d97706,color:#78350f
+    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
+    class API key
+    class ETCD store
+    class SCH,CM,KL,KP,CR,U mute
 ```
 
 **화살표 방향이 핵심이다.** 모든 컴포넌트가 **API 서버를 향한다.**
@@ -100,6 +102,22 @@ etcd 백업/복구는 **거의 확실히 나온다.**
 
 ## kube-scheduler — 자리를 정할 뿐이다
 
+```mermaid
+flowchart LR
+    W["spec.nodeName 이 비어 있는 Pod"] --> F["Filtering<br/>못 놓는 노드를 거른다"]
+    F --> S["Scoring<br/>남은 노드에 점수"]
+    S --> B["spec.nodeName 을 채운다<br/>★ 여기까지가 전부"]
+    B -.->|"실행은 kubelet 의 몫"| KL["kubelet"]
+    F -.->|"리소스 부족 · taint<br/>nodeSelector 불일치 …"| X["전부 걸러지면 Pending"]
+
+    classDef key fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
+    classDef bad fill:#fee2e2,stroke:#dc2626,color:#7f1d1d
+    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
+    class F,S key
+    class X bad
+    class W,B,KL mute
+```
+
 - `spec.nodeName`이 **비어 있는 Pod**을 찾는다
 - 조건에 맞는 노드를 골라 **`spec.nodeName`을 채운다.** 그게 전부다
 - **컨테이너를 직접 실행하지 않는다.** 실행은 kubelet의 몫
@@ -117,8 +135,23 @@ etcd 백업/복구는 **거의 확실히 나온다.**
 
 ## kube-controller-manager — 루프들의 모음
 
-- 하나의 프로세스 안에서 **수십 개의 컨트롤러**가 각자 루프를 돈다
-- 각 루프: **원하는 상태 관찰 → 실제 상태 관찰 → 차이만큼 API 호출**
+```mermaid
+flowchart LR
+    CM["kube-controller-manager<br/>프로세스 하나"]
+    CM --> L1["Deployment 컨트롤러"]
+    CM --> L2["ReplicaSet 컨트롤러"]
+    CM --> L3["Node 컨트롤러"]
+    CM --> L4["Job / CronJob 컨트롤러"]
+    CM --> L5["EndpointSlice 컨트롤러"]
+    CM --> L6["ServiceAccount 컨트롤러"]
+    CM --> L7["PV / PVC 컨트롤러"]
+    L1 --> LOOP["각 루프: 원하는 상태 관찰<br/>→ 실제 상태 관찰<br/>→ 차이만큼 API 호출"]
+
+    classDef key fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
+    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
+    class CM,LOOP key
+    class L1,L2,L3,L4,L5,L6,L7 mute
+```
 
 | 컨트롤러 | 하는 일 |
 |---|---|
@@ -148,6 +181,22 @@ kubelet은 클러스터 안의 Pod이 **아니다.**
 :::
 
 ## kube-proxy — Service를 노드의 규칙으로 번역한다
+
+```mermaid
+flowchart LR
+    API["kube-apiserver"] -->|"Service · EndpointSlice watch"| KP["kube-proxy<br/>DaemonSet"]
+    KP -->|"규칙만 심고 빠진다"| K["노드 커널<br/>iptables · ipvs · nftables"]
+    C["클라이언트 Pod"] -->|"패킷"| K
+    K -->|"DNAT"| P["대상 Pod"]
+    KP -.->|"트래픽은 여기를 통과하지 않는다"| K
+
+    classDef key fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
+    classDef kern fill:#fef3c7,stroke:#d97706,color:#78350f
+    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
+    class KP key
+    class K kern
+    class API,C,P mute
+```
 
 - 노드마다 하나씩. 보통 **DaemonSet**으로 돈다
 - Service와 EndpointSlice를 지켜보다가 **노드의 패킷 규칙**을 갱신한다
@@ -183,6 +232,21 @@ API 서버가 안 뜨는 문제에서 `crictl ps -a | grep apiserver` 로
 ## 컨트롤 플레인은 어떻게 떠 있나 — 스태틱 Pod
 
 kubeadm으로 만든 클러스터에서, 컨트롤 플레인 컴포넌트는 **Pod이다.** 그런데 특별한 Pod이다.
+
+```mermaid
+flowchart LR
+    F["/etc/kubernetes/manifests/*.yaml"] -->|"kubelet 이 직접 읽는다"| KL["kubelet"]
+    KL --> CR["containerd"] --> POD["컨트롤 플레인 Pod"]
+    KL -.->|"읽기 전용 미러 Pod 등록"| API["kube-apiserver"]
+    NOTE["API 서버도 스케줄러도 거치지 않는다<br/>→ 순환 의존을 피한다"] -.- F
+
+    classDef key fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
+    classDef warn fill:#fef3c7,stroke:#d97706,color:#78350f
+    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
+    class F key
+    class NOTE warn
+    class KL,CR,POD,API mute
+```
 
 - **kubelet이 디렉터리를 직접 읽어서** 띄운다. API 서버도 스케줄러도 거치지 않는다
 - 경로: **`/etc/kubernetes/manifests/`**
@@ -222,18 +286,22 @@ sudo grep staticPodPath /var/lib/kubelet/config.yaml
 ```mermaid
 flowchart LR
     R["요청"] --> A["Authentication<br/>너는 누구인가"]
-    A -->|실패 401| X1["거부"]
-    A --> Z["Authorization<br/>해도 되는가 (RBAC)"]
-    Z -->|실패 403| X2["거부"]
+    A -->|"실패 401"| X1["거부"]
+    A --> Z["Authorization<br/>해도 되는가 · RBAC"]
+    Z -->|"실패 403"| X2["거부"]
     Z --> M["Mutating Admission<br/>요청을 고친다"]
     M --> V["Validating Admission<br/>규칙 위반인가"]
-    V -->|위반| X3["거부"]
+    V -->|"위반"| X3["거부"]
     V --> S["스키마 검증 → etcd 저장"]
 
-    style S fill:#dcfce7,stroke:#16a34a
-    style X1 fill:#fecaca,stroke:#dc2626
-    style X2 fill:#fecaca,stroke:#dc2626
-    style X3 fill:#fecaca,stroke:#dc2626
+    classDef ok fill:#dcfce7,stroke:#16a34a,color:#14532d
+    classDef bad fill:#fee2e2,stroke:#dc2626,color:#7f1d1d
+    classDef key fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
+    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
+    class S ok
+    class X1,X2,X3 bad
+    class A,Z key
+    class R,M,V mute
 ```
 
 **이 순서를 알면 에러 코드로 원인을 짚을 수 있다.**
@@ -282,6 +350,23 @@ status:                    # 실제 상태        ← 컨트롤러가 쓴다
   readyReplicas: 3
 ```
 
+```mermaid
+flowchart LR
+    H["사람"] -->|"쓴다"| SPEC["spec<br/>원하는 상태"]
+    SPEC --> CTRL["컨트롤러"]
+    CTRL -->|"현실을 맞춘다"| REAL["실제 클러스터"]
+    REAL --> STATUS["status<br/>실제 상태"]
+    CTRL -->|"쓴다"| STATUS
+    H -.->|"직접 편집하지 않는다 ❌"| STATUS
+
+    classDef key fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
+    classDef bad fill:#fee2e2,stroke:#dc2626,color:#7f1d1d
+    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
+    class SPEC key
+    class STATUS bad
+    class H,CTRL,REAL mute
+```
+
 - **`spec`은 사람이, `status`는 시스템이 쓴다.** `status`를 직접 편집하지 않는다
 - `apiVersion`이 `v1`이면 **core 그룹**(그룹 이름이 없다), `apps/v1`이면 `apps` 그룹
 - 이 구조가 같으니 **처음 보는 리소스도 읽는 법은 똑같다**
@@ -307,9 +392,29 @@ kubectl explain deployment.spec.strategy --recursive # 하위 전부 펼치기
 
 ## 네임스페이스
 
-- 리소스 **이름의 유효 범위**를 나누는 논리적 구획이다
-- **네트워크 격리가 아니다** — 다른 네임스페이스의 Pod과 통신은 그대로 된다 (막으려면 NetworkPolicy)
-- 모든 리소스가 네임스페이스에 속하지는 않는다: **Node, PV, StorageClass, ClusterRole**은 클러스터 스코프
+```mermaid
+flowchart LR
+    subgraph NS["네임스페이스 안 — 이름의 유효 범위"]
+      P["Pod"]
+      S["Service"]
+      C["ConfigMap · Secret"]
+      RB["Role · RoleBinding"]
+    end
+    subgraph CL["클러스터 스코프 — 네임스페이스가 없다"]
+      N["Node"]
+      PV["PersistentVolume"]
+      SC["StorageClass"]
+      CR["ClusterRole"]
+    end
+    NET["네트워크 격리가 아니다 ⚠️<br/>다른 네임스페이스와 통신은 그대로 된다<br/>막으려면 NetworkPolicy · 12장"] -.- NS
+
+    classDef ns fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
+    classDef cl fill:#fef3c7,stroke:#d97706,color:#78350f
+    classDef warn fill:#fee2e2,stroke:#dc2626,color:#7f1d1d
+    class P,S,C,RB ns
+    class N,PV,SC,CR cl
+    class NET warn
+```
 
 ```bash
 kubectl get ns
@@ -325,6 +430,20 @@ kubectl config set-context --current --namespace=dev   # 기본 네임스페이�
 :::
 
 ## 라벨과 셀렉터 — 연결의 접착제
+
+```mermaid
+flowchart LR
+    L["Pod 라벨<br/>app=web"] --> SVC["Service selector"]
+    L --> RS["ReplicaSet selector"]
+    L --> NP["NetworkPolicy podSelector"]
+    L --> PDB["PodDisruptionBudget selector"]
+    A["애노테이션<br/>선택 대상이 아니다"] -.->|"도구가 읽는 메타데이터"| TOOL["kubectl · 컨트롤러 · 외부 도구"]
+
+    classDef key fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
+    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
+    class L key
+    class SVC,RS,NP,PDB,A,TOOL mute
+```
 
 - **라벨(label)**: 선택하기 위한 key-value. Service·ReplicaSet·NetworkPolicy가 전부 이걸로 대상을 찾는다
 - **애노테이션(annotation)**: 선택 대상이 아닌 부가 정보. 도구가 읽는 메타데이터
@@ -354,6 +473,21 @@ kubectl get events --field-selector type=Warning
 ```
 
 **ownerReferences** — 오브젝트가 누구에게서 만들어졌는지 기록한다.
+
+```mermaid
+flowchart LR
+    D["Deployment web"] -->|ownerReference| RS["ReplicaSet web-5d4f"]
+    RS -->|ownerReference| P["Pod web-5d4f-x7k2p"]
+    DEL["부모를 지우면"] -->|"가비지 컬렉터가 자식을 지운다 · cascade"| P
+    ORPH["--cascade=orphan"] -.->|"Pod 을 남긴다"| P
+
+    classDef key fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
+    classDef warn fill:#fef3c7,stroke:#d97706,color:#78350f
+    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
+    class D key
+    class ORPH warn
+    class RS,P,DEL mute
+```
 
 ```bash
 kubectl get pod web-abc-123 -o jsonpath='{.metadata.ownerReferences[0].kind}'
@@ -389,19 +523,29 @@ kubectl get node node01 -o yaml
 
 ## 파일이 어디 있는지 — 트러블슈팅의 지도
 
-| 경로 | 내용 |
-|---|---|
-| `/etc/kubernetes/manifests/` | **컨트롤 플레인 스태틱 Pod YAML** |
-| `/etc/kubernetes/pki/` | 인증서·키 (CA, apiserver, etcd …) |
-| `/etc/kubernetes/admin.conf` | 관리자 kubeconfig |
-| `/etc/kubernetes/kubelet.conf` | kubelet의 kubeconfig |
-| `/var/lib/kubelet/config.yaml` | **kubelet 설정** (staticPodPath, cgroupDriver …) |
-| `/var/lib/etcd/` | etcd 데이터 디렉터리 |
-| `/var/log/pods/`, `/var/log/containers/` | 컨테이너 로그 실체 |
-| `/etc/cni/net.d/` | CNI 설정 |
+<FileTree>
+
+- etc/
+  - kubernetes/
+    - **manifests/** 컨트롤 플레인 스태틱 Pod YAML
+    - **pki/** 인증서·키 (CA, apiserver, etcd …)
+    - admin.conf 관리자 kubeconfig
+    - kubelet.conf kubelet의 kubeconfig
+  - cni/
+    - net.d/ CNI 설정
+- var/
+  - lib/
+    - kubelet/
+      - **config.yaml** kubelet 설정 (staticPodPath, cgroupDriver …)
+    - etcd/ etcd 데이터 디렉터리
+  - log/
+    - pods/ 컨테이너 로그 실체
+    - containers/ 위로 향하는 심볼릭 링크
+
+</FileTree>
 
 :::tip[시험]
-이 표는 **외워야 한다.**
+이 트리는 **외워야 한다.**
 컨트롤 플레인이 고장나면 `kubectl`이 안 되고, 문서도 이 경로를 딱 집어주지 않는다.
 :::
 

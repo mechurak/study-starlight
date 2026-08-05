@@ -3,11 +3,30 @@ title: "12. NetworkPolicy와 CNI"
 description: "Pod 사이의 통신을 막는 법"
 ---
 
+import { Steps, Card, CardGrid, Tabs, TabItem } from '@astrojs/starlight/components';
+
 > Pod 사이의 통신을 막는 법
 
 ## 기본값은 "전부 허용"이다
 
 Kubernetes 네트워크 모델의 전제 —
+
+```mermaid
+flowchart LR
+    subgraph NS1["네임스페이스 prod"]
+      A["Pod A"]
+      B["Pod B"]
+    end
+    subgraph NS2["네임스페이스 dev"]
+      C["Pod C"]
+    end
+    A <-->|"NAT 없이 직접 ✅"| B
+    A <-->|"네임스페이스가 달라도 ✅"| C
+    B <-->|"노드가 달라도 ✅"| C
+
+    classDef pod fill:#dcfce7,stroke:#16a34a,color:#14532d
+    class A,B,C pod
+```
 
 - **모든 Pod은 모든 Pod과 NAT 없이 통신할 수 있다**
 - 네임스페이스가 달라도 마찬가지다. **네임스페이스는 네트워크 경계가 아니다**
@@ -23,6 +42,18 @@ NetworkPolicy는 이 기본값을 **선택적으로 좁히는** 도구다.
 :::
 
 ## CNI — 누가 네트워크를 만드는가
+
+```mermaid
+sequenceDiagram
+    participant KL as kubelet
+    participant CNI as CNI 플러그인
+    participant POD as Pod 네트워크 네임스페이스
+    KL->>CNI: Pod 생성 — ADD 호출
+    Note over CNI: 설정 /etc/cni/net.d/<br/>바이너리 /opt/cni/bin/
+    CNI->>POD: IP 할당 · veth 인터페이스 연결 · 라우팅
+    CNI-->>KL: 결과 반환
+    Note over KL: 실패하면 Pod 은 ContainerCreating 에서 멈춘다
+```
 
 - kubelet은 Pod을 만들 때 **CNI 플러그인을 호출**해 IP를 할당하고 인터페이스를 붙인다
 - 설정은 **`/etc/cni/net.d/`** 에 있고, 바이너리는 `/opt/cni/bin/` 에 있다
@@ -75,19 +106,55 @@ spec:
           port: 5432
 ```
 
+**네 부분이 각각 다른 질문에 답한다.**
+
+```mermaid
+flowchart LR
+    P["NetworkPolicy"]
+    P --> Q1["podSelector<br/>누구에게 적용하나"]
+    P --> Q2["policyTypes<br/>어느 방향을 통제하나"]
+    P --> Q3["ingress.from<br/>들어오는 것 중 무엇을 허용하나"]
+    P --> Q4["egress.to<br/>나가는 것 중 무엇을 허용하나"]
+
+    classDef key fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
+    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
+    class Q1,Q2 key
+    class Q3,Q4 mute
+```
+
 ## 세 가지 규칙을 먼저 외우자
 
-**1. 정책이 하나라도 붙는 순간, 그 Pod은 "기본 거부"가 된다**
+<CardGrid>
+<Card title="1 · 걸리는 순간 기본 거부" icon="padlock">
+정책이 하나라도 붙으면 그 Pod은 **기본 거부**가 된다.
+명시적으로 허용한 것 외에는 전부 막힌다.
+</Card>
+<Card title="2 · 정책은 더해진다" icon="add-plus">
+여러 정책이 같은 Pod에 걸리면 **허용의 합집합**이다.
+순서도, 우선순위도, `deny` 규칙도 **없다.**
+</Card>
+<Card title="3 · 없는 방향은 통제되지 않는다" icon="right-arrow">
+`policyTypes: [Ingress]`만 쓰면
+**egress는 전혀 제한되지 않는다.**
+</Card>
+</CardGrid>
 
-`podSelector`에 걸린 Pod은 명시적으로 허용한 것 외에는 전부 막힌다.
+첫 번째 규칙이 가장 중요하다 — **정책 하나가 스위치를 뒤집는다.**
 
-**2. 정책은 더해진다(additive). 순서도 우선순위도 없다**
+```mermaid
+flowchart LR
+    S1["정책이 하나도 없다"] --> A1["전부 허용 ✅"]
+    S2["정책이 하나라도 걸렸다"] --> A2["기본 거부로 전환"]
+    A2 --> A3["명시적으로 허용한 것만 통과"]
+    A2 --> A4["나머지는 전부 차단 ❌"]
 
-여러 정책이 같은 Pod에 걸리면 **허용의 합집합**이다. `deny` 규칙 자체가 없다.
-
-**3. `policyTypes`에 없는 방향은 통제되지 않는다**
-
-`policyTypes: [Ingress]`만 쓰면 **egress는 전혀 제한되지 않는다.**
+    classDef ok fill:#dcfce7,stroke:#16a34a,color:#14532d
+    classDef bad fill:#fee2e2,stroke:#dc2626,color:#7f1d1d
+    classDef warn fill:#fef3c7,stroke:#d97706,color:#78350f
+    class A1,A3 ok
+    class A4 bad
+    class A2 warn
+```
 
 이 셋을 알면 대부분의 혼란이 정리된다.
 특히 **"막는 정책"을 쓰려 하지 말 것** — 막는 방법은 **허용하지 않는 것**뿐이다.
@@ -113,8 +180,23 @@ spec:
 | `{}` (빈 값) | 네임스페이스의 **모든** Pod |
 | `matchLabels: {app: api}` | 라벨이 맞는 Pod만 |
 
-**표준 패턴** — 먼저 `default-deny-all`을 깔고,
-필요한 통신만 정책을 추가해 뚫는다. 화이트리스트 방식이다.
+**표준 패턴 — 화이트리스트**
+
+<Steps>
+
+1. **`default-deny-all`을 먼저 깐다**
+
+   네임스페이스 전체가 기본 거부로 바뀐다.
+
+2. **필요한 통신만 정책을 추가해 뚫는다**
+
+   정책은 더해지므로, 허용 규칙을 하나씩 얹으면 된다.
+
+3. **egress를 켰다면 DNS를 잊지 않는다**
+
+   UDP/TCP 53을 안 열면 이름 해석부터 죽는다. 아래 절에서 다룬다.
+
+</Steps>
 
 ## 출발지를 지정하는 세 가지
 
@@ -135,13 +217,27 @@ ingress:
             - 10.0.5.0/24
 ```
 
+```mermaid
+flowchart LR
+    T["대상 Pod<br/>podSelector 로 지정"]
+    S1["① podSelector<br/>같은 네임스페이스 안에서만 찾는다"] --> T
+    S2["② namespaceSelector<br/>다른 네임스페이스 전체"] --> T
+    S3["③ ipBlock<br/>패킷의 소스 IP · 클러스터 밖 포함"] --> T
+
+    classDef key fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
+    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
+    class T key
+    class S1,S2,S3 mute
+```
+
 - `podSelector` 만 쓰면 **정책이 있는 네임스페이스 안**에서만 찾는다
 - 모든 네임스페이스에는 **`kubernetes.io/metadata.name`** 라벨이 자동으로 붙어 있다 — 이걸로 지정하면 편하다
 - `ipBlock`은 **Pod IP가 아니라 패킷의 소스 IP** 기준이다
 
 ## 가장 많이 틀리는 것 — AND와 OR
 
-**OR — 리스트 항목이 다르다**
+<Tabs>
+<TabItem label="OR — 하이픈이 둘">
 
 ```yaml
 from:
@@ -157,7 +253,17 @@ from:
 **또는**
 "같은 네임스페이스의 `app=web` Pod"
 
-**AND — 같은 항목 안에 있다**
+```mermaid
+flowchart LR
+    A["frontend 네임스페이스의<br/>모든 Pod"] --> T["허용"]
+    B["같은 네임스페이스의<br/>app=web Pod"] --> T
+
+    classDef ok fill:#dcfce7,stroke:#16a34a,color:#14532d
+    class A,B,T ok
+```
+
+</TabItem>
+<TabItem label="AND — 하이픈이 하나">
 
 ```yaml
 from:
@@ -169,8 +275,22 @@ from:
         app: web
 ```
 
-"frontend 네임스페이스**이면서**
-`app=web`인 Pod"
+"frontend 네임스페이스**이면서** `app=web`인 Pod"
+
+```mermaid
+flowchart LR
+    A["frontend 네임스페이스"] --> X{"둘 다 만족"}
+    B["app=web 라벨"] --> X
+    X --> T["허용"]
+
+    classDef ok fill:#dcfce7,stroke:#16a34a,color:#14532d
+    classDef key fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
+    class T ok
+    class X key
+```
+
+</TabItem>
+</Tabs>
 
 :::caution[함정]
 **하이픈(`-`)의 위치가 전부다.**
@@ -203,6 +323,23 @@ spec:
         - { protocol: TCP, port: 53 }
 ```
 
+**DNS를 안 열면 증상이 엉뚱한 곳에서 나타난다.**
+
+```mermaid
+flowchart LR
+    P["egress 정책을 켰다"] --> D["CoreDNS 로 가는<br/>UDP 53 도 막힌다"]
+    D --> N["이름 해석 실패"]
+    N --> S["증상: 연결 거부가 아니라<br/>Name or service not known"]
+    S --> W["엉뚱하게 Service · 앱을 의심하게 된다 ❌"]
+
+    classDef bad fill:#fee2e2,stroke:#dc2626,color:#7f1d1d
+    classDef warn fill:#fef3c7,stroke:#d97706,color:#78350f
+    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
+    class W bad
+    class D,N,S warn
+    class P mute
+```
+
 :::caution[함정]
 **egress 정책을 켜면 DNS부터 막힌다.**
 증상은 "연결 거부"가 아니라 **이름 해석 실패**라서 원인을 엉뚱한 데서 찾게 된다.
@@ -224,6 +361,23 @@ ports:
 
 - `ports`를 **생략하면 모든 포트**가 허용된다
 - **`port`는 Pod의 포트(targetPort)** 다. Service의 `port`가 아니다
+
+**NetworkPolicy는 Service를 모른다.**
+
+```mermaid
+flowchart LR
+    C["클라이언트"] --> SVC["Service<br/>port 80 → targetPort 8080"]
+    SVC --> POD["Pod<br/>8080 에서 수신"]
+    NP["NetworkPolicy"] -.->|"여기를 본다<br/>→ 8080 을 써야 한다"| POD
+    NP -.->|"이건 안 본다 ❌"| SVC
+
+    classDef key fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
+    classDef bad fill:#fee2e2,stroke:#dc2626,color:#7f1d1d
+    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
+    class POD key
+    class SVC bad
+    class C,NP mute
+```
 
 :::caution[함정]
 Service가 `80 → 8080` 으로 매핑한다면
@@ -258,6 +412,24 @@ spec:
           port: 5432
 ```
 
+**정책 하나가 어디까지 바꾸는지** 보면 감이 온다.
+
+```mermaid
+flowchart LR
+    WEB["web<br/>정책 없음"] -->|"아무 데나 갈 수 있다 ✅"| API["api<br/>정책 없음"]
+    API -->|"5432 허용 ✅"| DB["db<br/>tier=db · 정책 걸림"]
+    WEB -.->|"차단 ❌"| DB
+    EXT["다른 네임스페이스"] -.->|"차단 ❌"| DB
+    API -->|"egress 는 여전히 자유 ⚠️"| OUT["외부 · 아무 데나"]
+
+    classDef locked fill:#fee2e2,stroke:#dc2626,color:#7f1d1d
+    classDef free fill:#dcfce7,stroke:#16a34a,color:#14532d
+    classDef warn fill:#fef3c7,stroke:#d97706,color:#78350f
+    class DB locked
+    class WEB,API free
+    class OUT warn
+```
+
 - 이 정책 하나로 **db Pod의 다른 모든 인바운드가 막힌다**
 - api Pod에는 아무 정책도 안 걸렸으므로 **api는 여전히 아무 데나 갈 수 있다**
 - 진짜 잠그려면 각 계층마다 정책이 필요하다
@@ -276,6 +448,25 @@ kubectl run tmp --image=busybox:1.36 --rm -it --restart=Never -n prod -- sh
 # 라벨이 정말 맞는지
 kubectl get pods -n prod --show-labels
 kubectl get ns --show-labels
+```
+
+```mermaid
+flowchart TD
+    S{"증상"}
+    S -->|"정책을 만들었는데 안 막힌다"| A["CNI 가 NetworkPolicy 를 지원하지 않는다<br/>Flannel 기본 설정을 의심"]
+    S -->|"의도보다 많이 막힌다"| B{"무엇을 확인하나"}
+    B --> B1["AND/OR 하이픈 위치"]
+    B --> B2["egress 라면 DNS 허용 여부"]
+    B --> B3["포트를 Service 포트로 쓰지 않았나"]
+    S -->|"특정 네임스페이스만 안 된다"| C["namespaceSelector 라벨 불일치<br/>kubectl get ns --show-labels"]
+    S -->|"이름 해석부터 실패"| D["egress 에서 UDP 53 미허용"]
+
+    classDef bad fill:#fee2e2,stroke:#dc2626,color:#7f1d1d
+    classDef warn fill:#fef3c7,stroke:#d97706,color:#78350f
+    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
+    class A,D bad
+    class B1,B2,B3,C warn
+    class S,B mute
 ```
 
 | 증상 | 원인 후보 |

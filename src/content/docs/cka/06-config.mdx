@@ -3,6 +3,8 @@ title: "6. 설정과 리소스"
 description: "ConfigMap · Secret · requests/limits"
 ---
 
+import { Steps, Card, CardGrid, Tabs, TabItem } from '@astrojs/starlight/components';
+
 > ConfigMap · Secret · requests/limits
 
 ## 설정을 이미지에서 분리하는 이유
@@ -10,6 +12,21 @@ description: "ConfigMap · Secret · requests/limits"
 - 같은 이미지를 **dev / staging / prod에 그대로** 쓸 수 있다
 - 설정만 바꿔서 재배포할 수 있다 — 이미지를 다시 빌드하지 않는다
 - 비밀 값이 **이미지 레이어에 박히지 않는다**
+
+```mermaid
+flowchart LR
+    IMG["이미지 myapp:1.0<br/>한 번만 빌드"]
+    IMG --> D["dev Pod"] --> CD["ConfigMap dev"]
+    IMG --> S["staging Pod"] --> CS["ConfigMap staging"]
+    IMG --> P["prod Pod"] --> CP["ConfigMap prod<br/>+ Secret"]
+
+    classDef img fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
+    classDef cfg fill:#fef3c7,stroke:#d97706,color:#78350f
+    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
+    class IMG img
+    class CD,CS,CP cfg
+    class D,S,P mute
+```
 
 Kubernetes가 주는 두 가지 그릇 —
 **ConfigMap**(평범한 설정)과 **Secret**(민감한 값).
@@ -67,6 +84,30 @@ immutable: false               # true면 수정 불가 (성능 이점 + 실수 �
 - **값은 전부 문자열**이다. `100`이라고 쓰면 YAML 파서가 숫자로 읽어 **거부**한다 → `"100"`
 - `binaryData:` 로 바이너리도 담을 수 있다 (base64)
 - **크기 제한 1MiB** — etcd의 제약이다. 큰 파일은 볼륨을 쓰자
+
+## 주입 방식 세 가지 — 전체 지도
+
+```mermaid
+flowchart LR
+    CM["ConfigMap · Secret"]
+    CM --> M1["① env + valueFrom<br/>키 하나를 원하는 이름으로"]
+    CM --> M2["② envFrom<br/>모든 키를 환경변수로"]
+    CM --> M3["③ volumes + volumeMounts<br/>키 하나 = 파일 하나"]
+    M1 --> E["컨테이너 환경변수"]
+    M2 --> E
+    M3 --> F["컨테이너 파일시스템"]
+    E -.->|"자동 갱신 안 됨 ❌"| R1["Pod 을 다시 만들어야"]
+    F -.->|"자동 갱신 됨 ✅<br/>subPath 는 예외"| R2["kubelet 이 파일을 갱신"]
+
+    classDef key fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
+    classDef bad fill:#fee2e2,stroke:#dc2626,color:#7f1d1d
+    classDef ok fill:#dcfce7,stroke:#16a34a,color:#14532d
+    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
+    class CM key
+    class R1 bad
+    class R2 ok
+    class M1,M2,M3,E,F mute
+```
 
 ## 주입 방식 1 — 개별 환경변수
 
@@ -150,6 +191,33 @@ spec:
 
 ## subPath — 파일 하나만 얹기
 
+<Tabs>
+<TabItem label="디렉터리 마운트 (기본)">
+
+```yaml
+volumeMounts:
+  - name: config
+    mountPath: /etc/nginx
+```
+
+```mermaid
+flowchart LR
+    B["/etc/nginx 원래 내용<br/>nginx.conf · mime.types · conf.d/"] -.->|"전부 가려진다 ❌"| A["/etc/nginx<br/>ConfigMap 의 키들만 보인다"]
+    U["ConfigMap 수정"] -->|"자동 반영 ✅"| A
+
+    classDef bad fill:#fee2e2,stroke:#dc2626,color:#7f1d1d
+    classDef ok fill:#dcfce7,stroke:#16a34a,color:#14532d
+    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
+    class B bad
+    class U ok
+    class A mute
+```
+
+**자동 갱신은 되지만** 원래 있던 파일이 전부 가려진다.
+
+</TabItem>
+<TabItem label="subPath — 파일 하나만">
+
 ```yaml
 volumeMounts:
   - name: config
@@ -157,8 +225,25 @@ volumeMounts:
     subPath: nginx.conf
 ```
 
-- 디렉터리를 덮지 않고 **파일 하나만** 교체한다
-- **대신 자동 갱신이 안 된다** — 여기가 핵심 트레이드오프다
+```mermaid
+flowchart LR
+    B["/etc/nginx 원래 내용<br/>mime.types · conf.d/"] -->|"그대로 남는다 ✅"| A["/etc/nginx"]
+    A --> F["nginx.conf 만 교체됨"]
+    U["ConfigMap 수정"] -.->|"자동 반영 안 됨 ❌"| F
+
+    classDef ok fill:#dcfce7,stroke:#16a34a,color:#14532d
+    classDef bad fill:#fee2e2,stroke:#dc2626,color:#7f1d1d
+    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
+    class B ok
+    class U bad
+    class A,F mute
+```
+
+디렉터리를 덮지 않고 **파일 하나만** 교체한다.
+**대신 자동 갱신이 안 된다** — 여기가 핵심 트레이드오프다.
+
+</TabItem>
+</Tabs>
 
 **자동 갱신 정리**
 
@@ -213,11 +298,29 @@ kubectl get secret db-secret -o jsonpath='{.data.password}' | base64 -d
 # s3cr3t
 ```
 
+**실제 보호는 base64가 아니라 다른 두 축에서 온다.**
+
+```mermaid
+flowchart LR
+    S["Secret"] --> B["base64 인코딩"]
+    B -.->|"누구나 디코딩 가능<br/>보호가 아니다 ❌"| X["보호 아님"]
+    S --> P1["① RBAC<br/>Secret 을 읽을 수 있는 주체 제한 · 14장"]
+    S --> P2["② EncryptionConfiguration<br/>etcd 저장 시 암호화"]
+    P1 --> OK["실제 보호 ✅"]
+    P2 --> OK
+
+    classDef bad fill:#fee2e2,stroke:#dc2626,color:#7f1d1d
+    classDef ok fill:#dcfce7,stroke:#16a34a,color:#14532d
+    classDef key fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
+    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
+    class X bad
+    class OK ok
+    class P1,P2 key
+    class S,B mute
+```
+
 - **누구나 디코딩할 수 있다.** 인코딩은 바이너리를 담기 위한 것이지 보호가 아니다
 - 기본 설정에서 **etcd에 평문으로 저장**된다
-- 실제 보호는 두 축에서 온다:
-  1. **RBAC** — Secret을 읽을 수 있는 주체를 제한 (14장)
-  2. **etcd 저장 시 암호화** — `EncryptionConfiguration`
 
 ```yaml
 # /etc/kubernetes/enc/enc.yaml  → apiserver의 --encryption-provider-config 로 지정
@@ -271,6 +374,23 @@ resources:
     memory: 256Mi
 ```
 
+**둘은 서로 다른 컴포넌트가 서로 다른 시점에 본다.**
+
+```mermaid
+flowchart LR
+    REQ["requests"] -->|"배치 시점"| SCH["kube-scheduler<br/>노드 남은 용량과 비교"]
+    LIM["limits"] -->|"실행 시점"| KL["kubelet · 런타임<br/>cgroup 제한으로 강제"]
+    SCH --> N["노드는 request 의 합만 본다<br/>실제 사용량이 아니다"]
+    KL --> C["초과하면 throttling 또는 OOMKilled"]
+
+    classDef req fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
+    classDef lim fill:#fef3c7,stroke:#d97706,color:#78350f
+    classDef warn fill:#fee2e2,stroke:#dc2626,color:#7f1d1d
+    class REQ,SCH req
+    class LIM,KL lim
+    class N,C warn
+```
+
 - **`requests`는 스케줄러가 본다.** 노드의 남은 용량과 비교해 배치 가능 여부를 판단
 - **`limits`는 kubelet/런타임이 강제한다.** 실제 cgroup 제한이 된다
 - **노드는 request의 합만 본다.** 실제 사용량이 아니다
@@ -283,20 +403,24 @@ request 합이 이미 Allocatable에 닿았기 때문이다.
 
 ## CPU와 메모리의 단위
 
-**CPU — 압축 가능(compressible)**
+**이 비대칭이 실무 감각의 핵심이다.**
 
-- `1` = 코어 1개
-- `500m` = 0.5코어 (m = milli)
-- limit 초과 시 → **throttling**. 느려질 뿐 죽지 않는다
+```mermaid
+flowchart LR
+    CPU["CPU · 압축 가능<br/>1 = 코어 1개 · 500m = 0.5코어"] -->|"limit 초과"| T["throttling<br/>느려질 뿐 죽지 않는다 ⚠️"]
+    MEM["메모리 · 압축 불가<br/>Mi = 1024² · M = 1000²"] -->|"limit 초과"| O["OOMKilled<br/>즉시 죽는다 ❌"]
+    T --> A["CPU limit 은 느슨하게"]
+    O --> B["메모리 limit 은 신중하게"]
 
-**메모리 — 압축 불가(incompressible)**
+    classDef warn fill:#fef3c7,stroke:#d97706,color:#78350f
+    classDef bad fill:#fee2e2,stroke:#dc2626,color:#7f1d1d
+    classDef key fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
+    class T,A warn
+    class O,B bad
+    class CPU,MEM key
+```
 
-- `Mi` = 1024², `M` = 1000²
-- `128Mi` ≠ `128M`
-- limit 초과 시 → **OOMKilled**. 즉시 죽는다
-
-이 비대칭이 실무 감각의 핵심이다.
-**CPU limit은 느슨하게, 메모리 limit은 신중하게.**
+`128Mi` ≠ `128M` 이라는 점도 기억할 것.
 
 :::tip[시험]
 `Exit Code 137` + `Reason: OOMKilled` 를 보면
@@ -306,6 +430,26 @@ request 합이 이미 Allocatable에 닿았기 때문이다.
 ## QoS 클래스 — 누가 먼저 쫓겨나는가
 
 노드에 자원이 부족하면 kubelet이 Pod을 축출(evict)한다. 순서는 QoS가 정한다.
+
+**QoS는 지정하는 것이 아니라 계산된다.**
+
+```mermaid
+flowchart TD
+    Q1{"requests · limits 를<br/>썼는가"}
+    Q1 -->|"둘 다 없다"| BE["BestEffort<br/>가장 먼저 축출 ❌"]
+    Q1 -->|"있다"| Q2{"모든 컨테이너에서<br/>requests == limits 인가<br/>CPU·메모리 둘 다"}
+    Q2 -->|"그렇다"| GU["Guaranteed<br/>가장 나중에 축출 ✅"]
+    Q2 -->|"아니다"| BU["Burstable<br/>중간 ⚠️"]
+
+    classDef bad fill:#fee2e2,stroke:#dc2626,color:#7f1d1d
+    classDef ok fill:#dcfce7,stroke:#16a34a,color:#14532d
+    classDef warn fill:#fef3c7,stroke:#d97706,color:#78350f
+    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
+    class BE bad
+    class GU ok
+    class BU warn
+    class Q1,Q2 mute
+```
 
 | 클래스 | 조건 | 축출 순서 |
 |---|---|---|
@@ -317,7 +461,6 @@ request 합이 이미 Allocatable에 닿았기 때문이다.
 kubectl get pod web -o jsonpath='{.status.qosClass}'
 ```
 
-**QoS는 직접 지정할 수 없다.** requests/limits를 어떻게 썼는지에 따라 **계산된다.**
 중요한 워크로드를 Guaranteed로 만들려면 requests와 limits를 똑같이 쓰면 된다.
 
 ## LimitRange — 네임스페이스의 기본값과 상한
@@ -372,6 +515,24 @@ spec:
 ```bash
 kubectl get resourcequota -n dev
 kubectl describe resourcequota dev-quota -n dev     # Used / Hard 를 보여준다
+```
+
+**둘은 짝으로 쓴다.** 왜 그런지는 순서대로 보면 명확하다.
+
+```mermaid
+flowchart LR
+    POD["requests 없는 Pod 생성 요청"] --> LR["LimitRange<br/>defaultRequest 를 채운다"]
+    LR --> RQ["ResourceQuota<br/>requests.cpu 총량 검사"]
+    RQ -->|"여유 있음"| OK["생성 ✅"]
+    RQ -->|"초과"| NG["거부 ❌"]
+    POD2["LimitRange 가 없다면"] -.->|"requests 가 비어 있어<br/>Quota 검사에서 거부 ❌"| NG2["생성 실패"]
+
+    classDef ok fill:#dcfce7,stroke:#16a34a,color:#14532d
+    classDef bad fill:#fee2e2,stroke:#dc2626,color:#7f1d1d
+    classDef key fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
+    class OK ok
+    class NG,NG2 bad
+    class LR,RQ key
 ```
 
 :::caution[함정]

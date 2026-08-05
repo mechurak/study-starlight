@@ -3,6 +3,8 @@ title: 개요
 description: CKA 시험 대비 노트 — 무엇을 어떤 순서로 읽을 것인가
 ---
 
+import { Card, CardGrid, LinkCard } from '@astrojs/starlight/components';
+
 > Certified Kubernetes Administrator — 개념부터 트러블슈팅까지
 
 kubectl은 써봤지만 "안에서 무슨 일이 벌어지는지"가 흐릿한 사람을 위한 자료다.
@@ -12,6 +14,26 @@ kubectl은 써봤지만 "안에서 무슨 일이 벌어지는지"가 흐릿한 �
 
 배점 순서와 학습 순서는 다르다. 트러블슈팅(30%)이 마지막에 있는 이유는,
 앞의 전부를 알아야 진단이 되기 때문이다.
+
+```mermaid
+flowchart LR
+    I["0~1장<br/>읽는 법 · 시험 해부"] --> B["2~3장<br/>아키텍처 · kubectl"]
+    B --> W["4~8장<br/>Workloads &amp; Scheduling<br/>15%"]
+    W --> N["9~12장<br/>Services &amp; Networking<br/>20%"]
+    N --> S["13장<br/>Storage<br/>10%"]
+    S --> C["14~17장<br/>Cluster Architecture<br/>25%"]
+    C --> T["18장<br/>Troubleshooting<br/>30%"]
+    T --> E["19~20장<br/>시험 전략 · 마무리"]
+
+    classDef big fill:#fee2e2,stroke:#dc2626,color:#7f1d1d
+    classDef mid fill:#fef3c7,stroke:#d97706,color:#78350f
+    classDef base fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
+    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
+    class T,C big
+    class N,W mid
+    class B base
+    class I,S,E mute
+```
 
 | 장 | 주제 | CKA 도메인 |
 |---|---|---|
@@ -32,13 +54,33 @@ Kubernetes의 모든 것은 **"선언된 상태(spec)와 실제 상태(status)�
 
 ## 읽는 법
 
-- 표시 약속 — 본문 중 :::tip 박스는 **시험 포인트**, :::caution 박스는 **자주 틀리는 함정**이다
-- `k` = `kubectl` (시험 환경에 alias가 걸려 있다). `-n <ns>`는 대부분 생략했지만 **실제 시험에서는 거의 항상 필요하다**
-- 읽기만 하면 안 된다 — **kind + killercoda**를 옆에 띄워두고 손을 움직일 것
-- 시험 직전에는 [19장 치트시트](/cka/19-exam-strategy/)와 [20장 요약](/cka/20-wrapup/)만 다시 본다
+<CardGrid>
+<Card title="표시 약속" icon="information">
+본문 중 `:::tip` 박스는 **시험 포인트**,
+`:::caution` 박스는 **자주 틀리는 함정**이다.
+</Card>
+<Card title="명령 표기" icon="laptop">
+`k` = `kubectl` (시험 환경에 alias가 걸려 있다).
+`-n <ns>`는 대부분 생략했지만 **실제 시험에서는 거의 항상 필요하다.**
+</Card>
+<Card title="손을 움직일 것" icon="rocket">
+읽기만 하면 안 된다.
+**kind + killercoda**를 옆에 띄워두고 볼 것.
+</Card>
+<Card title="시험 직전에는" icon="clock">
+[19장 치트시트](/cka/19-exam-strategy/)와
+[20장 요약](/cka/20-wrapup/)만 다시 본다.
+</Card>
+</CardGrid>
 
 :::tip[시험]
 시험 접수 직전에 [cncf/curriculum](https://github.com/cncf/curriculum)과
 Linux Foundation의 CKA program changes 페이지를 반드시 다시 확인할 것.
 커리큘럼은 분기마다, 시험 환경 버전은 k8s 릴리스 후 4~8주 안에 바뀐다.
 :::
+
+<LinkCard
+  title="0. 시작하기 전에"
+  description="이 덱을 어떻게 읽을 것인가 — 대상 독자, 표기 약속, 실습 환경 준비."
+  href="/cka/00-intro/"
+/>

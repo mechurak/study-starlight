@@ -11,8 +11,8 @@ astro.config.mjs              # 사이트 설정 + topics(덱 목록) 정의
 src/content/docs/
   index.mdx                   # 랜딩 페이지 (splash + 덱 카드)
   cka/                        # 덱 하나 = 디렉터리 하나 = topic 하나
-    index.md                  #   덱 개요 페이지
-    00-intro.md … 20-wrapup.md
+    index.mdx                 #   덱 개요 페이지
+    00-intro.mdx … 20-wrapup.mdx  #   본문 페이지 (컴포넌트를 쓰므로 전부 .mdx)
 src/styles/custom.css         # 최소 커스텀 (mermaid 오버플로 처리뿐)
 ```
 
@@ -40,11 +40,19 @@ pnpm preview
 
 ## 문서 작성 규칙
 
-- **순수 마크다운으로 쓴다.** HTML 태그(`<div>`, `<strong>` 등)를 쓰지 않는다
+- **raw HTML 태그(`<div>`, `<strong>` 등)는 쓰지 않는다.** 강조는 `**`로 한다
 - 시험 포인트·팁은 `:::tip[제목]`, 함정·주의는 `:::caution[제목]` aside를 쓴다
 - 페이지 프론트매터는 `title` / `description` 두 개면 충분하다.
   사이드바 순서·그룹은 `astro.config.mjs`의 topics에서 slug로 관리한다
 - 다이어그램은 ```` ```mermaid ```` 펜스로 — 별도 이미지 파일을 만들지 않는다
+- **Starlight 내장 컴포넌트는 쓴다.** 절차는 `<Steps>`, 두 갈래 비교는 `<Tabs>`,
+  개요 카드는 `<CardGrid>`, 디렉터리 구조는 `<FileTree>`.
+  쓰려면 파일 확장자를 **`.mdx`로 바꾸고** 맨 위에 import를 넣는다 —
+  topics의 slug는 확장자를 안 쓰므로 `astro.config.mjs`는 건드리지 않아도 된다
+
+  ```mdx
+  import { Steps, Card, CardGrid, Tabs, TabItem, FileTree } from '@astrojs/starlight/components';
+  ```
 
 ## 배포
 

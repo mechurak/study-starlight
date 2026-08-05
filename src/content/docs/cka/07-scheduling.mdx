@@ -3,14 +3,39 @@ title: "7. 스케줄링"
 description: "Pod을 어느 노드에 놓을 것인가"
 ---
 
+import { Steps, Card, CardGrid, Tabs, TabItem } from '@astrojs/starlight/components';
+
 > Pod을 어느 노드에 놓을 것인가
 
 ## 스케줄러가 하는 일 — 다시
 
+```mermaid
+flowchart LR
+    W["watch<br/>spec.nodeName 이 비어 있는 Pod"] --> F["Filtering<br/>놓을 수 없는 노드를 거른다"]
+    F --> S["Scoring<br/>남은 노드에 점수를 매긴다"]
+    S --> B["Binding<br/>spec.nodeName 을 채운다"]
+    B --> KL["kubelet 이 가져가 실행"]
+    F -->|"남은 노드가 0"| P["Pending<br/>Events 에 이유가 찍힌다"]
+
+    classDef key fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
+    classDef bad fill:#fee2e2,stroke:#dc2626,color:#7f1d1d
+    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
+    class F,S key
+    class P bad
+    class W,B,KL mute
+```
+
+<Steps>
+
 1. `spec.nodeName`이 **비어 있는 Pod**을 발견한다
+
 2. **Filtering** — 놓을 수 없는 노드를 전부 거른다
+
 3. **Scoring** — 남은 노드에 점수를 매긴다
+
 4. 최고점 노드로 **binding** — `spec.nodeName`을 채운다
+
+</Steps>
 
 **Filtering에서 걸러지는 이유들**
 
@@ -25,6 +50,20 @@ description: "Pod을 어느 노드에 놓을 것인가"
 
 ## 배치를 제어하는 도구들
 
+**방향이 반대인 두 축**이 핵심이다.
+
+```mermaid
+flowchart LR
+    POD["Pod"] -->|"nodeSelector · nodeAffinity<br/>내가 갈 노드를 고른다"| NODE["노드"]
+    NODE -->|"taint<br/>내가 받을 Pod을 거부한다"| POD
+    POD2["Pod"] -->|"podAffinity · antiAffinity<br/>다른 Pod 기준으로"| POD3["다른 Pod"]
+
+    classDef pod fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
+    classDef node fill:#fef3c7,stroke:#d97706,color:#78350f
+    class POD,POD2,POD3 pod
+    class NODE node
+```
+
 | 도구 | 관점 | 성격 |
 |---|---|---|
 | `nodeName` | Pod → 특정 노드 | 스케줄러를 건너뛴다 |
@@ -34,7 +73,6 @@ description: "Pod을 어느 노드에 놓을 것인가"
 | **taints / tolerations** | 노드 → Pod | 노드가 **밀어낸다** |
 | topologySpreadConstraints | Pod → 분산 | 균등 분포 |
 
-**방향이 반대인 두 축**이 핵심이다.
 affinity는 **Pod이 노드를 고르는 것**, taint는 **노드가 Pod을 거부하는 것**.
 둘은 함께 쓰여야 완성된다.
 
@@ -79,17 +117,31 @@ spec:
 
 ## nodeAffinity — 표현력 있는 버전
 
+<Tabs>
+<TabItem label="required — 못 맞추면 Pending">
+
 ```yaml
 spec:
   affinity:
     nodeAffinity:
-      requiredDuringSchedulingIgnoredDuringExecution:      # 반드시
+      requiredDuringSchedulingIgnoredDuringExecution:
         nodeSelectorTerms:
           - matchExpressions:
               - key: disktype
                 operator: In
                 values: ["ssd", "nvme"]
-      preferredDuringSchedulingIgnoredDuringExecution:     # 되도록
+```
+
+Filtering 단계에서 작동한다. 조건에 맞는 노드가 하나도 없으면 **Pod은 Pending**이다.
+
+</TabItem>
+<TabItem label="preferred — 못 맞춰도 뜬다">
+
+```yaml
+spec:
+  affinity:
+    nodeAffinity:
+      preferredDuringSchedulingIgnoredDuringExecution:
         - weight: 50
           preference:
             matchExpressions:
@@ -98,9 +150,27 @@ spec:
                 values: ["ap-northeast-2a"]
 ```
 
-- **`required…`** — 못 맞추면 Pending
-- **`preferred…`** — 못 맞춰도 배치된다. `weight`(1~100)로 점수만 준다
-- **`IgnoredDuringExecution`** — 이미 뜬 Pod은 나중에 조건이 깨져도 **쫓아내지 않는다**
+Scoring 단계에서 작동한다. `weight`(1~100)로 **점수만 준다.**
+조건에 맞는 노드가 없어도 다른 노드에 배치된다.
+
+</TabItem>
+</Tabs>
+
+```mermaid
+flowchart LR
+    R["requiredDuringScheduling…"] --> FIL["Filtering 에서 작동<br/>못 맞추면 Pending ❌"]
+    P["preferredDuringScheduling…"] --> SCO["Scoring 에서 작동<br/>weight 만큼 점수 ✅"]
+    I["…IgnoredDuringExecution"] --> EX["이미 뜬 Pod 은<br/>조건이 깨져도 안 쫓아낸다"]
+
+    classDef bad fill:#fee2e2,stroke:#dc2626,color:#7f1d1d
+    classDef ok fill:#dcfce7,stroke:#16a34a,color:#14532d
+    classDef warn fill:#fef3c7,stroke:#d97706,color:#78350f
+    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
+    class FIL bad
+    class SCO ok
+    class EX warn
+    class R,P,I mute
+```
 
 ## 긴 이름 읽는 법과 연산자
 
@@ -116,6 +186,21 @@ spec:
 | `Gt` / `Lt` | 숫자 비교 (nodeAffinity 전용) |
 
 **AND / OR 구조**
+
+```mermaid
+flowchart TB
+    NST["nodeSelectorTerms"]
+    NST -->|OR| T1["term 1"]
+    NST -->|OR| T2["term 2"]
+    T1 -->|AND| E1["matchExpression a"]
+    T1 -->|AND| E2["matchExpression b"]
+    T2 -->|AND| E3["matchExpression c"]
+
+    classDef or fill:#fef3c7,stroke:#d97706,color:#78350f
+    classDef and fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
+    class T1,T2 or
+    class E1,E2,E3 and
+```
 
 - `nodeSelectorTerms` 의 항목들끼리는 **OR**
 - 한 term 안의 `matchExpressions` 끼리는 **AND**
@@ -138,9 +223,35 @@ spec:
           topologyKey: kubernetes.io/hostname     # ← 무엇을 "같은 곳"으로 볼 것인가
 ```
 
-- **`topologyKey`가 핵심이다.** 노드 라벨의 키를 지정한다
-  - `kubernetes.io/hostname` → **노드 단위**로 (한 노드에 하나씩)
-  - `topology.kubernetes.io/zone` → **가용영역 단위**로
+**`topologyKey`가 무엇을 "같은 곳"으로 볼지 정한다.** 이게 핵심이다.
+
+```mermaid
+flowchart TB
+    subgraph Z1["zone ap-northeast-2a"]
+      subgraph N1["node01"]
+        W1["web"]
+      end
+      subgraph N2["node02"]
+        W2["web"]
+      end
+    end
+    subgraph Z2["zone ap-northeast-2c"]
+      subgraph N3["node03"]
+        W3["web"]
+      end
+    end
+
+    K1["topologyKey<br/>kubernetes.io/hostname"] -.->|"노드마다 하나씩"| N1
+    K2["topologyKey<br/>topology.kubernetes.io/zone"] -.->|"zone 마다 하나씩"| Z1
+
+    classDef key fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
+    classDef pod fill:#dcfce7,stroke:#16a34a,color:#14532d
+    class K1,K2 key
+    class W1,W2,W3 pod
+```
+
+- `kubernetes.io/hostname` → **노드 단위**로 (한 노드에 하나씩)
+- `topology.kubernetes.io/zone` → **가용영역 단위**로
 - `podAffinity` = 조건에 맞는 Pod **곁에**, `podAntiAffinity` = **떨어뜨려**
 
 :::caution[함정]
@@ -158,6 +269,26 @@ kubectl taint node node01 key=value:NoSchedule
 kubectl taint node node01 key=value:NoSchedule-      # 제거 (끝에 하이픈)
 kubectl taint node node01 gpu=true:NoSchedule
 kubectl describe node node01 | grep -A3 Taints
+```
+
+**effect 셋의 차이는 "새 Pod"과 "이미 있는 Pod"을 각각 어떻게 하느냐다.**
+
+```mermaid
+flowchart LR
+    T{"taint effect"}
+    T -->|NoSchedule| A1["새 Pod: 배치 안 함 ❌"]
+    T -->|NoSchedule| A2["기존 Pod: 그대로 둔다 ✅"]
+    T -->|PreferNoSchedule| B1["새 Pod: 되도록 피함<br/>자리 없으면 배치 ⚠️"]
+    T -->|PreferNoSchedule| B2["기존 Pod: 그대로 둔다 ✅"]
+    T -->|NoExecute| C1["새 Pod: 배치 안 함 ❌"]
+    T -->|NoExecute| C2["기존 Pod: 쫓아낸다 ❌"]
+
+    classDef bad fill:#fee2e2,stroke:#dc2626,color:#7f1d1d
+    classDef ok fill:#dcfce7,stroke:#16a34a,color:#14532d
+    classDef warn fill:#fef3c7,stroke:#d97706,color:#78350f
+    class A1,C1,C2 bad
+    class A2,B2 ok
+    class B1 warn
 ```
 
 | effect | 의미 |
@@ -192,6 +323,28 @@ spec:
 - `effect`를 생략하면 **모든 effect**에 대해 적용된다
 - `key`까지 생략하고 `Exists`만 두면 **전부 무시** — DaemonSet에서 쓰는 패턴
 
+### taint × toleration 조합표
+
+```mermaid
+flowchart LR
+    Q1{"노드에 taint 가 있나"}
+    Q1 -->|없다| R1["아무 Pod 이나 올 수 있다"]
+    Q1 -->|있다| Q2{"Pod 에 맞는 toleration 이 있나"}
+    Q2 -->|없다| R2["이 노드에는 못 온다 ❌"]
+    Q2 -->|있다| R3["올 수 있다<br/>단 온다는 보장은 없다 ⚠️"]
+    R3 --> Q3{"유도하고 싶은가"}
+    Q3 -->|"그렇다"| R4["nodeSelector · nodeAffinity 를<br/>같이 써야 그 노드로 간다 ✅"]
+
+    classDef ok fill:#dcfce7,stroke:#16a34a,color:#14532d
+    classDef bad fill:#fee2e2,stroke:#dc2626,color:#7f1d1d
+    classDef warn fill:#fef3c7,stroke:#d97706,color:#78350f
+    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
+    class R1,R4 ok
+    class R2 bad
+    class R3 warn
+    class Q1,Q2,Q3 mute
+```
+
 :::tip[시험]
 "taint를 걸고, 그 노드에만 뜨게 하시오"는
 **taint + toleration + nodeSelector(또는 affinity)를 함께** 써야 완성된다.
@@ -209,6 +362,21 @@ toleration만으로는 "그 노드로 간다"가 보장되지 않는다.
 | `node.kubernetes.io/unschedulable` | `cordon` 했을 때 |
 | `node-role.kubernetes.io/control-plane` | 컨트롤 플레인 노드 (`NoSchedule`) |
 
+**노드가 죽어도 Pod이 5분 동안 안 옮겨가는 이유**가 여기 있다.
+
+```mermaid
+sequenceDiagram
+    participant N as 노드
+    participant CM as node 컨트롤러
+    participant P as Pod
+    N--xCM: 하트비트 중단
+    CM->>N: not-ready / unreachable taint 부착 · NoExecute
+    Note over P: 모든 Pod 에 자동 toleration<br/>tolerationSeconds 300
+    P->>P: 300초 버틴다
+    P--xN: 300초 후 축출
+    Note over P: 상위 컨트롤러가 다른 노드에 새로 만든다
+```
+
 - 모든 Pod에는 `not-ready` / `unreachable`에 대한 **5분(300초) toleration이 자동으로 붙는다**
 - 그래서 **노드가 죽어도 5분 동안은 Pod이 안 옮겨간다.** 이게 그 유명한 지연의 정체다
 
@@ -222,6 +390,25 @@ kubectl taint node controlplane node-role.kubernetes.io/control-plane:NoSchedule
 :::
 
 ## cordon · drain · uncordon
+
+```mermaid
+stateDiagram-v2
+    [*] --> Ready: 정상
+    Ready --> SchedulingDisabled: kubectl cordon
+    SchedulingDisabled --> Ready: kubectl uncordon
+    Ready --> Drained: kubectl drain
+    Drained --> Ready: kubectl uncordon
+
+    note right of SchedulingDisabled
+      새 Pod 만 막는다.
+      기존 Pod 은 그대로 돈다.
+    end note
+
+    note right of Drained
+      cordon + 기존 Pod 축출.
+      PDB 를 존중해 기다린다.
+    end note
+```
 
 ```bash
 kubectl cordon node01            # 새 Pod 배치 금지 (기존은 유지)
@@ -256,7 +443,27 @@ spec:
           app: web
 ```
 
-- **`maxSkew`** — 토폴로지 도메인 간 Pod 개수 차이의 허용치
+**`maxSkew`는 도메인 간 개수 차이의 허용치다.**
+
+```mermaid
+flowchart LR
+    subgraph OK["maxSkew 1 · 허용 ✅"]
+      A1["zone A<br/>Pod 3개"]
+      A2["zone B<br/>Pod 2개"]
+      A3["차이 1"]
+    end
+    subgraph NG["maxSkew 1 · 위반 ❌"]
+      B1["zone A<br/>Pod 3개"]
+      B2["zone B<br/>Pod 1개"]
+      B3["차이 2 → DoNotSchedule 이면 Pending"]
+    end
+
+    classDef ok fill:#dcfce7,stroke:#16a34a,color:#14532d
+    classDef bad fill:#fee2e2,stroke:#dc2626,color:#7f1d1d
+    class A1,A2,A3 ok
+    class B1,B2,B3 bad
+```
+
 - `maxSkew: 1` 이면 zone A에 3개일 때 zone B는 최소 2개여야 한다
 - `whenUnsatisfiable: DoNotSchedule` = 강제, `ScheduleAnyway` = 선호
 
@@ -279,6 +486,20 @@ description: "중요한 워크로드용"
 ```yaml
 spec:
   priorityClassName: high-priority
+```
+
+```mermaid
+sequenceDiagram
+    participant H as 높은 우선순위 Pod
+    participant S as scheduler
+    participant N as 노드 · 자리 없음
+    participant L as 낮은 우선순위 Pod
+    H->>S: 스케줄 요청
+    S->>N: Filtering — 맞는 노드가 없다
+    S->>L: 축출 (preempt)
+    Note over L: describe 에 Preempted by … 기록
+    S->>H: 확보된 자리에 binding
+    L->>S: 다시 스케줄링 시도 (다른 노드일 수 있다)
 ```
 
 - 자리가 없으면 스케줄러가 **낮은 우선순위 Pod을 쫓아내고** 자리를 만든다
@@ -321,11 +542,21 @@ kubectl label ns dev \
   pod-security.kubernetes.io/warn=restricted
 ```
 
-| 레벨 | 의미 |
-|---|---|
-| `privileged` | 제한 없음 |
-| `baseline` | 알려진 권한 상승을 막는다 (hostNetwork, privileged 등 금지) |
-| `restricted` | 강하게 제한 (`runAsNonRoot`, capabilities drop ALL 등 요구) |
+**레벨(얼마나 조이나) × 모드(어기면 어떻게 하나)의 조합**이다.
+
+<CardGrid>
+<Card title="privileged" icon="open-book">
+제한 없음.
+</Card>
+<Card title="baseline" icon="warning">
+알려진 권한 상승을 막는다.
+`hostNetwork`, `privileged` 등 금지.
+</Card>
+<Card title="restricted" icon="padlock">
+강하게 제한.
+`runAsNonRoot`, capabilities `drop ALL` 등 요구.
+</Card>
+</CardGrid>
 
 | 모드 | 동작 |
 |---|---|
@@ -346,6 +577,22 @@ kubectl get nodes                           # SchedulingDisabled 표시 확인
 ```
 
 Events 메시지로 원인이 거의 확정된다.
+
+```mermaid
+flowchart LR
+    E{"describe pod → Events"}
+    E -->|"Insufficient cpu / memory"| R1["request 여유 부족<br/>describe node 의 Allocated resources"]
+    E -->|"had untolerated taint"| R2["toleration 없음<br/>describe node 의 Taints"]
+    E -->|"didn't match node affinity/selector"| R3["라벨 불일치<br/>get nodes --show-labels"]
+    E -->|"were unschedulable"| R4["cordon 되어 있다<br/>kubectl uncordon"]
+    E -->|"unbound immediate PersistentVolumeClaims"| R5["PVC 가 Bound 안 됨 · 13장"]
+    E -->|"메시지가 없다"| R6["스케줄러가 죽었거나<br/>schedulerName 오타"]
+
+    classDef norm fill:#fef3c7,stroke:#d97706,color:#78350f
+    classDef alarm fill:#fee2e2,stroke:#dc2626,color:#7f1d1d
+    class R1,R2,R3,R4,R5 norm
+    class R6 alarm
+```
 
 | 메시지 | 원인 |
 |---|---|
