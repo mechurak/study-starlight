@@ -19,7 +19,7 @@ import { Tabs, TabItem, LinkCard } from '@astrojs/starlight/components';
 흔한 오해는 "실시간 = Postgres Changes"인데,
 **실제로는 Broadcast가 더 자주 정답이다.** Postgres Changes는 편하지만 확장성 한계가 뚜렷하다.
 
-## 채널이라는 공통 추상
+### 채널이라는 공통 추상
 
 ```ts
 // 채널 = 클라이언트들이 모이는 방
@@ -131,7 +131,8 @@ alter table public.messages replica identity full;
 :::caution[함정]
 **"구독은 되는데 이벤트가 안 와요"의 1순위 원인**이 이 설정 누락이다.
 대시보드 **Database → Publications**에서 토글로도 가능하다.
-`replica identity full`은 WAL 크기를 키우므로 정말 필요할 때만 켠다.
+`replica identity full`은 WAL(Write-Ahead Log — Postgres가 모든 변경을 먼저 기록하는 로그,
+변경 구독도 이걸 읽는다) 크기를 키우므로 정말 필요할 때만 켠다.
 :::
 
 ### 구독과 필터

@@ -33,7 +33,7 @@ flowchart LR
 Auth를 직접 만들면 최소한 이만큼을 다뤄야 한다 —
 비밀번호 해싱과 안전한 비교, 이메일 확인·재설정 토큰의 발급·만료·1회용 보장,
 세션 저장·갱신·무효화, OAuth 제공자별 리다이렉트와 토큰 교환,
-무차별 대입 방어, MFA와 기기 관리.
+무차별 대입 방어, MFA(Multi-Factor Authentication, 다단계 인증)와 기기 관리.
 **이 중 하나만 틀려도 계정 탈취**로 이어진다. 직접 만들 이유가 거의 없는 영역이다.
 
 ## 신원의 저장소와 토큰
@@ -187,7 +187,8 @@ UI에 노출할 때도 이 성질을 유지하자.
 
 ### 매직 링크와 OTP
 
-비밀번호 없는 로그인. 이메일로 링크 또는 6자리 코드를 보낸다.
+비밀번호 없는 로그인. OTP(One-Time Password)는 이름 그대로 1회용 코드다 —
+이메일로 링크 또는 6자리 코드를 보낸다.
 
 ```ts
 await supabase.auth.signInWithOtp({
@@ -291,7 +292,8 @@ export async function GET(request: Request) {
 
 ### PKCE 플로우
 
-서버 사이드 렌더링 환경의 기본 플로우다.
+PKCE(Proof Key for Code Exchange)가 서버 사이드 렌더링 환경의 기본 플로우다 —
+브라우저가 만든 비밀값(verifier)을 증명으로 요구해, 코드만 가로채서는 세션을 얻지 못하게 한다.
 
 ```mermaid
 sequenceDiagram
@@ -358,7 +360,7 @@ SMS 제공자(Twilio, MessageBird, Vonage 등)를 대시보드에서 연결해�
 await supabase.auth.signInWithSSO({ domain: 'acme-corp.com' })
 ```
 
-SAML 2.0 기반으로 Okta, Azure AD, Google Workspace 등과 연동한다.
+SAML 2.0 기반으로 Okta, Azure AD(현 Microsoft Entra ID), Google Workspace 등과 연동한다.
 설정은 CLI 또는 관리 API로 IdP 메타데이터를 등록하는 방식이다.
 
 **B2B SaaS를 만든다면 로드맵에 넣어둘 항목**이다. 엔터프라이즈 계약의 단골 요구사항이고,

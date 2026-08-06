@@ -220,6 +220,10 @@ service_role key: eyJhbGciOiJIUzI1NiIs...
 **프로덕션과 같은 구성의 스택이 통째로 로컬에 뜬다.** Auth도, Storage도, Realtime도 전부 동작한다.
 로컬 키는 모든 개발자에게 동일한 고정값이라 커밋해도 안전하다.
 
+출력에 구형 `anon key` / `service_role key`(JWT)가 보이는 건 오타가 아니다 —
+**로컬 스택은 아직 구형 키 체계로 돈다.** 고정값이라 무방하고,
+새 키(`sb_publishable_...` / `sb_secret_...`)는 호스팅된 프로젝트 기준이다.
+
 | 포트 | 서비스 | 설명 |
 |---|---|---|
 | `54321` | API Gateway | `/rest/v1`, `/auth/v1`, `/storage/v1`, `/functions/v1` 전부 여기로 |

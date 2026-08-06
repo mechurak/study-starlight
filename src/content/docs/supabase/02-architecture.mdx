@@ -129,7 +129,8 @@ RLS가 켜져 있으면 정책에 걸린 행만 영향을 받지만, RLS가 없�
 
 사용자 정보를 `auth` 스키마(특히 `auth.users`)에 저장하고,
 로그인에 성공하면 **access token(JWT)** 과 **refresh token**을 발급한다.
-JWT에는 `sub`(사용자 UUID), `role`, `email`, `aal`, `app_metadata` 등이 담긴다.
+JWT에는 `sub`(사용자 UUID), `role`, `email`,
+`aal`(Authenticator Assurance Level — 다단계 인증(MFA)을 몇 단계 거쳤는지), `app_metadata` 등이 담긴다.
 
 이 JWT가 이후 모든 요청에 `Authorization: Bearer`로 실려 다니고,
 **PostgREST가 그걸 풀어 Postgres 세션 변수에 넣는다.**
@@ -205,7 +206,8 @@ Supavisor가 앞단에서 연결을 모아 소수의 실제 연결로 다중화�
 
 ### pg_meta와 Studio
 
-**pg_meta**는 테이블 생성, 컬럼 추가, 역할 관리 같은 **DDL 작업을 REST로** 노출하는 서버이고,
+**pg_meta**는 테이블 생성, 컬럼 추가, 역할 관리 같은
+**DDL(Data Definition Language — 스키마 자체를 바꾸는 SQL) 작업을 REST로** 노출하는 서버이고,
 **Studio**(웹 대시보드)의 실제 동작은 pg_meta 호출이다.
 즉 대시보드에서 클릭으로 만든 테이블은 **결국 SQL DDL이 실행된 것**이다.
 
@@ -215,7 +217,7 @@ Supavisor가 앞단에서 연결을 모아 소수의 실제 연결로 다중화�
 ([14장](/supabase/14-ops/)의 주제)
 :::
 
-## 스키마 지도
+### 스키마 지도
 
 | 스키마 | 내용 | API 노출 |
 |---|---|---|

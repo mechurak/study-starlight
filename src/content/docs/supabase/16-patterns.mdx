@@ -259,6 +259,12 @@ DB 정책과 Storage 정책이 **같은 헬퍼 함수를 공유**하면 규칙�
 
 ## AI 챗봇 (RAG)
 
+RAG(Retrieval-Augmented Generation, 검색 증강 생성)는
+**LLM(Large Language Model, 대규모 언어 모델)이 모르는 내 데이터로 답하게 하는** 표준 패턴이다.
+모델을 다시 학습시키는 대신, 질문과 관련된 문서를 검색해서 **프롬프트에 함께 넣어** 준다.
+그래서 파이프라인이 둘로 나뉜다 — 문서를 미리 벡터로 색인해 두는 쪽과,
+질문이 올 때 유사 문서를 찾아 LLM에 전달하는 쪽.
+
 ```mermaid
 flowchart LR
     subgraph IDX["색인 — 비동기"]

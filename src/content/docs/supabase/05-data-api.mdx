@@ -268,7 +268,7 @@ await supabase.from('posts').select('id, title, comments ( count )')
 
 - 임의의 `JOIN` 조건 (외래 키 없는 조인)
 - 복잡한 집계 (`group by` + 여러 집계 함수)
-- 윈도우 함수, CTE, 재귀 쿼리
+- 윈도우 함수, CTE(Common Table Expression, `with` 절), 재귀 쿼리
 - 서브쿼리 상관 조건
 
 **경계를 넘으면 답은 하나다 — 뷰를 만들거나 RPC 함수를 만든다.**
@@ -326,6 +326,8 @@ const { error } = await supabase
 :::caution[함정]
 **RLS로 막힌 `update`는 에러가 아니라 빈 결과로 온다.**
 "왜 조용히 실패하지?"의 대부분이 이것이다. `data.length`를 확인하자.
+정확히는 `using` 절에 걸려 **행이 안 보일 때** 빈 결과가 되는 것이고,
+새로 쓰는 값이 `with check`를 위반하면 조용히 넘어가지 않고 `42501` 에러가 난다 (아래 에러 코드 표).
 :::
 
 ### upsert

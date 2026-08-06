@@ -234,7 +234,7 @@ jobs:
 </TabItem>
 </Tabs>
 
-## 시크릿 관리
+### 시크릿 관리
 
 | 시크릿 | 어디에 | 비고 |
 |---|---|---|
@@ -257,7 +257,7 @@ jobs:
 | Free | **자동 백업 없음** → 직접 `pg_dump`를 돌려야 한다 |
 | Pro | 일 단위 백업, 7일 보관 |
 | Team | 14일 보관 |
-| PITR | 애드온. 특정 시각으로 복구 |
+| PITR (Point-in-Time Recovery) | 애드온. 특정 시각으로 복구 |
 
 ```bash
 supabase db dump --db-url "$DATABASE_URL" -f backup.sql              # 스키마 + 데이터

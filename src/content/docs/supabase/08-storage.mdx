@@ -215,6 +215,7 @@ const upload = new tus.Upload(file, {
 upload.start()
 ```
 
+tus는 재개 가능(resumable) 업로드의 오픈 표준 프로토콜이다 —
 네트워크가 끊겨도 **이어서 올릴 수 있다.**
 일반 업로드는 파일 크기 상한이 있으므로 큰 파일은 이쪽을 쓴다.
 진행률 표시가 필요한 UI에도 적합하다.

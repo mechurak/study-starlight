@@ -98,7 +98,8 @@ create index documents_embedding_idx
 
 - `<->` 유클리드 · `<=>` 코사인 · `<#>` 내적 — **인덱스와 쿼리의 연산자가 일치해야 한다**
 - 인덱스 없이도 동작하지만 행이 많아지면 급격히 느려진다
-- HNSW는 정확도·속도 균형이 좋고, IVFFlat은 메모리를 덜 쓴다
+- HNSW(Hierarchical Navigable Small World)는 정확도·속도 균형이 좋고,
+  IVFFlat(Inverted File with Flat compression)은 메모리를 덜 쓴다
 
 ### 검색 함수
 
@@ -261,7 +262,7 @@ DB 안에서 외부 API 키가 필요할 때(예: pg_net으로 웹훅 호출) �
 | `hypopg` | 가상 인덱스로 효과를 미리 실험 |
 | `index_advisor` | 쿼리를 보고 인덱스를 제안 |
 | `pgaudit` | 감사 로그 |
-| `pgroonga` | 한국어·일본어 형태소 기반 전문 검색 |
+| `pgroonga` | 한국어·일본어 등 CJK 전문 검색 (기본은 n-gram 계열 토크나이저, 형태소 분석은 옵션) |
 
 ## 조합 패턴
 

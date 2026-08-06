@@ -13,6 +13,7 @@ import { Card, CardGrid, Steps, LinkCard } from '@astrojs/starlight/components';
 - Firebase나 직접 만든 Express/Nest 백엔드를 써본 적이 있는 사람 — 비교 지점이 더 잘 보인다
 - Next.js + Vercel 조합을 쓰고 있거나 쓸 계획인 사람 — [12](/supabase/12-vercel/)–[13장](/supabase/13-nextjs/)이 특히 유용하다
 - "BaaS를 쓰고 싶은데 종속성이 걱정된다"는 판단을 앞두고 있는 사람
+  (BaaS = Backend as a Service. 인증·DB·스토리지 같은 백엔드를 직접 만들지 않고 서비스로 빌려 쓰는 방식)
 
 전제하지 않는 것: Postgres 심화 지식, 데브옵스 경험, Deno 경험.
 전제하는 것: `select`와 `where`가 무엇인지 알고, JavaScript로 HTTP 요청을 보내 본 적이 있다.
@@ -96,7 +97,8 @@ flowchart LR
 | JWT 서명 | **비대칭키(ECC/RSA) + JWKS** | 프로젝트당 대칭키(HS256) 하나 |
 | 커넥션 풀러 | **Supavisor** (transaction 모드 `6543`) | PgBouncer 단독 |
 | 대규모 실시간 | **트리거 + `realtime.broadcast_changes()`** | Postgres Changes만 |
-| 컨테이너 없는 로컬 | (여전히 Docker 필요) | — |
+
+바뀌지 않은 것도 하나 — 로컬 개발에는 **여전히 Docker가 필요하다.**
 
 ### 자주 나올 용어
 
@@ -104,12 +106,16 @@ flowchart LR
 |---|---|
 | **PostgREST** | 테이블·뷰·함수를 자동으로 REST API로 노출해 주는 서버 |
 | **RLS** | Row Level Security. 행 단위 접근 제어. Postgres 네이티브 기능 |
-| **JWT** | 로그인 후 발급되는 서명된 토큰. 여기 담긴 `sub`가 곧 사용자 ID |
+| **JWT** | JSON Web Token. 로그인 후 발급되는 서명된 토큰. 여기 담긴 `sub`가 곧 사용자 ID |
 | **anon / authenticated / service_role** | 요청이 매핑되는 Postgres 역할 3종 |
 | **publishable / secret key** | 클라이언트에 노출해도 되는 키 / 서버 전용 키 |
 | **Supavisor** | Supabase의 커넥션 풀러. 서버리스에서 필수 |
 | **RPC** | 데이터베이스 함수 호출. `POST /rest/v1/rpc/<이름>` |
 | **migration** | 스키마 변경을 SQL 파일로 버전 관리한 것 |
+| **CRUD** | Create·Read·Update·Delete. 만들고 읽고 고치고 지우는 기본 4연산 |
+| **MAU** | Monthly Active Users. 월간 활성 사용자 수 — 요금제가 이 단위로 계산된다 |
+| **DDL** | Data Definition Language. `create table`처럼 스키마 자체를 바꾸는 SQL |
+| **CTE** | Common Table Expression. `with` 절 — 쿼리 중간 결과에 이름을 붙이는 문법 |
 
 ## 실습 환경
 

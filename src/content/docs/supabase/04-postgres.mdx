@@ -267,13 +267,16 @@ create index posts_author_created_idx on posts (author_id, created_at desc);
 -- 부분 인덱스 — 조건에 맞는 행만 색인 (작고 빠르다)
 create index posts_published_idx on posts (created_at desc) where published;
 
--- 서비스 중단 없이 만들기 (프로덕션에서는 항상 이걸로)
+-- 서비스 중단 없이 만들기 (프로덕션 큰 테이블 — 단, 트랜잭션 밖에서만)
 create index concurrently posts_title_idx on posts (title);
 ```
 
 **복합 인덱스는 왼쪽부터 사용된다.** `(a, b)` 인덱스는 `a` 단독 조회에도 쓰이지만
 `b` 단독 조회에는 안 쓰인다.
-`create index concurrently`는 쓰기를 막지 않는 대신 **트랜잭션 안에서 실행할 수 없다.**
+`create index concurrently`는 쓰기를 막지 않는 대신 **트랜잭션 안에서 실행할 수 없다** —
+그리고 [3장](/supabase/03-start/)의 마이그레이션 파일은 트랜잭션으로 실행되므로 **마이그레이션 안에서는 못 쓴다.**
+이미 큰 프로덕션 테이블에 인덱스를 추가할 때는 SQL 에디터에서 `concurrently`로 직접 만들고,
+마이그레이션에는 일반 `create index if not exists`로 기록해 이력을 맞춘다.
 
 ### 어디에 만들고 어디에 만들지 않나
 
