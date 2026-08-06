@@ -1,0 +1,136 @@
+---
+title: "9. 모노레포"
+description: "프론트와 백이 타입을 공유하려면 — pnpm workspace와 Turborepo"
+---
+
+import { FileTree, LinkCard } from '@astrojs/starlight/components';
+import TermIntro from '../../../components/TermIntro.astro';
+
+> 모노레포는 "큰 회사 것"이 아니다 — **패키지 두 개가 타입 하나를 공유하는 순간** 시작된다
+
+<TermIntro
+  terms={[
+    ['모노레포', 'Monorepo', '여러 패키지(프론트·백·공유 코드)를 저장소 하나에서 관리하는 방식. 반대는 패키지마다 저장소를 두는 멀티레포(폴리레포)다.'],
+    ['워크스페이스', 'Workspace', '패키지 매니저가 "이 저장소 안의 이 폴더들은 각각 패키지다"라고 인식하는 단위. pnpm에선 `pnpm-workspace.yaml`이 그 선언이다.'],
+    ['태스크 러너', 'Task Runner', '여러 패키지의 build·test를 의존 순서에 맞게, 안 바뀐 것은 건너뛰며 돌려 주는 도구. Turborepo, Nx.'],
+  ]}
+/>
+
+## 무슨 통증에서 나왔는가
+
+프론트(Next.js)와 백(NestJS)을 별도 저장소로 운영하면 반드시 이 사고가 난다 —
+
+1. 백엔드가 API 응답에 필드를 하나 추가하고 배포한다
+2. 프론트 저장소는 그 사실을 모른다 — **타입 정의가 서로 딴 파일**이니까
+3. 컴파일은 통과하고, 런타임에 `undefined`가 화면에 뜬다
+
+같은 저장소에 두고 **타입·스키마를 한 곳에서 공유**하면 이 부류의 사고가
+컴파일 타임에 잡힌다. API 형태를 바꾸는 커밋이 프론트 수정까지 **한 커밋**에 담기게 되는 것
+— 이게 모노레포의 본질 가치다.
+
+## pnpm workspace — 선언 두 개면 된다
+
+pnpm이 모노레포 표준이 된 이유가 이 단순함이다(5장의 엄격한 구조 덕에 부작용도 없다).
+
+<FileTree>
+
+- my-service/
+  - **pnpm-workspace.yaml** "apps/*, packages/* 가 각각 패키지다"라는 선언
+  - package.json 루트 — 공통 스크립트와 개발 도구만
+  - apps/
+    - web/ Next.js — shared를 참조
+      - package.json
+    - api/ NestJS — shared를 참조
+      - package.json
+  - packages/
+    - shared/ 타입 · 스키마 · 상수 — 공유의 핵심
+      - package.json
+
+</FileTree>
+
+```yaml
+# pnpm-workspace.yaml
+packages:
+  - 'apps/*'
+  - 'packages/*'
+```
+
+```json
+// apps/web/package.json — 내부 패키지 참조
+{
+  "dependencies": {
+    "@my-service/shared": "workspace:*"
+  }
+}
+```
+
+`workspace:*`는 "npm 저장소가 아니라 **이 저장소 안의 shared를** 링크하라"는 프로토콜이다.
+shared를 고치면 web과 api에 즉시 반영된다 — 버전 올리고 배포하고 다시 설치하는 왕복이 없다.
+
+:::tip[핵심]
+공유 패키지에 넣을 것의 우선순위는 **타입과 스키마**다. zod 같은 검증 스키마를 shared에 두면
+프론트의 폼 검증과 백엔드의 요청 검증이 **같은 코드**가 된다 — "프론트는 통과했는데
+백엔드에서 거절"이 구조적으로 사라진다.
+:::
+
+## Turborepo — 패키지가 늘면 필요해지는 것
+
+workspace만으로 부족해지는 지점은 **빌드 순서와 반복**이다.
+shared → api → web 순서를 지켜야 하고, 안 바뀐 패키지도 매번 다시 빌드하게 된다.
+
+Turborepo는 그 위에 두 가지를 얹는다 —
+
+```mermaid
+flowchart LR
+    S["shared 빌드"] --> A["api 빌드"]
+    S --> W["web 빌드"]
+    A -.->|"안 바뀜 — 캐시에서"| SKIP["건너뜀"]
+
+    classDef key  fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
+    classDef ok   fill:#dcfce7,stroke:#16a34a,color:#14532d
+    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
+    class S key
+    class A,W ok
+    class SKIP mute
+```
+
+- **태스크 그래프** — `turbo.json`에 "build는 의존 패키지의 build 뒤에"를 선언하면
+  순서와 병렬화를 알아서 푼다
+- **캐싱** — 입력(소스·설정)이 안 바뀐 태스크는 이전 결과를 재사용한다.
+  CI 시간이 여기서 크게 줄어든다
+
+## 도입 판단
+
+| 상황 | 판단 |
+|---|---|
+| 앱 하나뿐 | 모노레포 불필요 — 폴더 구조로 충분하다 |
+| 프론트 + 백이 타입을 공유 | **workspace 도입 시점.** 이것만으로 충분한 경우가 많다 |
+| 패키지 4~5개 이상, 빌드가 느려짐 | Turborepo(또는 Nx)를 얹는다 |
+| 배포 | Vercel 등은 모노레포를 인식한다 — 앱별 Root Directory 지정, 바뀐 앱만 빌드 |
+
+:::caution[함정]
+모노레포 ≠ 모놀리스. 저장소가 하나라는 것이지 배포 단위가 하나라는 뜻이 아니다 —
+web은 Vercel로, api는 Railway로 **따로 배포**한다(12장).
+반대 방향의 함정도 있다: 처음부터 Turborepo·Nx·generator까지 풀 세팅하는 것.
+**통증(타입 공유)이 오기 전의 모노레포는 복잡도만 산다.**
+:::
+
+### 참고 — 이 레포의 pnpm-workspace.yaml
+
+혼동 방지용 각주 하나. 이 스터디 사이트 레포에도 `pnpm-workspace.yaml`이 있지만
+모노레포여서가 아니다 — pnpm의 보안 기본값(5장의 설치 스크립트 차단)에서
+sharp·esbuild만 허용하는 `allowBuilds` 설정용이다. 파일 이름이 같아도 쓰임은 다를 수 있다.
+
+## 9장 요약
+
+- 모노레포의 본질 가치 — API 형태 변경이 **한 커밋**에 담기고, 타입 불일치가 컴파일에서 잡힌다
+- pnpm workspace는 선언 두 개 — `pnpm-workspace.yaml` + `workspace:*` 참조
+- 공유 패키지의 일순위는 **타입과 검증 스키마** — 프론트/백이 같은 코드로 검증하게 된다
+- Turborepo는 **순서(태스크 그래프)와 반복(캐시)**을 푼다 — 패키지가 늘어난 뒤의 도구
+- 모노레포 ≠ 모놀리스 — 저장소는 하나, 배포는 따로
+
+<LinkCard
+  title="10. 백엔드와 데이터"
+  description="API의 세 가지 스타일, 세션과 토큰, DB 선택 — 데이터가 사는 곳."
+  href="/web/10-backend/"
+/>

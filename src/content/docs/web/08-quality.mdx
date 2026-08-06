@@ -1,0 +1,141 @@
+---
+title: "8. 품질 도구 — 타입 · 린트 · 포맷 · 테스트"
+description: "사람이 안 봐도 잡히게 만드는 네 겹의 그물 — 각 도구의 역할 분담"
+---
+
+import { Card, CardGrid, LinkCard } from '@astrojs/starlight/components';
+import TermIntro from '../../../components/TermIntro.astro';
+
+> 도구 이름은 바뀌어도 **네 겹의 역할**은 바뀌지 않는다
+
+<TermIntro
+  terms={[
+    ['린터', 'Linter', '코드에서 버그 가능성이 높은 패턴(안 쓰는 변수, 빠뜨린 await 등)을 찾아 주는 도구. 보풀(lint)을 골라낸다는 뜻이다.'],
+    ['포매터', 'Formatter', '들여쓰기·줄바꿈·따옴표 같은 겉모양을 규칙대로 자동 통일하는 도구. 스타일 논쟁을 도구에 위임한다.'],
+    ['E2E 테스트', 'End-to-End Test', '진짜 브라우저를 띄워 사용자 시나리오(가입 → 로그인 → 글 쓰기)를 통째로 검증하는 테스트.'],
+    ['CI', 'Continuous Integration', '커밋·PR마다 서버가 자동으로 검사(타입·린트·테스트·빌드)를 돌리는 것. "내 컴퓨터에선 됐는데"의 종결자다.'],
+  ]}
+/>
+
+## 네 겹의 그물
+
+각 겹은 잡는 것이 다르다 — 하나로 다른 것을 대신할 수 없다.
+
+| 겹 | 잡는 것 | 도구 (2026 기준) | 언제 도나 |
+|---|---|---|---|
+| **타입 검사** | 형태가 안 맞는 코드 | tsc (`--noEmit`) | 에디터 상시 + CI |
+| **린트** | 버그 냄새 나는 패턴 | ESLint 9, Biome, oxlint | 에디터 상시 + CI |
+| **포맷** | 겉모양 불일치 | Prettier, Biome | 저장할 때 |
+| **테스트** | 동작이 틀린 코드 | Vitest, Playwright | 수시 + CI |
+
+```mermaid
+flowchart LR
+    C["코드"] --> T["타입<br/>형태가 맞나"] --> L["린트<br/>위험한 패턴 없나"] --> F["포맷<br/>모양 통일"] --> X["테스트<br/>동작이 맞나"] --> M["머지"]
+
+    classDef key  fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
+    classDef ok   fill:#dcfce7,stroke:#16a34a,color:#14532d
+    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
+    class C,M mute
+    class T,L key
+    class F ok
+    class X key
+```
+
+:::tip[핵심]
+공통 철학은 하나다 — **사람의 주의력을 믿지 않는다.**
+리뷰에서 들여쓰기를 지적하고 있으면 포매터가 없는 것이고,
+"await 빼먹었네요"를 사람이 잡고 있으면 린트 설정이 부족한 것이다.
+사람의 리뷰는 도구가 못 잡는 것(설계, 이름, 의도)에 쓴다.
+:::
+
+## 각 겹의 현재 지형
+
+### 타입 — tsc는 검사만
+
+4장에서 본 분업의 반복이다 — 빌드 도구가 타입을 벗기고, **tsc는 검사만** 한다.
+CI에 `tsc --noEmit`이 없으면 타입 에러가 있는 코드도 빌드가 통과해 버린다.
+프로젝트에 이 한 줄이 있는지가 타입스크립트를 "쓰는" 것과 "믿는" 것의 차이다.
+
+### 린트와 포맷 — 2강 구도
+
+- **ESLint + Prettier** — 기존 표준 조합. 규칙 생태계가 가장 넓고,
+  React 훅 규칙 같은 프레임워크 특화 규칙은 여전히 여기가 최강이다.
+  ESLint 9부터 설정 형식이 `eslint.config.js`(flat config)로 바뀌었다 —
+  `.eslintrc`가 나오는 자료는 구세대다
+- **Biome** — Rust로 만든 **린터 + 포매터 통합** 도구. 설정 파일 하나, 속도는 수십 배.
+  v2부터 타입 정보를 쓰는 규칙까지 자체 지원하기 시작해 격차를 좁히는 중이다.
+  새 프로젝트에서 채택이 빠르게 늘고 있다
+- **oxlint** — Rolldown(7장)과 같은 Oxc 기반의 초고속 린터. "거대 레포의 CI에서
+  ESLint가 몇 분씩 걸리는" 문제를 노린다
+
+어느 쪽이든 **에디터의 저장 시 자동 실행**(format on save)까지 붙여야 완성이다.
+도구가 있는데 손으로 돌리고 있으면 절반만 쓰는 것이다.
+
+### 테스트 — 피라미드보다 역할
+
+<CardGrid>
+<Card title="Vitest — 단위·통합" icon="approve-check">
+함수·컴포넌트 수준의 빠른 테스트. 이름대로 Vite 위에 있어서(7장)
+**빌드 설정을 테스트가 그대로 공유한다** — 예전엔 이 설정 맞추기가 별도의 고생이었다.
+React 컴포넌트는 Testing Library를 얹어 "사용자가 보는 대로" 검증한다.
+</Card>
+<Card title="Playwright — E2E" icon="rocket">
+진짜 브라우저로 핵심 시나리오를 통째로 검증한다. 느리고 비싸므로
+**수는 적게, 돈이 걸린 경로**(가입·결제·핵심 플로우)에만.
+이 레포가 mermaid 렌더 검증에 쓰는 도구이기도 하다.
+</Card>
+</CardGrid>
+
+비율의 감각만 챙기면 된다 — **빠르고 싼 테스트를 많이, 느리고 비싼 테스트를 조금.**
+그 반대가 되면 CI가 느려지고 테스트가 미움받기 시작한다.
+
+## CI — 네 겹을 강제하는 곳
+
+네 겹이 다 있어도 **로컬에서만 돌면 없는 것과 같다.** 잊는 사람이 반드시 생기기 때문이다.
+GitHub Actions 기준으로 뼈대는 이 정도다 —
+
+```yaml
+# .github/workflows/ci.yml — 핵심만
+on: [pull_request]
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: pnpm install --frozen-lockfile   # 잠금 파일과 다르면 실패 (5장)
+      - run: pnpm tsc --noEmit                # 타입
+      - run: pnpm lint                        # 린트 (+포맷 검사)
+      - run: pnpm test                        # 테스트
+      - run: pnpm build                       # 빌드 자체도 검사다
+```
+
+:::caution[함정]
+마지막 줄을 빼먹기 쉽다 — **빌드도 검사다.** 타입·린트·테스트를 다 통과하고도
+빌드만 깨지는 경우(환경 변수, 설정 파일, import 경로 대소문자)가 실제로 있다.
+배포(12장)에서 처음 발견하면 가장 비싸게 치른다.
+:::
+
+## 어디까지 갖출 것인가
+
+전부 갖추는 게 항상 옳은 건 아니다 — 단계별 최소선은 이 정도다.
+
+| 단계 | 최소선 |
+|---|---|
+| 혼자 실험 | TypeScript + 포매터. 이 둘은 공짜나 다름없다 |
+| 혼자 운영 | + 린트, CI에서 `tsc`·빌드. 미래의 나는 남이다 |
+| 둘 이상 | + 테스트(핵심 로직부터), PR마다 CI 필수화 |
+| 돈이 걸림 | + E2E(결제·가입 경로), 커버리지보다 **경로**를 본다 |
+
+## 8장 요약
+
+- 네 겹의 그물 — **타입 / 린트 / 포맷 / 테스트.** 잡는 것이 달라 서로 대체 불가
+- 철학은 하나 — **사람의 주의력을 믿지 않는다.** 리뷰는 도구가 못 잡는 것에 쓴다
+- 린트·포맷은 ESLint+Prettier(생태계)와 Biome(속도·통합)의 2강 구도
+- Vitest는 Vite의 설정을 공유한다 — 도구 사슬이 수렴하면 테스트도 편해진다
+- CI에 안 올라간 검사는 없는 검사다 — 그리고 **빌드도 검사다**
+
+<LinkCard
+  title="9. 모노레포"
+  description="프론트와 백이 타입을 공유하려면 — workspace와 Turborepo."
+  href="/web/09-monorepo/"
+/>

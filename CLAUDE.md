@@ -21,11 +21,13 @@ dev 서버는 백그라운드 모드로 띄운다: `astro dev --background`
 | `frontend` | Next.js · Tailwind CSS · shadcn/ui | — |
 | `shadcn` | shadcn/ui 단독 — **테마 = 리소스 목록** 관점 | 아래 "shadcn 덱" 절을 읽는다 |
 | `supabase` | Postgres 위의 백엔드 플랫폼 · RLS · Vercel 역할 배분 | — |
+| `web` | 웹 개발 일반 — 요청의 일생 · 스택 지형 · 도구 사슬(pnpm·Vite) · 브라우저 보안(CORS·PKCE) · 배포 | — |
 
-**네 덱 모두 이 레포가 원본이다** (2026-08-05 소유자 결정).
-`frontend`와 `supabase`는 slidev 덱(`~/workspace/study-decks/decks/<이름>`)의 내용을
-**참고해 다시 쓴 것**이지만, 저쪽은 슬라이드(클릭 애니메이션·라이브 데모가 핵심)라
-구조가 다르다 — 동기화 대상이 아니다.
+**모든 덱은 이 레포가 원본이다** (2026-08-05 소유자 결정).
+`frontend`와 `supabase`는 slidev 덱(`~/workspace/study-decks/decks/<이름>`)의 내용을,
+`web`은 `~/workspace/web-study`의 노트를 **참고해 다시 쓴 것**이지만
+어느 쪽도 동기화 대상이 아니다 (slidev 쪽은 슬라이드라 구조 자체가 다르다).
+`web` 덱은 shadcn 덱의 서술 규칙(`<TermIntro>`, 용어 풀어 쓰기)을 따른다.
 
 ### shadcn 덱 (2026-08-06 소유자 결정)
 

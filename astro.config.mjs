@@ -88,6 +88,43 @@ export default defineConfig({
 							],
 						},
 						{
+							label: '웹 개발 일반',
+							link: '/web/',
+							icon: 'rocket',
+							items: [
+								'web',
+								{
+									label: '시작',
+									items: ['web/00-intro', 'web/01-request', 'web/02-rendering'],
+								},
+								{
+									label: '지형',
+									items: ['web/03-landscape'],
+								},
+								{
+									label: '도구 사슬',
+									items: [
+										'web/04-runtime',
+										'web/05-package',
+										'web/06-bundler',
+										'web/07-vite',
+									],
+								},
+								{
+									label: '품질과 규모',
+									items: ['web/08-quality', 'web/09-monorepo'],
+								},
+								{
+									label: '서비스가 되기까지',
+									items: ['web/10-backend', 'web/11-security', 'web/12-deploy'],
+								},
+								{
+									label: '마무리',
+									items: ['web/13-glossary', 'web/14-wrapup'],
+								},
+							],
+						},
+						{
 							label: '프론트엔드',
 							link: '/frontend/',
 							icon: 'laptop',

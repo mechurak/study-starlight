@@ -1,0 +1,99 @@
+---
+title: "13. 용어 사전"
+description: "이 덱에 나온 용어 전부 — 약어를 만나면 여기로"
+---
+
+import { LinkCard } from '@astrojs/starlight/components';
+
+> 본문을 읽다 막힌 약어는 여기서 찾는다. 각 용어는 자세히 다룬 장으로 링크한다.
+
+## 웹 기초와 인프라
+
+| 용어 | 풀어 쓰면 | 뜻 | 자세히 |
+|---|---|---|---|
+| DNS | Domain Name System | 도메인 이름을 IP 주소로 바꿔 주는 전화번호부 | [1장](/web/01-request/) |
+| TLS | Transport Layer Security | 통신 암호화. `https`의 자물쇠. 구명칭 SSL | [1장](/web/01-request/) |
+| CDN | Content Delivery Network | 전 세계 분산 캐시 서버망. 가까운 지점이 응답해서 빠르다 | [1장](/web/01-request/) |
+| 엣지 (Edge) | — | CDN의 각 지점. 캐시 서빙을 넘어 코드 실행까지 하는 위치 | [1장](/web/01-request/) · [4장](/web/04-runtime/) |
+| 오리진 (Origin) | — | CDN 뒤의 원본 서버. 캐시에 없는 것만 여기까지 온다 | [1장](/web/01-request/) |
+| serverless | — | 요청이 올 때만 함수가 실행되는 모델. 서버 관리가 없다 | [12장](/web/12-deploy/) |
+| 콜드 스타트 | Cold Start | serverless 함수가 깨어나며 생기는 첫 요청 지연 | [12장](/web/12-deploy/) |
+| PaaS / IaaS | Platform / Infrastructure as a Service | 클라우드 추상화 수준 — 코드만 주면 됨 vs VM부터 직접 | [12장](/web/12-deploy/) |
+| SEO | Search Engine Optimization | 검색 노출 최적화. 크롤러가 내용을 읽을 수 있어야 한다 | [2장](/web/02-rendering/) |
+
+## 렌더링
+
+| 용어 | 풀어 쓰면 | 뜻 | 자세히 |
+|---|---|---|---|
+| CSR | Client-Side Rendering | 브라우저 JS가 화면을 전부 그림. 서버는 빈 HTML만 | [2장](/web/02-rendering/) |
+| SSR | Server-Side Rendering | 요청마다 서버가 완성된 HTML을 생성 | [2장](/web/02-rendering/) |
+| SSG | Static Site Generation | 빌드 때 HTML을 미리 생성, CDN이 서빙 | [2장](/web/02-rendering/) |
+| ISR | Incremental Static Regeneration | 정적 페이지를 주기적으로 재생성하는 절충 | [2장](/web/02-rendering/) |
+| SPA | Single-Page Application | HTML 한 장 + JS로 화면 전환을 전부 처리하는 앱 | [2장](/web/02-rendering/) |
+| 하이드레이션 | Hydration | 서버가 보낸 HTML에 JS를 붙여 상호작용을 살리는 과정 | [2장](/web/02-rendering/) |
+| RSC | React Server Components | 서버에서만 실행되고 JS가 브라우저로 안 가는 컴포넌트 | [프론트엔드 덱 2장](/frontend/02-rsc/) |
+| 메타 프레임워크 | Meta-framework | UI 라이브러리 위에 라우팅·SSR·빌드를 얹은 완성형 | [3장](/web/03-landscape/) |
+
+## 도구 사슬
+
+| 용어 | 풀어 쓰면 | 뜻 | 자세히 |
+|---|---|---|---|
+| 런타임 | Runtime | JS를 실행하는 환경 = 엔진 + API. 브라우저, Node.js, Bun | [4장](/web/04-runtime/) |
+| LTS | Long-Term Support | 장기 지원 버전. 서버는 이걸 쓴다 (현재 Node 24) | [4장](/web/04-runtime/) |
+| ESM / CJS | ES Modules / CommonJS | 모듈 문법 표준(`import`) vs Node의 옛 방식(`require`) | [4장](/web/04-runtime/) |
+| 잠금 파일 | Lockfile | 실제 설치된 전체 의존성 버전의 기록. 반드시 커밋 | [5장](/web/05-package/) |
+| semver | Semantic Versioning | `주.부.수` 버전 규칙과 `^`/`~` 범위 표기 | [5장](/web/05-package/) |
+| 유령 의존성 | Phantom Dependency | 명세에 없는데 import되는 패키지. pnpm이 구조로 차단 | [5장](/web/05-package/) |
+| 번들러 | Bundler | 모듈 수백 개를 배포용 소수 파일로 묶는 도구 | [6장](/web/06-bundler/) |
+| 트랜스파일 | Transpile | TS→JS, JSX→함수 호출 같은 언어 수준 변환 | [6장](/web/06-bundler/) |
+| 트리셰이킹 | Tree Shaking | 안 쓰는 코드를 번들에서 털어내는 것 | [6장](/web/06-bundler/) |
+| 미니파이 | Minify | 공백·변수명을 줄여 파일을 압축 | [6장](/web/06-bundler/) |
+| HMR | Hot Module Replacement | 새로고침 없이 바뀐 모듈만 갈아 끼우는 것 | [7장](/web/07-vite/) |
+| Rolldown | — | Rust로 만든 번들러. Vite 8의 기본 엔진 | [7장](/web/07-vite/) |
+| 콘텐츠 해시 | Content Hash | 파일 내용에 따라 바뀌는 파일명 속 문자열 — 캐시 무효화 수법 | [7장](/web/07-vite/) |
+
+## 품질과 협업
+
+| 용어 | 풀어 쓰면 | 뜻 | 자세히 |
+|---|---|---|---|
+| 린터 | Linter | 버그 가능성 높은 코드 패턴을 찾는 도구 (ESLint, Biome) | [8장](/web/08-quality/) |
+| 포매터 | Formatter | 코드 겉모양을 규칙대로 자동 통일 (Prettier, Biome) | [8장](/web/08-quality/) |
+| CI / CD | Continuous Integration / Deployment | 커밋마다 자동 검사 / 머지되면 자동 배포 | [8장](/web/08-quality/) · [12장](/web/12-deploy/) |
+| E2E | End-to-End | 진짜 브라우저로 시나리오 전체를 검증하는 테스트 (Playwright) | [8장](/web/08-quality/) |
+| 모노레포 | Monorepo | 여러 패키지를 저장소 하나에서 관리 | [9장](/web/09-monorepo/) |
+| 워크스페이스 | Workspace | 패키지 매니저의 "이 폴더들이 각각 패키지다" 선언 | [9장](/web/09-monorepo/) |
+
+## 백엔드와 데이터
+
+| 용어 | 풀어 쓰면 | 뜻 | 자세히 |
+|---|---|---|---|
+| CRUD | Create, Read, Update, Delete | 데이터 다루기의 기본 4연산 | [10장](/web/10-backend/) |
+| REST | Representational State Transfer | 리소스 URL + HTTP 메서드의 API 관례 | [10장](/web/10-backend/) |
+| RPC | Remote Procedure Call | 원격 코드를 함수 호출처럼 부르는 스타일 (tRPC) | [10장](/web/10-backend/) |
+| ORM | Object-Relational Mapping | DB를 객체로 다루는 계층 (Prisma, Drizzle) | [10장](/web/10-backend/) |
+| N+1 문제 | — | 목록 1번 + 항목마다 1번씩 쿼리가 나가는 ORM의 함정 | [10장](/web/10-backend/) |
+| BaaS | Backend as a Service | DB·인증·스토리지를 서비스로 (Supabase, Firebase) | [3장](/web/03-landscape/) · [10장](/web/10-backend/) |
+| RLS | Row Level Security | Postgres의 행 단위 접근 제어 — 브라우저 직접 쿼리가 안전한 이유 | [Supabase 덱](/supabase/) |
+| JWT | JSON Web Token | 서명으로 신원을 증명하는 토큰 | [10장](/web/10-backend/) |
+| 인증 / 인가 | Authentication / Authorization | "누구인가" vs "무엇을 해도 되는가" — 다른 문제다 | [10장](/web/10-backend/) |
+| 트랜잭션 | Transaction | 여러 DB 작업을 전부 성공 또는 전부 취소로 묶는 단위 | [10장](/web/10-backend/) |
+| 커넥션 풀러 | Connection Pooler | DB 커넥션을 재사용하는 중계층 — serverless의 고갈 방지 | [12장](/web/12-deploy/) |
+| 웹훅 | Webhook | 이벤트 발생 시 외부 서비스가 내 URL을 호출해 주는 방식 | [10장](/web/10-backend/) |
+
+## 브라우저 보안과 인증
+
+| 용어 | 풀어 쓰면 | 뜻 | 자세히 |
+|---|---|---|---|
+| 출처 (Origin) | — | 프로토콜 + 도메인 + 포트의 묶음. 브라우저 보안의 기본 단위 | [11장](/web/11-security/) |
+| SOP | Same-Origin Policy | 다른 출처의 응답은 스크립트가 못 읽는다는 브라우저 기본 규칙 | [11장](/web/11-security/) |
+| CORS | Cross-Origin Resource Sharing | SOP를 서버의 허락(응답 헤더)으로 푸는 표준 | [11장](/web/11-security/) |
+| 프리플라이트 | Preflight | 본 요청 전에 브라우저가 보내는 사전 확인(OPTIONS) 요청 | [11장](/web/11-security/) |
+| CSRF | Cross-Site Request Forgery | 로그인된 브라우저를 속여 원치 않는 요청을 보내게 하는 공격 | [11장](/web/11-security/) |
+| OAuth | Open Authorization | 비밀번호를 넘기지 않고 권한만 위임하는 표준 — "Google로 로그인" | [11장](/web/11-security/) |
+| PKCE | Proof Key for Code Exchange | OAuth의 인가 코드를 가로채여도 쓸모없게 만드는 장치 | [11장](/web/11-security/) |
+
+<LinkCard
+  title="14. 마무리"
+  description="한 장으로 접는 전체 지도, 그리고 다음에 갈 곳."
+  href="/web/14-wrapup/"
+/>
