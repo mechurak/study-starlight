@@ -69,7 +69,7 @@ API 서버가 다른 컴포넌트를 호출하지 않는다.
 
 - 클러스터의 **모든 읽기·쓰기가 여기를 통과**한다. 예외 없다
 - 상태를 직접 갖지 않는다 — **stateless**. etcd에만 쓴다
-- 그래서 **수평 확장이 가능**하다 (HA 컨트롤 플레인의 근거)
+- 그래서 **수평 확장이 가능**하다 — HA(High Availability · 고가용성) 컨트롤 플레인의 근거다
 - REST API를 제공한다. `kubectl`은 그 위의 얇은 클라이언트일 뿐
 
 :::caution[함정]
@@ -87,7 +87,7 @@ API 서버부터 본다. `crictl ps` 로 컨테이너 단에서 확인 (18장).
 
 - **분산 key-value 저장소.** 클러스터의 모든 오브젝트가 여기 있다
 - Raft 합의 알고리즘 → **홀수 노드(3, 5)로 구성**한다. 과반이 살아야 쓰기가 된다
-- `etcd`만 백업하면 **클러스터 전체를 복구**할 수 있다 (PV 안의 데이터는 제외)
+- `etcd`만 백업하면 **클러스터 전체를 복구**할 수 있다 (PV(PersistentVolume — 13장) 안의 데이터는 제외)
 - API 서버 외에는 **아무도 etcd에 직접 접근하지 않는다**
 
 ```bash
@@ -174,7 +174,7 @@ flowchart LR
 
 - 노드마다 **하나씩** 돈다. **Pod이 아니라 systemd 서비스**다
 - API 서버에서 **"내 노드에 배정된 Pod"** 목록을 받아온다
-- 컨테이너 런타임(CRI)에게 컨테이너 생성·삭제를 지시한다
+- 컨테이너 런타임(CRI, Container Runtime Interface — 아래 절)에게 컨테이너 생성·삭제를 지시한다
 - 컨테이너 상태·노드 상태를 **API 서버에 보고**한다 (이게 끊기면 노드가 `NotReady`)
 - **probe(liveness/readiness/startup)를 실행하는 주체**도 kubelet이다
 
@@ -215,7 +215,7 @@ kube-proxy가 죽어도 **기존 연결은 유지**되고
 
 ### 컨테이너 런타임 (CRI)
 
-- kubelet은 **CRI(Container Runtime Interface)** 라는 gRPC 규약으로 런타임과 대화한다
+- kubelet은 **CRI**라는 gRPC 규약으로 런타임과 대화한다
 - 현재 표준은 **containerd**. (CRI-O도 쓰인다)
 - **Docker는 v1.24에서 제거되었다** — dockershim이 빠졌다
 - 그래서 노드에서 컨테이너를 직접 볼 때는 **`crictl`** 을 쓴다
@@ -394,7 +394,12 @@ kubectl explain deployment.spec.strategy --recursive # 하위 전부 펼치기
 `--recursive`와 함께 쓰면 구조 전체가 보인다.
 :::
 
-## 네임스페이스
+## 이름과 선택 — 네임스페이스·라벨
+
+오브젝트를 **어떻게 격리하고(네임스페이스), 어떻게 골라내는가(라벨)**.
+이 둘이 이후 모든 장의 전제다.
+
+### 네임스페이스
 
 ```mermaid
 flowchart LR
@@ -433,7 +438,7 @@ kubectl config set-context --current --namespace=dev   # 기본 네임스페이�
 **매 명령에 `-n`을 붙이는 습관**이 안전하다.
 :::
 
-## 라벨과 셀렉터 — 연결의 접착제
+### 라벨과 셀렉터 — 연결의 접착제
 
 ```mermaid
 flowchart LR
@@ -502,7 +507,12 @@ kubectl get pod web-abc-123 -o jsonpath='{.metadata.ownerReferences[0].kind}'
 - 부모를 지우면 **가비지 컬렉터가 자식을 지운다** (cascade)
 - `kubectl delete deploy web --cascade=orphan` 을 쓰면 Pod을 남길 수 있다
 
-## 노드 살펴보기
+## 노드와 파일 시스템
+
+`kubectl`이 보여주는 노드의 상태와, `kubectl`이 안 될 때 직접 뒤져야 하는
+노드 위의 파일들. 트러블슈팅(18장)의 기초 체력이다.
+
+### 노드 살펴보기
 
 ```bash
 kubectl get nodes -o wide
@@ -525,7 +535,7 @@ kubectl get node node01 -o yaml
 "CPU 100% 할당됨"인데 실제 CPU는 놀고 있을 수 있다. 실제 사용량은 `kubectl top`. (8장·18장)
 :::
 
-## 파일이 어디 있는지 — 트러블슈팅의 지도
+### 파일이 어디 있는지 — 트러블슈팅의 지도
 
 <FileTree>
 

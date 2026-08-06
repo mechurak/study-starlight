@@ -24,6 +24,9 @@ import { Steps, Card, CardGrid, Tabs, TabItem, FileTree } from '@astrojs/starlig
 
 ## 클러스터 설치
 
+설치의 주인공은 **kubeadm** — 공식 클러스터 부트스트랩 도구다.
+인증서·kubeconfig·컨트롤 플레인 스태틱 Pod을 순서대로 만들어 준다.
+
 ### 클러스터가 만들어지는 전체 흐름
 
 한 장으로 보면 어디서 무엇이 걸리는지가 보인다.
@@ -152,7 +155,8 @@ flowchart LR
 
 :::caution[함정]
 **`--control-plane-endpoint`는 나중에 추가하기 어렵다.**
-HA로 갈 가능성이 조금이라도 있으면 처음부터 넣어야 한다.
+HA(High Availability·고가용성 — 컨트롤 플레인을 여러 대로)로 갈 가능성이
+조금이라도 있으면 처음부터 넣어야 한다.
 :::
 
 ### init이 만들어놓는 것 — 파일의 지도
@@ -195,6 +199,9 @@ HA로 갈 가능성이 조금이라도 있으면 처음부터 넣어야 한다.
 
 ### CNI 설치 — 이걸 안 하면 노드가 NotReady
 
+CNI(Container Network Interface)는 **Pod 간 네트워크를 만드는 플러그인**이다.
+kubeadm은 이걸 설치해 주지 않는다 — 없으면 kubelet이 `NetworkReady=false`로 남는다.
+
 ```bash
 kubectl get nodes
 # NAME           STATUS     ROLES           AGE   VERSION
@@ -215,7 +222,7 @@ kubectl get pods -n kube-system
 ```
 
 :::caution[함정]
-`--pod-network-cidr`과 **CNI 매니페스트의 CIDR이 일치**해야 한다.
+`--pod-network-cidr`과 **CNI 매니페스트의 CIDR(Classless Inter-Domain Routing — IP 대역 표기법)이 일치**해야 한다.
 Calico 기본은 `192.168.0.0/16`, Flannel은 `10.244.0.0/16`이다.
 안 맞으면 Pod은 뜨는데 **통신이 안 된다** — 진단하기 까다로운 유형이다.
 :::
@@ -469,7 +476,7 @@ sudo kubeadm certs renew all                    # 전부 갱신
 sudo kubeadm certs renew apiserver              # 하나만
 ```
 
-- 클라이언트 인증서는 **1년**, CA는 **10년** 유효하다
+- 클라이언트 인증서는 **1년**, CA(Certificate Authority·인증 기관 — 다른 인증서에 서명하는 루트)는 **10년** 유효하다
 - **`kubeadm upgrade`를 하면 인증서가 자동 갱신된다** — 매년 업그레이드하면 신경 쓸 일이 없다
 - 갱신 후 컨트롤 플레인 스태틱 Pod을 **재시작**해야 반영된다
 

@@ -7,7 +7,9 @@ import { Steps, Card, CardGrid, Tabs, TabItem } from '@astrojs/starlight/compone
 
 > Pod을 직접 만들지 않는 이유
 
-## 컨트롤러가 필요한 이유
+## 컨트롤러 — 왜 필요하고 무엇을 고르나
+
+### 컨트롤러가 필요한 이유
 
 Pod을 직접 만들면 —
 
@@ -38,7 +40,7 @@ flowchart LR
 Deployment / DaemonSet / StatefulSet / Job 을 **언제 쓰는지**가 핵심.
 :::
 
-## 어떤 컨트롤러를 쓸 것인가
+### 어떤 컨트롤러를 쓸 것인가
 
 ```mermaid
 flowchart TD
@@ -74,7 +76,7 @@ flowchart TD
 :::caution[함정]
 "DB니까 StatefulSet"이 항상 맞지는 않다.
 기준은 **"각 인스턴스가 고유한 신원과 저장소를 가져야 하는가"**다.
-단일 인스턴스 DB라면 Deployment + PVC로도 충분하다.
+단일 인스턴스 DB라면 Deployment + PVC(PersistentVolumeClaim — 저장소 요청, 13장)로도 충분하다.
 :::
 
 ## ReplicaSet — 개수를 맞추는 루프
@@ -202,7 +204,7 @@ flowchart LR
     S["replicas 4<br/>maxSurge 1 · maxUnavailable 1"] --> R["살아 있는 Pod 은<br/>3 ~ 5 개 사이를 오간다"]
     MS["maxSurge<br/>목표보다 더 만들 수 있는 수"] -.->|"0 이면 절대 초과하지 않는다"| R
     MU["maxUnavailable<br/>없어도 되는 수"] -.->|"0 이면 용량이 절대 줄지 않는다"| R
-    BOTH["둘 다 0"] -->|"만들 수도 지울 수도 없다"| STUCK["롤아웃이 시작조차 안 된다 ❌"]
+    BOTH["둘 다 0"] -->|"만들 수도 지울 수도 없다"| STUCK["API 가 생성 · 수정을 거부한다 ❌"]
 
     classDef key fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
     classDef bad fill:#fee2e2,stroke:#dc2626,color:#7f1d1d
@@ -230,14 +232,16 @@ flowchart LR
 ```
 
 전부 죽이고 전부 새로 만든다. 다운타임이 있지만
-**RWO 볼륨을 공유하거나 버전 공존이 불가능할 때** 필요하다 (13장).
+**RWO(ReadWriteOnce — 한 번에 한 노드만 붙는) 볼륨을 공유하거나
+버전 공존이 불가능할 때** 필요하다 (13장).
 
 </TabItem>
 </Tabs>
 
 :::caution[함정]
-**둘 다 0으로 두면 롤아웃이 시작조차 안 된다.**
-새로 만들 수도(surge 0), 지울 수도(unavailable 0) 없기 때문이다. API가 이를 거부한다.
+**둘 다 0은 아예 저장되지 않는다.**
+새로 만들 수도(surge 0), 지울 수도(unavailable 0) 없는 조합이라
+API 서버가 생성/수정 시점에 거부한다.
 :::
 
 ### 롤아웃 다루기
@@ -308,7 +312,8 @@ kubectl scale statefulset db --replicas=3
 ```
 
 - `replicas: 0` 도 유효하다 — **삭제하지 않고 멈추는** 방법
-- HPA가 붙어 있으면 **수동 스케일은 곧 되돌려진다** (8장)
+- HPA(Horizontal Pod Autoscaler — 부하에 따라 replicas를 자동 조절)가 붙어 있으면
+  **수동 스케일은 곧 되돌려진다** (8장)
 
 ```bash
 # 롤아웃/스케일이 끝날 때까지 기다리기 — 검산에 유용
@@ -721,7 +726,7 @@ flowchart LR
 ## 5장 요약
 
 - **Deployment → ReplicaSet → Pod.** 옛 ReplicaSet이 남아 있는 것이 롤백의 재료다
-- 롤링 업데이트는 **`maxSurge` / `maxUnavailable`** 두 손잡이. 둘 다 0이면 멈춘다
+- 롤링 업데이트는 **`maxSurge` / `maxUnavailable`** 두 손잡이. 둘 다 0은 API가 거부한다
 - `rollout undo`는 되돌아가는 게 아니라 **새 리비전을 만든다**
 - **DaemonSet은 노드마다 하나.** 안 뜨면 십중팔구 **taint**
 - **StatefulSet은 이름·저장소·순서**를 보장한다. **삭제해도 PVC는 남는다**

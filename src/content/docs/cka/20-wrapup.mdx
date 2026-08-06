@@ -18,9 +18,10 @@ flowchart TB
     E --> F["실제 상태 · status"]
     F -.->|"차이를 좁힌다"| C
 
-    G["Service · DNS · Ingress<br/>9~12장"] --> E
+    G["Service · DNS · Ingress<br/>9~11장"] --> E
     H["PV/PVC · CSI<br/>13장"] --> E
-    I["RBAC · NetworkPolicy<br/>14 · 12장"] --> B
+    I["RBAC<br/>14장"] --> B
+    J["NetworkPolicy — CNI가 집행<br/>12장"] --> E
 
     classDef key fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
     classDef ok fill:#dcfce7,stroke:#16a34a,color:#14532d
@@ -28,7 +29,7 @@ flowchart TB
     classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
     class B key
     class F ok
-    class G,H,I side
+    class G,H,I,J side
     class A,C,D,E mute
 ```
 
@@ -113,11 +114,11 @@ CKA는 **관리자 관점**의 기초다. 그 다음은 관심사에 따라 갈�
 
 | 방향 | 다음 |
 |---|---|
-| **보안** | CKS — PSA, admission webhook, 런타임 보안, 이미지 스캔 |
-| **개발** | CKAD — 워크로드 설계 관점 (범위가 겹치니 비교적 쉽다) |
+| **보안** | CKS(Certified Kubernetes Security Specialist) — PSA(Pod Security Admission, 7장), admission webhook, 런타임 보안, 이미지 스캔 |
+| **개발** | CKAD(Certified Kubernetes Application Developer) — 워크로드 설계 관점 (범위가 겹치니 비교적 쉽다) |
 | **플랫폼** | GitOps(ArgoCD), Helm 차트 작성, 오퍼레이터 개발 |
 | **관측성** | Prometheus, Grafana, OpenTelemetry, 로그 파이프라인 |
-| **클라우드** | EKS/GKE 운영 — IRSA, 노드그룹, Karpenter, VPC CNI |
+| **클라우드** | EKS/GKE 운영 — IRSA(IAM Roles for Service Accounts), 노드그룹, Karpenter, VPC CNI |
 
 **다만 순서를 잘못 잡지 말 것.** 이 덱의 15·18장이 흔들리면
 어떤 방향으로 가도 결국 같은 자리로 돌아오게 된다.

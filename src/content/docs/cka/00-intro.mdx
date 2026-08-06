@@ -12,7 +12,7 @@ import { Steps, Card, CardGrid, Tabs, TabItem, LinkCard } from '@astrojs/starlig
 "이 명령을 외운다"가 아니라
 **"이 명령을 쳤을 때 클러스터 안에서 무슨 일이 벌어지는가"**를 남긴다.
 
-- CKA는 **실기 시험**이다. 객관식이 아니라 진짜 클러스터를 고친다
+- CKA(Certified Kubernetes Administrator)는 **실기 시험**이다. 객관식이 아니라 진짜 클러스터를 고친다
 - 그래서 암기는 오래 못 간다 — **동작 모델**이 있어야 처음 보는 문제도 푼다
 - 반대로 동작 모델만 있고 손이 느리면 **시간에 진다**. 둘 다 필요하다
 
@@ -41,7 +41,7 @@ Deployment가 뭔지는 안다.
 30초 안에 못 짚는다.
 </Card>
 <Card title="이건 불안하다" icon="warning">
-etcd 백업·복구, kubeadm 업그레이드처럼
+etcd 백업·복구, kubeadm(클러스터 설치·업그레이드 도구) 업그레이드처럼
 **평소에 안 하는 작업**.
 </Card>
 <Card title="이게 가장 큰 문제" icon="error">
@@ -59,8 +59,8 @@ etcd 백업·복구, kubeadm 업그레이드처럼
 |---|---|---|
 | 1 | 시험 자체 | — |
 | 2~3 | 아키텍처 · kubectl | 기초 |
-| 4~8 | Pod · 워크로드 · 설정 · 스케줄링 · 오토스케일링 | Workloads & Scheduling (15%) |
-| 9~12 | Service · DNS · Ingress/Gateway · NetworkPolicy | Services & Networking (20%) |
+| 4~8 | Pod · 워크로드 · 설정 · 스케줄링 · 오토스케일링 | Workloads and Scheduling (15%) |
+| 9~12 | Service · DNS · Ingress/Gateway · NetworkPolicy | Servicing and Networking (20%) |
 | 13 | 스토리지 | Storage (10%) |
 | 14~17 | RBAC · 클러스터 라이프사이클 · Helm/Kustomize · 확장 | Cluster Architecture (25%) |
 | 18 | 트러블슈팅 | Troubleshooting (30%) |
@@ -168,7 +168,7 @@ kind는 `kubeadm upgrade` 연습에 부적합하다.
 :::
 
 버전이 올라가도 **이 덱의 개념 부분은 거의 그대로**다.
-바뀌는 건 주로 API 버전 표기와 새로 GA된 기능 몇 개다.
+바뀌는 건 주로 API 버전 표기와 새로 GA(General Availability — 정식 승격)된 기능 몇 개다.
 
 ## 0장 요약
 

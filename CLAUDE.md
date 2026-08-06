@@ -130,10 +130,11 @@ import { Steps, Card, CardGrid, Tabs, TabItem, FileTree } from '@astrojs/starlig
   classDef warn fill:#fef3c7,stroke:#d97706,color:#78350f   /* 주의·대기 */
   classDef key  fill:#dbeafe,stroke:#2563eb,color:#1e3a8a   /* 핵심 대상 */
   classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155   /* 배경·경유 */
+  classDef zone fill:#ede9fe,stroke:#7c3aed,color:#4c1d95   /* 층·구획 구분 (의미 판정 아님) */
   ```
 
   `stateDiagram-v2`는 **색을 주지 않는 편이 낫다** — 테마 기본값이 양쪽 모드에서 이미 잘 맞는다.
-  덱 전체에 이 5색을 일관되게 쓰면 **색만 봐도 결론의 성격**이 읽힌다.
+  덱 전체에 이 팔레트를 일관되게 쓰면 **색만 봐도 결론의 성격**이 읽힌다.
 - **mermaid 라벨 안 문자.** 노드 텍스트는 `["…"]` 로 감싸면 대부분 안전하다 —
   `|`, `(`, `:`, `·`, 이모지 전부 통과한다. 다만 **`&` 는 `&amp;` 로 적어야** 하고,
   `<`/`>` 는 쓰지 않는다(`<br/>` 만 예외로 줄바꿈에 쓴다).

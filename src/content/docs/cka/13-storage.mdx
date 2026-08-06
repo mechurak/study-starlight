@@ -145,7 +145,7 @@ flowchart LR
     class PVC,POD dev
 ```
 
-- **앱 개발자는 저장소가 NFS인지 EBS인지 몰라도 된다.** "10Gi, RWO"만 요청한다
+- **앱 개발자는 저장소가 NFS인지 EBS인지 몰라도 된다.** "10Gi, RWO(ReadWriteOnce — 한 노드에서 읽기·쓰기)"만 요청한다
 - **관리자는 실제 저장소를 준비한다.** 또는 StorageClass로 자동 생성되게 한다
 - 이 분리 덕분에 **같은 매니페스트가 온프렘과 클라우드에서 모두 동작**한다
 
@@ -319,7 +319,7 @@ stateDiagram-v2
 |---|---|
 | **`Retain`** | PV는 남고 상태가 **`Released`** 가 된다. **데이터 보존**. 재사용하려면 수동 조치 |
 | **`Delete`** | PV와 **실제 스토리지까지 삭제**한다. 동적 프로비저닝의 기본값 |
-| `Recycle` | 삭제되었다 (deprecated) |
+| `Recycle` | **deprecated** — 쓰지 말 것. 대신 동적 프로비저닝을 쓴다 |
 
 ```bash
 kubectl patch pv pv-data -p '{"spec":{"persistentVolumeReclaimPolicy":"Retain"}}'
@@ -348,6 +348,9 @@ PVC가 `Pending`이면 `describe pvc`를 먼저 본다.\
 :::
 
 ## StorageClass — 동적 프로비저닝
+
+정적 프로비저닝은 PVC가 올 때마다 관리자가 PV를 손으로 만들어야 한다 — 팀이 커지면 확장이 안 된다.
+StorageClass는 그 생성을 **프로비저너에게 맡겨 자동화**한다.
 
 ```yaml
 apiVersion: storage.k8s.io/v1
@@ -497,6 +500,9 @@ kubectl delete pvc data-db-0        # 정말 지우려면 명시적으로
 
 ## CSI — 스토리지 확장 인터페이스
 
+CSI(Container Storage Interface)는 스토리지 벤더가 **Kubernetes 코드 밖에서**
+드라이버를 만들 수 있게 한 표준 인터페이스다.
+
 - 예전에는 스토리지 드라이버가 **Kubernetes 코드 안에** 있었다 (in-tree)
 - 지금은 전부 **CSI 드라이버**로 분리되었다. 벤더가 독립적으로 배포한다
 - in-tree 플러그인은 대부분 **제거**되었고 CSI로 마이그레이션되었다
@@ -578,7 +584,7 @@ volumes:
             audience: vault
 ```
 
-`projected`의 `serviceAccountToken`이 **현재 SA 토큰의 표준 주입 방식**이다 (14장).
+`projected`의 `serviceAccountToken`이 **현재 SA(ServiceAccount) 토큰의 표준 주입 방식**이다 (14장).
 
 ## 진단과 실습
 

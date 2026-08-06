@@ -309,7 +309,8 @@ kubectl run nginx --image=nginx $do > pod.yaml
 
 :::caution[함정]
 Pod의 **대부분 필드는 수정할 수 없다.**
-`image`, `tolerations`(추가), `activeDeadlineSeconds` 정도만 가능하다.
+`image`, `tolerations`(추가), `activeDeadlineSeconds` 정도만 가능하고,
+리소스(cpu·메모리)는 v1.35부터 **`--subresource=resize`로 제자리 수정**할 수 있다 (4장).
 그 외를 고치려면 `--force`로 지우고 다시 만들어야 한다.
 :::
 
@@ -381,7 +382,7 @@ flowchart TD
 :::caution[함정]
 Deployment가 관리하는 Pod을 지우면 **즉시 다시 생긴다.**
 "Pod을 지웠는데 계속 있다"면 상위 컨트롤러를 지워야 한다.
-반대로 **네임스페이스가 `Terminating`에서 안 끝나면** finalizer를 의심한다.
+반대로 **네임스페이스가 `Terminating`에서 안 끝나면** finalizer(삭제 전 정리가 끝날 때까지 삭제를 막는 표식 — 18장)를 의심한다.
 :::
 
 ## 진단 도구
@@ -477,4 +478,4 @@ kubectl events --for pod/web              # 새 전용 명령
 - 조회는 `-o wide` → `describe`(Events) → `-o yaml` 순으로 좁혀 간다
 - **`--sort-by`, `custom-columns`, `jsonpath`** 는 "파일에 저장하시오" 문제 전용 무기
 - **`logs --previous`** 와 **`get events --sort-by`** 는 진단의 두 기둥
-- Pod은 대부분 필드를 못 고친다 → `--force`로 다시 만든다
+- Pod은 대부분 필드를 못 고친다 → `--force`로 다시 만든다 (리소스만 `--subresource=resize` 예외)

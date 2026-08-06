@@ -7,6 +7,10 @@ import { Steps, Card, CardGrid, Tabs, TabItem } from '@astrojs/starlight/compone
 
 > 이름이 IP가 되는 과정
 
+Pod은 서로를 IP가 아니라 `web-svc` 같은 **이름**으로 부른다 (9장).
+그 이름을 IP로 바꿔 주는 것이 없으면 클러스터 안의 모든 이름 호출이 실패한다 —
+그 일을 하는 것이 **CoreDNS**다.
+
 ## CoreDNS는 어디에 있나
 
 ```bash

@@ -476,6 +476,10 @@ podAntiAffinity보다 **표현이 정확하고 계산이 싸다.**
 
 ### PriorityClass와 선점(preemption)
 
+우선순위가 없으면 클러스터가 꽉 찼을 때 **중요한 Pod도 자리가 날 때까지 똑같이 Pending**으로 기다린다.
+PriorityClass는 "누가 먼저인가"를 선언해 두는 것이고,
+자리가 없으면 스케줄러가 덜 중요한 Pod을 쫓아내 자리를 만든다 — 이것이 선점이다.
+
 ```yaml
 apiVersion: scheduling.k8s.io/v1
 kind: PriorityClass
@@ -537,7 +541,10 @@ kubectl get events | grep -i schedul
 
 ## Pod admission — Pod Security Admission
 
-커리큘럼의 "Pod admission" 항목. **네임스페이스 라벨로 켠다.**
+막는 장치가 없으면 `privileged: true`나 `hostNetwork` 같은 위험한 스펙도 **아무 검사 없이 통과**한다.
+이걸 막던 PodSecurityPolicy(PSP)는 v1.25에서 제거되었고 — 옛 자료에 나오면 무시할 것 —
+그 빈자리를 메운 것이 Pod Security Admission이다 (커리큘럼의 "Pod admission" 항목).
+**네임스페이스 라벨로 켠다.**
 
 ```bash
 kubectl label ns dev \
@@ -567,8 +574,6 @@ kubectl label ns dev \
 | `enforce` | **거부**한다 |
 | `audit` | 감사 로그에 남긴다 |
 | `warn` | 사용자에게 경고를 보여준다 |
-
-PodSecurityPolicy(PSP)는 **v1.25에서 제거**되었다. 옛 자료에 나오면 무시할 것.
 
 ## 스케줄링 실패 진단 순서
 

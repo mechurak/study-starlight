@@ -9,10 +9,15 @@ import { Steps, Card, CardGrid, Tabs, TabItem, FileTree } from '@astrojs/starlig
 
 ## 왜 커리큘럼에 있나
 
+매니페스트 수십 장짜리 컴포넌트를 dev·prod마다 값만 바꿔 다시 쓰려면,
+`kubectl apply -f`만으로는 **디렉터리를 통째로 복사해서 고치는 수밖에 없다.**
+복사본들은 금방 어긋나고, 설치한 것을 버전째 되돌릴 방법도 없다 —
+이 재사용·변형 문제를 푸는 도구가 Helm과 Kustomize다.
+
 커리큘럼 항목은 **"Use Helm and Kustomize to install cluster components"** 다.
 
 - 차트를 **만드는** 게 아니라 **설치하고 값을 바꾸는** 쪽이다
-- 실제로 CNI·Ingress 컨트롤러·모니터링은 전부 이 둘 중 하나로 설치한다
+- 실제로 CNI(Pod 네트워크 플러그인 — 17장)·Ingress 컨트롤러·모니터링은 전부 이 둘 중 하나로 설치한다
 
 ```mermaid
 flowchart LR
@@ -79,7 +84,8 @@ flowchart LR
 </FileTree>
 
 같은 차트를 **다른 이름의 릴리스로 여러 번** 설치할 수 있다.
-릴리스 정보는 **네임스페이스의 Secret**에 저장된다 (Helm 3부터. Tiller는 없어졌다).
+릴리스 정보는 **네임스페이스의 Secret**에 저장된다
+(Helm 3부터. Helm 2의 서버 컴포넌트였던 Tiller는 없어졌다).
 
 ### Helm 기본 명령
 
@@ -243,11 +249,14 @@ kind: Kustomization
 resources:
   - deployment.yaml
   - service.yaml
-commonLabels:
-  app: web
+labels:
+  - pairs: { app: web }
+    includeSelectors: true    # 셀렉터에도 넣는다 — 옛 commonLabels와 같은 효과
 ```
 
 - **템플릿 언어가 없다.** 전부 유효한 YAML이다
+- 라벨은 `labels`로 단다 — 옛 `commonLabels`는 v5.0.0에서 deprecated.
+  `labels`는 기본으로 셀렉터를 건드리지 않으니, 셀렉터까지 맞추려면 `includeSelectors: true`를 준다
 - 베이스는 그대로 두고 **오버레이가 패치를 얹는다**
 - `kubectl`에 내장되어 있다 — 별도 설치가 필요 없다
 
@@ -336,9 +345,9 @@ spec:
 ```
 
 </TabItem>
-<TabItem label="JSON 6902 패치">
+<TabItem label="JSON 패치 (RFC 6902)">
 
-경로를 직접 지정한다. 리스트 항목 교체·삭제에 정확하다.
+JSON Patch 표준(RFC 6902) 방식. 경로를 직접 지정한다. 리스트 항목 교체·삭제에 정확하다.
 
 ```yaml
 # kustomization.yaml 안에 인라인

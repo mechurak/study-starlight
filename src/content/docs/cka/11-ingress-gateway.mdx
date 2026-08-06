@@ -9,6 +9,10 @@ import { Steps, Card, CardGrid, Tabs, TabItem } from '@astrojs/starlight/compone
 
 ## Service만으로는 부족한 이유
 
+Service는 **L4(전송 계층 — IP와 포트만 본다)**에서 동작한다.
+호스트 이름이나 URL 경로로 트래픽을 나누려면
+**L7(애플리케이션 계층 — HTTP 호스트·경로·헤더까지 본다)**이 필요하다.
+
 ```mermaid
 flowchart LR
     subgraph L4["L4 — Service 만으로"]
@@ -273,7 +277,8 @@ HTTP뿐 아니라 gRPC·TCP·TLS를
 </Card>
 </CardGrid>
 
-**Gateway API는 CRD로 제공된다.** 클러스터에 기본 탑재가 아니다 —
+**Gateway API는 CRD(CustomResourceDefinition — 쿠버네티스에 새 리소스 종류를 추가하는 확장, 17장)로 제공된다.**
+클러스터에 기본 탑재가 아니다 —
 직접 설치해야 한다. 이 점이 Ingress와 가장 큰 실무적 차이다.
 
 ```bash

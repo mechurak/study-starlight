@@ -28,7 +28,7 @@ flowchart LR
     class A,B,C pod
 ```
 
-- **모든 Pod은 모든 Pod과 NAT 없이 통신할 수 있다**
+- **모든 Pod은 모든 Pod과 NAT(Network Address Translation — 주소 변환) 없이 통신할 수 있다**
 - 네임스페이스가 달라도 마찬가지다. **네임스페이스는 네트워크 경계가 아니다**
 - 노드가 달라도 마찬가지다
 
@@ -42,6 +42,9 @@ NetworkPolicy는 이 기본값을 **선택적으로 좁히는** 도구다.
 :::
 
 ## CNI — 누가 네트워크를 만드는가
+
+CNI(Container Network Interface — kubelet이 Pod 네트워크를 만들 때 호출하는 표준 인터페이스)가
+위의 "평평한 네트워크"를 실제로 만드는 주체다.
 
 ```mermaid
 sequenceDiagram
@@ -61,8 +64,8 @@ sequenceDiagram
 
 | CNI | 특징 | NetworkPolicy |
 |---|---|---|
-| **Calico** | 널리 쓰인다. BGP 또는 오버레이 | 지원 (확장 정책도) |
-| **Cilium** | eBPF 기반. L7 정책까지 | 지원 (강력) |
+| **Calico** | 널리 쓰인다. BGP(라우터 간 경로 교환 프로토콜) 또는 오버레이 | 지원 (확장 정책도) |
+| **Cilium** | eBPF(커널 내장 프로그래밍 기술) 기반. L7 정책까지 | 지원 (강력) |
 | **Flannel** | 가장 단순한 오버레이 | **미지원** |
 | **Weave** | 오버레이 | 지원 |
 

@@ -324,6 +324,7 @@ flowchart LR
 ```
 
 - **누구나 디코딩할 수 있다.** 인코딩은 바이너리를 담기 위한 것이지 보호가 아니다
+- 읽을 수 있는 주체를 좁히는 것은 **RBAC(Role-Based Access Control — 역할 기반 접근 제어, 14장)**의 몫이다
 - 기본 설정에서 **etcd에 평문으로 저장**된다
 
 ```yaml
@@ -435,7 +436,8 @@ flowchart LR
 
 ### QoS 클래스 — 누가 먼저 쫓겨나는가
 
-노드에 자원이 부족하면 kubelet이 Pod을 축출(evict)한다. 순서는 QoS가 정한다.
+노드에 자원이 부족하면 kubelet이 Pod을 축출(evict)한다.
+순서는 QoS(Quality of Service — 서비스 품질) 클래스가 정한다.
 
 **QoS는 지정하는 것이 아니라 계산된다.**
 

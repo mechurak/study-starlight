@@ -37,8 +37,8 @@ import { Steps, Card, CardGrid, Tabs, TabItem, LinkCard, Badge } from '@astrojs/
 flowchart LR
     T["Troubleshooting<br/>30%<br/>18장"]
     C["Cluster Architecture<br/>25%<br/>14~17장"]
-    N["Services & Networking<br/>20%<br/>9~12장"]
-    W["Workloads & Scheduling<br/>15%<br/>4~8장"]
+    N["Servicing and Networking<br/>20%<br/>9~12장"]
+    W["Workloads and Scheduling<br/>15%<br/>4~8장"]
     S["Storage<br/>10%<br/>13장"]
     T --- C
     C --- N
@@ -74,13 +74,13 @@ flowchart LR
 <Tabs>
 <TabItem label="Cluster Architecture 25%">
 
-- RBAC 관리
+- RBAC(Role-Based Access Control — 역할 기반 접근 제어) 관리 (14장)
 - 클러스터 설치를 위한 인프라 준비
 - **kubeadm으로 클러스터 생성·관리**
 - **클러스터 라이프사이클(업그레이드) 관리**
 - 고가용성 컨트롤 플레인 구성
 - **Helm·Kustomize로 컴포넌트 설치**
-- 확장 인터페이스(CNI, CSI, CRI) 이해
+- 확장 인터페이스 이해 — CNI(Container Network Interface)·CSI(Container Storage Interface)·CRI(Container Runtime Interface) (17장)
 - **CRD 이해, 오퍼레이터 설치·구성**
 
 </TabItem>
@@ -143,10 +143,10 @@ flowchart LR
     class G,H,C,A,L mute
 ```
 
-- **Gateway API** — Ingress만 알면 안 된다. CRD 기반이라 설치부터 다르다 (11장)
+- **Gateway API** — Ingress만 알면 안 된다. CRD(CustomResourceDefinition — 새 리소스 종류를 추가하는 확장) 기반이라 설치부터 다르다 (11장)
 - **Helm / Kustomize** — "컴포넌트 설치" 맥락. 차트 작성이 아니라 **설치·값 오버라이드** (16장)
 - **CRD와 오퍼레이터** — 직접 만들진 않지만 **읽고 설치하고 상태를 확인**할 줄 알아야 (17장)
-- **워크로드 오토스케일링** — HPA. metrics-server가 없으면 아무것도 안 된다 (8장)
+- **워크로드 오토스케일링** — HPA(Horizontal Pod Autoscaler — 부하에 따라 Pod 수를 자동 조절). metrics-server가 없으면 아무것도 안 된다 (8장)
 - **컨테이너 출력 스트림** — 로그. `kubectl logs` 옵션 전부 + 노드의 로그 파일 위치 (18장)
 
 :::caution[함정]

@@ -70,10 +70,11 @@ flowchart LR
 kubeadm의 `admin.conf`가 이것이다.
 </Card>
 <Card title="ServiceAccount 토큰" icon="document">
-Pod 안의 워크로드용. JWT.
+Pod 안의 워크로드용. JWT(JSON Web Token).
 </Card>
 <Card title="OIDC" icon="external">
-사람 · 조직 SSO. 실무 표준.
+OIDC(OpenID Connect).
+사람 · 조직 SSO(Single Sign-On·통합 로그인). 실무 표준.
 </Card>
 <Card title="Webhook" icon="link">
 외부 시스템에 위임.
@@ -274,6 +275,9 @@ CI/CD 등 클러스터 밖에서 쓸 토큰이 이 경우다.
 </Tabs>
 
 ## RBAC의 네 리소스
+
+RBAC(Role-Based Access Control, 역할 기반 접근 제어)은
+**역할에 권한을 정의해 두고, 주체를 그 역할에 묶는** 방식이다.
 
 **핵심 구조는 하나다 — 주체 → 바인딩 → 역할 → 리소스.**
 
@@ -619,7 +623,7 @@ RBAC 문제의 **검산은 반드시 `auth can-i --as`** 로 한다.
 ## 실제로 실행해보기
 
 ```bash
-# 임시 kubeconfig로 테스트
+# impersonation으로 테스트 (kubeconfig 전환 없이)
 kubectl --as=dev get pods -n dev
 kubectl --as=dev --as-group=developers get pods -n dev
 
