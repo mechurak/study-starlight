@@ -1,0 +1,206 @@
+---
+title: "6. 글자 리소스"
+description: "크기 스케일과 한글 — 영문 기준 설정을 그대로 쓰면 안 되는 이유"
+---
+
+import { LinkCard, Tabs, TabItem } from '@astrojs/starlight/components';
+import TermIntro from '../../../components/TermIntro.astro';
+import ScaleViz from '../../../components/ScaleViz.astro';
+
+> 화면의 대부분은 색도 버튼도 아니고 **글자**다. 그런데 토큰 관리에서 가장 자주 빠진다.
+
+<TermIntro
+  terms={[
+    ['폰트 패밀리', 'Font Family', '어떤 글꼴을 쓸 것인가. `--font-sans`, `--font-mono` 처럼 역할로 이름 붙인다.'],
+    ['줄 간격', 'Line Height', '줄과 줄 사이 간격. 글자 크기의 몇 배로 지정한다. **한글은 영문보다 넉넉해야** 읽힌다.'],
+    ['자간', 'Letter Spacing', '글자 사이 간격. 영문 큰 제목은 좁히면 좋아지지만 **한글은 좁히면 뭉개진다**.'],
+    ['폴백', 'Fallback', '지정한 폰트가 없을 때 대신 쓸 폰트 목록. 순서대로 시도한다.'],
+    ['시스템 폰트', 'System Font Stack', '사용자 기기에 이미 있는 기본 글꼴. 내려받을 게 없어 가장 빠르다.'],
+  ]}
+/>
+
+## 폰트 패밀리 — 역할로 이름 붙인다
+
+폰트도 색과 똑같다. **"Pretendard"가 아니라 "본문용 글꼴"이라고 이름 붙인다.**
+
+```css
+@theme inline {
+  --font-sans: 'Pretendard Variable', ui-sans-serif, system-ui, sans-serif;
+  --font-mono: ui-monospace, 'SFMono-Regular', Menlo, monospace;
+}
+```
+
+```tsx
+<p className="font-sans">본문</p>
+<code className="font-mono">코드</code>
+```
+
+폰트를 바꾸려면 **한 줄**만 고친다. 컴포넌트는 `font-sans`밖에 모른다.
+
+| 토큰 | 역할 | 빈도 |
+|---|---|---|
+| `--font-sans` | 본문·UI 전체 | ★★★ |
+| `--font-mono` | 코드, 숫자 정렬이 필요한 표 | ★★☆ |
+| `--font-serif` | 제목에 개성이 필요할 때 | ★☆☆ |
+
+**대부분의 앱은 `--font-sans` 하나로 끝난다.** 폰트를 여러 개 섞는 건 대체로 나쁜 신호다.
+
+### 폴백 목록을 반드시 남긴다
+
+```css
+--font-sans: 'Pretendard Variable', ui-sans-serif, system-ui, sans-serif;
+/*            ①                      ②              ③            ④  */
+```
+
+- **①** 원하는 폰트. 아직 안 내려받았거나 실패하면 →
+- **②③** 기기 기본 글꼴 (iOS는 SF Pro, Windows는 Segoe UI, Android는 Roboto)
+- **④** 최후의 보루
+
+폴백이 없으면 폰트 로딩 실패 시 **Times New Roman**이 나온다. 화면이 순식간에 90년대가 된다.
+
+## 크기 스케일
+
+간격과 같은 원리다. **아무 크기나 쓰지 않고 정해진 단계만 쓴다.**
+
+<ScaleViz kind="text" />
+
+Tailwind는 크기와 줄 간격을 **한 쌍**으로 준다. `text-sm`은 14px 글자 + 20px 줄 간격이다.
+크기만 바꾸면 줄 간격이 안 따라와서 어색해지기 때문이다.
+
+### 실무에서 실제로 쓰는 것
+
+| 클래스 | 크기 | 어디에 |
+|---|---|---|
+| `text-xs` | 12px | 배지, 캡션, 표의 부가정보 |
+| `text-sm` | 14px | **UI 기본** — 버튼, 라벨, 입력창. shadcn/ui 대부분이 이것 |
+| `text-base` | 16px | 본문 문단 |
+| `text-lg` ~ `text-xl` | 18~20px | 카드 제목, 섹션 제목 |
+| `text-2xl` ~ `text-4xl` | 24~36px | 페이지 제목, 히어로 |
+
+:::tip[핵심]
+**웹 앱 UI의 기본은 `text-sm`(14px)**이고, **읽는 문서의 기본은 `text-base`(16px)**다.
+shadcn/ui 컴포넌트가 14px 기준으로 만들어져 있어서, 블로그 본문에 그대로 쓰면 작아 보인다.
+:::
+
+### 단계를 건너뛰지 않는다
+
+제목 계층은 크기 차이가 **명확히 보여야** 한다.
+
+```tsx
+<h1 className="text-3xl">페이지 제목</h1>
+<h2 className="text-xl">섹션 제목</h2>
+<h3 className="text-base font-semibold">소제목</h3>
+```
+
+`text-xl` 다음에 `text-lg`를 쓰면 (20px → 18px) 차이가 2px이라 계층이 안 읽힌다.
+**한 칸씩 건너뛰는 편**이 낫다.
+
+## 한글은 규칙이 다르다
+
+여기가 중요하다. **영문 기준으로 만들어진 설정을 그대로 쓰면 한글이 답답해 보인다.**
+
+<Tabs>
+<TabItem label="줄 간격 — 넉넉하게">
+
+한글은 글자마다 네모 칸을 꽉 채운다(전각). 영문처럼 위아래 여백이 없어서
+**같은 줄 간격이어도 더 빽빽해 보인다.**
+
+```css
+/* Tailwind 기본: text-base = 16px / 24px (1.5배) */
+
+/* 한글 본문은 1.6~1.75배가 편하다 */
+.prose-ko { line-height: 1.7; }
+```
+
+- **UI 라벨·버튼** — 기본값 그대로 (짧아서 티가 안 난다)
+- **긴 본문 문단** — `leading-relaxed`(1.625) 이상을 권한다
+
+</TabItem>
+<TabItem label="자간 — 좁히지 않는다">
+
+영문 큰 제목에 `tracking-tight`(자간 -0.025em)를 주면 세련돼 보인다.
+**한글에 같은 걸 주면 글자가 서로 붙어 뭉개진다.**
+
+```tsx
+{/* 영문 제목 — 좋다 */}
+<h1 className="text-4xl tracking-tight">Build faster</h1>
+
+{/* 한글 제목 — 뭉갠다 */}
+<h1 className="text-4xl tracking-tight">더 빠르게 만드세요</h1>
+
+{/* 한글은 기본값 또는 아주 살짝만 */}
+<h1 className="text-4xl">더 빠르게 만드세요</h1>
+```
+
+</TabItem>
+<TabItem label="줄바꿈 — 단어 단위로">
+
+한글은 띄어쓰기 없이도 줄이 바뀔 수 있어서 **단어 중간에서 끊긴다.**
+
+```css
+.text-ko {
+  word-break: keep-all;      /* 단어 중간에서 안 끊는다 */
+  overflow-wrap: break-word; /* 단, 한 줄을 넘는 긴 단어는 끊는다 */
+}
+```
+
+Tailwind로는 `break-keep`(+ 필요 시 `break-words`)이다.
+**버튼 라벨과 카드 제목에 특히 효과가 크다.**
+
+</TabItem>
+</Tabs>
+
+:::caution[함정]
+`word-break: keep-all`만 주고 `overflow-wrap`을 안 주면,
+아주 긴 URL이나 영문 단어가 **컨테이너를 뚫고 나간다.** 둘은 한 세트다.
+:::
+
+### 한글 폰트는 무겁다
+
+영문 폰트는 글자가 200개 남짓이라 파일이 수십 KB지만,
+**한글은 완성형만 11,172자**라 굵기 하나에 수 MB가 된다.
+
+| 방법 | 크기 | 언제 |
+|---|---|---|
+| **시스템 폰트** | 0 | 가장 빠르다. 기기마다 글꼴이 다른 게 괜찮다면 최선 |
+| **동적 서브셋** | 페이지당 수십 KB | 실제 쓰인 글자 조각만 내려받는다. **한글 웹폰트의 현실적 해답** |
+| 전체 파일 | 수 MB | 하지 않는다 |
+
+동적 서브셋은 폰트를 수백 개 조각으로 쪼개 두고 `unicode-range`로
+**필요한 조각만** 브라우저가 가져가게 하는 방식이다.
+Pretendard는 이 방식의 CSS를 공식 제공한다 — 구체적인 로딩 방법은 [8장](/shadcn/08-icon-font/#폰트-리소스)에서 다룬다.
+
+## 굵기
+
+```tsx
+<span className="font-normal">본문 400</span>
+<span className="font-medium">라벨 500</span>
+<span className="font-semibold">제목 600</span>
+<span className="font-bold">강조 700</span>
+```
+
+**UI에서 실제로 쓰는 건 이 넷**이다. 그리고 규칙 하나 —
+
+:::caution[함정]
+한글 폰트에서 굵기는 **파일이 따로**다. `font-medium`을 쓰려면 500 웨이트 파일이 있어야 한다.
+없으면 브라우저가 **억지로 굵게 그려서**(가짜 볼드) 글자가 뭉개진다.
+
+Pretendard Variable 같은 **가변 폰트**를 쓰면 파일 하나로 모든 굵기가 나와서 이 문제가 없다.
+:::
+
+## 6장 요약
+
+- 폰트도 **역할로 이름 붙인다** — `--font-sans` 하나면 대부분 끝난다
+- **폴백 목록을 반드시** 남긴다. 없으면 로딩 실패 시 Times New Roman이 나온다
+- 크기는 스케일로만. **UI 기본은 `text-sm`(14px), 읽는 문서는 `text-base`(16px)**
+- 제목 계층은 **한 칸씩 건너뛰어야** 차이가 읽힌다
+- 한글은 규칙이 다르다 — **줄 간격은 넉넉하게, 자간은 좁히지 않고, `break-keep`**
+- `break-keep`과 `break-words`는 **한 세트**다
+- 한글 웹폰트는 무겁다. **시스템 폰트 아니면 동적 서브셋**
+- 굵기는 파일이 따로다. **가변 폰트**를 쓰면 이 문제가 사라진다
+
+<LinkCard
+  title="7. 컴포넌트 리소스"
+  description="button.tsx 안에도 결정이 들어 있다 — 코드로 된 테마."
+  href="/shadcn/07-component/"
+/>

@@ -15,7 +15,9 @@ src/content/docs/
     index.mdx                 #   덱 개요 페이지
     00-intro.mdx …            #   본문 페이지 (컴포넌트를 쓰므로 전부 .mdx)
   frontend/                   # Next.js · Tailwind CSS · shadcn/ui
+  shadcn/                     # shadcn/ui 단독 — 테마 = 리소스 목록 관점
   supabase/                   # Postgres 위의 백엔드 플랫폼 · RLS · Vercel 역할 배분
+src/components/               # 문서에서 import 하는 데모·시각화 컴포넌트
 src/styles/custom.css         # 폰트·본문 폭·mermaid 오버플로 커스텀
 docs/                         # 레포 운영 문서 (배포, 덱별 기준 시점)
 CLAUDE.md                     # 작업 규칙 (Claude Code 용)

@@ -19,12 +19,28 @@ dev 서버는 백그라운드 모드로 띄운다: `astro dev --background`
 |---|---|---|
 | `cka` | CKA 시험 대비 | **[docs/cka-baseline.md](docs/cka-baseline.md)를 읽는다** |
 | `frontend` | Next.js · Tailwind CSS · shadcn/ui | — |
+| `shadcn` | shadcn/ui 단독 — **테마 = 리소스 목록** 관점 | 아래 "shadcn 덱" 절을 읽는다 |
 | `supabase` | Postgres 위의 백엔드 플랫폼 · RLS · Vercel 역할 배분 | — |
 
-**세 덱 모두 이 레포가 원본이다** (2026-08-05 소유자 결정).
+**네 덱 모두 이 레포가 원본이다** (2026-08-05 소유자 결정).
 `frontend`와 `supabase`는 slidev 덱(`~/workspace/study-decks/decks/<이름>`)의 내용을
 **참고해 다시 쓴 것**이지만, 저쪽은 슬라이드(클릭 애니메이션·라이브 데모가 핵심)라
 구조가 다르다 — 동기화 대상이 아니다.
+
+### shadcn 덱 (2026-08-06 소유자 결정)
+
+`frontend` 13~16장과 주제가 겹치지만 **동기화 대상이 아니다** — 목적이 다르다.
+`frontend`는 세 도구의 흐름, `shadcn`은 shadcn/ui 하나를 테마 관점으로 깊게 판다.
+`frontend` 13~16장과 index에는 이쪽으로 오는 aside 링크만 걸어 뒀다.
+
+이 덱은 **읽기 어렵다는 피드백에서 나왔다.** 그래서 규칙이 셋 더 있다 —
+
+- **새 용어는 처음 나올 때 풀 이름과 "왜 필요한지"를 준다.**
+  각 장 첫머리의 `<TermIntro>` 상자가 그 장치다 (`src/components/TermIntro.astro`).
+  `terms`는 `[용어, 풀 이름(없으면 ''), 한 줄 설명][]`이고, 설명 안의 백틱은 코드로 안 바뀐다 — 평문이다
+- **곁가지를 넣지 않는다.** 뺀 것은 [0장의 "다루지 않는 것" 표](src/content/docs/shadcn/00-intro.mdx)에
+  이름만 남긴다. 새 내용을 넣을 때 그 표와 충돌하는지 먼저 본다
+- **12장은 용어 사전**이다. 새 약어를 본문에 쓰면 여기에도 추가한다
 
 ## 외관 — 세 겹 (2026-08-05 소유자 결정)
 

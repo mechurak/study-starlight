@@ -1,0 +1,108 @@
+---
+title: "12. 용어 사전"
+description: "이 덱에 나온 모든 용어를 한 곳에 — 풀 이름과 한 줄 설명"
+---
+
+import { LinkCard } from '@astrojs/starlight/components';
+
+> 읽다가 막히면 여기로 온다. **약어는 전부 풀 이름을 적었다.**
+
+## 도구 · 라이브러리
+
+| 이름 | 풀 이름 | 무엇인가 |
+|---|---|---|
+| **shadcn/ui** | — | 컴포넌트 소스를 내 레포에 복사해 주는 CLI 도구. 설치할 패키지가 없다 ([1장](/shadcn/01-what-is-shadcn/)) |
+| **Tailwind CSS** | — | 클래스 이름 하나 = 스타일 한 줄인 CSS 프레임워크. `p-4` = `padding: 1rem` |
+| **Base UI** | — | shadcn/ui의 기본 프리미티브. 겉모습 없이 동작·접근성만 담당한다 (2026년 7월부터 기본값) |
+| **Radix UI** | — | 예전 기본 프리미티브. 계속 지원된다. `init -b radix`로 선택 |
+| **React Aria** | — | Adobe가 만든 또 다른 프리미티브 선택지 |
+| **lucide** | — | shadcn/ui의 기본 아이콘 세트. 선 스타일 1500여 개 ([8장](/shadcn/08-icon-font/)) |
+| **cva** | class-variance-authority | variant 이름 → Tailwind 클래스 문자열을 만드는 라이브러리 ([7장](/shadcn/07-component/)) |
+| **clsx** | — | 조건에 따라 클래스를 켜고 끄는 라이브러리. `cn`의 절반 |
+| **tailwind-merge** | — | 충돌하는 Tailwind 클래스에서 뒤엣것만 남긴다. `cn`의 나머지 절반 |
+| **next-themes** | — | 다크 모드 상태 관리. 화면 번쩍임을 막아 준다 ([9장](/shadcn/09-dark/)) |
+| **react-hook-form** | — | 폼 입력값 상태 관리. shadcn `Form`이 이걸 전제한다 |
+| **zod** | — | 검증 규칙을 스키마로 선언하는 라이브러리. 타입이 같이 나온다 |
+| **tweakcn** | — | 커뮤니티 테마 편집기. 프리셋을 받아 쓸 수 있다 ([10장](/shadcn/10-make-theme/)) |
+
+## 약어
+
+| 약어 | 풀 이름 | 뜻 |
+|---|---|---|
+| **a11y** | Accessibility | 접근성. `a`와 `y` 사이 글자가 11개라 이렇게 줄여 쓴다 |
+| **ARIA** | Accessible Rich Internet Applications | 화면낭독기에 의미를 알려주는 HTML 속성 모음. `aria-label` 등 |
+| **CLI** | Command Line Interface | 터미널에서 실행하는 명령줄 도구 |
+| **CSS** | Cascading Style Sheets | 웹 문서의 겉모습을 정하는 언어 |
+| **dlx** | Download & Execute | 설치 없이 한 번만 실행하는 pnpm 명령. npm의 `npx` |
+| **FOIT** | Flash of Invisible Text | 웹폰트 로딩 중 글자가 안 보이는 현상 ([8장](/shadcn/08-icon-font/)) |
+| **FOUT** | Flash of Unstyled Text | 기본 폰트로 보였다가 웹폰트로 바뀌며 덜컹거리는 현상 |
+| **HSL** | Hue Saturation Lightness | 색상·채도·명도로 색을 적는 표기법. `oklch`의 전 세대 |
+| **JSON** | JavaScript Object Notation | 데이터를 적는 텍스트 형식. 레지스트리가 이걸로 배포된다 |
+| **oklch** | Oklab Lightness Chroma Hue | 밝기·선명도·색상으로 색을 적는 최신 CSS 표기법 ([4장](/shadcn/04-color/#oklch--왜-이-표기법인가)) |
+| **RSC** | React Server Components | 서버에서만 실행되는 React 컴포넌트. `components.json`의 `rsc` 옵션이 이것 |
+| **SVG** | Scalable Vector Graphics | 확대해도 안 깨지고 CSS로 색을 바꿀 수 있는 이미지 형식 |
+| **UI** | User Interface | 사용자가 보고 조작하는 화면 |
+| **WCAG** | Web Content Accessibility Guidelines | 웹 접근성 국제 표준. 색 대비 기준의 출처 |
+
+## 테마와 토큰
+
+| 용어 | 풀 이름 | 뜻 |
+|---|---|---|
+| **테마** | Theme | 토큰 값을 한 벌로 묶은 것. 라이트/다크는 이름이 같고 값만 다른 두 벌 ([2장](/shadcn/02-theme/)) |
+| **토큰** | Design Token | 디자인 결정에 붙인 이름. `#4f46e5`는 값이고 `--primary`는 결정이다 |
+| **원시 토큰** | Primitive Token | 값 자체에 이름을 붙인 것. `--zinc-900`. "무슨 색인가" |
+| **의미 토큰** | Semantic Token | 역할로 이름 붙인 것. `--primary`. "무슨 역할인가". **컴포넌트는 이것만 쓴다** |
+| **CSS 변수** | CSS Custom Property | `--primary: #fff`로 정의하고 `var(--primary)`로 꺼내 쓰는 문법 |
+| **유틸리티 클래스** | Utility Class | Tailwind가 만드는 한 줄짜리 클래스. `bg-primary` |
+| **`@theme inline`** | — | CSS 변수를 Tailwind 유틸리티 클래스로 연결하는 블록. **빠뜨리면 클래스가 안 생긴다** |
+| **`baseColor`** | — | `init` 때 고르는 중립색(회색) 계열. 화면의 90%를 차지한다 |
+| **foreground** | — | 배경 위에 올라가는 것, 주로 글자색. 배경 토큰마다 짝으로 둔다 |
+| **파생** | Derived | 기준값 하나에서 계산으로 뽑아내는 것. `calc(var(--radius) * 0.6)` |
+| **스케일** | Scale | 값을 정해진 단계로만 쓰는 것. 간격을 4의 배수로만 쓰는 식 |
+| **하드코딩** | Hardcoding | 값을 이름 없이 코드에 직접 박는 것. `bg-[#18181b]` |
+| **프리셋** | Preset | 미리 만들어 둔 테마 한 벌 |
+
+## 컴포넌트
+
+| 용어 | 풀 이름 | 뜻 |
+|---|---|---|
+| **컴포넌트 라이브러리** | Component Library | UI 부품을 모아 놓은 패키지. 설치하면 `node_modules`에 들어간다 |
+| **프리미티브** | Primitive / Headless Component | 겉모습 없이 **동작만** 들어 있는 부품. 키보드·포커스·화면낭독기 담당 |
+| **variant** | 변형 | 같은 컴포넌트의 다른 성격. `default` / `outline` / `ghost` |
+| **`cn`** | class names | 클래스를 합치되 충돌하면 뒤쪽이 이기게 하는 도우미 함수 |
+| **`asChild` / `render`** | — | "내 태그를 대신 써 달라"는 합성 프롭. Radix는 `asChild`, Base UI는 `render` |
+| **`focus-visible`** | — | **키보드로 이동했을 때만** 반응하는 CSS 선택자. `focus`는 클릭에도 반응한다 |
+| **`currentColor`** | — | "지금 이 요소의 글자색". SVG 아이콘이 주변 색을 따라오게 하는 장치 |
+
+## 배포와 운영
+
+| 용어 | 풀 이름 | 뜻 |
+|---|---|---|
+| **레지스트리** | Registry | 컴포넌트·테마를 JSON으로 담아 둔 배포처 ([11장](/shadcn/11-registry/)) |
+| **업스트림** | Upstream | 내가 복사해 온 원본. 여기서는 shadcn/ui 공식 레지스트리 |
+| **드리프트** | Drift | 같은 컴포넌트가 앱마다 갈라져 결국 다른 물건이 되는 현상 |
+| **`--diff`** | — | 내 파일과 업스트림 최신본의 차이를 보여주는 옵션. **소유권 모델의 유일한 안전장치** |
+| **`registryDependencies`** | — | 함께 받아야 할 다른 레지스트리 항목 |
+| **`dependencies`** | — | 함께 설치할 npm 패키지 |
+| **모노레포** | Monorepo | 앱 여러 개를 한 저장소에서 관리하는 구조 |
+| **alias / 경로 별칭** | Path Alias | `../../../components` 대신 `@/components`로 쓰게 하는 설정 |
+
+## 그 밖
+
+| 용어 | 풀 이름 | 뜻 |
+|---|---|---|
+| **대비** | Contrast Ratio | 배경과 글자의 밝기 차이. 본문은 4.5:1 이상 ([10장](/shadcn/10-make-theme/#대비-검사하는-법)) |
+| **고도** | Elevation | 요소가 얼마나 떠 있어 보이는가. 그림자 세기로 표현 |
+| **줄 간격** | Line Height | 줄 사이 간격. 한글은 영문보다 넉넉해야 한다 |
+| **자간** | Letter Spacing | 글자 사이 간격. 한글은 좁히면 뭉개진다 |
+| **폴백** | Fallback | 지정한 것이 없을 때 대신 쓸 목록. 폰트에서 특히 중요 |
+| **서브셋** | Subset | 폰트에서 필요한 글자만 잘라낸 것. 한글 웹폰트의 필수 기법 |
+| **가변 폰트** | Variable Font | 파일 하나에 모든 굵기가 들어 있는 폰트 |
+| **하이드레이션** | Hydration | 서버가 만든 HTML에 브라우저가 JavaScript를 붙이는 과정 |
+| **`prefers-color-scheme`** | — | "기기가 다크 모드인가"를 알려주는 CSS 미디어 쿼리 |
+
+<LinkCard
+  title="13. 마무리"
+  description="한 장으로 압축한 요약과 다음에 볼 것들."
+  href="/shadcn/13-wrapup/"
+/>

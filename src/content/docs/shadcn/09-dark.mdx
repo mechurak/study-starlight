@@ -1,0 +1,244 @@
+---
+title: "9. 테마 두 벌 — 다크 모드"
+description: "같은 이름, 다른 값 — 그리고 첫 화면이 하얗게 번쩍이는 문제"
+---
+
+import { LinkCard, Steps, Tabs, TabItem } from '@astrojs/starlight/components';
+import TermIntro from '../../../components/TermIntro.astro';
+import ThemeCompare from '../../../components/ThemeCompare.astro';
+
+> 다크 모드는 **새 기능이 아니라 테마 한 벌을 더 갖는 것**이다.
+> 앞 장까지 제대로 했다면 값만 채우면 된다.
+
+<TermIntro
+  terms={[
+    ['`.dark` 클래스', '', 'shadcn/ui가 다크 모드를 켜는 방식. `<html>` 에 이 클래스가 붙으면 토큰 값이 다크 세트로 바뀐다.'],
+    ['`next-themes`', '', '다크 모드 상태를 관리하는 작은 라이브러리. 시스템 설정 따라가기, 선택 기억하기, 화면 번쩍임 방지를 해 준다.'],
+    ['하이드레이션', 'Hydration', '서버가 만든 HTML에 브라우저가 나중에 JavaScript를 붙여 살아 움직이게 하는 과정. 이 사이의 시차가 다크 모드 번쩍임의 원인이다.'],
+    ['`prefers-color-scheme`', '', '"사용자 기기가 다크 모드인가"를 알려주는 CSS 미디어 쿼리.'],
+  ]}
+/>
+
+## 원리 — 이름은 그대로, 값만 바뀐다
+
+```css
+:root {
+  --background: oklch(1 0 0);        /* 흰색 */
+  --foreground: oklch(0.145 0 0);    /* 거의 검정 */
+}
+
+.dark {
+  --background: oklch(0.145 0 0);    /* 같은 이름, 어두운 값 */
+  --foreground: oklch(0.985 0 0);
+}
+```
+
+```tsx
+{/* 컴포넌트는 하나도 안 바뀐다 */}
+<div className="bg-background text-foreground">
+```
+
+`<html class="dark">`가 붙는 순간 **CSS 변수 값이 전부 갈린다.**
+브라우저가 직접 하는 일이라 리렌더도, JavaScript도 필요 없다.
+
+아래 둘은 **같은 컴포넌트**다 — 값만 다르다.
+
+<ThemeCompare themes={['shadcn', 'dark']} labels={[':root 값 (라이트)', '.dark 값 — 마크업 동일']} compact />
+
+:::tip[핵심]
+컴포넌트 코드에 **`dark:` 변형이 거의 등장하지 않는 것**이 정상이다.
+`dark:bg-zinc-800` 같은 게 늘어나고 있다면 토큰을 안 쓰고 있다는 신호다.
+:::
+
+## 켜고 끄기 — `next-themes`
+
+```bash
+pnpm add next-themes
+```
+
+<Steps>
+
+1. **Provider로 감싼다**
+
+   ```tsx
+   // app/providers.tsx
+   'use client'
+   import { ThemeProvider } from 'next-themes'
+
+   export function Providers({ children }) {
+     return (
+       <ThemeProvider
+         attribute="class"        // .dark 클래스를 붙인다
+         defaultTheme="system"    // 기본은 기기 설정 따라가기
+         enableSystem
+         disableTransitionOnChange
+       >
+         {children}
+       </ThemeProvider>
+     )
+   }
+   ```
+
+2. **`<html>`에 `suppressHydrationWarning`을 준다**
+
+   ```tsx
+   // app/layout.tsx
+   <html lang="ko" suppressHydrationWarning>
+     <body><Providers>{children}</Providers></body>
+   </html>
+   ```
+
+   서버는 클래스가 없는 HTML을 만들고 브라우저가 나중에 붙이므로,
+   React가 "서버와 다르다"고 경고한다. **이 한 군데만** 경고를 끈다.
+
+3. **토글 버튼**
+
+   ```tsx
+   'use client'
+   import { useTheme } from 'next-themes'
+   import { Moon, Sun } from 'lucide-react'
+   import { Button } from '@/components/ui/button'
+
+   export function ThemeToggle() {
+     const { setTheme, resolvedTheme } = useTheme()
+     return (
+       <Button
+         variant="ghost"
+         size="icon"
+         aria-label="테마 전환"
+         onClick={() => setTheme(resolvedTheme === 'dark' ? 'light' : 'dark')}
+       >
+         <Sun className="size-4 dark:hidden" />
+         <Moon className="hidden size-4 dark:block" />
+       </Button>
+     )
+   }
+   ```
+
+</Steps>
+
+### 옵션 두 개의 의미
+
+- **`defaultTheme="system"` + `enableSystem`** — 기기가 다크면 다크로 시작한다.
+  사용자가 직접 고르면 그 선택이 기억되고, 그때부터 기기 설정을 무시한다
+- **`disableTransitionOnChange`** — 전환 순간에 CSS transition을 잠깐 끈다.
+  이게 없으면 색이 있는 요소 수십 개가 **제각각 다른 속도로 물드는** 어지러운 장면이 나온다
+
+## 화면이 하얗게 번쩍이는 문제
+
+가장 흔하게 겪는 증상이다. **다크 모드로 설정했는데 새로고침하면 흰 화면이 잠깐 보인다.**
+
+```mermaid
+flowchart LR
+    A["서버가 HTML 생성<br/>사용자 취향을 모른다<br/>= 라이트"] --> B["브라우저가 그린다<br/>흰 화면 ⚡"]
+    B --> C["JS 로드 · 하이드레이션"]
+    C --> D["localStorage 확인<br/>.dark 추가"]
+    D --> E["다크로 바뀐다"]
+
+    classDef bad  fill:#fee2e2,stroke:#dc2626,color:#7f1d1d
+    classDef ok   fill:#dcfce7,stroke:#16a34a,color:#14532d
+    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
+    class B bad
+    class E ok
+    class A,C,D mute
+```
+
+원인은 명확하다 — **서버는 사용자의 취향을 모른다.**
+사용자 선택은 브라우저의 `localStorage`에 있고, 서버는 그걸 읽을 수 없다.
+
+**해결은 `next-themes`가 이미 해 준다.** `<head>`에 아주 작은 스크립트를 넣어
+**React가 로드되기 전에** `localStorage`를 읽고 클래스를 붙인다.
+
+:::caution[함정]
+직접 `useState` + `useEffect`로 다크 모드를 만들면 **반드시 이 번쩍임이 생긴다.**
+`useEffect`는 첫 렌더 **이후에** 실행되기 때문이다.
+
+"간단한 기능인데 직접 만들지"가 잘 안 통하는 대표 사례다. `next-themes`를 쓴다.
+:::
+
+## 다크에서 실제로 깨지는 것들
+
+토큰을 잘 썼어도 이 넷은 따로 챙겨야 한다.
+
+<Tabs>
+<TabItem label="① 그림자가 안 보인다">
+
+어두운 배경 위의 검은 그림자는 **보이지 않는다.** 카드가 바탕에 붙어 보인다.
+
+```css
+:root { --card: oklch(1 0 0);    }  /* 라이트: 그림자로 띄운다 */
+.dark { --card: oklch(0.21 0 0); }  /* 다크: --background(0.145)보다 밝게 */
+```
+
+**다크에서는 밝기 차이로 고도를 표현한다.** ([5장](/shadcn/05-shape/#그림자--고도를-표현한다))
+
+</TabItem>
+<TabItem label="② 순수 검정은 눈이 아프다">
+
+`#000` 배경에 `#fff` 글자는 대비가 21:1로 너무 강해서 글자가 번져 보인다(헤일레이션).
+
+```css
+.dark {
+  --background: oklch(0.145 0 0);   /* 순수 검정이 아니다 */
+  --foreground: oklch(0.985 0 0);   /* 순수 흰색도 아니다 */
+}
+```
+
+shadcn 기본값이 이미 이렇게 돼 있다. **함부로 `#000`으로 바꾸지 않는다.**
+
+</TabItem>
+<TabItem label="③ 이미지와 로고">
+
+흰 배경을 전제로 만든 PNG 로고는 다크에서 흰 사각형이 된다.
+
+```tsx
+<img src="/logo-light.svg" className="dark:hidden" />
+<img src="/logo-dark.svg"  className="hidden dark:block" />
+```
+
+사진은 살짝 밝기를 낮추면 눈이 편해진다 — `dark:brightness-90`.
+
+</TabItem>
+<TabItem label="④ 채도가 높은 색">
+
+라이트에서 예쁘던 진한 파랑이 다크 배경에서는 **탁하고 안 읽힌다.**
+
+```css
+:root { --primary: oklch(0.45 0.22 264); }   /* 어둡고 진하게 */
+.dark { --primary: oklch(0.72 0.16 264); }   /* 밝게, 채도는 낮춰서 */
+```
+
+**다크에서는 밝기를 올리고 채도를 내린다.** `oklch`를 쓰면 숫자 두 개만 조정하면 된다.
+
+</TabItem>
+</Tabs>
+
+## 점검 목록
+
+새 화면을 만들 때 다크 모드에서 이 다섯 개만 확인하면 대부분 잡힌다.
+
+| 확인 | 흔한 원인 |
+|---|---|
+| 카드가 배경과 구분되는가 | `--card`를 `--background`와 같게 뒀다 |
+| 글자가 다 읽히는가 | `text-white`, `text-zinc-600` 같은 하드코딩 |
+| 테두리가 보이는가 | `--border`가 배경과 너무 비슷하다 |
+| 로고·이미지가 멀쩡한가 | 흰 배경 전제 PNG |
+| 새로고침해도 안 번쩍이는가 | `next-themes` 없이 직접 구현 |
+
+**두 번째가 압도적으로 많다.** 다크 모드 버그의 대부분은 결국 토큰을 안 쓴 자리다.
+
+## 9장 요약
+
+- 다크 모드는 **테마 한 벌을 더 갖는 것**이다. `:root`와 `.dark`에 같은 이름, 다른 값
+- 컴포넌트에 **`dark:` 변형이 늘고 있다면 토큰을 안 쓰고 있다는 신호**
+- `next-themes` + `attribute="class"` + `suppressHydrationWarning`이 표준 조합
+- `disableTransitionOnChange`를 켠다 — 없으면 전환이 어지럽다
+- **직접 만들면 화면이 번쩍인다.** 서버가 취향을 모르고, `useEffect`는 첫 렌더 이후라서
+- 다크에서 따로 챙길 것 넷 — **그림자 대신 밝기 차 · 순수 검정 금지 · 로고 교체 · 채도 낮추기**
+- 다크 버그의 대부분은 결국 **토큰을 안 쓴 자리**다
+
+<LinkCard
+  title="10. 내 테마 만들기"
+  description="브랜드 색 하나에서 시작해 완전한 테마 한 벌까지."
+  href="/shadcn/10-make-theme/"
+/>

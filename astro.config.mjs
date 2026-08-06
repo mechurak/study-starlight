@@ -142,6 +142,44 @@ export default defineConfig({
 							],
 						},
 						{
+							label: 'shadcn/ui',
+							link: '/shadcn/',
+							icon: 'puzzle',
+							items: [
+								'shadcn',
+								{
+									label: '준비',
+									items: ['shadcn/00-intro', 'shadcn/01-what-is-shadcn'],
+								},
+								{
+									label: '테마라는 그릇',
+									items: ['shadcn/02-theme', 'shadcn/03-setup'],
+								},
+								{
+									label: '리소스 하나씩',
+									items: [
+										'shadcn/04-color',
+										'shadcn/05-shape',
+										'shadcn/06-typography',
+										'shadcn/07-component',
+										'shadcn/08-icon-font',
+									],
+								},
+								{
+									label: '테마 다루기',
+									items: [
+										'shadcn/09-dark',
+										'shadcn/10-make-theme',
+										'shadcn/11-registry',
+									],
+								},
+								{
+									label: '마무리',
+									items: ['shadcn/12-glossary', 'shadcn/13-wrapup'],
+								},
+							],
+						},
+						{
 							label: 'Supabase',
 							link: '/supabase/',
 							icon: 'seti:db',

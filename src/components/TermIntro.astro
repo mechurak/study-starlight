@@ -1,0 +1,103 @@
+---
+/*
+  장 첫머리의 "처음 나오는 말" 상자.
+  이 덱의 약속 — 새 용어는 반드시 풀 이름과 "왜 필요한지"를 먼저 준다.
+
+  terms: [용어, 풀 이름(없으면 ''), 한 줄 설명][]
+*/
+interface Props {
+  title?: string;
+  terms: [string, string, string][];
+}
+const { title = '이 장에서 처음 나오는 말', terms } = Astro.props;
+
+// 설명은 평문이라 마크다운이 안 먹는다. `코드`와 **굵게**만 직접 처리한다.
+const escape = (s: string) =>
+  s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+const format = (s: string) =>
+  escape(s)
+    .replace(/`([^`]+)`/g, '<code>$1</code>')
+    .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+---
+
+<div class="terms">
+  <div class="terms__title">{title}</div>
+  <dl>
+    {terms.map(([word, full, desc]) => (
+      <div class="terms__row">
+        <dt>
+          <code>{word}</code>
+          {full && <span class="terms__full">{full}</span>}
+        </dt>
+        <dd set:html={format(desc)} />
+      </div>
+    ))}
+  </dl>
+</div>
+
+<style>
+  .terms {
+    margin: 1.2rem 0 1.6rem;
+    border: 1px solid var(--sl-color-gray-5, #d4d4d8);
+    border-left: 3px solid var(--sl-color-accent, #4f46e5);
+    border-radius: 0.4rem;
+    padding: 0.85rem 1rem 0.95rem;
+    background: var(--sl-color-gray-7, #f4f4f5);
+  }
+  :global([data-theme='dark']) .terms {
+    background: var(--sl-color-gray-6, #27272a);
+    border-color: var(--sl-color-gray-5, #3f3f46);
+  }
+  .terms__title {
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    opacity: 0.6;
+    margin-bottom: 0.6rem;
+  }
+  dl {
+    margin: 0;
+    display: grid;
+    gap: 0.55rem;
+  }
+  .terms__row {
+    display: grid;
+    grid-template-columns: minmax(9rem, 14rem) 1fr;
+    gap: 0.2rem 0.9rem;
+    align-items: baseline;
+  }
+  @media (max-width: 45rem) {
+    .terms__row {
+      grid-template-columns: 1fr;
+    }
+  }
+  dt {
+    margin: 0;
+    min-width: 0;
+  }
+  dt code {
+    font-size: 0.82rem;
+    font-weight: 600;
+    background: none;
+    padding: 0;
+    border: 0;
+    color: var(--sl-color-white);
+  }
+  .terms__full {
+    display: block;
+    font-size: 0.68rem;
+    opacity: 0.6;
+    line-height: 1.4;
+    margin-top: 0.05rem;
+  }
+  dd {
+    margin: 0;
+    font-size: 0.875rem;
+    line-height: 1.6;
+    min-width: 0;
+  }
+  dd :global(code) {
+    font-size: 0.85em;
+  }
+</style>
