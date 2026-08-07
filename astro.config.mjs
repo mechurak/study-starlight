@@ -217,6 +217,46 @@ export default defineConfig({
 							],
 						},
 						{
+							label: 'Keycloak',
+							link: '/keycloak/',
+							icon: 'seti:lock',
+							items: [
+								'keycloak',
+								{
+									label: '시작',
+									items: ['keycloak/00-intro', 'keycloak/01-why'],
+								},
+								{
+									label: '프로토콜',
+									items: ['keycloak/02-oauth-oidc'],
+								},
+								{
+									label: 'Keycloak 들여다보기',
+									items: [
+										'keycloak/03-structure',
+										'keycloak/04-ad-federation',
+										'keycloak/05-sessions',
+									],
+								},
+								{
+									label: '연동',
+									items: ['keycloak/06-k8s-oidc', 'keycloak/07-apps'],
+								},
+								{
+									label: '배포와 운영',
+									items: [
+										'keycloak/08-deploy',
+										'keycloak/09-ops',
+										'keycloak/10-troubleshooting',
+									],
+								},
+								{
+									label: '마무리',
+									items: ['keycloak/11-glossary', 'keycloak/12-wrapup'],
+								},
+							],
+						},
+						{
 							label: 'Supabase',
 							link: '/supabase/',
 							icon: 'seti:db',

@@ -1,0 +1,147 @@
+---
+title: "9. 운영 — 백업 · 업그레이드 · 키 관리"
+description: "원본은 DB — 백업과 복구, 업그레이드 순서, 서명 키 롤오버, 권한 위임, 가시성"
+---
+
+import { Steps, LinkCard } from '@astrojs/starlight/components';
+import TermIntro from '../../../components/TermIntro.astro';
+
+> 인증 인프라의 장애는 **다른 모든 시스템의 장애로 번역**된다 — 운영 루틴이 곧 전사 가용성이다
+
+<TermIntro
+  terms={[
+    ['realm export', '', 'realm 설정(client·매퍼·정책…)을 JSON으로 내보내는 기능. **구성의 스냅샷**이지 백업의 원본이 아니다.'],
+    ['키 롤오버', 'Key Rollover', '토큰 서명 키를 **서비스 중단 없이** 새 키로 교체하는 절차. 옛 키를 검증용으로 남겨 두는 겹침 구간이 핵심이다.'],
+    ['not-before 정책', 'not-before policy', '"이 시각 이전에 발급된 토큰은 전부 거부하라"는 회수 장치. 탈취 대응의 마지막 카드다.'],
+  ]}
+/>
+
+## 백업 — 원본은 DB, export는 보조
+
+[8장](/keycloak/08-deploy/)의 결론을 백업 정책으로 옮기면 이렇다 —
+
+| 대상 | 수단 | 성격 |
+|---|---|---|
+| **DB (PostgreSQL)** | pg_dump · Postgres Operator의 백업 기능 (WAL 아카이빙) | **원본.** realm·client·사용자·세션 전부 |
+| realm 설정 | `kc.sh export` (JSON) | 구성 스냅샷 — 리뷰·이관·재현용 |
+| 구성 코드 | kcadm 스크립트 · Terraform · Operator CR을 git에 | **의도의 기록** — 재현 가능한 구성 ([4장](/keycloak/04-ad-federation/)) |
+
+- 재해 복구의 기준은 **DB 복원**이다. export JSON만으로는 세션·오프라인 토큰·연동
+  상태까지 돌아오지 않는다
+- 콘솔의 partial export는 **client 시크릿이 빠질 수 있다** — "export 있으니 안심"이
+  가장 흔한 착각이다
+- 백업은 **복원 연습을 해 본 것만** 백업이다 — 분기마다 스테이징에 복원해 로그인까지 확인한다
+
+## 업그레이드 — 롤백 수단은 DB 백업뿐
+
+Keycloak은 분기마다 마이너 버전이 나온다. 절차의 골격 —
+
+<Steps>
+
+1. **DB 백업** — 새 버전이 스키마를 마이그레이션하면 **되돌리는 길은 백업 복원뿐**이다
+
+2. 릴리스 노트에서 **breaking change·deprecation** 확인 — 특히 옵션 이름 변경
+   (`KC_PROXY` → `KC_PROXY_HEADERS` 같은 사례가 실제로 있었다)
+
+3. **스테이징에서 먼저** — 핵심 시나리오 세 개면 충분하다: 브라우저 로그인,
+   kubectl 로그인, AD sync
+
+4. 적용 — 패치 버전은 26.2부터 **롤링 업데이트**가 지원된다 (Operator의 update 전략이
+   호환성을 확인). 마이너 업그레이드는 짧은 중단 창을 잡는 편이 안전하다
+
+5. 확인 — 버전, `/health/ready`, 로그인 이벤트 정상 유입
+
+</Steps>
+
+:::caution[함정]
+**버전을 몇 개씩 건너뛰어 미루지 않는다.** 마이그레이션 경로가 길어질수록
+breaking change가 겹치고, 문제가 생겼을 때 어느 버전 탓인지 가릴 수 없게 된다.
+분기 릴리스를 작게 따라가는 쪽이 총비용이 싸다.
+:::
+
+## 서명 키 관리 — 무중단 롤오버
+
+토큰 서명 키도 수명이 있다 — 유출 대비, 규정, 알고리즘 세대 교체.
+교체를 "옛 키 삭제 + 새 키 생성"으로 하면 **아직 안 만료된 모든 토큰이 즉사**한다.
+올바른 절차는 겹침 구간을 두는 것이다.
+
+<Steps>
+
+1. **Realm settings → Keys**에서 새 키를 **더 높은 priority로 추가** —
+   이후 발급되는 토큰은 새 키로 서명된다
+
+2. 옛 키는 **active를 끄되 남겨 둔다** — 이미 발급된 토큰의 검증용.
+   JWKS에는 두 키가 같이 공개되고, 검증자는 토큰 헤더의 `kid`로 맞는 키를 고른다 ([2장](/keycloak/02-oauth-oidc/))
+
+3. 옛 키로 서명된 토큰·세션이 **모두 만료될 때까지 기다린 뒤** (offline token 주의 — [5장](/keycloak/05-sessions/)) 옛 키를 제거한다
+
+</Steps>
+
+:::tip[검증자의 캐시]
+앱·API 서버는 JWKS를 캐시한다. 대부분 모르는 `kid`를 만나면 다시 내려받게 구현돼
+있어 롤오버가 자연스럽게 흡수되지만, **JWKS를 파일로 박아 둔 연동**(캐시 갱신 없음)이
+하나라도 있으면 거기서만 검증이 깨진다 — 연동 목록에 그런 예외가 있는지 파악해 둔다.
+:::
+
+### 유출 대응 — 회수의 도구들
+
+| 상황 | 도구 |
+|---|---|
+| 사용자 계정 탈취 | AD 비활성화 + 세션 강제 종료 + offline token 회수 ([5장](/keycloak/05-sessions/)) |
+| client 시크릿 유출 | Clients → Credentials → **Regenerate** |
+| 서명 키 유출 | 즉시 키 롤오버 (겹침 없이 — 이때는 토큰 즉사가 목적이다) |
+| 범위를 모를 때 | **not-before 정책** — Sessions → Revocation → Set to now: 그 시각 이전 토큰 전부 거부 |
+
+## 관리 권한 위임 — master는 금고에
+
+[3장](/keycloak/03-structure/)에서 master realm에 앱을 붙이지 않기로 했다. 같은 원리로
+**사람에게도 master 계정을 남발하지 않는다.** 업무 realm 안에는 `realm-management`라는
+내장 client가 있고, 그 client의 롤이 곧 관리 권한의 낱개 단위다.
+
+| realm-management 롤 | 허용 범위 | 어울리는 대상 |
+|---|---|---|
+| `realm-admin` | 그 realm의 전부 | realm 담당 관리자 |
+| `manage-users` | 사용자·그룹 관리 | 헬프데스크 (계정 잠금 해제, 세션 종료) |
+| `view-users` · `view-clients` | 조회만 | 감사·보안팀 |
+| `manage-clients` | client 등록·수정 | 플랫폼팀 |
+
+헬프데스크에 `manage-users`만 주면 "비밀번호 초기화해 주세요" 업무가
+master 계정 공유 없이 돌아간다 — **권한도 앱과 같은 원리로, 필요한 만큼만.**
+
+## 가시성 — 이벤트 · 메트릭 · 로그
+
+| 채널 | 켜는 곳 | 보는 것 |
+|---|---|---|
+| **로그인 이벤트** | Realm settings → **User events** (기본 꺼짐!) | 누가 언제 로그인·실패했나. 보존 기간 설정 |
+| **관리 이벤트** | Realm settings → **Admin events** | 누가 설정을 바꿨나 — 감사의 핵심 |
+| 메트릭 | `KC_METRICS_ENABLED` → 관리 포트 9000 `/metrics` | Prometheus 포맷 — 로그인 성공/실패율, 응답 시간, JVM |
+| 로그 | `KC_LOG_LEVEL` (예: `info,org.keycloak.events:debug`) | 트러블슈팅 시 카테고리별 상향 ([10장](/keycloak/10-troubleshooting/)) |
+
+:::caution[함정]
+이벤트 로깅이 **기본으로 꺼져 있다.** 사고가 난 뒤에 켜면 과거는 없다 —
+구축 첫 주에 User events·Admin events를 켜고 보존 기간을 정하는 것까지가 설치다.
+:::
+
+## 운영 루틴 요약
+
+| 주기 | 할 일 |
+|---|---|
+| 상시 (알림) | 로그인 실패율 급증, `/health` 실패, DB 용량, **인증서 만료 임박** (LDAPS·TLS) |
+| 주간 | AD sync 상태·오류 로그 확인, 관리 이벤트 리뷰 |
+| 분기 | 버전 업그레이드, **백업 복원 연습**, client 목록 정리 (안 쓰는 client·시크릿 폐기) |
+| 연간 | 서명 키 롤오버, bind 계정 비밀번호 교체, 권한 위임 목록 재검토 |
+
+## 9장 요약
+
+- 백업의 원본은 **DB**다 — export는 구성 스냅샷일 뿐이고, 복원 연습까지가 백업이다
+- 업그레이드는 **DB 백업 → 릴리스 노트 → 스테이징 → 적용** — 롤백 수단은 백업 복원뿐, 작게 자주 따라간다
+- 키 교체는 **겹침 구간을 둔 롤오버** — 새 키 우선순위 ↑, 옛 키는 검증용으로 잔류, 만료 후 제거
+- 회수 도구 네 층: 세션 종료 · 시크릿 재생성 · 키 롤오버 · **not-before 정책**
+- 관리 권한은 **realm-management 롤로 낱개 위임** — master 계정은 금고에
+- **이벤트 로깅은 기본 꺼짐** — 켜는 것까지가 설치다. 메트릭은 관리 포트 9000
+
+<LinkCard
+  title="10. 트러블슈팅"
+  description="어느 경계에서 끊겼나 — 진단 순서와 증상별 처방전."
+  href="/keycloak/10-troubleshooting/"
+/>

@@ -1,0 +1,160 @@
+---
+title: "7. 앱을 SSO에 붙이는 세 패턴"
+description: "OIDC를 아는 앱, 모르는 앱, 우리가 만든 앱 — oauth2-proxy와 client 등록 체크리스트"
+---
+
+import { Card, CardGrid, LinkCard } from '@astrojs/starlight/components';
+import TermIntro from '../../../components/TermIntro.astro';
+
+> "이 앱 SSO 붙여 주세요"가 오면 첫 질문은 하나다 — **그 앱이 OIDC를 말할 줄 아는가**
+
+<TermIntro
+  terms={[
+    ['oauth2-proxy', '', 'OIDC 로그인을 대신 처리해 주는 리버스 프록시. 인증을 통과한 요청만 뒤의 앱으로 흘려보내는 **인증 게이트**다.'],
+    ['auth_request', '', 'ingress-nginx의 기능 — 요청을 백엔드로 보내기 전에 **다른 서버(oauth2-proxy)에 인증 여부를 물어보는** 서브요청.'],
+    ['X-Forwarded 헤더', '', '프록시가 뒤의 앱에 "확인된 사용자 정보"를 전달하는 HTTP 헤더 무리 (`X-Forwarded-User`, `-Email`, `-Groups` …).'],
+  ]}
+/>
+
+## 세 패턴 — 앱의 처지에 따라 갈린다
+
+<CardGrid>
+<Card title="① OIDC를 아는 앱" icon="approve-check">
+Grafana · Argo CD · Harbor처럼 **OIDC 설정 칸이 있는** 앱.
+client를 등록하고 앱 설정에 issuer·client ID·시크릿을 넣으면 끝.
+가장 깔끔한 경로다.
+</Card>
+<Card title="② OIDC를 모르는 앱" icon="warning">
+인증 개념이 아예 없는 사내 도구, 손 못 대는 레거시.
+**앞에 oauth2-proxy를 세워** 인증을 통과한 요청만 들여보낸다.
+앱은 헤더로 사용자 이름만 받는다.
+</Card>
+<Card title="③ 우리가 만드는 앱" icon="pencil">
+OIDC 라이브러리를 붙여 **직접 client가 된다.**
+scope·claim을 앱이 결정할 수 있는 유일한 패턴.
+토큰 검증 책임도 앱이 진다 (2장).
+</Card>
+</CardGrid>
+
+어느 패턴이든 Keycloak 쪽 작업은 같다 — **client 등록.** 패턴 ②의 특수성은
+client가 앱이 아니라 oauth2-proxy라는 점이다 (아래 함정).
+
+## client 등록 체크리스트 — 패턴 공통
+
+| 항목 | 기준 | 이유 |
+|---|---|---|
+| **앱 하나 = client 하나** | 시크릿 공유·재활용 금지 | 감사 분리, 개별 회수, redirect URI 격리 ([3장](/keycloak/03-structure/)) |
+| **Client type** | 서버 있으면 confidential, SPA·CLI는 public + PKCE | 시크릿을 숨길 수 있는가로 판단 ([2장](/keycloak/02-oauth-oidc/)) |
+| **Valid redirect URIs** | 정확한 URL로, 좁게. 와일드카드는 경로 끝에만 | 느슨하면 토큰 탈취 경로가 된다 |
+| **scope** | 필요한 것만 (`openid profile email groups`) | 토큰 비대화 방지 |
+| **claim 합의** | 앱이 기대하는 claim 이름·형식을 **먼저** 확인 | `groups` vs `roles`, 배열 vs 문자열, full path — 어긋나면 인가가 빈다 |
+| service account | 안 쓰면 끈다 | 공격면 축소 |
+
+패턴 ①의 예 — Grafana라면 앱 쪽 설정은 대략 이 정도로 끝난다:
+
+```ini
+[auth.generic_oauth]
+enabled = true
+auth_url  = https://keycloak.corp.com/realms/corp/protocol/openid-connect/auth
+token_url = https://keycloak.corp.com/realms/corp/protocol/openid-connect/token
+api_url   = https://keycloak.corp.com/realms/corp/protocol/openid-connect/userinfo
+client_id = grafana
+client_secret = (시크릿)
+scopes = openid profile email groups
+# groups claim으로 Grafana 역할을 정하는 매핑식
+role_attribute_path = contains(groups[*], 'platform-admin') && 'Admin' || 'Viewer'
+```
+
+앱마다 이름은 달라도 구조는 같다 — **issuer(또는 엔드포인트들) + client ID/시크릿 +
+claim → 앱 내 역할 매핑.** 첫 두 줄은 discovery 문서([2장](/keycloak/02-oauth-oidc/))에서 그대로 나온다.
+
+## 패턴 ② — oauth2-proxy 해부
+
+oauth2-proxy를 끼우는 방식은 둘이고, 이 구분이 이후 모든 혼란의 출발점이다.
+
+```mermaid
+flowchart TB
+    subgraph A["모드 A — ingress에 인증만 위임 (auth_request)"]
+        a1["요청"] --> a2["ingress-nginx"]
+        a2 -.->|"서브요청: 인증됐나?"| a3["oauth2-proxy"]
+        a2 -->|"통과 시 그대로"| a4["앱"]
+    end
+    subgraph B["모드 B — oauth2-proxy가 직접 프록시 (--upstream)"]
+        b1["요청"] --> b2["oauth2-proxy<br/>인증 + 라우팅"] --> b3["앱"]
+    end
+
+    classDef key  fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
+    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
+    class a3,b2 key
+    class a1,a2,a4,b1,b3 mute
+```
+
+| | 모드 A (annotation) | 모드 B (`--upstream`) |
+|---|---|---|
+| oauth2-proxy 위치 | 트래픽 **옆** — 인증 판정만 | 트래픽 **위** — 직접 프록시 |
+| 라우팅 주체 | ingress-nginx | oauth2-proxy 자신 (host는 안 보고 **path만** 본다) |
+| 어떻게 붙나 | ingress **annotation** 3종 (`auth-url` · `auth-signin` · `auth-response-headers`) | 기동 플래그 / 설정 파일 |
+| 헤더 전달 | `--set-xauthrequest` + annotation에 헤더 나열 | `--pass-user-headers` 등 요청에 직접 부착 |
+| 어울리는 곳 | ingress 라우팅을 이미 쓰는 클러스터 — **ingress별로 선택 적용** 가능 | ingress 없는 단순 구성, path 분기까지 맡기고 싶을 때 |
+
+:::caution[함정 1 — OIDC client는 oauth2-proxy다]
+이 구조에서 Keycloak에 등록된 client는 **oauth2-proxy 하나**다. 뒤의 앱은
+Keycloak에 등록조차 안 된 소비자라 **scope를 결정할 권한이 없다.**
+"우리 앱에 claim 하나만 추가해 주세요"는 앱 설정이 아니라
+**oauth2-proxy의 `--scope`와 그 client의 매퍼**를 고치는 일이다.
+:::
+
+:::caution[함정 2 — 헤더 신뢰의 전제는 위조 차단]
+앱이 `X-Forwarded-User`를 믿으려면 그 헤더가 **오직 oauth2-proxy를 거쳐야만**
+도달한다는 보장이 필요하다. 앱의 Service가 클러스터 안에서 직접 호출될 수 있으면,
+같은 이름의 헤더를 붙여 **인증을 통째로 우회**할 수 있다.
+NetworkPolicy로 앱 Pod의 인입을 프록시(또는 ingress)로 제한한다 ([CKA 덱 12장](/cka/12-networkpolicy/)).
+:::
+
+:::caution[함정 3 — 헤더는 고정 세트다]
+oauth2-proxy가 헤더로 주는 것은 user·email·preferred username·groups 정도로
+**정해져 있다.** `X-Forwarded-Department` 같은 임의 claim 헤더는 없다 —
+임의 claim이 필요하면 토큰 원본을 내려받아 (`--pass-access-token`)
+**앱이 JWT를 디코드**해야 한다. 그 순간 앱의 책임(JWKS 재검증, 로그 마스킹)도 생긴다.
+:::
+
+## "claim이 앱까지 안 와요" — 다섯 고리 점검
+
+패턴 ②에서 특정 값(그룹, 부서명)이 앱에 도달하려면 **다섯 고리**가 다 이어져야 한다.
+어디서 끊겼는지 순서대로 본다 — [1장의 두 경계](/keycloak/01-why/)에 oauth2-proxy 구간이 더해진 사슬이다.
+
+| # | 고리 | 확인 위치 | 도구 |
+|---|---|---|---|
+| ① | AD에 값 존재 + bind 계정 읽기 권한 | AD | AD 관리팀 |
+| ② | LDAP 매퍼 (AD → Keycloak) | User federation | [4장](/keycloak/04-ad-federation/) |
+| ③ | protocol mapper + scope (→ 토큰) | oauth2-proxy client의 매퍼 | **Evaluate** ([3장](/keycloak/03-structure/)) |
+| ④ | oauth2-proxy가 전달 | `--scope` · `--pass-*` / `--set-*` 플래그 | Deployment args 확인 |
+| ⑤ | 앱이 읽기 | 앱 설정 — 헤더 이름 / 디코드 | 앱 로그 |
+
+:::tip[진단 순서]
+가운데(③)부터 가른다 — Evaluate에서 토큰에 보이면 ①②는 무죄고 ④⑤만 보면 된다.
+안 보이면 ②③ 쪽이다. 절반씩 자르는 이분 탐색이 다섯 고리를 다 뒤지는 것보다 빠르다.
+:::
+
+## 로그아웃은 세 층이다
+
+패턴 ②의 로그아웃은 쿠키가 세 층이라는 점을 알아야 한다 —
+**앱 자체 세션**(있다면) + **oauth2-proxy의 암호화 쿠키** + **Keycloak SSO 세션.**
+oauth2-proxy의 `/oauth2/sign_out`은 자기 쿠키만 지운다 — Keycloak 세션이 살아 있으면
+다음 방문에 자동 재로그인된다. 전체 로그아웃은 `/oauth2/sign_out?rd=(Keycloak 로그아웃 URL)`
+처럼 이어 붙여야 한다 ([5장](/keycloak/05-sessions/)).
+
+## 7장 요약
+
+- 첫 질문은 **"앱이 OIDC를 아는가"** — 알면 client 등록으로 끝(①), 모르면 oauth2-proxy(②), 직접 만들면 앱이 client(③)
+- 어느 패턴이든 **앱 하나 = client 하나**, redirect URI는 좁게, claim 합의는 연동 전에
+- oauth2-proxy 모드 둘: **A는 ingress 옆에서 판정만, B는 트래픽 위에서 직접 프록시** — path만 본다
+- 패턴 ②의 client는 oauth2-proxy다 — **scope 결정권은 앱에 없다**
+- `X-Forwarded-*` 신뢰는 **NetworkPolicy로 우회 경로를 막았을 때만** 성립한다
+- claim 전달은 다섯 고리 — **Evaluate로 가운데부터 이분 탐색**한다
+
+<LinkCard
+  title="8. 온프렘 k8s에 Keycloak 배포"
+  description="Operator vs Helm, production 모드, DB, 그리고 HA — Keycloak 자체를 돌리는 일."
+  href="/keycloak/08-deploy/"
+/>

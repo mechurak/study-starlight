@@ -1,0 +1,218 @@
+---
+title: "6. 쿠버네티스 API 서버와 OIDC"
+description: "kubectl을 SSO로 — 인증서 kubeconfig의 한계, AuthenticationConfiguration, kubelogin, RBAC 매핑"
+---
+
+import { Steps, Tabs, TabItem, LinkCard } from '@astrojs/starlight/components';
+import TermIntro from '../../../components/TermIntro.astro';
+
+> 인증서는 발급은 쉽고 **회수가 불가능**하다 — OIDC 연동이 푸는 문제가 정확히 이것이다
+
+<TermIntro
+  terms={[
+    ['kubelogin', '', 'kubectl의 OIDC 로그인 플러그인 (`kubectl oidc-login`). 브라우저를 열어 Keycloak 로그인을 받고, 토큰을 캐시하고, 만료되면 조용히 갱신한다.'],
+    ['AuthenticationConfiguration', '', 'kube-apiserver의 인증 설정을 **구조화된 파일**로 주는 방식. 1.34에서 GA — 플래그 나열 방식(--oidc-*)의 후계자다.'],
+    ['claim mapping', '', '토큰의 claim을 쿠버네티스의 사용자 이름·그룹으로 **바꿔 읽는 규칙**. 여기서 만든 그룹 이름이 RBAC 바인딩의 대상이 된다.'],
+    ['exec plugin', '', 'kubeconfig가 "토큰이 필요하면 이 명령을 실행해서 받아라"라고 외부 프로그램에 위임하는 방식. kubelogin이 이걸로 붙는다.'],
+  ]}
+/>
+
+## 문제 — 인증서 kubeconfig는 회수가 안 된다
+
+CKA에서 배우는 사용자 발급 절차 — CSR 제출, 승인, 인증서 추출, kubeconfig 배포
+([CKA 덱 14장](/cka/14-rbac/)) — 를 사내에서 그대로 쓰면 곧 이런 벽을 만난다.
+
+| 통증 | 왜 |
+|---|---|
+| **회수가 불가능하다** | 쿠버네티스는 인증서 폐기 목록(CRL)을 **지원하지 않는다.** 퇴사자의 kubeconfig는 인증서 만료일까지 유효하다 |
+| 발급이 수작업이다 | 입사자마다 CSR 승인·배포를 누군가 해야 한다 |
+| 그룹 변경이 재발급이다 | 그룹은 인증서 O 필드에 구워진다 — 팀 이동 = 인증서 재발급 |
+| MFA·감사가 없다 | 누가 언제 인증했는지 남지 않고, MFA를 끼울 자리도 없다 |
+
+OIDC 연동은 이 넷을 한 번에 바꾼다: kubectl이 **Keycloak에서 짧은 토큰**을 받아 오고,
+API 서버는 서명만 검증한다. 회수는 AD 비활성화·세션 종료로 중앙에서 되고,
+그룹은 로그인할 때마다 토큰에 **현재 상태로** 실려 온다.
+
+## 전체 그림
+
+```mermaid
+sequenceDiagram
+    participant U as kubectl + kubelogin
+    participant K as Keycloak
+    participant A as kube-apiserver
+
+    U->>K: 브라우저 열어 로그인 (Authorization Code + PKCE)
+    K-->>U: ID token (groups claim 포함)
+    U->>A: 요청 + Bearer ID token
+    A->>A: JWKS로 서명 검증 · iss/aud/exp 확인
+    A->>A: claim → 사용자명·그룹 매핑
+    A->>A: RBAC 판정 (그룹 기준)
+    A-->>U: 응답
+    Note over U: 토큰 캐시 · 만료 시 자동 갱신
+```
+
+API 서버는 Keycloak에 **물어보러 가지 않는다** — 공개키(JWKS)로 서명을 검증할 뿐이다.
+단 한 가지 예외가 기동·갱신 시 JWKS를 내려받는 것이고, 그래서 **API 서버에서
+Keycloak URL이 열려 있고 인증서가 신뢰돼야** 한다 (아래 함정).
+
+## Keycloak 쪽 준비 — client 하나와 매퍼 둘
+
+<Steps>
+
+1. **client 등록** — `kubernetes`, **public + PKCE** (kubectl은 시크릿을 숨길 곳이 없다).
+   Valid redirect URIs에 kubelogin의 콜백 `http://localhost:8000`, `http://localhost:18000` 추가
+
+2. **groups 매퍼** — Group Membership protocol mapper, claim 이름 `groups`,
+   **Full group path는 off** (경로 `/eng/dev-team`보다 평평한 이름이 RBAC 바인딩에 다루기 쉽다)
+
+3. **(선택) audience 확인** — API 서버는 ID token의 `aud`가 자기 설정과 일치하는지 본다.
+   kubelogin이 받는 ID token의 `aud`는 client ID(`kubernetes`)라 보통 그대로 맞는다
+
+</Steps>
+
+:::caution[함정 — 평평화 매퍼]
+Keycloak의 **롤**은 토큰에 `realm_access.roles`(중첩)로 실리는데, API 서버의
+groups claim은 **최상위의 평평한 배열**을 기대한다. 롤 기반으로 가려면 User Realm Role
+매퍼로 평평한 claim(예: `roles`, Multivalued on)을 따로 만들어 그걸 가리켜야 한다.
+그룹 기반(`groups` claim)이면 이 문제가 없다 — 사내 AD 그룹과도 자연스럽게 이어진다 ([4장](/keycloak/04-ad-federation/)).
+:::
+
+## API 서버 쪽 설정 — 두 세대
+
+<Tabs>
+<TabItem label="AuthenticationConfiguration (1.34 GA, 권장)">
+
+파일 하나로 선언하고 `--authentication-config=/etc/kubernetes/auth/oidc.yaml`로 가리킨다.
+
+```yaml
+apiVersion: apiserver.config.k8s.io/v1
+kind: AuthenticationConfiguration
+jwt:
+- issuer:
+    url: https://keycloak.corp.com/realms/corp
+    audiences: ["kubernetes"]
+    certificateAuthority: |
+      -----BEGIN CERTIFICATE-----
+      (사내 CA PEM)
+      -----END CERTIFICATE-----
+  claimMappings:
+    username:
+      claim: preferred_username
+      prefix: "oidc:"
+    groups:
+      claim: groups
+      prefix: "oidc:"
+```
+
+- **복수 issuer**를 나란히 등록할 수 있고 (IdP 이관기에 유용), CEL(Common Expression
+  Language) 식으로 claim 검증·변환 규칙도 쓸 수 있다
+- **파일을 고치면 API 서버 재시작 없이 리로드**된다 — 플래그 세대와의 큰 운영 차이
+- kubeadm 클러스터면 static Pod 매니페스트(`/etc/kubernetes/manifests/kube-apiserver.yaml`)에
+  이 파일과 CA가 담긴 디렉터리의 **hostPath 마운트**를 함께 추가한다
+
+</TabItem>
+<TabItem label="--oidc-* 플래그 (구식)">
+
+1.29 이전부터 쓰던 방식. 아직 널리 돌아가지만 신규 구성이면 위를 쓴다.
+
+| 플래그 | 뜻 |
+|---|---|
+| `--oidc-issuer-url` | realm URL — 토큰의 `iss`와 정확히 일치해야 |
+| `--oidc-client-id` | 기대하는 `aud` |
+| `--oidc-username-claim` | 사용자명으로 쓸 claim (기본 `sub`) |
+| `--oidc-groups-claim` | 그룹으로 쓸 claim |
+| `--oidc-username-prefix` / `--oidc-groups-prefix` | 접두사 (아래) |
+| `--oidc-ca-file` | Keycloak 인증서의 CA |
+
+플래그를 바꾸면 **API 서버 재시작**이다. `--authentication-config`와는 동시에 못 쓴다.
+
+</TabItem>
+</Tabs>
+
+:::caution[함정 — prefix 없이 그룹을 매핑하지 않는다]
+prefix가 없으면 Keycloak의 그룹 이름이 그대로 쿠버네티스 그룹이 된다.
+누군가 AD에 `system:masters`라는 그룹을 만들면 **그 그룹원 전원이 인증서 없이
+클러스터 최고 권한**을 갖는다. `oidc:` 같은 prefix로 이름 공간을 갈라 두면
+`oidc:system:masters`가 될 뿐이라 무해하다. username에도 같은 이유로 건다.
+:::
+
+## kubectl 쪽 — kubelogin
+
+[krew](/cka/03-kubectl/)로 설치하고, kubeconfig의 user를 exec plugin으로 정의한다.
+
+```bash
+kubectl krew install oidc-login
+```
+
+```yaml
+# kubeconfig
+users:
+- name: keycloak
+  user:
+    exec:
+      apiVersion: client.authentication.k8s.io/v1beta1
+      command: kubectl
+      args:
+      - oidc-login
+      - get-token
+      - --oidc-issuer-url=https://keycloak.corp.com/realms/corp
+      - --oidc-client-id=kubernetes
+      - --oidc-use-pkce
+```
+
+- 첫 kubectl 실행 때 브라우저가 열려 Keycloak 로그인(AD 자격 + MFA)을 받는다.
+  이후는 캐시된 토큰을 쓰고, 만료되면 refresh token으로 **조용히 갱신**된다 —
+  Access Token Lifespan이 5분이어도 사용자는 못 느낀다 ([5장](/keycloak/05-sessions/))
+- 브라우저가 없는 서버에서는 `--grant-type=device-code`로 Device Authorization
+  흐름([2장](/keycloak/02-oauth-oidc/))을 쓴다 — 코드를 자기 PC 브라우저에서 승인
+- 이 kubeconfig에는 **비밀이 없다** — 전 직원에게 같은 파일을 배포해도 된다.
+  신원은 각자의 로그인이 정한다
+
+## RBAC 매핑 — 여기부터는 아는 길
+
+인증이 끝나면 사용자는 `oidc:jdoe`, 그룹 `oidc:platform-admin` 같은 문자열이 된다.
+이후는 CKA에서 배운 그대로 — 문자열에 바인딩을 건다 ([CKA 덱 14장](/cka/14-rbac/)).
+
+```yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: platform-admins
+subjects:
+- kind: Group
+  name: oidc:platform-admin        # prefix + groups claim의 값
+  apiGroup: rbac.authorization.k8s.io
+roleRef:
+  kind: ClusterRole
+  name: cluster-admin
+  apiGroup: rbac.authorization.k8s.io
+```
+
+이 한 벌로 **"AD 그룹 = 클러스터 권한"** 이 완성된다: AD에서 `Platform-Admin` 그룹에
+넣으면 클러스터 관리자가 되고, 빼면 다음 토큰부터 권한이 사라진다.
+개별 사용자 바인딩(`kind: User`)도 되지만, 운영은 그룹 바인딩으로 몰아야
+입퇴사·이동이 AD 작업만으로 끝난다.
+
+## 운영 함정 셋
+
+| 함정 | 내용 | 대비 |
+|---|---|---|
+| **API 서버 → Keycloak 도달성** | API 서버가 issuer URL에 접속해 JWKS를 가져와야 한다. Keycloak이 **같은 클러스터 안**에 있으면 외부 도메인이 안에서 안 풀리는 문제가 흔하다 | 클러스터 안에서도 issuer 도메인이 풀리게 (CoreDNS rewrite 등) + 사내 CA를 `certificateAuthority`에 |
+| **Keycloak 장애 = 로그인 장애** | Keycloak이 죽으면 새 토큰 발급이 안 된다 — 클러스터를 고치러 들어갈 수단도 같이 죽는다 | **break-glass**: 인증서 기반 admin kubeconfig를 금고에 따로 보관. OIDC와 인증서 인증은 공존한다 |
+| **issuer 불일치** | 토큰의 `iss`는 Keycloak의 hostname 설정에서 나온다. 설정과 실제 접속 도메인이 다르면 검증이 전부 실패 | `KC_HOSTNAME`을 고정하고 ([8장](/keycloak/08-deploy/)), discovery 문서의 `issuer` 값 확인 ([10장](/keycloak/10-troubleshooting/)) |
+
+## 6장 요약
+
+- 인증서 kubeconfig의 근본 한계는 **회수 불가**(CRL 없음) — OIDC는 짧은 토큰 + 중앙 회수로 푼다
+- API 서버는 Keycloak에 물어보지 않는다 — **JWKS 서명 검증**뿐. 대신 issuer 도달성·CA 신뢰가 전제
+- 설정은 **AuthenticationConfiguration 파일**(1.34 GA)이 현재 방식 — 재시작 없는 리로드, 복수 issuer, CEL
+- **prefix(`oidc:`)는 보안 장치다** — `system:` 이름 공간 위조를 막는다. username·groups 둘 다
+- kubectl은 **kubelogin exec plugin** — kubeconfig에 비밀이 없어 전 직원 공통 배포가 된다
+- RBAC은 **그룹 바인딩으로** — AD 그룹 변경만으로 클러스터 권한이 따라온다
+- **break-glass 인증서 kubeconfig를 남겨 둔다** — Keycloak 장애가 클러스터 접근 불능이 되지 않게
+
+<LinkCard
+  title="7. 앱을 SSO에 붙이는 세 패턴"
+  description="OIDC를 아는 앱, 모르는 앱, 우리가 만든 앱 — 각각의 연동 경로."
+  href="/keycloak/07-apps/"
+/>

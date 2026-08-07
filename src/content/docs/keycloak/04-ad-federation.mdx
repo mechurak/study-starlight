@@ -1,0 +1,247 @@
+---
+title: "4. AD 연동 — User Federation"
+description: "AD를 사용자 저장소로 빌려 쓰기 — LDAP 프로바이더 설정, 매퍼, 동기화, kcadm 자동화"
+---
+
+import { Steps, Tabs, TabItem, LinkCard } from '@astrojs/starlight/components';
+import TermIntro from '../../../components/TermIntro.astro';
+
+> 비밀번호는 가져오지 않는다 — **검증을 AD에 위임**할 뿐이다
+
+<TermIntro
+  terms={[
+    ['User Federation', '', 'Keycloak이 사용자를 직접 만들지 않고 **외부 저장소(AD/LDAP)를 빌려 쓰는** 기능. 경계 ①의 이름.'],
+    ['DN', 'Distinguished Name', 'AD 객체의 고유 경로. `CN=John,OU=Users,DC=corp,DC=com` — 파일 절대경로와 비슷하되 **오른쪽이 뿌리**다.'],
+    ['sAMAccountName', 'Security Account Manager Account Name', '윈도우의 짧은 로그인 ID (`jdoe`). 도메인 안에서 유일하다.'],
+    ['UPN', 'User Principal Name', '이메일 모양의 로그인 ID (`jdoe@corp.com`). sAMAccountName과 둘 중 하나를 로그인 ID로 고른다.'],
+    ['objectGUID', '', 'AD 객체의 **변하지 않는** 고유 ID. 이름·부서가 바뀌어도 같은 사람임을 추적하는 열쇠.'],
+    ['LDAPS', 'LDAP over TLS', '암호화된 LDAP (포트 636). 평문 389는 bind 비밀번호가 그대로 네트워크에 노출된다.'],
+  ]}
+/>
+
+## 두 가지 연동 방식 — 페더레이션과 브로커링
+
+AD 계정으로 Keycloak에 로그인하게 하는 길은 둘이다. 무엇이 이미 있느냐로 갈린다.
+
+| | **User Federation (LDAP)** | **Identity Brokering** |
+|---|---|---|
+| 방식 | Keycloak이 AD에 **LDAP으로 직접** 붙는다 | Keycloak이 **다른 IdP**(ADFS·Entra ID)로 로그인을 넘긴다 |
+| 전제 | AD에 LDAP 접근 가능 | 이미 돌아가는 IdP가 따로 있음 |
+| 로그인 화면 | **Keycloak이** 띄운다 | 외부 IdP가 띄운다 (Keycloak은 중계) |
+| 그룹·속성 | LDAP 매퍼로 가져온다 | 외부 IdP의 토큰 claim에서 매핑한다 |
+| 콘솔 메뉴 | **User federation** | **Identity providers** |
+
+이 장은 전자 — 사내에 AD가 있고 Keycloak이 직접 붙는 구성 — 를 다룬다.
+한 줄 요약: **Keycloak은 사용자를 자기가 만들지 않고, AD를 사용자 저장소로 빌려 쓴다.**
+로그인 검증은 AD에 위임하고, 속성·그룹은 매퍼로 옮겨 온 뒤, 토큰에 실어 앱에 준다.
+
+### 인증은 누가 하나 — 비밀번호의 소재
+
+| | 어디서 |
+|---|---|
+| 비밀번호 **검증** | 로그인 때 Keycloak이 **그 사용자 자격으로 AD에 LDAP bind** — 성공하면 인증 OK |
+| 비밀번호 **저장** | **AD에만.** import를 켜도 비밀번호는 복제되지 않는다 |
+| 속성·그룹 | AD에서 읽어와 매퍼를 따라 Keycloak에 반영 |
+
+AD가 항상 인증의 진실이다 — AD에서 비밀번호를 바꾸거나 계정을 잠그면 그게 곧 적용된다
+(계정 상태 반영은 아래 MSAD 매퍼가 담당).
+
+## AD 용어 해부 — 설정 값을 읽기 위한 최소한
+
+LDAP 프로바이더 설정에는 `CN=…,OU=…,DC=…` 같은 값이 계속 나온다. 구조는 이렇다.
+
+```text
+CN=John Doe, OU=Users, OU=Seoul, DC=corp, DC=com
+└─ 객체 본인 ┘ └── 담긴 위치 (폴더) ──┘ └─ 도메인 corp.com ─┘
+```
+
+| 조각 | 풀이 | 뜻 | 비유 |
+|---|---|---|---|
+| **CN** | Common Name | 객체 자신의 이름 | 파일명 |
+| **OU** | Organizational Unit | 객체가 담긴 조직 단위 | 폴더 |
+| **DC** | Domain Component | 도메인을 점(.)으로 쪼갠 조각 | `corp.com` → `DC=corp,DC=com` |
+
+사용자·그룹 객체의 속성 중 연동에 쓰이는 것들 —
+
+| 속성 | 뜻 | 예 |
+|---|---|---|
+| `sAMAccountName` | 짧은 로그인 ID | `jdoe` |
+| `userPrincipalName` | 이메일 모양 로그인 ID | `jdoe@corp.com` |
+| `mail` | 이메일 주소 | `jdoe@corp.com` |
+| `objectGUID` | 불변 고유 ID | (16바이트 바이너리) |
+| `memberOf` | (사용자가) 속한 그룹들 | `CN=Dev-Team,OU=Groups,…` |
+| `member` | (그룹의) 구성원들 | 사용자 DN 목록 |
+
+## LDAP 프로바이더 설정
+
+콘솔에서 realm → **User federation → Add LDAP provider**. Vendor를
+**Active Directory**로 고르면 AD에 맞는 기본값이 채워진다 — 아래는 그 프리셋 기준이고,
+실제 값은 AD 관리팀에서 받는다.
+
+| 항목 | 의미 | AD에서 흔한 값 |
+|---|---|---|
+| **Connection URL** | AD 주소 | `ldaps://dc.corp.com:636` |
+| **Bind DN** | Keycloak이 AD를 읽을 **서비스 계정** | `CN=svc-keycloak,OU=Service,DC=corp,DC=com` |
+| **Bind credential** | 그 계정의 비밀번호 | (시크릿으로 관리) |
+| **Users DN** | 사용자 검색 시작 지점 | `OU=Users,DC=corp,DC=com` |
+| **Username LDAP attribute** | 로그인 ID로 쓸 속성 | `sAMAccountName` 또는 `userPrincipalName` |
+| **UUID LDAP attribute** | 불변 고유 ID | `objectGUID` |
+| **User object classes** | 사용자로 볼 객체 | `person, organizationalPerson, user` |
+
+:::caution[함정 1 — 평문 LDAP 금지]
+운영은 **`ldaps://`(636)** 이어야 한다. 평문 `ldap://`(389)은 bind 비밀번호가
+네트워크에 그대로 흐른다. AD 인증서가 사내 CA 서명이면 그 CA를 Keycloak의
+truststore에 넣어야 연결된다 — "Test connection은 되는데 authentication이 실패"의
+단골 원인이 인증서 불신뢰다.
+:::
+
+:::caution[함정 2 — UUID 속성을 잘못 잡으면 사용자가 중복된다]
+`objectGUID`는 이름·부서가 바뀌어도 같은 사람임을 추적하는 열쇠다.
+이걸 `cn` 같은 가변 속성으로 잡으면, 개명·조직 개편 때 **같은 사람이 새 사용자로
+중복 생성**된다. 앱 입장에선 권한이 초기화된 유령 계정이 생기는 사고다.
+:::
+
+## Edit mode와 동기화 — AD와의 관계 설정
+
+### Edit mode — 누가 주인인가
+
+| 옵션 | 의미 | 판단 |
+|---|---|---|
+| **`READ_ONLY`** | Keycloak에서 사용자 수정 불가 — AD가 주인 | **사내 표준.** 원본은 AD 하나로 유지 |
+| `WRITABLE` | Keycloak의 변경이 AD로 역기록 | bind 계정에 쓰기 권한 필요. 신중히 |
+| `UNSYNCED` | Keycloak DB에서만 수정, AD 반영 없음 | 원본이 둘이 되는 구조 — 특수한 경우만 |
+
+### Import와 Sync
+
+**Import users**를 켜면 로그인·동기화 때 사용자가 Keycloak DB로 복제된다
+(비밀번호 제외). 로그인이 빨라지고 콘솔 검색이 되는 대신 동기화 관리가 생긴다.
+사내 구성 무난한 조합은 **`READ_ONLY` + import on** — AD가 권위를 갖고 Keycloak은 캐시처럼 동작한다.
+
+| Sync | 동작 | 언제 |
+|---|---|---|
+| **Full sync** | 전체를 다시 읽어 반영 | 첫 구성, 대량 조직 개편 후 |
+| **Changed users sync** | AD의 `whenChanged` 기준으로 바뀐 것만 | 주기 실행 (가볍다) |
+
+:::caution[함정 3 — 삭제는 저절로 전파되지 않을 수 있다]
+AD에서 지운 사용자가 Keycloak DB에 **남아 있을 수 있다** (설정·버전에 따라 다르다).
+비밀번호 검증은 AD로 가니 로그인은 막히지만, 세션·offline token이 살아 있으면
+그걸로는 접근이 된다. 퇴사자 처리 정책은 "AD에서 지우면 끝"이 아니라
+**sync 동작 확인 + 세션 강제 종료**([5장](/keycloak/05-sessions/))까지로 세운다.
+:::
+
+## LDAP 매퍼 — 경계 ①의 실체
+
+프로바이더 안의 **Mappers** 탭. AD vendor를 고르면 기본 매퍼가 깔린다.
+
+| Mapper | 종류 | 하는 일 |
+|---|---|---|
+| `username`·`email`·`first name`·`last name` | user-attribute-ldap-mapper | AD 속성 → Keycloak 사용자 필드 |
+| `MSAD account controls` | msad-user-account-control-mapper | AD의 계정 **비활성·잠금·비밀번호 만료** 상태를 반영 (AD 전용) |
+| `groups` | group-ldap-mapper | AD 그룹 → Keycloak 그룹 |
+| `roles` | role-ldap-mapper | AD 그룹을 그룹 대신 **롤**로 가져오고 싶을 때 (선택) |
+
+속성이 넘어오려면 **세 관문**을 다 통과해야 한다 —
+① AD에 그 속성이 존재하고 값이 있어야 하고(AD 관리자),
+② bind 서비스 계정이 그 속성을 읽을 권한이 있어야 하고(AD ACL — 민감 속성은 막힐 수 있다),
+③ Keycloak에 그 속성용 매퍼가 있어야 한다.
+기본 매퍼에 없는 속성(예: `department`, `employeeID`)은 user-attribute 매퍼를 직접 추가한다.
+
+### Group 매퍼 — 가장 중요한 매퍼
+
+| 항목 | 의미 | AD 흔한 값 |
+|---|---|---|
+| **LDAP Groups DN** | 그룹 검색 시작점 | `OU=Groups,DC=corp,DC=com` |
+| **Group Name LDAP Attribute** | 그룹 이름으로 쓸 속성 | `cn` |
+| **Membership LDAP Attribute** | 멤버십을 담은 속성 | `member` |
+| **Mode** | 그룹의 주인 | 보통 `READ_ONLY` |
+| **User Groups Retrieve Strategy** | 멤버십 조회 방법 | AD는 `LOAD_GROUPS_BY_MEMBER_ATTRIBUTE` (`memberOf` 활용)가 흔하고 빠르다 |
+
+중첩 그룹(그룹 안의 그룹)까지 펼치려면 `…_RECURSIVELY` 전략이 따로 있다 —
+켜기 전에 그룹 수가 얼마나 불어나는지 확인한다.
+
+:::caution[함정 4 — 그룹 매퍼만으로는 토큰에 안 나온다]
+LDAP 그룹 매퍼는 **경계 ①**이다. Keycloak 콘솔에 그룹이 들어와도, 토큰에 실으려면
+client 쪽 **Group Membership protocol mapper(경계 ②, [3장](/keycloak/03-structure/))** 가 따로 있어야 한다.
+두 매핑은 별개다 — 이 덱이 같은 말을 세 번째 하고 있다면, 그만큼 실제로 자주 걸리는 곳이라서다.
+:::
+
+:::tip[운영 메모 — 그룹 폭증]
+AD 그룹을 통째로 가져오면 수천 개가 될 수 있다. Groups DN을 좁히거나 필터를 걸어
+**앱이 실제로 쓰는 그룹만** 들여온다. 토큰이 커지면 헤더 크기 문제로도 이어진다 ([10장](/keycloak/10-troubleshooting/)).
+:::
+
+### 데스크톱 SSO — Kerberos
+
+도메인에 물린 윈도우 PC라면 비밀번호 입력조차 생략할 수 있다 — 이미 윈도우
+로그인 때 받은 Kerberos 티켓을 브라우저가 SPNEGO(Simple and Protected GSSAPI
+Negotiation Mechanism)로 제시하고, Keycloak이 keytab으로 검증하는 방식이다.
+LDAP 프로바이더의 **Kerberos integration** 설정에서 켠다. AD 팀의 SPN(Service
+Principal Name) 등록과 keytab 발급이 선행돼야 하는, 별도 협의가 필요한 작업이라
+이 덱에서는 존재만 짚는다.
+
+## 콘솔 클릭을 코드로 — kcadm.sh 자동화
+
+콘솔은 명령형이라 재현이 안 된다. 재현 가능한 관리 수단은 셋 —
+**kcadm.sh**(공식 CLI), **Terraform**(keycloak 프로바이더, 완전 선언형),
+**Operator의 realm import CR**([8장](/keycloak/08-deploy/)). 온프렘 k8s에서 흔한 절충은
+kcadm 스크립트를 ConfigMap에 담아 Job으로 실행하는 방식이다.
+
+```bash
+# 관리자 세션 열기 (Keycloak Pod 안의 /opt/keycloak/bin/kcadm.sh)
+kcadm.sh config credentials --server http://localhost:8080 \
+  --realm master --user "$KC_ADMIN" --password "$KC_ADMIN_PW"
+
+# LDAP 매퍼는 프로바이더를 부모로 갖는 component로 만든다
+kcadm.sh create components -r corp \
+  -s name=group-mapper \
+  -s providerId=group-ldap-mapper \
+  -s providerType=org.keycloak.storage.ldap.mappers.LDAPStorageMapper \
+  -s parentId=$LDAP_ID \
+  -s 'config."groups.dn"=["OU=Groups,DC=corp,DC=com"]' \
+  -s 'config."group.name.ldap.attribute"=["cn"]'
+```
+
+:::caution[함정 5 — kcadm create는 멱등이 아니다]
+이미 있는 리소스를 `create`하면 **409로 실패한다.** Job을 재실행하면 스크립트가
+중간에 죽는다는 뜻이다. 그래서 실전 스크립트는 "조회해서 있으면 update, 없으면
+create" 헬퍼 함수로 감싼다 — 사내 구성 스크립트에 함수가 많은 이유가 이것이다.
+멱등성을 사람이 보장하는 게 싫어지면 Terraform·Operator CR 같은 선언형으로 옮길 때다.
+:::
+
+## AD 연동 트러블슈팅
+
+증상에서 원인으로 — 이 표만으로 AD 쪽 문제 대부분이 갈린다.
+(전체 진단 순서는 [10장](/keycloak/10-troubleshooting/).)
+
+| 증상 | 흔한 원인 | 해결 |
+|---|---|---|
+| 로그인 자체가 안 됨 | bind DN·비밀번호 오류, 방화벽(636), LDAPS 인증서 불신뢰 | 프로바이더 화면의 Test connection / Test authentication, CA를 truststore에 |
+| 사용자는 보이는데 **그룹이 비어 있음** | group 매퍼의 DN·membership 속성·전략 부적합 | Groups DN·`member` 설정 점검 후 full sync |
+| Keycloak엔 그룹이 있는데 **토큰에 `groups` 없음** | protocol mapper 누락 (경계 ②) | client scope에 Group Membership 매퍼 추가 ([3장](/keycloak/03-structure/)) |
+| 앱이 `groups`를 못 읽음 | claim 이름·형식 불일치 (`/dev` vs `dev`, 배열 vs 문자열) | 매퍼의 full path·claim 이름을 앱과 일치 |
+| 개명한 사용자가 **중복 생성** | UUID 속성 오설정 | `objectGUID`로 지정 (함정 2) |
+| AD에서 잠근 계정이 **여전히 로그인** | MSAD account-control 매퍼 누락 | 매퍼 활성 + sync |
+| 바꾼 비밀번호가 반영 안 되는 느낌 | 검증 경로가 AD가 아니게 됨 (설정 변경 사고) | 비밀번호 검증은 항상 AD bind여야 — edit mode·프로바이더 상태 확인 |
+
+## 보안 메모
+
+- **bind 서비스 계정은 읽기 전용 최소 권한**으로. `WRITABLE`을 안 쓰면 쓰기 권한도 필요 없다
+- bind 비밀번호는 시크릿으로 관리하고 교체 주기를 정한다
+- LDAPS 인증서의 **만료일 추적**을 운영 루틴에 넣는다 ([9장](/keycloak/09-ops/)) —
+  만료되면 그날부터 전사 로그인이 멈춘다
+
+## 4장 요약
+
+- 연동 방식은 둘: AD에 직접 붙는 **User Federation**, 기존 IdP를 넘기는 **Identity Brokering**
+- 비밀번호는 **AD에만 있다** — Keycloak은 사용자 자격으로 bind해서 검증만 위임한다
+- 설정의 골격: **LDAPS 연결 + Users DN + `sAMAccountName`(로그인 ID) + `objectGUID`(불변 키)**
+- 무난한 조합은 **`READ_ONLY` + import on + Changed users sync 주기 실행**
+- 매퍼의 세 관문: AD에 값이 있고, bind 계정이 읽을 수 있고, 매퍼가 존재해야 넘어온다
+- **그룹 매퍼(경계 ①)와 protocol mapper(경계 ②)는 별개** — "그룹이 안 와요"는 둘 중 어디인지부터
+- kcadm 자동화는 재현성을 주지만 **멱등은 스스로 챙겨야** 한다
+
+<LinkCard
+  title="5. 세션과 토큰 수명"
+  description="SSO 세션, 토큰 수명, 로그아웃 전파 — 탈취 위험과 UX 사이의 다이얼."
+  href="/keycloak/05-sessions/"
+/>

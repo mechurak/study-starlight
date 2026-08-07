@@ -1,0 +1,214 @@
+---
+title: "2. OAuth 2.0과 OIDC"
+description: "위임에서 시작한 OAuth, 인증을 얹은 OIDC — 토큰 세 종류와 검증의 문법"
+---
+
+import { Tabs, TabItem, LinkCard } from '@astrojs/starlight/components';
+import TermIntro from '../../../components/TermIntro.astro';
+
+> Keycloak 콘솔의 모든 설정은 결국 이 장의 개념 — **어떤 토큰에 무엇을 실어 누구에게 줄까** — 로 환원된다
+
+<TermIntro
+  terms={[
+    ['OAuth 2.0', 'Open Authorization 2.0', '비밀번호를 넘기지 않고 **권한을 위임**하는 프로토콜. 원래 목적은 인증이 아니라 인가다.'],
+    ['OIDC', 'OpenID Connect', 'OAuth 2.0 위에 **"누가 로그인했는가"(인증)** 를 얹은 표준. Keycloak과 앱이 대화하는 기본 언어.'],
+    ['JWT', 'JSON Web Token', '서명이 붙은 JSON 토큰. 내용(claim)을 누구나 읽을 수 있지만 위조는 서명 때문에 못 한다 — **암호화가 아니라 서명**이다.'],
+    ['claim', '', '토큰 안의 항목 하나하나 (`email`, `groups`, `exp` …). "주장"이라는 뜻 그대로, 발급자가 서명으로 보증하는 진술이다.'],
+    ['JWKS', 'JSON Web Key Set', '토큰 서명을 검증할 **공개키 묶음**. Keycloak이 URL로 공개하고, 검증하는 쪽이 내려받는다.'],
+    ['PKCE', 'Proof Key for Code Exchange', '"픽시"라 읽는다. 시크릿을 가질 수 없는 클라이언트(CLI·SPA)가 코드 가로채기를 막는 장치.'],
+  ]}
+/>
+
+## 문제 — 비밀번호를 주지 않고 권한을 넘기려면
+
+OAuth가 풀려던 원래 문제는 로그인이 아니다. "사진 인화 서비스가 내 구글 포토를
+읽게 해 주고 싶은데, **구글 비밀번호를 줄 수는 없다**"는 위임 문제였다.
+호텔에서 차 키 대신 **트렁크는 안 열리는 발렛 키**를 주는 것 — 범위와 기한이
+제한된 자격을 발급하는 것이 OAuth의 본질이다.
+
+이 구조에는 역할이 넷 나온다. Keycloak 문서를 읽을 때 계속 마주치는 이름들이다.
+
+| OAuth 용어 | 뜻 | 사내 구성에서 |
+|---|---|---|
+| Resource Owner | 자원의 주인 = 사용자 | 임직원 |
+| Client | 사용자를 대신해 자원에 접근하는 앱 | 사내 포털, oauth2-proxy, kubectl |
+| Authorization Server | 자격(토큰)을 발급하는 곳 | **Keycloak** |
+| Resource Server | 토큰을 받고 자원을 내주는 API | 백엔드 API, 쿠버네티스 API 서버 |
+
+### OAuth만으로는 로그인이 안 된다 — OIDC가 얹은 것
+
+OAuth의 access token은 "이 자원에 접근해도 된다"는 **출입증**일 뿐,
+"이 사람이 누구다"라는 보증이 아니다. 로그인에 쓰려면 인증의 의미론이 필요했고,
+그걸 표준으로 얹은 것이 OIDC다.
+
+| OIDC가 추가한 것 | 내용 |
+|---|---|
+| **ID token** | "누가, 언제, 어떻게 로그인했는가"를 담은 JWT — 인증의 증명서 |
+| `openid` scope | 요청에 이게 있어야 OIDC다. 없으면 그냥 OAuth (ID token 없음) |
+| UserInfo 엔드포인트 | access token으로 사용자 프로필을 조회하는 표준 API |
+| Discovery 문서 | 엔드포인트 목록을 기계가 읽는 표준 위치 (아래) |
+
+## 토큰 세 종류 — 신분증, 출입증, 재발급권
+
+로그인이 끝나면 Keycloak의 토큰 엔드포인트가 **하나의 JSON 응답으로 셋을 같이** 준다.
+"토큰"이 특정 하나가 아니라 세트이고, 앱이 목적에 맞는 것을 골라 쓴다.
+
+```json
+{
+  "access_token":  "eyJ...",
+  "id_token":      "eyJ...",
+  "refresh_token": "eyJ...",
+  "token_type":    "Bearer",
+  "expires_in":    300
+}
+```
+
+| | **ID token (신분증)** | **Access token (출입증)** | **Refresh token (재발급권)** |
+|---|---|---|---|
+| 출신 표준 | OIDC | OAuth 2.0 | OAuth 2.0 |
+| 목적 | **인증** — 누가 로그인했나 | **인가** — API 호출에 첨부 | 만료된 access token 재발급 |
+| 소비자 | client(앱) 자신 | Resource Server(API) | Keycloak의 토큰 엔드포인트 |
+| 대상(`aud`) | 앱 자신 | 호출 대상 API | — |
+| 수명 | 그 로그인 순간의 증명 | 짧다 (기본 5분, [5장](/keycloak/05-sessions/)) | 길다 — SSO 세션에 묶임 |
+| 형식 | 항상 JWT (OIDC 규약) | 표준상 불투명해도 됨 — **Keycloak은 JWT** | 불투명 취급 |
+
+:::caution[함정 — 자주 하는 실수 둘]
+**ID token을 API에 보내 인가에 쓰지 말 것.** API가 볼 것은 access token이다.
+`aud`가 안 맞아 거부되거나, 통과되더라도 의미가 틀렸다.
+반대로 **"누가 로그인했나"를 access token으로 판단하지 말 것** — 그건 ID token의 일이다.
+Keycloak의 access token이 JWT라 열어볼 수 *있을* 뿐, 표준상 불투명할 수 있는 물건이다.
+:::
+
+## 로그인의 표준 경로 — Authorization Code Flow
+
+웹 앱의 표준 흐름이다. 핵심은 **앱이 비밀번호를 절대 만지지 않는다**는 것 —
+로그인 화면은 Keycloak이 띄우고, 앱은 일회용 코드(code)를 토큰으로 바꿔 받는다.
+
+```mermaid
+sequenceDiagram
+    participant U as 브라우저
+    participant A as 앱 (client)
+    participant K as Keycloak
+    participant AD as AD
+
+    U->>A: 보호된 페이지 요청
+    A->>U: Keycloak 로그인으로 redirect
+    U->>K: 로그인 화면에서 id/pw 입력
+    K->>AD: LDAP bind로 자격 검증 (위임)
+    AD-->>K: 인증 OK + 속성·그룹
+    K->>U: 일회용 code 발급 → 앱으로 redirect
+    U->>A: code 전달
+    A->>K: code + client secret → 토큰 교환
+    K-->>A: ID + Access + Refresh token
+    A->>A: 토큰 검증 후 자기 세션 시작
+```
+
+- 비밀번호는 **브라우저 → Keycloak → AD** 경로로만 흐른다. 앱 구간에는 없다
+- code를 토큰으로 바꿀 때 client가 자기 시크릿을 함께 내밀어 **"코드를 주운 놈"과 구별**된다
+- 시크릿을 가질 수 없는 클라이언트(CLI·SPA)는 시크릿 대신 **PKCE**로 같은 효과를 낸다 —
+  요청 시작 때 만든 비밀값의 해시를 맡겨 두고, 교환 때 원본을 제시한다
+  (브라우저 쪽 원리는 [웹 덱 11장](/web/11-security/)에서도 다룬다)
+
+### 다른 흐름들 — 언제 무엇을 쓰나
+
+| 흐름 | 용도 | 사내에서 만나는 곳 |
+|---|---|---|
+| **Authorization Code (+PKCE)** | 사람이 브라우저로 로그인 | 웹 앱 전부, kubectl 로그인 ([6장](/keycloak/06-k8s-oidc/)) |
+| **Client Credentials** | 사람 없이 서버끼리 (M2M) | 배치 작업, CI — Keycloak에선 client의 **service account** ([3장](/keycloak/03-structure/)) |
+| **Device Authorization** | 브라우저 없는 기기 — 코드를 다른 기기에서 승인 | SSH만 되는 서버에서 kubectl 로그인 |
+| ~~Implicit~~ · ~~Password (ROPC)~~ | **쓰지 않는다** — 각각 토큰 노출·비밀번호 취급 문제로 퇴역 | 낡은 문서에만 남아 있다 |
+
+## JWT 해부 — 서명이 신뢰를 만든다
+
+JWT는 `헤더.내용.서명` 세 부분을 각각 base64로 적고 점으로 이은 문자열이다.
+
+```json
+// 헤더 — 어떤 키로 서명했나
+{ "alg": "RS256", "kid": "x8FpWn..." }
+
+// 내용(payload) — claim들. 디코드한 access token 예시
+{
+  "iss": "https://keycloak.company.com/realms/corp",
+  "sub": "f:3a9c...:jdoe",
+  "aud": "my-app",
+  "azp": "my-app",
+  "exp": 1785000000,
+  "preferred_username": "jdoe",
+  "email": "jdoe@company.com",
+  "groups": ["/dev-team", "/platform-admin"],
+  "realm_access": { "roles": ["app-user"] }
+}
+```
+
+`preferred_username`·`email`·`groups`는 AD에서 흘러온 값이고 ([1장의 사슬](/keycloak/01-why/)),
+`iss`·`sub`·`aud` 같은 것은 어느 토큰에나 있는 **표준 claim**이다.
+
+| claim | 풀이 | 뜻 | 검증하는 쪽이 확인할 것 |
+|---|---|---|---|
+| `iss` | issuer | 발급자 — **realm URL이 그대로 들어간다** | 기대하는 realm URL과 일치하는가 |
+| `sub` | subject | 사용자의 불변 ID | 사용자 식별 키로 사용 |
+| `aud` | audience | 이 토큰을 **소비할** 대상 | 자기가 `aud`에 있는가 — 없으면 거부 |
+| `azp` | authorized party | 토큰을 **발급받은** client | (참고용) 로그인한 앱이 누군가 |
+| `exp` / `iat` | expiration / issued-at | 만료 / 발급 시각 | 만료 전인가 — 시계가 맞아야 한다 ([10장](/keycloak/10-troubleshooting/)) |
+
+:::tip[aud vs azp]
+`aud`는 "이 토큰을 **쓸** 곳", `azp`는 "이 토큰을 **받은** 앱".
+`aud` 검증이 중요한 이유: A API용 토큰을 B API에 들이밀어도 B는 자기가 `aud`에
+없으니 거절한다 — **토큰 오용을 막는 자물쇠**다. 쿠버네티스 연동에서도 이걸로 걸린다 ([6장](/keycloak/06-k8s-oidc/)).
+:::
+
+### 검증은 네 가지를 본다
+
+| 항목 | 어떻게 |
+|---|---|
+| **서명** | JWKS의 공개키로 검증. 헤더의 `kid`로 어느 키인지 고른다 |
+| **발급자** | `iss` == 내가 신뢰하는 realm URL |
+| **대상** | `aud`에 내가 있는가 |
+| **만료** | `exp`가 지나지 않았는가 |
+
+이걸 직접 짜지 않는다 — 검증된 OIDC 라이브러리·미들웨어가 넷 다 해 준다.
+관리자에게 중요한 것은 **어느 쪽이 검증 주체인가**다: ID token은 앱이,
+access token은 API가, 쿠버네티스로 가는 토큰은 API 서버가 검증한다.
+
+## Discovery — 설정의 출발점은 URL 하나
+
+realm마다 표준 위치에 **discovery 문서**가 있다. 앱·oauth2-proxy·쿠버네티스가
+"issuer URL 하나"만 받는 이유 — 나머지 엔드포인트는 여기서 자동으로 찾는다.
+
+```text
+https://keycloak.company.com/realms/corp/.well-known/openid-configuration
+```
+
+| 이 문서가 알려주는 것 | 예 |
+|---|---|
+| 인가 엔드포인트 | `…/protocol/openid-connect/auth` |
+| 토큰 엔드포인트 | `…/protocol/openid-connect/token` |
+| UserInfo | `…/protocol/openid-connect/userinfo` |
+| **JWKS (공개키)** | `…/protocol/openid-connect/certs` |
+| 로그아웃 | `…/protocol/openid-connect/logout` ([5장](/keycloak/05-sessions/)) |
+
+:::tip[운영 팁]
+연동이 이상할 때 **discovery 문서를 curl로 열어 보는 것**이 진단의 1번이다.
+문서가 열리고 `issuer` 값이 기대와 같은지만 봐도 절반은 걸러진다 ([10장](/keycloak/10-troubleshooting/)).
+:::
+
+### SAML은 어디에 있나
+
+Keycloak은 SAML(Security Assertion Markup Language) 2.0도 말한다 — OIDC보다 오래된
+XML 기반 SSO 표준으로, 오래된 엔터프라이즈 제품이 아직 요구하는 경우가 있다.
+새로 붙이는 연동은 OIDC가 기본이고, 이 덱은 SAML 상세를 다루지 않는다
+([0장의 범위](/keycloak/00-intro/)).
+
+## 2장 요약
+
+- OAuth는 **비밀번호 없는 위임**(인가)에서 출발했고, OIDC가 그 위에 **인증**을 얹었다
+- 토큰은 세트로 온다 — **ID(신분증) / Access(출입증) / Refresh(재발급권)**. 소비자가 각각 다르다
+- 표준 경로는 Authorization Code Flow. 비밀번호는 앱을 지나지 않고, 시크릿 없는 클라이언트는 **PKCE**
+- JWT 검증은 **서명(JWKS) · iss · aud · exp** 네 가지 — 검증 주체가 누구인지가 관리 포인트
+- 모든 연동 설정의 출발점은 **discovery 문서 URL 하나**다
+
+<LinkCard
+  title="3. Realm과 Client — Keycloak의 구조"
+  description="격리의 단위 realm, 앱 하나 client, 토큰에 무엇을 실을지 정하는 매퍼."
+  href="/keycloak/03-structure/"
+/>

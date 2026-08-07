@@ -1,0 +1,94 @@
+---
+title: "11. 용어 사전"
+description: "이 덱에 나온 용어 전부 — 약어를 만나면 여기로"
+---
+
+import { LinkCard } from '@astrojs/starlight/components';
+
+> 본문을 읽다 막힌 약어는 여기서 찾는다. 각 용어는 자세히 다룬 장으로 링크한다.
+
+## 인증의 큰 그림
+
+| 용어 | 풀어 쓰면 | 뜻 | 자세히 |
+|---|---|---|---|
+| SSO | Single Sign-On | 로그인이라는 일을 IdP 한 곳에 몰아준 구조 | [0장](/keycloak/00-intro/) · [1장](/keycloak/01-why/) |
+| IdP | Identity Provider | "누가 로그인했는가"를 책임지는 서버 — 이 덱에선 Keycloak | [1장](/keycloak/01-why/) |
+| 인증 / 인가 | Authentication / Authorization | "누구인가" 확인 vs "무엇을 해도 되는가" 판단 — 401과 403의 차이 | [2장](/keycloak/02-oauth-oidc/) · [CKA 덱 14장](/cka/14-rbac/) |
+| MFA | Multi-Factor Authentication | 비밀번호에 더한 추가 증명 (OTP 등) | [1장](/keycloak/01-why/) |
+| 페더레이션 | Federation | 외부 저장소(AD)를 사용자 저장소로 빌려 쓰는 구성 | [4장](/keycloak/04-ad-federation/) |
+| 브로커링 | Identity Brokering | 로그인을 다른 IdP(ADFS·Entra ID)로 넘기는 구성 | [4장](/keycloak/04-ad-federation/) |
+
+## AD와 LDAP
+
+| 용어 | 풀어 쓰면 | 뜻 | 자세히 |
+|---|---|---|---|
+| AD | Active Directory | 윈도우 도메인의 사용자·그룹 디렉터리 — 사내 계정의 원본 | [1장](/keycloak/01-why/) |
+| LDAP / LDAPS | Lightweight Directory Access Protocol (+ over TLS) | 디렉터리 조회·인증 프로토콜 / 그 암호화판 (636) | [4장](/keycloak/04-ad-federation/) |
+| bind | — | LDAP의 로그인 동작 — "이 DN에 이 비밀번호가 맞는가" | [1장](/keycloak/01-why/) |
+| DN · CN · OU · DC | Distinguished Name · Common Name · Organizational Unit · Domain Component | AD 객체의 고유 경로와 그 조각들 — 오른쪽이 뿌리 | [4장](/keycloak/04-ad-federation/) |
+| sAMAccountName | Security Account Manager Account Name | 윈도우의 짧은 로그인 ID (`jdoe`) | [4장](/keycloak/04-ad-federation/) |
+| UPN | User Principal Name | 이메일 모양의 로그인 ID (`jdoe@corp.com`) | [4장](/keycloak/04-ad-federation/) |
+| objectGUID | — | AD 객체의 불변 고유 ID — 사용자 중복 생성을 막는 열쇠 | [4장](/keycloak/04-ad-federation/) |
+| memberOf / member | — | 사용자→소속 그룹 / 그룹→구성원 속성 | [4장](/keycloak/04-ad-federation/) |
+| Kerberos / SPNEGO | — / Simple and Protected GSSAPI Negotiation Mechanism | 윈도우 도메인의 티켓 인증 / 그걸 브라우저로 제시하는 방식 — 데스크톱 SSO | [4장](/keycloak/04-ad-federation/) |
+
+## 프로토콜과 토큰
+
+| 용어 | 풀어 쓰면 | 뜻 | 자세히 |
+|---|---|---|---|
+| OAuth 2.0 | Open Authorization 2.0 | 비밀번호 없이 권한을 위임하는 프로토콜 — 본래 인가용 | [2장](/keycloak/02-oauth-oidc/) |
+| OIDC | OpenID Connect | OAuth 위에 인증("누가 로그인했나")을 얹은 표준 | [2장](/keycloak/02-oauth-oidc/) |
+| SAML | Security Assertion Markup Language | OIDC 이전 세대의 XML 기반 SSO 표준 | [2장](/keycloak/02-oauth-oidc/) |
+| JWT | JSON Web Token | 서명 붙은 JSON 토큰 — 암호화가 아니라 서명 | [2장](/keycloak/02-oauth-oidc/) |
+| claim | — | 토큰 안의 항목 하나 (`email`, `groups` …) | [2장](/keycloak/02-oauth-oidc/) |
+| ID / Access / Refresh token | — | 신분증 / 출입증 / 재발급권 — 소비자가 각각 다르다 | [2장](/keycloak/02-oauth-oidc/) |
+| iss · sub · aud · azp · exp | issuer · subject · audience · authorized party · expiration | JWT 표준 claim — 발급자·주체·소비 대상·발급받은 앱·만료 | [2장](/keycloak/02-oauth-oidc/) |
+| JWKS | JSON Web Key Set | 서명 검증용 공개키 묶음 — URL로 공개된다 | [2장](/keycloak/02-oauth-oidc/) |
+| kid | Key ID | JWT 헤더의 서명 키 식별자 — JWKS에서 키를 고르는 열쇠 | [10장](/keycloak/10-troubleshooting/) |
+| PKCE | Proof Key for Code Exchange | 시크릿 없는 클라이언트의 코드 가로채기 방지 ("픽시") | [2장](/keycloak/02-oauth-oidc/) |
+| scope | — | 앱이 요청하는 정보·권한의 범위 라벨 (`openid profile …`) | [3장](/keycloak/03-structure/) |
+| discovery 문서 | — | 엔드포인트 목록의 표준 위치 — `/.well-known/openid-configuration` | [2장](/keycloak/02-oauth-oidc/) |
+| Device Authorization | — | 브라우저 없는 기기의 로그인 흐름 — 코드를 다른 기기에서 승인 | [2장](/keycloak/02-oauth-oidc/) |
+
+## Keycloak 내부
+
+| 용어 | 풀어 쓰면 | 뜻 | 자세히 |
+|---|---|---|---|
+| realm | — | 사용자·client·설정이 격리된 보안 공간 — SSO의 영역 | [3장](/keycloak/03-structure/) |
+| client | — | realm에 등록된 앱 하나 (confidential / public) | [3장](/keycloak/03-structure/) |
+| client scope | — | 매퍼·롤을 묶은 재사용 단위 — scope 문자열과 토큰을 잇는다 | [3장](/keycloak/03-structure/) |
+| protocol mapper | — | 무엇을 어떤 claim으로 토큰에 실을지 정하는 규칙 (경계 ②) | [3장](/keycloak/03-structure/) |
+| User Federation | — | AD/LDAP을 사용자 저장소로 빌려 쓰는 기능 (경계 ①) | [4장](/keycloak/04-ad-federation/) |
+| service account | — | 사람 없이 client 자체가 토큰을 받는 기능 (M2M) | [3장](/keycloak/03-structure/) |
+| SSO 세션 | — | realm 수준 로그인 세션 — 앱들이 이걸 타고 통과한다 | [5장](/keycloak/05-sessions/) |
+| offline token | — | 세션과 분리돼 오래 사는 refresh token — 퇴사 처리의 사각지대 | [5장](/keycloak/05-sessions/) |
+| backchannel logout | — | 서버 간 로그아웃 통지 — 브라우저를 거치지 않는다 | [5장](/keycloak/05-sessions/) |
+| not-before 정책 | — | "이 시각 이전 발급 토큰 전부 거부" — 회수의 마지막 카드 | [9장](/keycloak/09-ops/) |
+| kcadm.sh | — | Keycloak 공식 관리 CLI — 콘솔 클릭을 코드로 | [4장](/keycloak/04-ad-federation/) |
+| realm export | — | realm 설정의 JSON 스냅샷 — 백업의 원본은 아니다 | [9장](/keycloak/09-ops/) |
+| realm-management 롤 | — | 관리 권한의 낱개 단위 (`manage-users` 등) — 위임의 도구 | [9장](/keycloak/09-ops/) |
+
+## 연동과 배포
+
+| 용어 | 풀어 쓰면 | 뜻 | 자세히 |
+|---|---|---|---|
+| kubelogin | — | kubectl의 OIDC 로그인 플러그인 (`kubectl oidc-login`) | [6장](/keycloak/06-k8s-oidc/) |
+| AuthenticationConfiguration | — | kube-apiserver 인증을 파일로 선언 — 1.34 GA | [6장](/keycloak/06-k8s-oidc/) |
+| claim mapping | — | 토큰 claim → 쿠버네티스 사용자명·그룹 변환 규칙 | [6장](/keycloak/06-k8s-oidc/) |
+| exec plugin | — | kubeconfig가 토큰 발급을 외부 명령에 위임하는 방식 | [6장](/keycloak/06-k8s-oidc/) |
+| CRL | Certificate Revocation List | 인증서 폐기 목록 — 쿠버네티스가 지원하지 않아 OIDC가 필요해진 이유 | [6장](/keycloak/06-k8s-oidc/) |
+| oauth2-proxy | — | OIDC 로그인을 대신 처리하는 인증 게이트 프록시 | [7장](/keycloak/07-apps/) |
+| auth_request | — | ingress-nginx가 백엔드 전송 전에 인증을 물어보는 서브요청 | [7장](/keycloak/07-apps/) |
+| X-Forwarded 헤더 | — | 프록시가 앱에 넘기는 확인된 사용자 정보 헤더 | [7장](/keycloak/07-apps/) |
+| Operator | — | 앱 운영 지식을 담은 컨트롤러 — CR로 선언하면 알아서 배포 | [8장](/keycloak/08-deploy/) |
+| Infinispan / JGroups | — | 내장 분산 캐시 / 그 멤버 발견·통신 계층 | [8장](/keycloak/08-deploy/) |
+| hostname (KC_HOSTNAME) | — | Keycloak의 공식 주소 — 토큰 `iss`의 원천 | [8장](/keycloak/08-deploy/) |
+| persistent sessions | — | 세션을 DB에 저장 (26 기본) — 재시작에도 로그인 유지 | [5장](/keycloak/05-sessions/) · [8장](/keycloak/08-deploy/) |
+| 키 롤오버 | Key Rollover | 서명 키의 무중단 교체 — 겹침 구간이 핵심 | [9장](/keycloak/09-ops/) |
+| clock skew | — | 서버 간 시계 차이 — 토큰 시각 검증을 깨뜨리는 온프렘의 고전 | [10장](/keycloak/10-troubleshooting/) |
+
+<LinkCard
+  title="12. 마무리"
+  description="전체 지도 한 장과 구축·운영 체크리스트."
+  href="/keycloak/12-wrapup/"
+/>
