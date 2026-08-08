@@ -15,39 +15,30 @@ dev 서버는 백그라운드 모드로 띄운다: `astro dev --background`
 
 ## 덱
 
-| 덱 | 내용 | 고치기 전에 |
-|---|---|---|
-| `cka` | CKA 시험 대비 | **[docs/cka-baseline.md](docs/cka-baseline.md)를 읽는다** |
-| `frontend` | Next.js · Tailwind CSS · shadcn/ui | — |
-| `kafka` | 이벤트 스트리밍 — 로그 모델 · 전달 보장 · Strimzi 온프렘 k8s 배포/운영 | — |
-| `keycloak` | 사내 AD 인증 SSO — OIDC · AD 연동 · k8s API 서버 연동 · 온프렘 배포/운영 | — |
-| `shadcn` | shadcn/ui 단독 — **테마 = 리소스 목록** 관점 | 아래 "shadcn 덱" 절을 읽는다 |
-| `supabase` | Postgres 위의 백엔드 플랫폼 · RLS · Vercel 역할 배분 | — |
-| `web` | 웹 개발 일반 — 요청의 일생 · 스택 지형 · 도구 사슬(pnpm·Vite) · 브라우저 보안(CORS·PKCE) · 배포 | — |
+덱 목록의 원본은 `astro.config.mjs`의 topics와 랜딩(`src/content/docs/index.mdx`)이다.
+여기에는 **고치기 전에 알아야 할 것이 있는 덱만** 적는다 — 특별한 규칙이 없는 덱은
+새로 만들어도 이 문서를 고칠 필요가 없다.
 
-**모든 덱은 이 레포가 원본이다** (2026-08-05 소유자 결정).
-`frontend`와 `supabase`는 slidev 덱(`~/workspace/study-decks/decks/<이름>`)의 내용을,
-`web`은 `~/workspace/web-study`의 노트를,
-`keycloak`은 `~/workspace/k8s-study`의 노트(`11_identity-keycloak/`, `04_services-networking/oauth2-proxy.md`)를
-**참고해 다시 쓴 것**이지만 어느 쪽도 동기화 대상이 아니다 (slidev 쪽은 슬라이드라 구조 자체가 다르다).
-`web`·`keycloak`·`kafka` 덱은 shadcn 덱의 서술 규칙(`<TermIntro>`, 용어 풀어 쓰기)을 따른다.
+- `cka` — **[docs/cka-baseline.md](docs/cka-baseline.md)를 먼저 읽는다** (기준 커리큘럼과 버전 고정)
+- `shadcn` — 아래 절의 전용 규칙 셋을 따른다
+- `shadcn` · `web` · `keycloak` · `kafka` — 각 장 첫머리의 `<TermIntro>` 상자가 의무다 (아래 절)
 
-### shadcn 덱 (2026-08-06 소유자 결정)
+### shadcn 덱
 
 `frontend` 13~16장과 주제가 겹치지만 **동기화 대상이 아니다** — 목적이 다르다.
-`frontend`는 세 도구의 흐름, `shadcn`은 shadcn/ui 하나를 테마 관점으로 깊게 판다.
+`frontend`는 세 도구의 흐름, `shadcn`은 shadcn/ui 하나를 **테마 = 리소스 목록** 관점으로 깊게 판다.
 `frontend` 13~16장과 index에는 이쪽으로 오는 aside 링크만 걸어 뒀다.
 
 이 덱은 **읽기 어렵다는 피드백에서 나왔다.** 그래서 규칙이 셋 더 있다 —
 
 - **용어 규칙("콘텐츠 규칙" 절)을 각 장 첫머리의 `<TermIntro>` 상자로 강제한다**
-  (`src/components/TermIntro.astro`).
+  (`src/components/TermIntro.astro`). `web`·`keycloak`·`kafka` 덱도 이 규칙을 같이 쓴다.
   `terms`는 `[용어, 풀 이름(없으면 ''), 한 줄 설명][]`이고, 설명 안의 백틱은 코드로 안 바뀐다 — 평문이다
 - **곁가지를 넣지 않는다.** 뺀 것은 [0장의 "다루지 않는 것" 표](src/content/docs/shadcn/00-intro.mdx)에
   이름만 남긴다. 새 내용을 넣을 때 그 표와 충돌하는지 먼저 본다
 - **12장은 용어 사전**이다. 새 약어를 본문에 쓰면 여기에도 추가한다
 
-## 외관 — 세 겹 (2026-08-05 소유자 결정)
+## 외관 — 세 겹
 
 - **테마**: `starlight-theme-rapide` (코드 블록 테마도 Vitesse 계열로 함께 바뀐다)
 - **폰트**: Pretendard Variable 셀프호스팅. `customCss`의 **dynamic subset** CSS가 핵심이다
@@ -74,17 +65,19 @@ dev 서버는 백그라운드 모드로 띄운다: `astro dev --background`
 
 - **새 용어·약어는 처음 나올 때 풀 이름을 주고, 새 개념은 "왜 필요한지"부터 설명한다.**
   "이게 뭔지"보다 **"없으면 무슨 문제가 생기는지"**가 잘 읽힌다 — 문제 → 해법 순서로 쓴다.
-  (2026-08-06 소유자 결정 — shadcn 덱 전용 규칙에서 전 덱 공통으로 승격.
-  shadcn·web 덱은 여기에 더해 `<TermIntro>` 상자가 의무다 — 위 "shadcn 덱" 절.)
+  (shadcn·web·keycloak·kafka 덱은 여기에 더해 `<TermIntro>` 상자가 의무다 — 위 "덱" 절.)
 - **제목 계층으로 우측 목차(TOC)를 조직한다.** 목차에는 h2·h3만 나온다.
   h2는 **주제 묶음 5~9개**로 세우고 상세 절은 h3로 내린다 — h2만 나열하면 목차가
   평면이 되어 안 읽히고, h4는 목차에 안 잡히니 만들지 않는다.
-  (2026-08-05에 cka 전 페이지를 이 구조로 재조직했다. 제목을 고치면 앵커 slug도 바뀐다.)
-- **raw HTML은 본문에 인라인으로 쓰지 않는다.** 강조는 `**`, 안내 박스는 aside로.
-  Starlight 내장 컴포넌트는 허용한다 (아래 절). **그 이상의 시각 효과가 필요하면
-  `src/components/`에 Astro 컴포넌트를 만들어 import한다** — 스타일은 컴포넌트 `<style>`에
-  캡슐화하고(다크 모드는 `[data-theme='dark']`로 대응), 본문에는 태그 하나만 남긴다.
-  사이트 전역 조정은 `src/styles/custom.css`.
+  제목을 고치면 앵커 slug도 바뀐다는 점에 주의한다.
+- **시각 효과는 환영하되, raw HTML을 본문에 인라인으로 쓰지 않는다.**
+  문서가 "있어보이는" 건 페이지별 장식이 아니라 덱 전체의 일관성 —
+  mermaid 팔레트, aside 라벨, 컴포넌트 역할 분담 — 에서 나온다.
+  한 번 쓸 강조는 `**`와 aside로, Starlight 내장 컴포넌트는 아래 절의 역할 표대로 쓴다.
+  **그 이상이 필요하면 `src/components/`에 Astro 컴포넌트를 만들어 import한다** —
+  단, 만들기 전에 기존 컴포넌트에 비슷한 게 있는지 먼저 훑는다.
+  스타일은 컴포넌트 `<style>`에 캡슐화하고(다크 모드는 `[data-theme='dark']`로 대응),
+  본문에는 태그 하나만 남긴다. 사이트 전역 조정은 `src/styles/custom.css`.
 - 시험 포인트·핵심 원칙은 `:::tip[…]`, 함정·주의는 `:::caution[함정]` aside를 쓴다.
   aside 제목에 구체 라벨을 달 수 있다 (`:::caution[함정 1 — ...]` 처럼).
 - 다이어그램은 ```` ```mermaid ```` 펜스로 — **별도 이미지 파일을 만들지 않는다.**
@@ -99,7 +92,7 @@ topics의 slug는 **확장자를 안 쓰므로** 파일 확장자와 무관하�
 `@astrojs/mdx`는 Starlight의 전이 의존성이라 별도 설치가 필요 없다.
 
 ```mdx
-import { Steps, Card, CardGrid, Tabs, TabItem, FileTree } from '@astrojs/starlight/components';
+import { Steps, Card, CardGrid, Tabs, TabItem, FileTree, LinkCard, Badge } from '@astrojs/starlight/components';
 ```
 
 무엇을 어디에 쓰는지 —
@@ -111,6 +104,9 @@ import { Steps, Card, CardGrid, Tabs, TabItem, FileTree } from '@astrojs/starlig
 | `<CardGrid>` + `<Card>` | 층·분류의 개요. 장 첫머리나 "해결책 넷 중 하나" |
 | `<FileTree>` | 디렉터리 구조 (`/etc/kubernetes/`, Helm 차트, `supabase/`) |
 | `<LinkCard>` | 장 끝의 "다음 장으로" 안내 |
+| `<LinkButton>` | 덱 index의 "첫 장부터 읽기" 시작 CTA — 덱마다 하나. 본문 중간에는 안 쓴다 (`<LinkCard>`와 역할이 겹친다) |
+| `<Badge>` | 표·제목 옆의 짧은 상태 라벨 — 성숙도(`alpha`/`GA`), deprecated, 기본값, 시험 비중. variant 색이 aside 체계와 같다 |
+| 아이콘 | 인라인 `<Icon>`이 아니라 **prop으로** — `<Card icon>`, topics의 덱 icon. 본문 문장 속 아이콘은 스캔을 방해한다 |
 | mermaid 펜스 | 결정 트리, 관계도, 상태 머신, 시퀀스 |
 
 `<FileTree>` 항목은 **`- 경로/` 뒤에 설명을 그냥 이어 쓰면** 회색 주석으로 붙고,
