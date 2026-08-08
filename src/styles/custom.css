@@ -7,6 +7,24 @@
   --sl-content-width: 55rem;
 }
 
+/* 헤더 검색 결과의 덱 라벨 — MarkdownContent override가 심은 Pagefind meta("덱").
+   기본 UI는 이걸 카드 맨 아래 태그 칩으로 그리므로, 제목 위의 작은 라벨로 올린다.
+   (.pagefind-ui__result-inner가 flex column이라 order로 위치만 바꾼다) */
+#starlight__search .pagefind-ui__result-tags {
+  order: -1;
+  margin: 0;
+  padding-block: 0 0.25rem;
+  padding-inline: var(--sl-search-result-pad-inline-start)
+    var(--sl-search-result-pad-inline-end);
+}
+
+#starlight__search .pagefind-ui__result-tag {
+  padding: 0;
+  background: none;
+  font-size: var(--sl-text-xs);
+  color: var(--sl-color-gray-3);
+}
+
 /* mermaid 다이어그램 — 폭이 넘치면 다이어그램 안에서만 가로 스크롤 */
 .mermaid {
   overflow-x: auto;

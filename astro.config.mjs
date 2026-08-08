@@ -27,6 +27,10 @@ export default defineConfig({
 				'pretendard/dist/web/variable/pretendardvariable-dynamic-subset.css',
 				'./src/styles/custom.css',
 			],
+			components: {
+				// 검색 결과에 덱 이름을 표시하기 위한 Pagefind meta 주입 — 파일 안 주석 참고
+				MarkdownContent: './src/components/MarkdownContent.astro',
+			},
 			plugins: [
 				starlightThemeRapide(),
 				starlightSidebarTopics(
