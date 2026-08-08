@@ -257,6 +257,46 @@ export default defineConfig({
 							],
 						},
 						{
+							label: 'Kafka',
+							link: '/kafka/',
+							icon: 'random',
+							items: [
+								'kafka',
+								{
+									label: '시작',
+									items: ['kafka/00-intro', 'kafka/01-why'],
+								},
+								{
+									label: '핵심 모델',
+									items: ['kafka/02-log', 'kafka/03-cluster'],
+								},
+								{
+									label: '읽고 쓰기',
+									items: [
+										'kafka/04-producer',
+										'kafka/05-consumer',
+										'kafka/06-semantics',
+									],
+								},
+								{
+									label: '설계',
+									items: ['kafka/07-topic-design', 'kafka/08-ecosystem'],
+								},
+								{
+									label: '온프렘 배포와 운영',
+									items: [
+										'kafka/09-deploy',
+										'kafka/10-ops',
+										'kafka/11-troubleshooting',
+									],
+								},
+								{
+									label: '마무리',
+									items: ['kafka/12-glossary', 'kafka/13-wrapup'],
+								},
+							],
+						},
+						{
 							label: 'Supabase',
 							link: '/supabase/',
 							icon: 'seti:db',

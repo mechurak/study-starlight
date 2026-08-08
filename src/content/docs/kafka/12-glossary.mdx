@@ -1,0 +1,87 @@
+---
+title: "12. 용어 사전"
+description: "이 덱에 나온 용어 · 약어 모음 — 처음 나온 장으로 가는 색인"
+---
+
+import { LinkCard } from '@astrojs/starlight/components';
+
+> 본문에서 처음 나올 때 풀어 쓴 용어들을 한 곳에 모았다 — 찾아보기용
+
+## 데이터 모델
+
+| 용어 | 풀 이름 | 뜻 | 장 |
+|---|---|---|---|
+| 레코드 | Record | Kafka에 쓰는 데이터 한 건 (키 · 값 · 타임스탬프 · 헤더) | [2](/kafka/02-log/) |
+| 토픽 | Topic | 레코드가 쌓이는 논리적 이름 | [2](/kafka/02-log/) |
+| 파티션 | Partition | 토픽의 물리 조각 — 순서 · 병렬성 · 분산의 단위 | [2](/kafka/02-log/) |
+| 오프셋 | Offset | 파티션 내 레코드 순번 — 소비자의 책갈피 | [2](/kafka/02-log/) |
+| 세그먼트 | Segment | 파티션 로그의 디스크 파일 단위 — 삭제의 단위 | [2](/kafka/02-log/) |
+| 보존 | Retention | 데이터를 언제까지 남길지의 정책 (기간 · 용량) | [7](/kafka/07-topic-design/) |
+| 컴팩션 | Compaction | 키별 최신값만 남기는 보존 방식 | [7](/kafka/07-topic-design/) |
+| 툼스톤 | Tombstone | value가 null인 레코드 — 컴팩션 토픽의 삭제 표시 | [7](/kafka/07-topic-design/) |
+| 스키마 | Schema | 토픽에 흐르는 메시지의 형식 계약 | [7](/kafka/07-topic-design/) |
+
+## 클러스터
+
+| 용어 | 풀 이름 | 뜻 | 장 |
+|---|---|---|---|
+| 브로커 | Broker | Kafka 서버 프로세스 | [0](/kafka/00-intro/) |
+| 복제 계수 | Replication Factor (RF) | 파티션을 몇 부 두는가 | [3](/kafka/03-cluster/) |
+| 리더 / 팔로워 | Leader / Follower | 읽기·쓰기를 받는 복제본 / 따라 복사하는 복제본 | [3](/kafka/03-cluster/) |
+| ISR | In-Sync Replicas | 리더를 따라잡고 있는 복제본 명단 — 유실 없는 failover의 근거 | [3](/kafka/03-cluster/) |
+| 컨트롤러 | Controller | 메타데이터 관리 · 리더 선출 역할 | [3](/kafka/03-cluster/) |
+| KRaft | Kafka Raft | 컨트롤러들이 Raft 합의로 메타데이터를 관리하는 방식 — ZooKeeper의 후임 | [0](/kafka/00-intro/) |
+| URP | Under-Replicated Partitions | 정해진 만큼 복제되지 못한 파티션 수 — 0이 정상 | [10](/kafka/10-ops/) |
+
+## 클라이언트
+
+| 용어 | 풀 이름 | 뜻 | 장 |
+|---|---|---|---|
+| acks | Acknowledgements | 수신 확인을 어디까지 기다릴지 (0 · 1 · all) | [4](/kafka/04-producer/) |
+| 멱등성 | Idempotence | 재시도가 겹쳐도 한 번만 남게 하는 성질 (프로듀서 기본 켜짐) | [4](/kafka/04-producer/) |
+| 배치 | Batch | 레코드를 모아 보내는 것 — 처리량 ↔ 지연의 손잡이 | [4](/kafka/04-producer/) |
+| 핫 파티션 | Hot Partition | 특정 키에 쏠려 혼자 바쁜 파티션 | [4](/kafka/04-producer/) |
+| 컨슈머 그룹 | Consumer Group | 토픽을 나눠 읽는 컨슈머 묶음 — 파티션 1 ↔ 컨슈머 1 | [5](/kafka/05-consumer/) |
+| 리밸런스 | Rebalance | 그룹 구성 변경 시 파티션 재배정 | [5](/kafka/05-consumer/) |
+| 커밋 | Commit | "어디까지 처리했다"는 오프셋 기록 | [5](/kafka/05-consumer/) |
+| 랙 | Lag | 최신 오프셋 − 커밋 오프셋 — 밀린 정도 | [5](/kafka/05-consumer/) |
+| at-least-once | | 유실 없음 · 중복 가능 — 실무 기본값 | [6](/kafka/06-semantics/) |
+| exactly-once | | 정확히 한 번 — Kafka 안(트랜잭션)에서만 자동 | [6](/kafka/06-semantics/) |
+| 멱등 소비 | Idempotent Consumer | 중복 처리가 무해하게 소비자를 만드는 것 | [6](/kafka/06-semantics/) |
+| 트랜잭션 | Transaction | 여러 쓰기 + 오프셋 커밋을 원자적으로 묶는 기능 | [6](/kafka/06-semantics/) |
+| poison pill | | 처리가 항상 실패해 파티션을 멈추게 하는 레코드 | [11](/kafka/11-troubleshooting/) |
+| DLT | Dead Letter Topic | 계속 실패한 레코드를 치워 두는 토픽 | [11](/kafka/11-troubleshooting/) |
+
+## 배포 · 생태계
+
+| 용어 | 풀 이름 | 뜻 | 장 |
+|---|---|---|---|
+| Strimzi | | k8s에서 Kafka를 CRD로 운영하는 오퍼레이터 | [0](/kafka/00-intro/) · [9](/kafka/09-deploy/) |
+| KafkaNodePool | | 노드 집합(역할 · 스토리지)을 선언하는 Strimzi CRD | [9](/kafka/09-deploy/) |
+| 리스너 | Listener | 브로커의 클라이언트 접점 정의 (포트 · 노출 · TLS · 인증) | [9](/kafka/09-deploy/) |
+| advertised address | | 브로커가 클라이언트에게 알려주는 자기 주소 | [9](/kafka/09-deploy/) |
+| JBOD | Just a Bunch Of Disks | RAID 없이 낱개로 붙인 디스크들 | [9](/kafka/09-deploy/) |
+| Kafka Connect | | 반복 연동을 설정으로 돌리는 실행 프레임워크 | [8](/kafka/08-ecosystem/) |
+| CDC | Change Data Capture | DB 변경 내역을 로그로 뽑아 전파하는 기법 | [1](/kafka/01-why/) · [8](/kafka/08-ecosystem/) |
+| Debezium | | CDC 커넥터의 사실상 표준 | [8](/kafka/08-ecosystem/) |
+| 스키마 레지스트리 | Schema Registry | 스키마 버전 관리 + 호환성 강제 서비스 | [8](/kafka/08-ecosystem/) |
+| Kafka Streams | | 토픽 → 변환 · 집계 → 토픽 처리용 자바 라이브러리 | [8](/kafka/08-ecosystem/) |
+| MirrorMaker 2 | | 클러스터 간 토픽 복제 도구 | [8](/kafka/08-ecosystem/) |
+| Cruise Control | | 파티션 배치를 자동 재조정하는 컴포넌트 | [10](/kafka/10-ops/) |
+
+## 보안 · 개념
+
+| 용어 | 풀 이름 | 뜻 | 장 |
+|---|---|---|---|
+| SASL/SCRAM | Simple Authentication and Security Layer / Salted Challenge Response Authentication Mechanism | 사용자명 · 비밀번호 기반 인증 방식 | [10](/kafka/10-ops/) |
+| mTLS | mutual TLS | 클라이언트도 인증서로 신원을 증명하는 TLS | [10](/kafka/10-ops/) |
+| ACL | Access Control List | 계정별 · 토픽별 권한 목록 | [10](/kafka/10-ops/) |
+| 백프레셔 | Backpressure | 하류의 지연이 상류로 거슬러 오는 압력 | [1](/kafka/01-why/) |
+| 결합 | Coupling | 한쪽의 사정이 다른 쪽에 전염되는 정도 | [1](/kafka/01-why/) |
+| 이벤트 스트리밍 | Event Streaming | 이벤트를 흐름으로 쌓고 여러 곳이 각자 읽는 방식 | [0](/kafka/00-intro/) |
+
+<LinkCard
+  title="13. 마무리"
+  description="전체 그림 한 장과 도입 체크리스트."
+  href="/kafka/13-wrapup/"
+/>

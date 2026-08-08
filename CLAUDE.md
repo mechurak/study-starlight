@@ -19,6 +19,7 @@ dev 서버는 백그라운드 모드로 띄운다: `astro dev --background`
 |---|---|---|
 | `cka` | CKA 시험 대비 | **[docs/cka-baseline.md](docs/cka-baseline.md)를 읽는다** |
 | `frontend` | Next.js · Tailwind CSS · shadcn/ui | — |
+| `kafka` | 이벤트 스트리밍 — 로그 모델 · 전달 보장 · Strimzi 온프렘 k8s 배포/운영 | — |
 | `keycloak` | 사내 AD 인증 SSO — OIDC · AD 연동 · k8s API 서버 연동 · 온프렘 배포/운영 | — |
 | `shadcn` | shadcn/ui 단독 — **테마 = 리소스 목록** 관점 | 아래 "shadcn 덱" 절을 읽는다 |
 | `supabase` | Postgres 위의 백엔드 플랫폼 · RLS · Vercel 역할 배분 | — |
@@ -29,7 +30,7 @@ dev 서버는 백그라운드 모드로 띄운다: `astro dev --background`
 `web`은 `~/workspace/web-study`의 노트를,
 `keycloak`은 `~/workspace/k8s-study`의 노트(`11_identity-keycloak/`, `04_services-networking/oauth2-proxy.md`)를
 **참고해 다시 쓴 것**이지만 어느 쪽도 동기화 대상이 아니다 (slidev 쪽은 슬라이드라 구조 자체가 다르다).
-`web`·`keycloak` 덱은 shadcn 덱의 서술 규칙(`<TermIntro>`, 용어 풀어 쓰기)을 따른다.
+`web`·`keycloak`·`kafka` 덱은 shadcn 덱의 서술 규칙(`<TermIntro>`, 용어 풀어 쓰기)을 따른다.
 
 ### shadcn 덱 (2026-08-06 소유자 결정)
 

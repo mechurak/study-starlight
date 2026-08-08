@@ -29,6 +29,10 @@ hero:
       link: /keycloak/
       icon: right-arrow
       variant: minimal
+    - text: Kafka
+      link: /kafka/
+      icon: right-arrow
+      variant: minimal
 ---
 
 import { Card, CardGrid } from '@astrojs/starlight/components';
@@ -69,6 +73,12 @@ import { Card, CardGrid } from '@astrojs/starlight/components';
 		쿠버네티스 API 서버 연동, 온프렘 배포와 운영까지 관리자 관점으로.
 
 		[시작하기 →](/keycloak/)
+	</Card>
+	<Card title="Kafka — 서비스 사이의 지워지지 않는 로그" icon="random">
+		서비스끼리 직접 부르던 결합을 시간 축에서 끊는 로그 — 파티션 · 전달 보장부터
+		Strimzi로 온프렘 쿠버네티스에서 굴리는 법까지 도입하는 사람 관점으로.
+
+		[시작하기 →](/kafka/)
 	</Card>
 	<Card title="다음 덱" icon="add-document">
 		새 주제는 `src/content/docs/<덱이름>/`에 페이지를 추가하고
