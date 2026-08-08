@@ -15,12 +15,13 @@ import { LinkCard } from '@astrojs/starlight/components';
 
 | 과제 | 명령 |
 |---|---|
-| 타입·ClusterIP 확인 | `k get svc` → TYPE 열 |
-| targetPort 확인 | `k describe svc <name>` → TargetPort |
-| 라벨 확인 | `k get svc --show-labels` |
-| 엔드포인트 개수 | `k describe svc <name>` → Endpoints |
+| 타입·ClusterIP 확인 — *What is the type of the default kubernetes service?* | `k get svc` → TYPE 열 |
+| targetPort 확인 — *What is the targetPort configured on the kubernetes service?* | `k describe svc <name>` → TargetPort |
+| 라벨 확인 — *How many labels are configured on the kubernetes service?* | `k get svc --show-labels` |
+| 엔드포인트 개수 — *How many Endpoints are attached on the kubernetes service?* | `k describe svc <name>` → Endpoints |
 
-Service 생성 문제는 정의 파일의 빈칸(셀렉터·포트)을 채워 `create -f` 하거나,
+Service 생성 문제 — *Create a new service to access the web application using the
+service-definition-1.yaml file.* — 는 정의 파일의 빈칸(셀렉터·포트)을 채워 `create -f` 하거나,
 [1장의 `expose` 한 줄](/cka-udemy/01-basics/)로 끝낸다.
 
 :::tip[엔드포인트가 답의 근거다]
@@ -36,15 +37,23 @@ Service 생성 문제는 정의 파일의 빈칸(셀렉터·포트)을 채워 `c
 노드의 네트워크 인터페이스를 읽는 연습 — 시험보다 [18장 트러블슈팅](/cka/18-troubleshooting/)의 재료다.
 
 ```bash
+# "What is the Internal IP address of the controlplane node in this cluster?"
 kubectl get nodes -o wide                 # INTERNAL-IP
+# "What is the network interface configured for cluster connectivity on the controlplane node?"
+# "What is the MAC address of the interface on the controlplane node?"
 ip a | grep -B2 <그 IP>                   # 해당 IP를 가진 인터페이스와 MAC(link/ether)
+# "If you were to ping google from the controlplane node, which route does it take?"
 ip route show default                     # 기본 게이트웨이
+# "What is the port the kube-scheduler is listening on in the controlplane node?"
 netstat -nplt | grep kube-scheduler       # 프로세스가 듣는 포트 (스케줄러: 10259)
+# "Notice that ETCD is listening on two ports. Which of these have more client connections established?"
 netstat -anp | grep etcd                  # etcd: 클라이언트 2379, 피어 2380
 ```
 
 - 인터페이스 이름 규칙: `eth*`는 물리, `lo`는 루프백, `veth*`는 Pod 쪽 터널 —
   veth가 물려 있는 브리지(`cni0` 등)가 컨테이너 런타임이 만든 브리지다
+  — *We use Containerd as our container runtime. What is the interface/bridge created by
+  Containerd on this host?*
 - etcd의 두 포트 중 연결이 많은 쪽은 **2379**(API 서버가 붙는 클라이언트 포트),
   2380은 컨트롤 플레인이 여럿일 때의 피어 통신용이다
 
@@ -56,15 +65,18 @@ netstat -anp | grep etcd                  # etcd: 클라이언트 2379, 피어 2
 
 | 대역 | 찾는 곳 |
 |---|---|
-| 노드 | `k get nodes -o wide` → INTERNAL-IP |
-| Pod | `k get pods -A -o wide` — 단, **호스트 네트워크를 쓰는 컨트롤 플레인 static Pod은 제외**하고 본다 |
-| Service | `k get svc -A` → CLUSTER-IP |
+| 노드 — *What network range are the nodes in the cluster part of?* | `k get nodes -o wide` → INTERNAL-IP |
+| Pod — *What is the range of IP addresses configured for PODs on this cluster?* | `k get pods -A -o wide` — 단, **호스트 네트워크를 쓰는 컨트롤 플레인 static Pod은 제외**하고 본다 |
+| Service — *What is the IP Range configured for the services within the cluster?* | `k get svc -A` → CLUSTER-IP |
 
 kube-proxy 관련 —
 
 ```bash
+# "How many kube-proxy pods are deployed in this cluster?"
 kubectl get pods -n kube-system | grep kube-proxy   # 노드 수만큼 있다
+# "What type of proxy is the kube-proxy configured to use?"
 kubectl logs -n kube-system <kube-proxy-pod>        # 프록시 모드(iptables 등)가 로그에 찍힌다
+# "How does this Kubernetes cluster ensure that a kube-proxy pod runs on all nodes in the cluster?"
 kubectl get ds -n kube-system                       # 모든 노드에 하나씩 = DaemonSet
 ```
 

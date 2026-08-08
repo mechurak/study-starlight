@@ -15,10 +15,11 @@ import { LinkCard } from '@astrojs/starlight/components';
 원본 랩: [practice-test-manual-scheduling](https://kodekloud.com/topic/practice-test-manual-scheduling/)
 
 스케줄러가 없는 클러스터(kube-system에 kube-scheduler Pod이 없다)에서
-Pod이 Pending에 머무는 상황 — `spec.nodeName`을 직접 채워 배치한다.
+Pod이 Pending에 머무는 상황 — *Why is the POD in a pending state? Inspect the environment
+for various kubernetes control plane components.* — `spec.nodeName`을 직접 채워 배치한다.
 
 ```yaml
-spec:
+spec:                  # — "Manually schedule the pod on node01."
   nodeName: node01     # 스케줄러를 거치지 않는 직접 지정
   containers:
   - image: nginx
@@ -28,6 +29,7 @@ spec:
 :::caution[함정 — nodeName은 나중에 못 붙인다]
 실행 중인 Pod에 `nodeName`을 추가하는 건 불가능하다 —
 **지우고 재생성**해야 한다 (`kubectl replace --force -f nginx.yaml`).
+후속 문제도 같은 반복이다 — *Now schedule the same pod on the controlplane node.*
 :::
 
 ## 라벨과 셀렉터 — Practice Test: Labels and Selectors
@@ -35,21 +37,27 @@ spec:
 원본 랩: [practice-test-labels-and-selectors](https://kodekloud.com/topic/practice-test-labels-and-selectors/)
 
 ```bash
+# "We have deployed a number of PODs. They are labelled with tier, env and bu. How many PODs exist in the dev environment (env)?"
 kubectl get pods --selector env=dev                          # 하나
+# "Identify the POD which is part of the prod environment, the finance BU and of frontend tier?"
 kubectl get all --selector env=prod,bu=finance,tier=frontend # AND 조건은 쉼표
 kubectl get pods -l env=dev --no-headers | wc -l             # 개수 세기 콤보
 ```
 
 `--selector`와 `-l`은 같다. "PODs, ReplicaSets **포함 모든 오브젝트**"를 세라면
-`get pods`가 아니라 **`get all`**이다.
+`get pods`가 아니라 **`get all`**이다 — *How many objects are in the prod environment
+including PODs, ReplicaSets and any other objects?*
 
 ## taint와 toleration — Practice Test: Taints and Tolerations
 
 원본 랩: [practice-test-taints-and-tolerations](https://kodekloud.com/topic/practice-test-taints-and-tolerations/)
 
 ```bash
+# "Do any taints exist on node01 node?"
 kubectl describe node node01 | grep -i taints        # 확인
+# "Create a taint on node01 with key of spray, value of mortein and effect of NoSchedule"
 kubectl taint nodes node01 spray=mortein:NoSchedule  # 부여
+# "Remove the taint on controlplane, which currently has the taint effect of NoSchedule."
 kubectl taint nodes controlplane node-role.kubernetes.io/control-plane:NoSchedule-  # 제거는 끝에 -
 ```
 
@@ -59,7 +67,7 @@ kubectl taint nodes controlplane node-role.kubernetes.io/control-plane:NoSchedul
 toleration은 **Pod 스펙 수준**(containers와 같은 들여쓰기)에 넣는다 —
 
 ```yaml
-spec:
+spec:                # — "Create another pod named bee with the nginx image, which has a toleration set to the taint mortein."
   tolerations:
   - key: spray
     operator: Equal
@@ -73,7 +81,8 @@ spec:
 :::caution[함정 — toleration은 "가게" 하지 않는다]
 toleration을 줘도 그 노드로 **유도되지는 않는다** — 갈 수 있게 될 뿐이다.
 컨트롤 플레인의 taint를 제거하면 일반 Pod도 그리로 갈 수 있게 된다는 것,
-그 역방향도 이 랩의 출제 포인트다.
+그 역방향도 이 랩의 출제 포인트다 — *Why do you think the pod is in a pending state?*
+→ *Which node is the POD mosquito on now?*
 :::
 
 ## nodeAffinity — Practice Test: Node Affinity
@@ -81,14 +90,16 @@ toleration을 줘도 그 노드로 **유도되지는 않는다** — 갈 수 있
 원본 랩: [practice-test-node-affinity](https://kodekloud.com/topic/practice-test-node-affinity-2/)
 
 ```bash
+# "How many Labels exist on node node01?"
 kubectl get node node01 --show-labels
+# "Apply a label color=blue to node node01"
 kubectl label node node01 color=blue
 ```
 
 Deployment의 **Pod 템플릿 쪽**(`spec.template.spec`)에 붙인다 —
 
 ```yaml
-      affinity:
+      affinity:      # — "Set Node Affinity to the deployment to place the pods on node01 only."
         nodeAffinity:
           requiredDuringSchedulingIgnoredDuringExecution:
             nodeSelectorTerms:
@@ -100,17 +111,18 @@ Deployment의 **Pod 템플릿 쪽**(`spec.template.spec`)에 붙인다 —
 ```
 
 값 없이 라벨의 존재만 볼 때는 `operator: Exists` (컨트롤 플레인에 배치하는 문제에서
-`key: node-role.kubernetes.io/control-plane`과 함께 쓴다).
+`key: node-role.kubernetes.io/control-plane`과 함께 쓴다) — *Create a new deployment named red
+with the nginx image and 2 replicas, and ensure it gets placed on the controlplane node only.*
 
 ## 리소스 요청과 제한 — Practice Test: Resource Limits
 
 원본 랩: [practice-test-resource-limits](https://kodekloud.com/topic/practice-test-resource-limits/)
 
-- `k describe pod rabbit` → Requests/Limits 확인
-- STATUS `OOMKilled` = 메모리 limit 초과로 죽음 → limit을 올려서 재생성
+- `k describe pod rabbit` → Requests/Limits 확인 — *Run the command 'kubectl describe pod rabbit' and inspect requests.*
+- STATUS `OOMKilled` = 메모리 limit 초과로 죽음 → limit을 올려서 재생성 — *The status 'OOMKilled' indicates that the pod ran out of memory. Identify the memory limit set on the POD.*
 
 ```yaml
-    resources:
+    resources:       # — "Update the elephant.yaml pod definition with the resource memory limits to 20Mi"
       requests:
         memory: 15Mi
       limits:
@@ -125,13 +137,16 @@ Pod 수준 리소스 수정도 원칙은 재생성이지만, 요즘 시험 기�
 원본 랩: [practice-test-daemonsets](https://kodekloud.com/topic/practice-test-daemonsets/)
 
 ```bash
+# "Run the command kubectl get daemonsets --all-namespaces"
 kubectl get ds -A                                        # kube-proxy가 대표 사례
+# "Run the command kubectl describe daemonset kube-proxy --namespace=kube-system"
 kubectl describe ds kube-proxy -n kube-system
 ```
 
 DaemonSet은 명령형 생성 명령이 없다 — **Deployment YAML을 뽑아서 고치는 것**이 정석이다:
 
 ```bash
+# "Create a daemonset"
 kubectl create deployment elasticsearch -n kube-system \
   --image=registry.k8s.io/fluentd-elasticsearch:1.20 --dry-run=client -o yaml > ds.yaml
 ```
@@ -145,10 +160,10 @@ kubectl create deployment elasticsearch -n kube-system \
 
 | 과제 | 명령 |
 |---|---|
-| 스태틱 Pod 찾기 | 이름 끝에 노드명 접미사 (`etcd-controlplane`) — `-o wide`로 노드 확인 |
-| 매니페스트 경로 찾기 | `ps -aux \| grep kubelet` → `--config` 파일 → `grep staticPodPath /var/lib/kubelet/config.yaml` |
-| 스태틱 Pod 만들기 | 아래 한 줄 |
-| 지우기 | 해당 노드에 ssh → 매니페스트 파일 삭제 |
+| 스태틱 Pod 찾기 — *Run the command kubectl get pods --all-namespaces and look for those with -controlplane appended in the name* | 이름 끝에 노드명 접미사 (`etcd-controlplane`) — `-o wide`로 노드 확인 |
+| 매니페스트 경로 찾기 — *Run the command ps -aux \| grep kubelet and identify the config file… Then checkin the config file for staticPdPath.* | `ps -aux \| grep kubelet` → `--config` 파일 → `grep staticPodPath /var/lib/kubelet/config.yaml` |
+| 스태틱 Pod 만들기 — *Create a pod definition file in the manifests folder. Use command kubectl run --restart=Never --image=busybox static-busybox…* | 아래 한 줄 |
+| 지우기 — *Identify which node the static pod is created on, ssh to the node and delete the pod definition file.…* | 해당 노드에 ssh → 매니페스트 파일 삭제 |
 
 ```bash
 kubectl run static-busybox --image=busybox --restart=Never \

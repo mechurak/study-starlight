@@ -18,16 +18,19 @@ kubeadm 클러스터의 인증서 위치는 정해져 있다 —
 
 | 무엇 | 어디 |
 |---|---|
-| API 서버 인증서 | `/etc/kubernetes/pki/apiserver.crt` |
-| API 서버 → etcd 클라이언트 | `/etc/kubernetes/pki/apiserver-etcd-client.crt` |
-| API 서버 → kubelet 클라이언트 | `/etc/kubernetes/pki/apiserver-kubelet-client.crt` |
-| etcd 서버 인증서 | `/etc/kubernetes/pki/etcd/server.crt` |
-| etcd CA | `/etc/kubernetes/pki/etcd/ca.crt` |
+| API 서버 인증서 — *Identify the certificate file used for the kube-api server* | `/etc/kubernetes/pki/apiserver.crt` |
+| API 서버 → etcd 클라이언트 — *Identify the Certificate file used to authenticate kube-apiserver as a client to ETCD Server* | `/etc/kubernetes/pki/apiserver-etcd-client.crt` |
+| API 서버 → kubelet 클라이언트 — *Look for kubelet-client-key option in the file /etc/kubernetes/manifests/kube-apiserver.yaml* | `/etc/kubernetes/pki/apiserver-kubelet-client.crt` |
+| etcd 서버 인증서 — *Look for cert file option in the file /etc/kubernetes/manifests/etcd.yaml* | `/etc/kubernetes/pki/etcd/server.crt` |
+| etcd CA — *Look for CA Certificate in file /etc/kubernetes/manifests/etcd.yaml* | `/etc/kubernetes/pki/etcd/ca.crt` |
 
 경로의 근거는 스태틱 Pod 매니페스트다 — `/etc/kubernetes/manifests/kube-apiserver.yaml`,
 `etcd.yaml`의 커맨드라인 플래그에 다 적혀 있다.
 
 ```bash
+# "Run the command openssl x509 -in /etc/kubernetes/pki/apiserver.crt -text and look for issuer"
+# "Run the command openssl x509 -in /etc/kubernetes/pki/apiserver.crt -text and look at Alternative Names"
+# "Run the command openssl x509 -in /etc/kubernetes/pki/apiserver.crt -text and check on the Expiry date."
 openssl x509 -in /etc/kubernetes/pki/apiserver.crt -text -noout
 # 볼 곳: Subject CN / Issuer / X509v3 Subject Alternative Name / Validity(Not After)
 ```
@@ -35,7 +38,8 @@ openssl x509 -in /etc/kubernetes/pki/apiserver.crt -text -noout
 :::caution[함정 — etcd는 CA가 따로다]
 etcd는 **자체 CA**(`pki/etcd/ca.crt`)를 쓴다. API 서버의 `--etcd-cafile`에
 루트 CA를 넣으면 API 서버가 etcd에 못 붙는다 — 이 랩의 마지막 문제이자
-[10장 트러블슈팅](/cka-udemy/10-troubleshooting/)의 단골 원인이다.
+[10장 트러블슈팅](/cka-udemy/10-troubleshooting/)의 단골 원인이다
+— *ETCD has its own CA. The right CA must be used for the ETCD-CA file in /etc/kubernetes/manifests/kube-apiserver.yaml.*
 :::
 
 ## CSR 승인 — Practice Test: Certificates API
@@ -45,11 +49,16 @@ etcd는 **자체 CA**(`pki/etcd/ca.crt`)를 쓴다. API 서버의 `--etcd-cafile
 새 사용자의 인증서 서명 요청(CSR, CertificateSigningRequest) 처리 —
 
 ```bash
+# "A new member akshay joined our team. He requires access to our cluster. The Certificate Signing Request is at the /root location."
 cat akshay.csr | base64 -w 0     # request 필드에 넣을 값
 kubectl apply -f akshay-csr.yaml # kind: CertificateSigningRequest
+# "Run the command kubectl get csr"
 kubectl get csr
+# "Run the command kubectl certificate approve akshay"
 kubectl certificate approve akshay
+# "Run the command kubectl certificate deny agent-smith"
 kubectl certificate deny agent-smith    # 수상한 요청은 거부
+# "Run the command kubectl delete csr agent-smith"
 kubectl delete csr agent-smith
 ```
 
@@ -57,7 +66,7 @@ CSR YAML의 뼈대(`signerName: kubernetes.io/kube-apiserver-client`, `usages: [
 공식 문서에서 복사한다 — [cka 14장](/cka/14-rbac/)에 전체 흐름이 있다.
 
 :::tip[누가 요청했는지 의심하기]
-`kubectl get csr <name> -o yaml`로 **groups와 usages**를 본다.
+`kubectl get csr <name> -o yaml`로 **groups와 usages**를 본다 — *Run the command kubectl get csr agent-smith -o yaml*.
 `system:masters` 그룹을 요구하는 CSR은 승인하면 안 된다 — 거부 문제로 나온다.
 :::
 
@@ -66,8 +75,12 @@ CSR YAML의 뼈대(`signerName: kubernetes.io/kube-apiserver-client`, `usages: [
 원본 랩: [practice-test-kubeconfig](https://kodekloud.com/topic/practice-test-kubeconfig/)
 
 ```bash
+# "Run the kubectl config view command and count the number of clusters"
 kubectl config view                                   # 기본 파일(~/.kube/config)
+# "How many contexts are configured in the 'my-kube-config' file?"
+# "What user is configured in the 'research' context?"
 kubectl config view --kubeconfig my-kube-config       # 다른 파일 지정
+# "Run the command kubectl config --kubeconfig=/root/my-kube-config use-context research"
 kubectl config --kubeconfig=/root/my-kube-config use-context research
 ```
 
@@ -77,7 +90,8 @@ kubectl config --kubeconfig=/root/my-kube-config use-context research
 :::caution[함정 — kubectl이 갑자기 안 될 때]
 `kubectl get pods`가 인증서 에러를 뱉으면 kubeconfig의
 **client-certificate 경로 오타**부터 확인한다. 이 랩의 마지막 문제이며,
-실전에서도 "잘 되던 kubectl이 안 된다" 유형의 흔한 정답이다.
+실전에서도 "잘 되던 kubectl이 안 된다" 유형의 흔한 정답이다
+— *The path to certificate is incorrect in the kubeconfig file. Fix it. All users certificates are stored at /etc/kubernetes/pki/users*.
 :::
 
 ## Role과 RoleBinding — Practice Test: RBAC
@@ -85,9 +99,13 @@ kubectl config --kubeconfig=/root/my-kube-config use-context research
 원본 랩: [practice-test-role-based-access-controls](https://kodekloud.com/topic/practice-test-role-based-access-controls/)
 
 ```bash
+# "Run the command kubectl describe pod kube-apiserver-controlplane -n kube-system and look for --authorization-mode"
 kubectl describe pod kube-apiserver-controlplane -n kube-system | grep authorization-mode
+# "Run the command kubectl get roles --all-namespaces"
 kubectl get roles -A
+# "Check the verbs associated to the kube-proxy role"
 kubectl describe role kube-proxy -n kube-system       # 리소스·verbs 읽기
+# "Run the command kubectl get pods --as dev-user"
 kubectl get pods --as dev-user                        # 권한 시험해보기
 kubectl create role developer --verb=list,create,delete --resource=pods -n default
 kubectl create rolebinding dev-user-binding --role=developer --user=dev-user -n default
@@ -99,7 +117,8 @@ kubectl create rolebinding dev-user-binding --role=developer --user=dev-user -n 
 :::
 
 :::caution[함정 — resourceNames]
-"특정 이름의 리소스만" 허용하는 Role은 rules에 `resourceNames: ["blue-app"]`가 붙는다.
+"특정 이름의 리소스만" 허용하는 Role은 rules에 `resourceNames: ["blue-app"]`가 붙는다
+— *New roles and role bindings are created in the blue namespace. Check it out. Check the resourceNames configured on the role*.
 edit로 고칠 때 이 필드를 놓치면 계속 403이다.
 :::
 
@@ -107,8 +126,8 @@ edit로 고칠 때 이 필드를 놓치면 계속 403이다.
 
 원본 랩: [practice-test-cluster-roles](https://kodekloud.com/topic/practice-test-cluster-roles/)
 
-- ClusterRole/ClusterRoleBinding은 **네임스페이스가 없다** — "어느 ns 소속인가"는 함정 질문
-- 개수 세기: `kubectl get clusterroles --no-headers | wc -l`
+- ClusterRole/ClusterRoleBinding은 **네임스페이스가 없다** — "어느 ns 소속인가"는 함정 질문 — *What namespace is the cluster-admin clusterrole part of?*
+- 개수 세기: `kubectl get clusterroles --no-headers | wc -l` — *Run the command `kubectl get clusterroles --no-headers | wc -l` or `kubectl get clusterroles --no-headers -o json | jq '.items | length'`*
 
 노드 관리자·스토리지 관리자를 만드는 문제 —
 
@@ -130,18 +149,21 @@ kubectl create clusterrolebinding michelle-storage-admin \
 원본 랩: [practice-test-service-accounts](https://uklabs.kodekloud.com/topic/practice-test-service-accounts-2/)
 
 ```bash
+# "How many service accounts exist in the default namespace?"
 kubectl get sa
+# "Create a new ServiceAccount named dashboard-sa."
 kubectl create serviceaccount dashboard-sa
 kubectl create token dashboard-sa            # 수명 있는 토큰 발급 (TokenRequest)
 ```
 
-- Pod이 어떤 SA를 쓰는지: `kubectl get pod <name> -o jsonpath='{.spec.serviceAccountName}'`
-- 토큰이 마운트되는 곳: `/var/run/secrets/kubernetes.io/serviceaccount`
+- Pod이 어떤 SA를 쓰는지: `kubectl get pod <name> -o jsonpath='{.spec.serviceAccountName}'` — *Which account does the Dashboard application use to query the Kubernetes API?*
+- 토큰이 마운트되는 곳: `/var/run/secrets/kubernetes.io/serviceaccount` — *At what location is the ServiceAccount credentials available within the pod?*
 - Deployment의 SA 교체: `kubectl set serviceaccount deploy web-dashboard dashboard-sa`
   (또는 edit로 `spec.template.spec.serviceAccountName`) — 템플릿 변경이라 롤아웃된다
+  — *Edit the deployment to change ServiceAccount from default to dashboard-sa.*
 
 :::caution[함정 — SA에는 더 이상 자동 Secret이 없다]
-`describe sa`의 Tokens가 `<none>`인 게 정상이다. 무기한 Secret 자동 생성은 폐기됐고,
+`describe sa`의 Tokens가 `<none>`인 게 정상이다 — *What is the secret token used by the default service account?* 무기한 Secret 자동 생성은 폐기됐고,
 지금은 **`kubectl create token`으로 수명 있는 토큰을 발급**한다 — [cka 14장](/cka/14-rbac/).
 :::
 
@@ -150,6 +172,7 @@ kubectl create token dashboard-sa            # 수명 있는 토큰 발급 (Toke
 원본 랩: [practice-test-image-security](https://kodekloud.com/topic/practice-test-image-security/)
 
 ```bash
+# "Run command kubectl create secret docker-registry private-reg-cred --docker-username=dock_user --docker-password=dock_password …"
 kubectl create secret docker-registry private-reg-cred \
   --docker-server=myprivateregistry.com:5000 \
   --docker-username=dock_user \
@@ -160,12 +183,14 @@ kubectl create secret docker-registry private-reg-cred \
 그리고 Pod 템플릿에 (컨테이너가 아니라 **spec 수준**) —
 
 ```yaml
+      # "Edit deployment using kubectl edit deploy web command and add imagePullSecrets section. Use private-reg-cred"
       imagePullSecrets:
       - name: private-reg-cred
 ```
 
 이미지를 `myprivateregistry.com:5000/nginx:alpine`처럼 바꾼 뒤 `ImagePullBackOff`가 뜨면
-이 Secret이 없다는 신호다. Secret 타입은 `docker-registry`라는 것까지 기억.
+이 Secret이 없다는 신호다 — *Use the kubectl edit deployment command to edit the image name
+to myprivateregistry.com:5000/nginx:alpine*. Secret 타입은 `docker-registry`라는 것까지 기억.
 
 ## 이 장에서 남길 것
 

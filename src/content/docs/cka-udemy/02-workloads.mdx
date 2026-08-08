@@ -16,17 +16,20 @@ import { LinkCard } from '@astrojs/starlight/components';
 
 | 과제 | 명령 |
 |---|---|
-| 조회 (단축명 `rs`) | `k get rs` / `k get rs -o wide` |
-| 이미지 확인 | `k describe rs <name>` 또는 `-o wide`의 IMAGES 열 |
-| 스케일 | `k scale rs new-replica-set --replicas 5` |
-| 삭제 (여러 개 한 번에) | `k delete rs replicaset-1 replicaset-2` |
+| 조회 (단축명 `rs`) — *How many ReplicaSets exist on the system?* | `k get rs` / `k get rs -o wide` |
+| 이미지 확인 — *What is the image used to create the pods in the new-replica-set?* | `k describe rs <name>` 또는 `-o wide`의 IMAGES 열 |
+| 스케일 — *Scale the ReplicaSet to 5 PODs.* | `k scale rs new-replica-set --replicas 5` |
+| 삭제 (여러 개 한 번에) — *Delete the two newly created ReplicaSets - replicaset-1 and replicaset-2* | `k delete rs replicaset-1 replicaset-2` |
 
 깨진 정의 파일 두 유형 —
 
 - **apiVersion 오류**: `kubectl explain replicaset | grep VERSION`으로 맞는 값(`apps/v1`)을 확인해 고친다
+  — *Create a ReplicaSet using the replicaset-definition-1.yaml file located at /root/. There is an issue with the file, so try to fix it.*
 - **셀렉터 불일치**: `spec.selector.matchLabels`와 `spec.template.metadata.labels`가 **같아야** 생성된다
+  — *Fix the issue in the replicaset-definition-2.yaml file and create a ReplicaSet using it.*
 
 :::caution[함정 — ReplicaSet은 이미지를 고쳐도 Pod을 안 갈아엎는다]
+*Fix the original replica set new-replica-set to use the correct busybox image.* —
 `kubectl edit rs`로 이미지를 고쳐도 **기존 Pod은 그대로 깨진 채**다.
 ReplicaSet은 개수만 맞추는 루프라 템플릿 변경을 롤아웃하지 않는다. 고친 뒤 —
 
@@ -44,14 +47,17 @@ kubectl scale rs new-replica-set --replicas 4
 원본 랩: [practice-tests-deployments](https://kodekloud.com/topic/practice-tests-deployments/)
 
 Deployment를 만들면 ReplicaSet과 Pod이 딸려 나온다 — 조회 문제는
-`get deploy` → `get rs` → `get pods` 세 층을 오가며 센다.
+`get deploy` → `get rs` → `get pods` 세 층을 오가며 센다
+— *How many Deployments exist on the system now? How many ReplicaSets exist on the system now?*
 
+*Create a new Deployment using the deployment-definition-1.yaml file located at /root/. There is an issue with the file, so try to fix it.* —
 깨진 파일 유형: **`kind: deployment`처럼 대소문자가 틀린 경우** — `Deployment`로 고친다.
 kind는 대문자로 시작한다.
 
 스펙이 주어지는 생성 문제는 명령형이 빠르다 —
 
 ```bash
+# "Create a new Deployment with the below attributes using your own deployment definition file."
 kubectl create deployment httpd-frontend --image=httpd:2.4-alpine --replicas=3
 ```
 
@@ -61,11 +67,12 @@ kubectl create deployment httpd-frontend --image=httpd:2.4-alpine --replicas=3
 
 | 과제 | 보는 곳 |
 |---|---|
-| 전략 확인 | `k describe deploy` → StrategyType |
-| 몇 개씩 교체되나 | `k describe deploy` → RollingUpdateStrategy의 max unavailable |
-| 이미지 변경 | `k edit deploy frontend` 또는 `k set image deploy/frontend <컨테이너>=<이미지>` |
+| 전략 확인 — *Run the command 'kubectl describe deployment' and look at 'StrategyType'* | `k describe deploy` → StrategyType |
+| 몇 개씩 교체되나 — *Look at the Max Unavailable value under RollingUpdateStrategy in deployment details* | `k describe deploy` → RollingUpdateStrategy의 max unavailable |
+| 이미지 변경 — *Run the command 'kubectl edit deployment frontend' and modify the required feild* | `k edit deploy frontend` 또는 `k set image deploy/frontend <컨테이너>=<이미지>` |
 
 :::caution[함정 — 전략을 Recreate로 바꿀 때]
+*Run the command 'kubectl edit deployment frontend' and modify the required field. Make sure to delete the properties of rollingUpdate as well, set at 'strategy.rollingUpdate'.* —
 `strategy.type`을 `Recreate`로 바꾸라는 문제에서 `type`만 고치면 에러가 난다.
 **`strategy.rollingUpdate` 블록(maxSurge/maxUnavailable)을 통째로 지워야** 한다 —
 Recreate 전략에는 rollingUpdate 파라미터가 있을 수 없다.

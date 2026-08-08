@@ -31,7 +31,7 @@ Dockerfile의 ENTRYPOINT/CMD와 Pod 스펙의 command/args가 어떻게 덮어�
 | `CMD` | `args` | args가 CMD를 **대체** |
 
 ```yaml
-spec:
+spec:                       # — "Set the command option to ['sleep', '5000']."
   containers:
   - name: ubuntu-sleeper
     image: ubuntu-sleeper
@@ -40,7 +40,8 @@ spec:
 ```
 
 :::caution[함정 — 숫자도 문자열로]
-`command: ["sleep", 1200]`은 생성이 거부된다. YAML 배열 안의 값은
+`command: ["sleep", 1200]`은 생성이 거부된다 — *Both sleep and 1200 should be defined as a string.*
+YAML 배열 안의 값은
 **전부 따옴표 친 문자열**이어야 한다 — `["sleep", "1200"]`.
 :::
 
@@ -49,16 +50,17 @@ spec:
 원본 랩: [practice-test-env-variables](https://kodekloud.com/topic/practice-test-env-variables/)
 
 ```bash
+# "Create a new ConfigMap for the 'webapp-color' POD. Use the spec given on the right."
 kubectl create configmap webapp-config-map --from-literal=APP_COLOR=darkblue
 ```
 
 주입 두 방식 — 개별 지정(`env`)과 통째로(`envFrom`) —
 
 ```yaml
-    env:
+    env:              # — "Set the environment option to APP_COLOR - green."
     - name: APP_COLOR
       value: green
-    envFrom:
+    envFrom:          # — "Set the environment option to envFrom and use configMapRef webapp-config-map."
     - configMapRef:
         name: webapp-config-map
 ```
@@ -70,6 +72,7 @@ kubectl create configmap webapp-config-map --from-literal=APP_COLOR=darkblue
 원본 랩: [practice-test-secrets](https://kodekloud.com/topic/practice-test-secrets/)
 
 ```bash
+# "Run command kubectl create secret generic db-secret --from-literal=DB_Host=sql01 --from-literal=DBUser=root --from-literal=DB_Password=password123"
 kubectl create secret generic db-secret \
   --from-literal=DB_Host=sql01 \
   --from-literal=DB_User=root \
@@ -85,7 +88,8 @@ Pod에 통째로 주입은 ConfigMap과 대칭이다 —
 ```
 
 :::tip[조회 습관]
-`k get secrets`의 **DATA 열**이 키 개수다. 값 확인은 `k describe secret`이 아니라
+`k get secrets`의 **DATA 열**이 키 개수다 — *Run the command 'kubectl get secrets' and look at the DATA field*.
+값 확인은 `k describe secret`이 아니라
 `k get secret <name> -o jsonpath='{.data.<key>}' | base64 -d` — describe는 값을 안 보여준다.
 :::
 
@@ -95,9 +99,9 @@ Pod에 통째로 주입은 ConfigMap과 대칭이다 —
 
 | 과제 | 위치 |
 |---|---|
-| 실행 유저 확인 | `k exec ubuntu-sleeper -- whoami` |
-| 유저 바꾸기 | `securityContext.runAsUser: 1010` |
-| 커널 능력 추가 | 컨테이너 쪽 `securityContext.capabilities.add: ["SYS_TIME"]` |
+| 실행 유저 확인 — *Run the command 'kubectl exec ubuntu-sleeper -- whoami'…* | `k exec ubuntu-sleeper -- whoami` |
+| 유저 바꾸기 — *Set a security context to run as user 1010.* | `securityContext.runAsUser: 1010` |
+| 커널 능력 추가 — *Add SYS_TIME capability to the container's securityContext* | 컨테이너 쪽 `securityContext.capabilities.add: ["SYS_TIME"]` |
 
 ```yaml
 spec:
@@ -111,7 +115,8 @@ spec:
 ```
 
 :::caution[함정 — capabilities는 컨테이너 수준에만]
-`runAsUser`는 Pod·컨테이너 양쪽에 다 쓸 수 있고 컨테이너 쪽이 이기지만,
+`runAsUser`는 Pod·컨테이너 양쪽에 다 쓸 수 있고 컨테이너 쪽이 이기지만
+(*The User ID defined in the securityContext of the container overrides the User ID in the POD.*),
 **`capabilities`는 컨테이너 수준에만** 존재한다. Pod 수준에 넣으면 거부된다.
 :::
 
@@ -119,7 +124,8 @@ spec:
 
 원본 랩: [practice-test-multi-container-pods](https://kodekloud.com/topic/practice-test-multi-container-pods/)
 
-- 컨테이너 수는 `k get pod red`의 READY 열(`x/y`의 y), 이름은 `k describe pod blue`
+- 컨테이너 수는 `k get pod red`의 READY 열(`x/y`의 y) — *Identify the number of containers running in the 'red' pod.*
+- 이름은 `k describe pod blue` — *Identify the name of the containers running in the 'blue' pod.*
 - 특정 컨테이너에 들어가기: `k exec -it <pod> -c <container> -- sh`
 - 로그 확인: `k logs <pod> -c <container>` — 멀티 컨테이너에서 `-c`는 필수다
 
@@ -133,9 +139,9 @@ spec:
 
 | 과제 | 보는 곳 |
 |---|---|
-| init 컨테이너 있는 Pod 찾기 | `k describe pods` → Init Containers 절 |
-| init 상태·실패 이유 | `k describe pod <name>` → State / Reason |
-| init 추가·수정 | YAML 뽑아 고치고 재생성 (이 장 첫머리 3단계) |
+| init 컨테이너 있는 Pod 찾기 — *Identify the pod that has an initContainer configured.* | `k describe pods` → Init Containers 절 |
+| init 상태·실패 이유 — *Run the command kubectl describe pod blue and check the state field of the initContainer.* | `k describe pod <name>` → State / Reason |
+| init 추가·수정 — *Update the pod red to use an initContainer that uses the busybox image and sleeps for 20 seconds* | YAML 뽑아 고치고 재생성 (이 장 첫머리 3단계) |
 
 ```yaml
 spec:
@@ -147,7 +153,9 @@ spec:
 
 :::caution[함정 — Init:CrashLoopBackOff]
 Pod STATUS가 `Init:...`으로 시작하면 범인은 본 컨테이너가 아니라 init이다.
-원본 랩의 정답도 `sleeeep 2`라는 **오타 하나**였다 — init의 command부터 읽을 것.
+원본 랩의 정답도 `sleeeep 2`라는 **오타 하나**였다 — *Check the command used by the initContainer.
+Looks like there is a type in sleep command. Fix it, it should be `sleep 2` not `sleeeep 2`* —
+init의 command부터 읽을 것.
 init은 **순서대로, 성공해야** 다음으로 넘어간다.
 :::
 

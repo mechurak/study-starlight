@@ -16,13 +16,14 @@ import { LinkCard } from '@astrojs/starlight/components';
 
 | 과제 | 명령 |
 |---|---|
-| Pod 개수 세기 | `k get pods --no-headers \| wc -l` |
-| Pod 만들기 | `k run nginx --image=nginx` |
-| 이미지·노드 확인 | `k get pods -o wide` 또는 `k describe pod <name>` |
-| 컨테이너 상태·에러 원인 | `k describe pod <name>` → State / Events |
-| Pod 삭제 (빠르게) | `k delete pod webapp --force` |
-| YAML 뽑아서 생성 | `k run redis --image=redis123 --dry-run=client -o yaml > redis.yaml` |
+| Pod 개수 세기 — *How many pods exist on the system?* | `k get pods --no-headers \| wc -l` |
+| Pod 만들기 — *Create a new pod with the nginx image.* | `k run nginx --image=nginx` |
+| 이미지·노드 확인 — *What is the image used to create the new pods? / Which nodes are these pods placed on?* | `k get pods -o wide` 또는 `k describe pod <name>` |
+| 컨테이너 상태·에러 원인 — *What is the state of the container agentx in the pod webapp? / Why do you think the container agentx in pod webapp is in error?* | `k describe pod <name>` → State / Events |
+| Pod 삭제 (빠르게) — *Delete the webapp Pod.* | `k delete pod webapp --force` |
+| YAML 뽑아서 생성 — *Create a new pod with the name redis and with the image redis123. Use a pod-definition YAML file.* | `k run redis --image=redis123 --dry-run=client -o yaml > redis.yaml` |
 
+*Now change the image on this pod to redis. Once done, the pod should be in a running state.* —
 이미지 이름이 틀린 Pod(`redis123`)을 고치는 방법은 셋 다 알아둔다 —
 
 ```bash
@@ -35,6 +36,7 @@ kubectl set image pod/redis redis=redis
 ```
 
 :::tip[READY 열 읽는 법]
+*What does the READY column in the output of the kubectl get pods command indicate?* —
 `READY 1/2`는 "컨테이너 2개 중 1개 준비됨"이다. Pod 개수가 아니라
 **컨테이너 준비 수 / 전체 수** — 멀티 컨테이너 문제에서 반복해서 나온다.
 :::
@@ -50,16 +52,18 @@ kubectl set image pod/redis redis=redis
 
 | 과제 | 명령 |
 |---|---|
-| 네임스페이스 목록 | `k get ns` |
-| 특정 ns의 Pod | `k get pods -n research` |
-| 전체 ns에서 찾기 | `k get pods -A \| grep blue` |
-| ns 지정해 생성 | `k run redis --image=redis -n finance` |
+| 네임스페이스 목록 — *How many Namespaces exist on the system?* | `k get ns` |
+| 특정 ns의 Pod — *How many pods exist in the research namespace?* | `k get pods -n research` |
+| 전체 ns에서 찾기 — *Which namespace has the blue pod in it?* | `k get pods -A \| grep blue` |
+| ns 지정해 생성 — *Create a POD in the finance namespace.* | `k run redis --image=redis -n finance` |
 
 DNS 이름 규칙이 이 랩의 진짜 출제 포인트다 —
 
 - **같은 네임스페이스**의 Service: 호스트 이름만 — `db-service`
+  — *What DNS name should the Blue application use to access the database db-service in its own namespace - marketing?*
 - **다른 네임스페이스**(dev)의 Service: `db-service.dev` 또는
   풀 네임 `db-service.dev.svc.cluster.local`
+  — *What DNS name should the Blue application use to access the database db-service in the dev namespace?*
 
 원리는 [cka 10장 이름 규칙](/cka/10-dns/)에 있다.
 
@@ -70,12 +74,19 @@ DNS 이름 규칙이 이 랩의 진짜 출제 포인트다 —
 YAML을 열지 않고 한 줄로 끝내는 연습이다. 전부 손에 붙여둘 것 —
 
 ```bash
+# "Deploy a pod named nginx-pod using the nginx:alpine image."
 kubectl run nginx-pod --image=nginx:alpine
+# "Deploy a redis pod using the redis:alpine image with the labels set to tier=db."
 kubectl run redis --image=redis:alpine -l tier=db          # 라벨 지정
+# "Create a new pod called custom-nginx using the nginx image and expose it on container port 8080."
 kubectl run custom-nginx --image=nginx --port=8080          # containerPort 지정
+# "Create a service redis-service to expose the redis application within the cluster on port 6379."
 kubectl expose pod redis --port=6379 --name redis-service   # ClusterIP Service
+# "Create a new namespace called dev-ns."
 kubectl create ns dev-ns
+# "Create a deployment named webapp using the image kodekloud/webapp-color with 3 replicas."
 kubectl create deployment webapp --image=kodekloud/webapp-color --replicas=3
+# "Create a new deployment called redis-deploy in the dev-ns namespace with the redis image. It should have 2 replicas."
 kubectl create deployment redis-deploy -n dev-ns --image=redis --replicas=2
 ```
 
@@ -84,6 +95,7 @@ kubectl create deployment redis-deploy -n dev-ns --image=redis --replicas=2
 `--expose`가 한 줄로 끝낸다 —
 
 ```bash
+# "Create a pod called httpd using the image httpd:alpine in the default namespace. Next, create a service of type ClusterIP by the same name (httpd). The target port for the service should be 80."
 kubectl run httpd --image=httpd:alpine --expose --port 80
 ```
 :::

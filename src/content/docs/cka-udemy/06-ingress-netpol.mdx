@@ -85,7 +85,7 @@ kubectl create serviceaccount ingress-nginx-admission -n ingress-nginx
 |---|---|
 | 정책 조회 | `k get netpol` |
 | 어느 Pod에 적용되나 | `k describe netpol` → PodSelector |
-| 무엇을 막나 | PolicyTypes + Ingress/Egress 규칙 읽기 |
+| 무엇을 막나 — *What is the impact of the rule configured on this Network Policy?* | PolicyTypes + Ingress/Egress 규칙 읽기 |
 
 작성 문제의 정석 — internal Pod에서 **나가는(Egress)** 트래픽을
 mysql(3306)과 payroll(8080)로만 허용:
@@ -120,7 +120,8 @@ spec:
 
 :::caution[함정 — 정책에 안 잡힌 Pod은 전부 허용]
 NetworkPolicy가 있어도 **podSelector에 안 걸린 Pod은 여전히 전부 허용**이다.
-"internal → payroll이 되는 이유"류의 보기 문제는 이 기본값을 묻는 것이다.
+"internal → payroll이 되는 이유"류의 보기 문제는 이 기본값을 묻는 것이다 —
+랩의 정답 보기도 *Only internal applications can access payroll service* 다.
 DNS(53/UDP) egress를 열어야 이름 조회가 되는 것도 같이 기억 — [cka 12장](/cka/12-networkpolicy/).
 :::
 
