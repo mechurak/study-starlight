@@ -154,12 +154,23 @@ pnpm build          # 실패하면 topics slug 오타나 mdx 문법이 대부분
 npx serve dist -l 4323
 ```
 
-브라우저로 확인할 것 세 가지 (Playwright는 레포 의존성이 아니다 — 스크래치패드에서 돌린다):
+**브라우저 검증은 무엇을 고쳤는지에 맞춰 고른다** — 덱을 수정했다고 전부 돌리지 않는다.
+검색은 빌드가 통과하면 거의 안 깨지니 따로 확인하지 않는다 (Pagefind 인덱스가 빌드 산출물이다).
+
+| 변경 | 검증 |
+|---|---|
+| 문장·문단·링크 수정 | `pnpm build`만 |
+| 표·컴포넌트(`<Steps>` 등) 추가 | build + 아래 3 (모바일 넘침) |
+| mermaid 추가·수정 | build + 아래 1 (라이트/다크 렌더) |
+| 테마·`custom.css`·config 변경 | 전수 스윕 (아래 주의 참고) |
+
+브라우저 확인 방법 (Playwright는 레포 의존성이 아니다 — 스크래치패드에서 돌린다):
 
 1. **mermaid** — `.mermaid` 안에 `svg`가 있는가 (astro-mermaid는 shadow DOM을 쓰지 않는다).
    **다크 모드에서도** 확인한다: `document.documentElement.dataset.theme = 'dark'` 후 재렌더를 기다린다
 2. **검색** — `button[data-open-modal]` 클릭 → `dialog[open] input`에 질의.
-   한국어 질의 포함 결과가 나오는가 (Pagefind 인덱스는 빌드 시 생성)
+   한국어 질의 포함 결과가 나오는가. 콘텐츠 수정 때는 생략 —
+   Starlight·Pagefind 업그레이드처럼 검색 자체를 건드렸을 때만 본다
 3. 모바일 390px에서 `scrollWidth > clientWidth`가 아닌가
    (코드 블록이 `main` 밖으로 나가는 것은 정상 — 자체 가로 스크롤이다. 문서 본문이 넘치는지를 본다)
 
