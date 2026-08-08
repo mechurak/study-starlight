@@ -1,0 +1,111 @@
+---
+title: "7. 스토리지 — PV · PVC · StorageClass"
+description: "PV/PVC 바인딩 조건, Pending의 두 가지 원인, WaitForFirstConsumer"
+---
+
+import { LinkCard } from '@astrojs/starlight/components';
+
+> 짝이 되는 개념 장: [cka 13. 스토리지](/cka/13-storage/)
+
+스토리지 실습의 핵심 질문은 하나다 — **"왜 Pending인가."**
+PVC가 Pending인 이유가 랩마다 다르고, 그 차이가 곧 출제 포인트다.
+
+## PV와 PVC — Practice Test: Persistent Volume Claims
+
+원본 랩: [practice-test-persistent-volume-claims](https://kodekloud.com/topic/practice-test-persistent-volume-claims/)
+
+흐름: hostPath 볼륨 → PV(PersistentVolume) → PVC(PersistentVolumeClaim) → Pod 마운트.
+
+```yaml
+# 1) Pod에 hostPath 볼륨
+  volumes:
+  - name: log-volume
+    hostPath:
+      path: /var/log/webapp
+```
+
+```yaml
+# 2) PV
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: pv-log
+spec:
+  accessModes: [ReadWriteMany]
+  capacity:
+    storage: 100Mi
+  hostPath:
+    path: /pv/log
+```
+
+```yaml
+# 3) PVC — 그리고 Pod에서 쓰기
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: claim-log-1
+spec:
+  accessModes: [ReadWriteMany]
+  resources:
+    requests:
+      storage: 50Mi
+```
+
+```yaml
+  volumes:
+  - name: log-volume
+    persistentVolumeClaim:
+      claimName: claim-log-1
+```
+
+:::caution[함정 1 — accessModes가 다르면 안 묶인다]
+PV가 `ReadWriteMany`, PVC가 `ReadWriteOnce`면 용량이 맞아도 **Pending**이다.
+바인딩 조건은 accessModes·용량·storageClassName 세 가지 — [cka 13장](/cka/13-storage/).
+:::
+
+:::caution[함정 2 — 바인딩되면 용량은 PV 것]
+50Mi를 요청해도 100Mi PV에 묶이면 **PVC의 CAPACITY는 100Mi**다. PV는 쪼개지지 않는다.
+:::
+
+사용 중인 PVC를 지우면 — `Terminating`에 **멈춘 채 대기**한다 (Pod이 쓰고 있는 동안).
+Pod을 지우면 그제야 삭제되고, PV는 reclaim 정책이 `Retain`이면 `Released`가 된다 —
+**다시 쓸 수 있는 상태가 아니다** (Available로 안 돌아온다).
+
+## StorageClass — Practice Test: Storage Class
+
+원본 랩: [practice-test-storage-class](https://kodekloud.com/topic/practice-test-storage-class-2/)
+
+| 과제 | 명령 |
+|---|---|
+| StorageClass 조회 | `k get sc` — PROVISIONER·VOLUMEBINDINGMODE 열 |
+| 동적 프로비저닝 여부 | provisioner가 `kubernetes.io/no-provisioner`면 **안 된다** (로컬 볼륨) |
+| PVC에 클래스 지정 | `spec.storageClassName: local-storage` |
+
+```yaml
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: delayed-volume-sc
+provisioner: kubernetes.io/no-provisioner
+volumeBindingMode: WaitForFirstConsumer
+```
+
+:::caution[함정 — WaitForFirstConsumer의 Pending은 정상이다]
+`volumeBindingMode: WaitForFirstConsumer`인 클래스의 PVC는 **그 PVC를 쓰는 Pod이
+스케줄될 때까지 Pending이 정상**이다. "왜 Pending인가"에 대한 답이
+7장 첫 랩(accessModes 불일치)과 다르다는 것 — 이 대비가 두 랩의 출제 의도다.
+Pod을 만들면 그때 바인딩된다.
+:::
+
+## 이 장에서 남길 것
+
+- PVC Pending의 원인은 둘 — **맞는 PV가 없다** vs **WaitForFirstConsumer 대기**
+- 바인딩 조건: accessModes · 용량 · storageClassName
+- 바인딩 후 용량은 PV 기준, PV는 Released여도 자동 재사용 안 됨
+- `no-provisioner` = 동적 프로비저닝 불가 = PV를 손으로 만들어야 한다
+
+<LinkCard
+  title="8. 인증서 · kubeconfig · RBAC"
+  description="인증서 위치와 openssl, CSR 승인, kubeconfig 수리, Role/ClusterRole, ServiceAccount."
+  href="/cka-udemy/08-security/"
+/>

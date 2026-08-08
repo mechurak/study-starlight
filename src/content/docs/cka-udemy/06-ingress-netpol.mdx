@@ -1,0 +1,138 @@
+---
+title: "6. Ingress와 NetworkPolicy"
+description: "Ingress 리소스 수정·생성과 컨트롤러 배포, NetworkPolicy 읽기·쓰기"
+---
+
+import { LinkCard } from '@astrojs/starlight/components';
+
+> 짝이 되는 개념 장: [cka 11. Ingress와 Gateway API](/cka/11-ingress-gateway/) · [cka 12. NetworkPolicy와 CNI](/cka/12-networkpolicy/)
+
+Ingress 실습은 두 벌이다 — 첫 벌은 **리소스**(라우팅 규칙)만 다루고,
+둘째 벌은 **컨트롤러**를 바닥부터 배포한다. 이 구분이 곧
+"Ingress = 리소스 + 컨트롤러"라는 [cka 11장](/cka/11-ingress-gateway/)의 축이다.
+
+## Ingress 리소스 — Practice Test: CKA Ingress 1
+
+원본 랩: [practice-test-cka-ingress-networking-1](https://kodekloud.com/topic/practice-test-cka-ingress-networking-1/)
+
+| 과제 | 명령 |
+|---|---|
+| 컨트롤러가 어느 ns에 있나 | `k get all -A \| grep -i ingress` |
+| 라우팅 규칙 읽기 | `k describe ingress -n app-space` → Host/Path → Backend |
+| 경로 수정·추가 | `k edit ingress -n app-space` |
+
+새 Ingress를 만드는 문제 — 현행 API(`networking.k8s.io/v1`)로 쓴다.
+(원본 랩 답안 일부는 폐기된 `extensions/v1beta1`로 남아 있다 — 그대로 쓰면 안 된다.)
+
+```yaml
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: ingress-pay
+  namespace: critical-space
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /
+    nginx.ingress.kubernetes.io/ssl-redirect: "false"
+spec:
+  rules:
+  - http:
+      paths:
+      - path: /pay
+        pathType: Prefix
+        backend:
+          service:
+            name: pay-service
+            port:
+              number: 8282
+```
+
+:::caution[함정 — Ingress는 앱과 같은 네임스페이스]
+Ingress 리소스는 **백엔드 Service가 있는 네임스페이스**에 만든다.
+컨트롤러의 네임스페이스가 아니다. `-n`을 빼먹으면 default에 생기고 라우팅은 안 된다.
+:::
+
+:::tip[명령형 생성]
+`kubectl create ingress ingress-pay -n critical-space --rule="/pay=pay-service:8282"`
+한 줄로도 만들 수 있다 — 뼈대를 뽑고 annotation만 edit로 붙이는 편이 빠르다.
+:::
+
+## Ingress 컨트롤러 배포 — Practice Test: CKA Ingress 2
+
+원본 랩: [practice-test-cka-ingress-networking-2](https://kodekloud.com/topic/practice-test-cka-ingress-networking-2/)
+
+컨트롤러(nginx-ingress)를 구성 요소별로 직접 만든다 — 순서가 곧 답안이다:
+
+```bash
+kubectl create namespace ingress-nginx
+kubectl create configmap ingress-nginx-controller -n ingress-nginx
+kubectl create serviceaccount ingress-nginx -n ingress-nginx
+kubectl create serviceaccount ingress-nginx-admission -n ingress-nginx
+# Role/RoleBinding은 주어진 파일로, Deployment+Service는 /root/ingress-controller.yaml을 고쳐서
+```
+
+주어진 매니페스트에서 고치게 시키는 오류 네 가지 — **전부 실제 시험에서도 나오는 유형**이다:
+
+- Deployment의 `namespace`가 다른 ns로 되어 있다
+- 들여쓰기 오류 (vi에서 `:set nu`로 줄 번호 켜고 찾는다)
+- Service `name` 오타
+- `nodeport` 소문자 — **`nodePort`**가 맞다 (YAML 키는 대소문자 구분)
+
+## NetworkPolicy — Practice Test: Network Policies
+
+원본 랩: [practice-test-network-policies](https://kodekloud.com/topic/practice-test-network-policies/)
+
+| 과제 | 명령 |
+|---|---|
+| 정책 조회 | `k get netpol` |
+| 어느 Pod에 적용되나 | `k describe netpol` → PodSelector |
+| 무엇을 막나 | PolicyTypes + Ingress/Egress 규칙 읽기 |
+
+작성 문제의 정석 — internal Pod에서 **나가는(Egress)** 트래픽을
+mysql(3306)과 payroll(8080)로만 허용:
+
+```yaml
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: internal-policy
+spec:
+  podSelector:
+    matchLabels:
+      name: internal
+  policyTypes:
+  - Egress
+  egress:
+  - to:
+    - podSelector:
+        matchLabels:
+          name: mysql
+    ports:
+    - protocol: TCP
+      port: 3306
+  - to:
+    - podSelector:
+        matchLabels:
+          name: payroll
+    ports:
+    - protocol: TCP
+      port: 8080
+```
+
+:::caution[함정 — 정책에 안 잡힌 Pod은 전부 허용]
+NetworkPolicy가 있어도 **podSelector에 안 걸린 Pod은 여전히 전부 허용**이다.
+"internal → payroll이 되는 이유"류의 보기 문제는 이 기본값을 묻는 것이다.
+DNS(53/UDP) egress를 열어야 이름 조회가 되는 것도 같이 기억 — [cka 12장](/cka/12-networkpolicy/).
+:::
+
+## 이 장에서 남길 것
+
+- Ingress 문제는 먼저 **리소스 문제인지 컨트롤러 문제인지** 가른다
+- Ingress 리소스는 앱과 같은 ns, API는 `networking.k8s.io/v1`
+- 남이 만든 매니페스트 디버깅: ns → 들여쓰기 → 이름 오타 → 키 대소문자 순으로 훑는다
+- NetworkPolicy는 PolicyTypes에 적은 방향만 잠긴다 — 선택 안 된 Pod은 전부 허용
+
+<LinkCard
+  title="7. 스토리지"
+  description="hostPath 볼륨, PV/PVC 바인딩 조건, StorageClass와 WaitForFirstConsumer."
+  href="/cka-udemy/07-storage/"
+/>

@@ -1,0 +1,63 @@
+---
+title: 개요
+description: 유데미 CKA 강의의 KodeKloud 실습 풀이 44개를 cka 덱 장 순서로 재편성한 연습 덱
+---
+
+import { LinkButton, LinkCard } from '@astrojs/starlight/components';
+
+> 문제를 받았을 때 손이 먼저 나가게 — 실습 풀이 패턴 모음
+
+유데미 CKA 강의의 참고 레포 `certified-kubernetes-administrator-course`에 요약된
+**KodeKloud 실습(Practice Test) 풀이 44개**를, [cka 덱](/cka/)의 장 순서로 재편성했다.
+개념 설명은 cka 덱이 맡고, 이 덱은 **"이런 문제가 나오면 이렇게 푼다"**만 맡는다.
+
+<LinkButton href="/cka-udemy/01-basics/" icon="right-arrow">첫 장부터 읽기</LinkButton>
+
+## cka 덱과의 관계
+
+- **cka 덱은 "왜 그런가", 이 덱은 "시키면 어떻게 하나"**다. 같은 주제를 두 번 설명하지 않는다 —
+  각 장 첫머리에 짝이 되는 cka 장을 걸어 뒀고, 원리가 궁금하면 그리로 간다.
+- 실습마다 KodeKloud 원본 랩 링크를 남겼다. **읽는 것으로 끝내지 말고 랩에서 직접 칠 것** —
+  이 덱은 랩을 돌기 전의 예습과 돈 뒤의 복습용이다.
+- 원본 레포는 유데미 강의 시점의 구버전 Kubernetes 기준이다. **명령이 낡은 곳은
+  시험 환경(v1.35) 기준으로 고쳐 실었고**, 고친 자리마다 표시를 남겼다.
+
+## 구성
+
+| 장 | 실습 | 짝이 되는 cka 장 |
+|---|---|---|
+| [1. 기본 조작](/cka-udemy/01-basics/) | Pod · 네임스페이스 · 명령형 커맨드 · JSONPath | [2](/cka/02-architecture/)·[3](/cka/03-kubectl/)·[4](/cka/04-pods/)장 |
+| [2. 워크로드](/cka-udemy/02-workloads/) | ReplicaSet · Deployment · 롤링 업데이트 | [5장](/cka/05-workloads/) |
+| [3. Pod 설정](/cka-udemy/03-pod-config/) | command/args · 환경 변수 · Secret · securityContext · 멀티 컨테이너 · init | [4](/cka/04-pods/)·[6](/cka/06-config/)장 |
+| [4. 스케줄링](/cka-udemy/04-scheduling/) | 수동 배치 · 라벨 · taint · affinity · 리소스 · DaemonSet · 스태틱 Pod | [7장](/cka/07-scheduling/) |
+| [5. Service와 DNS](/cka-udemy/05-services-dns/) | Service · 서비스 네트워킹 · 환경 탐색 · CoreDNS | [9](/cka/09-services/)·[10](/cka/10-dns/)장 |
+| [6. Ingress와 NetworkPolicy](/cka-udemy/06-ingress-netpol/) | Ingress 두 벌 · NetworkPolicy | [11](/cka/11-ingress-gateway/)·[12](/cka/12-networkpolicy/)장 |
+| [7. 스토리지](/cka-udemy/07-storage/) | PV/PVC · StorageClass | [13장](/cka/13-storage/) |
+| [8. 인증서 · kubeconfig · RBAC](/cka-udemy/08-security/) | 인증서 · CSR · kubeconfig · RBAC · ClusterRole · ServiceAccount · 프라이빗 레지스트리 | [14장](/cka/14-rbac/) |
+| [9. 클러스터 라이프사이클](/cka-udemy/09-cluster-lifecycle/) | kubeadm 설치 · drain · 업그레이드 · etcd 백업/복구 두 벌 | [15장](/cka/15-cluster-lifecycle/) |
+| [10. 모니터링과 트러블슈팅](/cka-udemy/10-troubleshooting/) | metrics-server · 로그 · 네트워크 트러블슈팅 | [8](/cka/08-autoscaling/)·[18](/cka/18-troubleshooting/)장 |
+
+## 다루지 않는 것
+
+원본 레포의 Practice-Test 문서는 51개다. 아래 7개는 뺐고, 이름만 남긴다.
+
+| 실습 | 제외 이유 |
+|---|---|
+| Core Concepts Introduction | 원본이 빈 껍데기 — 풀이 요약이 없다 |
+| Control Plane Failure | 원본이 빈 껍데기 — 진단 순서는 [cka 18장](/cka/18-troubleshooting/)에 있다 |
+| Worker Node Failure | 원본이 빈 껍데기 — 진단 순서는 [cka 18장](/cka/18-troubleshooting/)에 있다 |
+| CNI weave | Weave는 단종됐고 현 시험 환경에 없다 |
+| Networking weave | 위와 같다 |
+| Deploy Network Solution | 풀이가 "weave를 설치하라" 한 줄이다 |
+| Multiple Schedulers | 현 커리큘럼(v1.35)에 없는 항목이다 |
+
+:::tip[시험 직전에는]
+이 덱을 처음부터 다시 읽지 말고, 각 장의 **함정 aside만** 훑은 뒤
+[cka 19장 치트시트](/cka/19-exam-strategy/)로 넘어간다.
+:::
+
+<LinkCard
+  title="1. 기본 조작"
+  description="Pod 생성·진단, 네임스페이스, 명령형 커맨드, JSONPath — 손 속도의 기본기."
+  href="/cka-udemy/01-basics/"
+/>

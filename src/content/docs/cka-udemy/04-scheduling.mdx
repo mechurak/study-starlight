@@ -1,0 +1,177 @@
+---
+title: "4. 스케줄링 — taint · affinity · DaemonSet · 스태틱 Pod"
+description: "배치 제어 실습 일곱 벌 — 수동 배치부터 스태틱 Pod까지"
+---
+
+import { LinkCard } from '@astrojs/starlight/components';
+
+> 짝이 되는 개념 장: [cka 7. 스케줄링](/cka/07-scheduling/)
+
+실습이 일곱 벌로 가장 많은 장이다. 축은 두 방향이다 —
+**affinity는 Pod이 노드를 고르고, taint는 노드가 Pod을 밀어낸다.**
+
+## 수동 배치 — Practice Test: Manual Scheduling
+
+원본 랩: [practice-test-manual-scheduling](https://kodekloud.com/topic/practice-test-manual-scheduling/)
+
+스케줄러가 없는 클러스터(kube-system에 kube-scheduler Pod이 없다)에서
+Pod이 Pending에 머무는 상황 — `spec.nodeName`을 직접 채워 배치한다.
+
+```yaml
+spec:
+  nodeName: node01     # 스케줄러를 거치지 않는 직접 지정
+  containers:
+  - image: nginx
+    name: nginx
+```
+
+:::caution[함정 — nodeName은 나중에 못 붙인다]
+실행 중인 Pod에 `nodeName`을 추가하는 건 불가능하다 —
+**지우고 재생성**해야 한다 (`kubectl replace --force -f nginx.yaml`).
+:::
+
+## 라벨과 셀렉터 — Practice Test: Labels and Selectors
+
+원본 랩: [practice-test-labels-and-selectors](https://kodekloud.com/topic/practice-test-labels-and-selectors/)
+
+```bash
+kubectl get pods --selector env=dev                          # 하나
+kubectl get all --selector env=prod,bu=finance,tier=frontend # AND 조건은 쉼표
+kubectl get pods -l env=dev --no-headers | wc -l             # 개수 세기 콤보
+```
+
+`--selector`와 `-l`은 같다. "PODs, ReplicaSets **포함 모든 오브젝트**"를 세라면
+`get pods`가 아니라 **`get all`**이다.
+
+## taint와 toleration — Practice Test: Taints and Tolerations
+
+원본 랩: [practice-test-taints-and-tolerations](https://kodekloud.com/topic/practice-test-taints-and-tolerations/)
+
+```bash
+kubectl describe node node01 | grep -i taints        # 확인
+kubectl taint nodes node01 spray=mortein:NoSchedule  # 부여
+kubectl taint nodes controlplane node-role.kubernetes.io/control-plane:NoSchedule-  # 제거는 끝에 -
+```
+
+(원본은 옛 `master` 키로 쓰여 있다 — 현 시험 환경의 컨트롤 플레인 taint 키는
+`node-role.kubernetes.io/control-plane`이다.)
+
+toleration은 **Pod 스펙 수준**(containers와 같은 들여쓰기)에 넣는다 —
+
+```yaml
+spec:
+  tolerations:
+  - key: spray
+    operator: Equal
+    value: mortein
+    effect: NoSchedule
+  containers:
+  - image: nginx
+    name: bee
+```
+
+:::caution[함정 — toleration은 "가게" 하지 않는다]
+toleration을 줘도 그 노드로 **유도되지는 않는다** — 갈 수 있게 될 뿐이다.
+컨트롤 플레인의 taint를 제거하면 일반 Pod도 그리로 갈 수 있게 된다는 것,
+그 역방향도 이 랩의 출제 포인트다.
+:::
+
+## nodeAffinity — Practice Test: Node Affinity
+
+원본 랩: [practice-test-node-affinity](https://kodekloud.com/topic/practice-test-node-affinity-2/)
+
+```bash
+kubectl get node node01 --show-labels
+kubectl label node node01 color=blue
+```
+
+Deployment의 **Pod 템플릿 쪽**(`spec.template.spec`)에 붙인다 —
+
+```yaml
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+            - matchExpressions:
+              - key: color
+                operator: In
+                values:
+                - blue
+```
+
+값 없이 라벨의 존재만 볼 때는 `operator: Exists` (컨트롤 플레인에 배치하는 문제에서
+`key: node-role.kubernetes.io/control-plane`과 함께 쓴다).
+
+## 리소스 요청과 제한 — Practice Test: Resource Limits
+
+원본 랩: [practice-test-resource-limits](https://kodekloud.com/topic/practice-test-resource-limits/)
+
+- `k describe pod rabbit` → Requests/Limits 확인
+- STATUS `OOMKilled` = 메모리 limit 초과로 죽음 → limit을 올려서 재생성
+
+```yaml
+    resources:
+      requests:
+        memory: 15Mi
+      limits:
+        memory: 20Mi
+```
+
+Pod 수준 리소스 수정도 원칙은 재생성이지만, 요즘 시험 기준(v1.35)에는
+**in-place resize**(`--subresource=resize`)가 GA다 — [cka 4장](/cka/04-pods/) 끝 절 참고.
+
+## DaemonSet — Practice Test: DaemonSets
+
+원본 랩: [practice-test-daemonsets](https://kodekloud.com/topic/practice-test-daemonsets/)
+
+```bash
+kubectl get ds -A                                        # kube-proxy가 대표 사례
+kubectl describe ds kube-proxy -n kube-system
+```
+
+DaemonSet은 명령형 생성 명령이 없다 — **Deployment YAML을 뽑아서 고치는 것**이 정석이다:
+
+```bash
+kubectl create deployment elasticsearch -n kube-system \
+  --image=registry.k8s.io/fluentd-elasticsearch:1.20 --dry-run=client -o yaml > ds.yaml
+```
+
+고칠 곳: `kind: DaemonSet`, `replicas`·`strategy`·`status` 삭제. `spec.selector`와
+템플릿 라벨은 그대로 두면 짝이 맞는다.
+
+## 스태틱 Pod — Practice Test: Static Pods
+
+원본 랩: [practice-test-static-pods](https://kodekloud.com/topic/practice-test-static-pods/)
+
+| 과제 | 명령 |
+|---|---|
+| 스태틱 Pod 찾기 | 이름 끝에 노드명 접미사 (`etcd-controlplane`) — `-o wide`로 노드 확인 |
+| 매니페스트 경로 찾기 | `ps -aux \| grep kubelet` → `--config` 파일 → `grep staticPodPath /var/lib/kubelet/config.yaml` |
+| 스태틱 Pod 만들기 | 아래 한 줄 |
+| 지우기 | 해당 노드에 ssh → 매니페스트 파일 삭제 |
+
+```bash
+kubectl run static-busybox --image=busybox --restart=Never \
+  --dry-run=client -o yaml --command -- sleep 1000 > /etc/kubernetes/manifests/static-busybox.yaml
+```
+
+:::caution[함정 — 다른 노드의 스태틱 Pod]
+`kubectl delete`로 지우면 kubelet이 다시 만든다. **파일이 원본**이다 —
+어느 노드인지 확인하고(`kubectl get pods -o wide`), `ssh <node>`로 들어가
+staticPodPath의 파일을 지워야 사라진다. 경로가 기본값(`/etc/kubernetes/manifests`)이
+아닐 수 있으니 kubelet config에서 확인하는 습관을 들일 것.
+:::
+
+## 이 장에서 남길 것
+
+- Pending 진단은 `describe pod`의 Events 한 줄로 끝나는 경우가 대부분
+- taint 제거는 명령 끝에 `-`, 컨트롤 플레인 키는 `node-role.kubernetes.io/control-plane`
+- toleration은 Pod 스펙 수준, affinity는 Deployment면 템플릿 쪽 — **넣는 위치**가 반은 먹는다
+- DaemonSet은 Deployment YAML을 뽑아 kind만 바꾼다
+- 스태틱 Pod은 파일이 원본 — 만들 때도 지울 때도 매니페스트 디렉터리
+
+<LinkCard
+  title="5. Service와 DNS"
+  description="Service 조회·생성, 클러스터의 세 IP 대역 찾기, CoreDNS와 이름 규칙."
+  href="/cka-udemy/05-services-dns/"
+/>

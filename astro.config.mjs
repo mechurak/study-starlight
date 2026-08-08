@@ -88,6 +88,41 @@ export default defineConfig({
 							],
 						},
 						{
+							label: 'CKA 실습',
+							link: '/cka-udemy/',
+							icon: 'pencil',
+							items: [
+								'cka-udemy',
+								{
+									label: '워크로드와 스케줄링',
+									items: [
+										'cka-udemy/01-basics',
+										'cka-udemy/02-workloads',
+										'cka-udemy/03-pod-config',
+										'cka-udemy/04-scheduling',
+									],
+								},
+								{
+									label: '네트워킹',
+									items: [
+										'cka-udemy/05-services-dns',
+										'cka-udemy/06-ingress-netpol',
+									],
+								},
+								{
+									label: '스토리지와 보안',
+									items: ['cka-udemy/07-storage', 'cka-udemy/08-security'],
+								},
+								{
+									label: '클러스터 운영',
+									items: [
+										'cka-udemy/09-cluster-lifecycle',
+										'cka-udemy/10-troubleshooting',
+									],
+								},
+							],
+						},
+						{
 							label: '웹 개발 일반',
 							link: '/web/',
 							icon: 'rocket',

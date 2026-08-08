@@ -1,0 +1,91 @@
+---
+title: "2. 워크로드 — ReplicaSet · Deployment · 롤링 업데이트"
+description: "깨진 정의 파일 고치기와 롤아웃 제어 — 워크로드 컨트롤러 실습 패턴"
+---
+
+import { LinkCard } from '@astrojs/starlight/components';
+
+> 짝이 되는 개념 장: [cka 5. 워크로드 컨트롤러](/cka/05-workloads/)
+
+이 장의 실습은 **"깨진 정의 파일을 고쳐서 만들어라"** 유형이 절반이다.
+에러 메시지를 읽고 어느 줄을 고칠지 바로 짚는 것이 연습 목표다.
+
+## ReplicaSet — Practice Test: ReplicaSets
+
+원본 랩: [practice-test-replicasets](https://kodekloud.com/topic/practice-test-replicasets/)
+
+| 과제 | 명령 |
+|---|---|
+| 조회 (단축명 `rs`) | `k get rs` / `k get rs -o wide` |
+| 이미지 확인 | `k describe rs <name>` 또는 `-o wide`의 IMAGES 열 |
+| 스케일 | `k scale rs new-replica-set --replicas 5` |
+| 삭제 (여러 개 한 번에) | `k delete rs replicaset-1 replicaset-2` |
+
+깨진 정의 파일 두 유형 —
+
+- **apiVersion 오류**: `kubectl explain replicaset | grep VERSION`으로 맞는 값(`apps/v1`)을 확인해 고친다
+- **셀렉터 불일치**: `spec.selector.matchLabels`와 `spec.template.metadata.labels`가 **같아야** 생성된다
+
+:::caution[함정 — ReplicaSet은 이미지를 고쳐도 Pod을 안 갈아엎는다]
+`kubectl edit rs`로 이미지를 고쳐도 **기존 Pod은 그대로 깨진 채**다.
+ReplicaSet은 개수만 맞추는 루프라 템플릿 변경을 롤아웃하지 않는다. 고친 뒤 —
+
+```bash
+kubectl scale rs new-replica-set --replicas 0
+kubectl scale rs new-replica-set --replicas 4
+```
+
+처럼 0으로 줄였다 되돌리거나, Pod을 직접 지워 재생성시킨다.
+이게 Deployment가 존재하는 이유다 — [cka 5장](/cka/05-workloads/).
+:::
+
+## Deployment — Practice Test: Deployments
+
+원본 랩: [practice-tests-deployments](https://kodekloud.com/topic/practice-tests-deployments/)
+
+Deployment를 만들면 ReplicaSet과 Pod이 딸려 나온다 — 조회 문제는
+`get deploy` → `get rs` → `get pods` 세 층을 오가며 센다.
+
+깨진 파일 유형: **`kind: deployment`처럼 대소문자가 틀린 경우** — `Deployment`로 고친다.
+kind는 대문자로 시작한다.
+
+스펙이 주어지는 생성 문제는 명령형이 빠르다 —
+
+```bash
+kubectl create deployment httpd-frontend --image=httpd:2.4-alpine --replicas=3
+```
+
+## 롤링 업데이트와 롤백 — Practice Test: Rolling Updates and Rollbacks
+
+원본 랩: [practice-test-rolling-updates-and-rollbacks](https://kodekloud.com/topic/practice-test-rolling-updates-and-rollbacks/)
+
+| 과제 | 보는 곳 |
+|---|---|
+| 전략 확인 | `k describe deploy` → StrategyType |
+| 몇 개씩 교체되나 | `k describe deploy` → RollingUpdateStrategy의 max unavailable |
+| 이미지 변경 | `k edit deploy frontend` 또는 `k set image deploy/frontend <컨테이너>=<이미지>` |
+
+:::caution[함정 — 전략을 Recreate로 바꿀 때]
+`strategy.type`을 `Recreate`로 바꾸라는 문제에서 `type`만 고치면 에러가 난다.
+**`strategy.rollingUpdate` 블록(maxSurge/maxUnavailable)을 통째로 지워야** 한다 —
+Recreate 전략에는 rollingUpdate 파라미터가 있을 수 없다.
+:::
+
+:::tip[관찰 명령]
+롤아웃이 실제로 어떻게 진행되는지는 `kubectl rollout status deploy/frontend`,
+되돌리기는 `kubectl rollout undo deploy/frontend`.
+히스토리 관리와 원리는 [cka 5장 Deployment 절](/cka/05-workloads/)에 있다.
+:::
+
+## 이 장에서 남길 것
+
+- 깨진 YAML은 **에러 메시지 → `kubectl explain`** 순서로 고친다
+- 셀렉터와 템플릿 라벨은 항상 짝이다 — 불일치가 단골 출제
+- ReplicaSet 직접 수정은 롤아웃되지 않는다. 롤아웃이 필요하면 Deployment
+- Recreate로 바꿀 땐 rollingUpdate 파라미터 삭제까지
+
+<LinkCard
+  title="3. Pod 설정"
+  description="command와 args의 우선순위, ConfigMap/Secret 주입, securityContext, init 컨테이너."
+  href="/cka-udemy/03-pod-config/"
+/>

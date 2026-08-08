@@ -1,0 +1,182 @@
+---
+title: "8. 인증서 · kubeconfig · RBAC — 접근 제어 일곱 벌"
+description: "인증서 읽기, CSR 승인/거부, kubeconfig 수리, Role과 ClusterRole, ServiceAccount, 프라이빗 레지스트리"
+---
+
+import { LinkCard } from '@astrojs/starlight/components';
+
+> 짝이 되는 개념 장: [cka 14. 인증 · 인가 · RBAC](/cka/14-rbac/)
+
+일곱 실습이 전부 "요청이 통과해야 하는 세 관문"(인증 → 인가 → admission) 위에 있다.
+어느 관문의 문제인지부터 가르면 절반은 푼 것이다.
+
+## 인증서 읽기 — Practice Test: View Certificate Details
+
+원본 랩: [practice-test-view-certificate-details](https://kodekloud.com/topic/practice-test-view-certificate-details/)
+
+kubeadm 클러스터의 인증서 위치는 정해져 있다 —
+
+| 무엇 | 어디 |
+|---|---|
+| API 서버 인증서 | `/etc/kubernetes/pki/apiserver.crt` |
+| API 서버 → etcd 클라이언트 | `/etc/kubernetes/pki/apiserver-etcd-client.crt` |
+| API 서버 → kubelet 클라이언트 | `/etc/kubernetes/pki/apiserver-kubelet-client.crt` |
+| etcd 서버 인증서 | `/etc/kubernetes/pki/etcd/server.crt` |
+| etcd CA | `/etc/kubernetes/pki/etcd/ca.crt` |
+
+경로의 근거는 스태틱 Pod 매니페스트다 — `/etc/kubernetes/manifests/kube-apiserver.yaml`,
+`etcd.yaml`의 커맨드라인 플래그에 다 적혀 있다.
+
+```bash
+openssl x509 -in /etc/kubernetes/pki/apiserver.crt -text -noout
+# 볼 곳: Subject CN / Issuer / X509v3 Subject Alternative Name / Validity(Not After)
+```
+
+:::caution[함정 — etcd는 CA가 따로다]
+etcd는 **자체 CA**(`pki/etcd/ca.crt`)를 쓴다. API 서버의 `--etcd-cafile`에
+루트 CA를 넣으면 API 서버가 etcd에 못 붙는다 — 이 랩의 마지막 문제이자
+[10장 트러블슈팅](/cka-udemy/10-troubleshooting/)의 단골 원인이다.
+:::
+
+## CSR 승인 — Practice Test: Certificates API
+
+원본 랩: [practice-test-certificates-api](https://kodekloud.com/topic/practice-test-certificates-api/)
+
+새 사용자의 인증서 서명 요청(CSR, CertificateSigningRequest) 처리 —
+
+```bash
+cat akshay.csr | base64 -w 0     # request 필드에 넣을 값
+kubectl apply -f akshay-csr.yaml # kind: CertificateSigningRequest
+kubectl get csr
+kubectl certificate approve akshay
+kubectl certificate deny agent-smith    # 수상한 요청은 거부
+kubectl delete csr agent-smith
+```
+
+CSR YAML의 뼈대(`signerName: kubernetes.io/kube-apiserver-client`, `usages: [client auth]`)는
+공식 문서에서 복사한다 — [cka 14장](/cka/14-rbac/)에 전체 흐름이 있다.
+
+:::tip[누가 요청했는지 의심하기]
+`kubectl get csr <name> -o yaml`로 **groups와 usages**를 본다.
+`system:masters` 그룹을 요구하는 CSR은 승인하면 안 된다 — 거부 문제로 나온다.
+:::
+
+## kubeconfig — Practice Test: KubeConfig
+
+원본 랩: [practice-test-kubeconfig](https://kodekloud.com/topic/practice-test-kubeconfig/)
+
+```bash
+kubectl config view                                   # 기본 파일(~/.kube/config)
+kubectl config view --kubeconfig my-kube-config       # 다른 파일 지정
+kubectl config --kubeconfig=/root/my-kube-config use-context research
+```
+
+클러스터·유저·컨텍스트 개수, research 컨텍스트의 유저 같은 조회 문제는
+전부 `config view` 출력 하나에서 읽는다.
+
+:::caution[함정 — kubectl이 갑자기 안 될 때]
+`kubectl get pods`가 인증서 에러를 뱉으면 kubeconfig의
+**client-certificate 경로 오타**부터 확인한다. 이 랩의 마지막 문제이며,
+실전에서도 "잘 되던 kubectl이 안 된다" 유형의 흔한 정답이다.
+:::
+
+## Role과 RoleBinding — Practice Test: RBAC
+
+원본 랩: [practice-test-role-based-access-controls](https://kodekloud.com/topic/practice-test-role-based-access-controls/)
+
+```bash
+kubectl describe pod kube-apiserver-controlplane -n kube-system | grep authorization-mode
+kubectl get roles -A
+kubectl describe role kube-proxy -n kube-system       # 리소스·verbs 읽기
+kubectl get pods --as dev-user                        # 권한 시험해보기
+kubectl create role developer --verb=list,create,delete --resource=pods -n default
+kubectl create rolebinding dev-user-binding --role=developer --user=dev-user -n default
+```
+
+:::tip[--as로 확인까지가 한 세트]
+만들라는 문제든 고치라는 문제든, 끝은 항상
+`kubectl get pods --as dev-user`(또는 `kubectl auth can-i ... --as ...`)로 검증한다.
+:::
+
+:::caution[함정 — resourceNames]
+"특정 이름의 리소스만" 허용하는 Role은 rules에 `resourceNames: ["blue-app"]`가 붙는다.
+edit로 고칠 때 이 필드를 놓치면 계속 403이다.
+:::
+
+## ClusterRole — Practice Test: Cluster Roles
+
+원본 랩: [practice-test-cluster-roles](https://kodekloud.com/topic/practice-test-cluster-roles/)
+
+- ClusterRole/ClusterRoleBinding은 **네임스페이스가 없다** — "어느 ns 소속인가"는 함정 질문
+- 개수 세기: `kubectl get clusterroles --no-headers | wc -l`
+
+노드 관리자·스토리지 관리자를 만드는 문제 —
+
+```bash
+kubectl create clusterrole node-admin --verb=get,watch,list,create,delete --resource=nodes
+kubectl create clusterrolebinding michelle-binding --clusterrole=node-admin --user=michelle
+
+kubectl create clusterrole storage-admin \
+  --verb=get,watch,list,create,delete --resource=persistentvolumes,storageclasses
+kubectl create clusterrolebinding michelle-storage-admin \
+  --clusterrole=storage-admin --user=michelle
+```
+
+노드·PV·StorageClass처럼 **클러스터 범위 리소스에는 Role이 아니라 ClusterRole**이다 —
+가르는 기준은 [cka 14장](/cka/14-rbac/).
+
+## ServiceAccount — Practice Test: Service Accounts
+
+원본 랩: [practice-test-service-accounts](https://uklabs.kodekloud.com/topic/practice-test-service-accounts-2/)
+
+```bash
+kubectl get sa
+kubectl create serviceaccount dashboard-sa
+kubectl create token dashboard-sa            # 수명 있는 토큰 발급 (TokenRequest)
+```
+
+- Pod이 어떤 SA를 쓰는지: `kubectl get pod <name> -o jsonpath='{.spec.serviceAccountName}'`
+- 토큰이 마운트되는 곳: `/var/run/secrets/kubernetes.io/serviceaccount`
+- Deployment의 SA 교체: `kubectl set serviceaccount deploy web-dashboard dashboard-sa`
+  (또는 edit로 `spec.template.spec.serviceAccountName`) — 템플릿 변경이라 롤아웃된다
+
+:::caution[함정 — SA에는 더 이상 자동 Secret이 없다]
+`describe sa`의 Tokens가 `<none>`인 게 정상이다. 무기한 Secret 자동 생성은 폐기됐고,
+지금은 **`kubectl create token`으로 수명 있는 토큰을 발급**한다 — [cka 14장](/cka/14-rbac/).
+:::
+
+## 프라이빗 레지스트리 — Practice Test: Image Security
+
+원본 랩: [practice-test-image-security](https://kodekloud.com/topic/practice-test-image-security/)
+
+```bash
+kubectl create secret docker-registry private-reg-cred \
+  --docker-server=myprivateregistry.com:5000 \
+  --docker-username=dock_user \
+  --docker-password=dock_password \
+  --docker-email=dock_user@myprivateregistry.com
+```
+
+그리고 Pod 템플릿에 (컨테이너가 아니라 **spec 수준**) —
+
+```yaml
+      imagePullSecrets:
+      - name: private-reg-cred
+```
+
+이미지를 `myprivateregistry.com:5000/nginx:alpine`처럼 바꾼 뒤 `ImagePullBackOff`가 뜨면
+이 Secret이 없다는 신호다. Secret 타입은 `docker-registry`라는 것까지 기억.
+
+## 이 장에서 남길 것
+
+- 인증서 문제의 근거는 항상 `/etc/kubernetes/manifests/`의 플래그다. etcd CA는 따로
+- CSR: 만들고 → `get csr`로 보고 → approve/deny. groups가 수상하면 거부
+- RBAC는 만들기보다 **`--as`/`auth can-i`로 검증**까지가 한 문제
+- 클러스터 범위 리소스(nodes·pv·sc)는 ClusterRole
+- SA 토큰은 `create token`, 레지스트리 인증은 `docker-registry` 타입 Secret + imagePullSecrets
+
+<LinkCard
+  title="9. 클러스터 라이프사이클"
+  description="kubeadm 설치, drain/cordon, 버전 업그레이드, etcd 백업과 복구 (스택·외부)."
+  href="/cka-udemy/09-cluster-lifecycle/"
+/>

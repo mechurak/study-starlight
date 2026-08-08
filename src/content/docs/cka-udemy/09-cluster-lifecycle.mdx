@@ -1,0 +1,179 @@
+---
+title: "9. 클러스터 라이프사이클 — kubeadm · 업그레이드 · etcd 백업"
+description: "kubeadm 설치, drain/uncordon, 클러스터 버전 업그레이드, etcd 스냅샷 저장·복구 (스택·외부)"
+---
+
+import { Steps, LinkCard } from '@astrojs/starlight/components';
+
+> 짝이 되는 개념 장: [cka 15. 클러스터 라이프사이클](/cka/15-cluster-lifecycle/)
+
+cka 15장이 "시험의 승부처"라 부르는 영역의 실습판이다. 다섯 벌 모두
+**절차형** — 순서를 외우는 게 아니라 각 단계가 왜 있는지 알면 순서는 따라온다.
+
+## kubeadm 설치 — Practice Test: Deploy a Cluster using Kubeadm
+
+원본 랩: [practice-test-deploy-a-kubernetes-cluster-using-kubeadm](https://kodekloud.com/topic/practice-test-deploy-a-kubernetes-cluster-using-kubeadm/)
+
+(원본의 버전 번호·apt 저장소는 낡았다 — 패턴만 가져가고, 저장소 주소와 버전은
+시험 문제가 주는 값과 [kubernetes.io 설치 문서](https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/install-kubeadm/)를 따른다.)
+
+<Steps>
+
+1. 두 노드 모두: 커널 모듈·파라미터 (`overlay`, `br_netfilter`, ip_forward)
+
+   ```bash
+   cat <<EOF | tee /etc/sysctl.d/k8s.conf
+   net.bridge.bridge-nf-call-iptables = 1
+   net.ipv4.ip_forward = 1
+   EOF
+   sysctl --system
+   ```
+
+2. 두 노드 모두: pkgs.k8s.io 저장소 등록 후 정확한 버전으로 설치·고정
+
+   ```bash
+   apt-get install -y kubelet=<버전> kubeadm=<버전> kubectl=<버전>
+   apt-mark hold kubelet kubeadm kubectl
+   ```
+
+3. 컨트롤 플레인에서 init — advertise 주소는 `eth0`의 IP(`ip a` 확인)
+
+   ```bash
+   kubeadm init \
+     --apiserver-cert-extra-sans=controlplane \
+     --apiserver-advertise-address <eth0 IP> \
+     --pod-network-cidr=10.244.0.0/16
+   mkdir -p ~/.kube && cp /etc/kubernetes/admin.conf ~/.kube/config
+   ```
+
+4. init 출력의 `kubeadm join ...`을 복사해 워커에서 실행 (`ssh node01`)
+
+5. CNI 설치 전까지 노드가 `NotReady`인 것은 **정상** — 문제에서 준 네트워크
+   플러그인 매니페스트를 apply하면 Ready가 된다
+
+</Steps>
+
+:::tip[join 토큰을 잃어버렸으면]
+`kubeadm token create --print-join-command`가 다시 만들어준다.
+:::
+
+## 노드 비우기 — Practice Test: OS Upgrades
+
+원본 랩: [practice-test-os-upgrades](https://kodekloud.com/topic/practice-test-os-upgrades/)
+
+```bash
+kubectl drain node01 --ignore-daemonsets   # 비우고 + cordon
+kubectl uncordon node01                    # 다시 받게
+kubectl cordon node03                      # 새 Pod만 막기 (기존은 안 쫓아냄)
+```
+
+:::caution[함정 1 — drain이 거부될 때]
+컨트롤러(ReplicaSet 등) 소속이 아닌 **단독 Pod이 있으면 drain이 거부**된다.
+`--force`를 붙이면 진행되지만 **그 Pod은 영원히 사라진다** — 문제도 이걸 물어본다.
+:::
+
+:::caution[함정 2 — uncordon해도 Pod은 안 돌아온다]
+uncordon은 "다시 스케줄 가능"으로 돌릴 뿐이다. 기존 Pod이 재배치되지는 않는다 —
+**새로 생성되는 Pod부터** 그 노드에 갈 수 있다.
+:::
+
+## 버전 업그레이드 — Practice Test: Cluster Upgrade Process
+
+원본 랩: [practice-test-cluster-upgrade-process](https://kodekloud.com/topic/practice-test-cluster-upgrade-process/)
+
+전략 질문의 답: VM을 추가할 수 없다면 **한 노드씩 비우고 올리고 되돌린다.**
+
+<Steps>
+
+1. 컨트롤 플레인: `kubeadm upgrade plan`으로 목표 버전 확인 → drain
+
+2. kubeadm 패키지를 목표 버전으로 → `kubeadm upgrade apply v1.xx.x`
+
+3. kubelet(과 kubectl)을 같은 버전으로 → `systemctl daemon-reload && systemctl restart kubelet` → uncordon
+
+4. 워커: drain → kubeadm 올리고 **`kubeadm upgrade node`** → kubelet 올리고 재시작 → uncordon
+
+</Steps>
+
+(원본은 `apt install kubeadm=1.18...` 시절 답안이다. 지금은 pkgs.k8s.io 저장소의
+**마이너 버전별 리포지터리**를 먼저 바꿔야 다음 마이너가 보인다 — 절차 전문은
+[cka 15장](/cka/15-cluster-lifecycle/) 업그레이드 절.)
+
+:::caution[함정 — 워커는 apply가 아니라 node]
+`kubeadm upgrade apply`는 **첫 컨트롤 플레인에서 한 번**이다.
+워커(및 추가 컨트롤 플레인)는 `kubeadm upgrade node`. 그리고 **kubelet 업그레이드를
+빼먹으면 `kubectl get nodes`의 VERSION이 안 바뀐다** — 채점은 이걸 본다.
+:::
+
+## etcd 백업과 복구 — Practice Test: Backup and Restore Methods
+
+원본 랩: [practice-test-backup-and-restore-methods](https://kodekloud.com/topic/practice-test-backup-and-restore-methods/)
+
+```bash
+# 백업 — 인증서 세 개는 etcd 스태틱 Pod 매니페스트에서 확인
+ETCDCTL_API=3 etcdctl snapshot save /opt/snapshot-pre-boot.db \
+  --cacert=/etc/kubernetes/pki/etcd/ca.crt \
+  --cert=/etc/kubernetes/pki/etcd/server.crt \
+  --key=/etc/kubernetes/pki/etcd/server.key
+```
+
+복구는 두 단계 — **새 디렉터리로 복원 + etcd가 그 디렉터리를 보게 변경**:
+
+```bash
+ETCDCTL_API=3 etcdctl snapshot restore /opt/snapshot-pre-boot.db \
+  --data-dir /var/lib/etcd-from-backup
+```
+
+```yaml
+# /etc/kubernetes/manifests/etcd.yaml — etcd-data 볼륨의 hostPath만 바꾼다
+  - hostPath:
+      path: /var/lib/etcd-from-backup
+      type: DirectoryOrCreate
+    name: etcd-data
+```
+
+저장하면 스태틱 Pod이 재생성된다 — 1분쯤 기다렸다가 `kubectl get deploy`로 검증.
+
+:::tip[백업엔 인증서 필수, 복원엔 불필요]
+`snapshot save`는 살아 있는 etcd에 접속하므로 인증서가 필요하고,
+`snapshot restore`는 파일을 푸는 작업이라 필요 없다. 헷갈리면 이 구분으로 기억.
+:::
+
+## 스택 vs 외부 etcd — Practice Test: Backup and Restore Methods 2
+
+원본 랩: [practice-test-backup-and-restore-methods-2](https://kodekloud.com/topic/practice-test-backup-and-restore-methods-2-2/)
+
+멀티 클러스터 환경 — 먼저 `kubectl config get-contexts` / `use-context`로 오간다.
+
+| 구분 | 스택(stacked) | 외부(external) |
+|---|---|---|
+| 판별 | kube-system에 etcd Pod이 **있다** | 없다 — API 서버의 `--etcd-servers`가 외부 IP |
+| 실행 형태 | 스태틱 Pod | 별도 서버의 **systemd 서비스** |
+| 데이터 디렉터리 | etcd Pod의 `etcd-data` hostPath | `systemctl cat etcd.service`의 `--data-dir` |
+| 복구 후 전환 | 매니페스트의 hostPath 수정 | **서비스 유닛 파일** 수정 → `daemon-reload` + `restart` |
+
+외부 etcd 복구에서 추가되는 두 가지 —
+
+```bash
+scp /opt/cluster2.db etcd-server:~/                 # 스냅샷을 etcd 서버로
+chown -R etcd:etcd /var/lib/etcd-data-new           # 복원 디렉터리 소유권
+```
+
+:::caution[함정 — daemon-reload]
+유닛 파일을 고쳤으면 `systemctl daemon-reload` 없이는 반영되지 않는다.
+`restart etcd`만 하고 "왜 그대로지"에 빠지는 게 이 랩의 함정이다.
+:::
+
+## 이 장에서 남길 것
+
+- kubeadm: 커널 설정 → 패키지 고정 설치 → init → join → CNI. NotReady는 CNI 전까지 정상
+- drain은 단독 Pod에서 멈춘다(`--force`는 유실 감수). uncordon은 재배치가 아니다
+- 업그레이드: 컨트롤 플레인 `upgrade apply`, 워커 `upgrade node`, **kubelet까지 올려야 끝**
+- etcd 복구 = 새 디렉터리로 restore + etcd의 시선(hostPath 또는 --data-dir)을 그리로
+- 외부 etcd면 systemd — scp·chown·daemon-reload가 추가된다
+
+<LinkCard
+  title="10. 모니터링과 트러블슈팅"
+  description="metrics-server와 kubectl top, 로그 보기, kube-proxy·CNI 네트워크 장애 진단."
+  href="/cka-udemy/10-troubleshooting/"
+/>

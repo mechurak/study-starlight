@@ -912,3 +912,7 @@ kubectl run tmp --image=busybox:1.36 --rm -it --restart=Never -- wget -qO- http:
 - **kube-proxy가 죽으면 ClusterIP만 죽는다** (Pod 직접 통신은 정상)
 - **etcd가 죽으면 API 서버도 못 뜬다** — 순서대로 고친다
 - 고친 뒤에는 **반드시 최종 상태를 확인**한다
+
+:::note[손 연습]
+이 장 범위의 KodeKloud 실습 풀이 — [CKA 실습 10장 · 모니터링과 트러블슈팅](/cka-udemy/10-troubleshooting/)
+:::

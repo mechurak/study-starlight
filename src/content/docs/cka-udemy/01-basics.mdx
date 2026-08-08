@@ -1,0 +1,127 @@
+---
+title: "1. 기본 조작 — Pod · 네임스페이스 · 명령형 커맨드"
+description: "kubectl 손 속도의 기본기 — 조회·생성·수정 패턴과 JSONPath"
+---
+
+import { LinkCard } from '@astrojs/starlight/components';
+
+> 짝이 되는 개념 장: [cka 2. 아키텍처](/cka/02-architecture/) · [cka 3. kubectl](/cka/03-kubectl/) · [cka 4. Pod](/cka/04-pods/)
+
+이 장의 실습 네 개는 전부 **"조회 → 원인 찾기 → 명령 한 줄로 해결"**의 반복이다.
+여기서 몸에 붙는 패턴이 이후 모든 장의 재료가 된다.
+
+## Pod 기초 — Practice Test: PODs
+
+원본 랩: [practice-test-pods](https://kodekloud.com/topic/practice-test-pods/)
+
+| 과제 | 명령 |
+|---|---|
+| Pod 개수 세기 | `k get pods --no-headers \| wc -l` |
+| Pod 만들기 | `k run nginx --image=nginx` |
+| 이미지·노드 확인 | `k get pods -o wide` 또는 `k describe pod <name>` |
+| 컨테이너 상태·에러 원인 | `k describe pod <name>` → State / Events |
+| Pod 삭제 (빠르게) | `k delete pod webapp --force` |
+| YAML 뽑아서 생성 | `k run redis --image=redis123 --dry-run=client -o yaml > redis.yaml` |
+
+이미지 이름이 틀린 Pod(`redis123`)을 고치는 방법은 셋 다 알아둔다 —
+
+```bash
+# 1) 매니페스트 고치고 apply
+vi redis.yaml && kubectl apply -f redis.yaml
+# 2) 실행 중인 Pod을 직접 편집 (image는 편집 가능한 몇 안 되는 필드)
+kubectl edit pod redis
+# 3) image만 바로 교체 — pod/<pod이름> <컨테이너이름>=<새이미지>
+kubectl set image pod/redis redis=redis
+```
+
+:::tip[READY 열 읽는 법]
+`READY 1/2`는 "컨테이너 2개 중 1개 준비됨"이다. Pod 개수가 아니라
+**컨테이너 준비 수 / 전체 수** — 멀티 컨테이너 문제에서 반복해서 나온다.
+:::
+
+:::caution[함정 — --force]
+`--force`는 시험에서는 시간을 벌어주지만, 실무에서는 정리 작업(preStop 등)을
+건너뛴 채 컨테이너를 남길 수 있는 최후 수단이다. 시험용 습관과 실무 습관을 구분할 것.
+:::
+
+## 네임스페이스 — Practice Test: Namespaces
+
+원본 랩: [practice-test-namespaces](https://kodekloud.com/topic/practice-test-namespaces/)
+
+| 과제 | 명령 |
+|---|---|
+| 네임스페이스 목록 | `k get ns` |
+| 특정 ns의 Pod | `k get pods -n research` |
+| 전체 ns에서 찾기 | `k get pods -A \| grep blue` |
+| ns 지정해 생성 | `k run redis --image=redis -n finance` |
+
+DNS 이름 규칙이 이 랩의 진짜 출제 포인트다 —
+
+- **같은 네임스페이스**의 Service: 호스트 이름만 — `db-service`
+- **다른 네임스페이스**(dev)의 Service: `db-service.dev` 또는
+  풀 네임 `db-service.dev.svc.cluster.local`
+
+원리는 [cka 10장 이름 규칙](/cka/10-dns/)에 있다.
+
+## 명령형 커맨드 — Practice Test: Imperative Commands
+
+원본 랩: [practice-test-imperative-commands](https://kodekloud.com/topic/practice-test-imperative-commands-2/)
+
+YAML을 열지 않고 한 줄로 끝내는 연습이다. 전부 손에 붙여둘 것 —
+
+```bash
+kubectl run nginx-pod --image=nginx:alpine
+kubectl run redis --image=redis:alpine -l tier=db          # 라벨 지정
+kubectl run custom-nginx --image=nginx --port=8080          # containerPort 지정
+kubectl expose pod redis --port=6379 --name redis-service   # ClusterIP Service
+kubectl create ns dev-ns
+kubectl create deployment webapp --image=kodekloud/webapp-color --replicas=3
+kubectl create deployment redis-deploy -n dev-ns --image=redis --replicas=2
+```
+
+:::tip[Pod + Service 한 줄]
+"Pod을 만들고 같은 이름의 ClusterIP Service로 노출하라"는 문제는
+`--expose`가 한 줄로 끝낸다 —
+
+```bash
+kubectl run httpd --image=httpd:alpine --expose --port 80
+```
+:::
+
+## JSONPath와 정렬 — Practice Test: Advanced Kubectl Commands
+
+원본 랩: [practice-test-advanced-kubectl-commands](https://kodekloud.com/topic/practice-test-advanced-kubectl-commands/)
+
+출력 가공 네 가지 패턴이 전부다. 문법은 [cka 3장 조회와 출력](/cka/03-kubectl/)에 정리돼 있다.
+
+```bash
+# 1) JSON 통째로 저장
+kubectl get nodes -o json > /opt/outputs/nodes.json
+# 2) JSONPath로 필드만 뽑기
+kubectl get nodes -o jsonpath='{.items[*].metadata.name}'
+kubectl get nodes -o jsonpath='{.items[*].status.nodeInfo.osImage}'
+# 3) 정렬과 커스텀 열
+kubectl get pv --sort-by=.spec.capacity.storage \
+  -o custom-columns=NAME:.metadata.name,CAPACITY:.spec.capacity.storage
+# 4) 필터 표현식 — 특정 user를 쓰는 context 이름 찾기
+kubectl config view --kubeconfig=my-kube-config \
+  -o jsonpath="{.contexts[?(@.context.user=='aws-user')].name}"
+```
+
+:::caution[함정 — 결과를 파일로]
+이 유형은 대부분 "**결과를 지정된 파일에 저장하라**"까지가 문제다.
+명령이 맞아도 리다이렉트(`> /opt/outputs/...`)를 빼먹으면 0점이다.
+:::
+
+## 이 장에서 남길 것
+
+- 모든 진단은 `get → describe → Events`로 시작한다
+- `--dry-run=client -o yaml`이 YAML 작성의 출발점이다
+- 만들라는 명령(`run`/`create`/`expose`)은 한 줄로, 고치라는 명령은 `edit`/`set image`/`apply` 셋 중에서
+- DNS는 `<service>.<namespace>`만 기억하면 대부분 풀린다
+
+<LinkCard
+  title="2. 워크로드"
+  description="ReplicaSet의 셀렉터 함정, 깨진 YAML 고치기, 롤링 업데이트 전략."
+  href="/cka-udemy/02-workloads/"
+/>

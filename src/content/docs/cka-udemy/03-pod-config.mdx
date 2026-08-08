@@ -1,0 +1,166 @@
+---
+title: "3. Pod 설정 — command · 환경 변수 · Secret · 컨테이너 구성"
+description: "Pod 스펙을 고쳐 재생성하는 패턴 — command/args, ConfigMap/Secret 주입, securityContext, 멀티·init 컨테이너"
+---
+
+import { LinkCard } from '@astrojs/starlight/components';
+
+> 짝이 되는 개념 장: [cka 4. Pod](/cka/04-pods/) · [cka 6. 설정과 리소스](/cka/06-config/)
+
+이 장 실습의 공통 뼈대는 하나다 — **Pod 스펙 대부분은 실행 중에 못 고친다.**
+그래서 모든 문제가 같은 3단계로 풀린다:
+
+```bash
+kubectl get pod <name> -o yaml > pod.yaml   # 1) 현재 스펙을 뽑고
+kubectl delete pod <name>                   # 2) 지우고
+vi pod.yaml && kubectl create -f pod.yaml   # 3) 고쳐서 다시 만든다
+```
+
+(`kubectl delete --force`로 시간을 벌 수 있다. `kubectl replace --force -f pod.yaml`로
+2~3단계를 합칠 수도 있다.)
+
+## command와 args — Practice Test: Commands and Arguments
+
+원본 랩: [practice-test-commands-and-arguments](https://kodekloud.com/topic/practice-test-commands-and-arguments/)
+
+Dockerfile의 ENTRYPOINT/CMD와 Pod 스펙의 command/args가 어떻게 덮어쓰는지가 전부다 —
+
+| Dockerfile | Pod 스펙 | 실제 실행 |
+|---|---|---|
+| `ENTRYPOINT` | `command` | command가 ENTRYPOINT를 **대체** |
+| `CMD` | `args` | args가 CMD를 **대체** |
+
+```yaml
+spec:
+  containers:
+  - name: ubuntu-sleeper
+    image: ubuntu-sleeper
+    command: ["sleep"]
+    args: ["5000"]
+```
+
+:::caution[함정 — 숫자도 문자열로]
+`command: ["sleep", 1200]`은 생성이 거부된다. YAML 배열 안의 값은
+**전부 따옴표 친 문자열**이어야 한다 — `["sleep", "1200"]`.
+:::
+
+## 환경 변수와 ConfigMap — Practice Test: Env Variables
+
+원본 랩: [practice-test-env-variables](https://kodekloud.com/topic/practice-test-env-variables/)
+
+```bash
+kubectl create configmap webapp-config-map --from-literal=APP_COLOR=darkblue
+```
+
+주입 두 방식 — 개별 지정(`env`)과 통째로(`envFrom`) —
+
+```yaml
+    env:
+    - name: APP_COLOR
+      value: green
+    envFrom:
+    - configMapRef:
+        name: webapp-config-map
+```
+
+세 가지 주입 방식(env/envFrom/volume)의 전체 지도는 [cka 6장](/cka/06-config/)에 있다.
+
+## Secret — Practice Test: Secrets
+
+원본 랩: [practice-test-secrets](https://kodekloud.com/topic/practice-test-secrets/)
+
+```bash
+kubectl create secret generic db-secret \
+  --from-literal=DB_Host=sql01 \
+  --from-literal=DB_User=root \
+  --from-literal=DB_Password=password123
+```
+
+Pod에 통째로 주입은 ConfigMap과 대칭이다 —
+
+```yaml
+    envFrom:
+    - secretRef:
+        name: db-secret
+```
+
+:::tip[조회 습관]
+`k get secrets`의 **DATA 열**이 키 개수다. 값 확인은 `k describe secret`이 아니라
+`k get secret <name> -o jsonpath='{.data.<key>}' | base64 -d` — describe는 값을 안 보여준다.
+:::
+
+## securityContext — Practice Test: Security Contexts
+
+원본 랩: [practice-test-security-contexts](https://kodekloud.com/topic/practice-test-security-contexts/)
+
+| 과제 | 위치 |
+|---|---|
+| 실행 유저 확인 | `k exec ubuntu-sleeper -- whoami` |
+| 유저 바꾸기 | `securityContext.runAsUser: 1010` |
+| 커널 능력 추가 | 컨테이너 쪽 `securityContext.capabilities.add: ["SYS_TIME"]` |
+
+```yaml
+spec:
+  securityContext:        # Pod 수준 — 모든 컨테이너에 적용
+    runAsUser: 1010
+  containers:
+  - name: ubuntu
+    securityContext:      # 컨테이너 수준 — Pod 수준을 덮어쓴다
+      capabilities:
+        add: ["SYS_TIME"]
+```
+
+:::caution[함정 — capabilities는 컨테이너 수준에만]
+`runAsUser`는 Pod·컨테이너 양쪽에 다 쓸 수 있고 컨테이너 쪽이 이기지만,
+**`capabilities`는 컨테이너 수준에만** 존재한다. Pod 수준에 넣으면 거부된다.
+:::
+
+## 멀티 컨테이너 — Practice Test: Multi-Container Pods
+
+원본 랩: [practice-test-multi-container-pods](https://kodekloud.com/topic/practice-test-multi-container-pods/)
+
+- 컨테이너 수는 `k get pod red`의 READY 열(`x/y`의 y), 이름은 `k describe pod blue`
+- 특정 컨테이너에 들어가기: `k exec -it <pod> -c <container> -- sh`
+- 로그 확인: `k logs <pod> -c <container>` — 멀티 컨테이너에서 `-c`는 필수다
+
+사이드카로 로그를 나르는 구성(앱 컨테이너 + 로그 에이전트)이 단골 문제다.
+요즘 시험 기준의 **네이티브 사이드카**(initContainers + `restartPolicy: Always`, v1.33 GA)는
+[cka 4장 컨테이너 여러 개 쓰기](/cka/04-pods/)를 볼 것.
+
+## init 컨테이너 — Practice Test: Init-Containers
+
+원본 랩: [practice-test-init-containers](https://kodekloud.com/topic/practice-test-init-containers/)
+
+| 과제 | 보는 곳 |
+|---|---|
+| init 컨테이너 있는 Pod 찾기 | `k describe pods` → Init Containers 절 |
+| init 상태·실패 이유 | `k describe pod <name>` → State / Reason |
+| init 추가·수정 | YAML 뽑아 고치고 재생성 (이 장 첫머리 3단계) |
+
+```yaml
+spec:
+  initContainers:
+  - name: warmup
+    image: busybox
+    command: ["sleep", "20"]
+```
+
+:::caution[함정 — Init:CrashLoopBackOff]
+Pod STATUS가 `Init:...`으로 시작하면 범인은 본 컨테이너가 아니라 init이다.
+원본 랩의 정답도 `sleeeep 2`라는 **오타 하나**였다 — init의 command부터 읽을 것.
+init은 **순서대로, 성공해야** 다음으로 넘어간다.
+:::
+
+## 이 장에서 남길 것
+
+- Pod 스펙 수정 = **뽑고(`-o yaml`) → 지우고 → 재생성**. `replace --force`면 한 번에
+- command↔ENTRYPOINT, args↔CMD — 각각 대체 관계
+- 환경 주입은 `env`(개별) / `envFrom`(통째) 두 손잡이, ConfigMap과 Secret이 대칭
+- securityContext는 Pod 수준과 컨테이너 수준의 우선순위(컨테이너 승)와 capabilities 위치
+- `Init:` 접두사가 붙은 상태는 init 컨테이너부터 진단
+
+<LinkCard
+  title="4. 스케줄링"
+  description="nodeName, taint/toleration, nodeAffinity, 리소스 제한, DaemonSet, 스태틱 Pod."
+  href="/cka-udemy/04-scheduling/"
+/>
