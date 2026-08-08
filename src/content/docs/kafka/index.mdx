@@ -3,6 +3,8 @@ title: 개요
 description: Kafka — 서비스 사이에 로그를 놓는 이유와 온프렘 쿠버네티스에서 굴리는 법
 ---
 
+import { LinkCard, LinkButton } from '@astrojs/starlight/components';
+
 > Kafka는 큐가 아니라 **읽어도 사라지지 않는 로그**다 — 소비자가 각자 책갈피를 들고 읽는다
 
 온프렘 쿠버네티스에서 서비스를 구성하며 Kafka를 도입하는 환경을 전제로 한다.
@@ -13,6 +15,8 @@ description: Kafka — 서비스 사이에 로그를 놓는 이유와 온프렘 
 쿠버네티스 기초는 [CKA 덱](/cka/) 수준을 전제하고, 여기서 다시 설명하지 않는다.
 
 **2026년 8월 기준**으로 쓰였다 — Kafka 4.3 (KRaft 전용) · Strimzi 0.51 · Kubernetes 1.34.
+
+<LinkButton href="/kafka/00-intro/" icon="right-arrow">첫 장부터 읽기</LinkButton>
 
 ## 구성
 
@@ -55,8 +59,6 @@ flowchart LR
 **순서·병렬성·확장의 단위는 파티션이다.** 순서는 파티션 안에서만 보장되고,
 컨슈머는 파티션 수까지만 병렬로 붙는다. 키를 무엇으로 잡을지([4장](/kafka/04-producer/)),
 파티션을 몇 개로 할지([7장](/kafka/07-topic-design/))가 설계의 절반인 이유다.
-
-import { LinkCard } from '@astrojs/starlight/components';
 
 <LinkCard
   title="0. 시작하기 전에"
