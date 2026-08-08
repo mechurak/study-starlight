@@ -16,7 +16,7 @@ src/content/docs/
     00-intro.mdx …            #   본문 페이지 (컴포넌트를 쓰므로 전부 .mdx)
 src/components/               # 문서에서 import 하는 데모·시각화 컴포넌트
 src/styles/custom.css         # 폰트·본문 폭·mermaid 오버플로 커스텀
-docs/                         # 레포 운영 문서 (배포, 덱별 기준 시점)
+docs/                         # 레포 운영 문서 (배포, Starlight 변경 내역, 덱별 기준 시점)
 CLAUDE.md                     # 작업 규칙 (Claude Code 용)
 ```
 
@@ -54,5 +54,6 @@ README나 CLAUDE.md는 고칠 필요가 없다 — 단, 덱에 특별한 규칙�
 | 문서 | 내용 |
 |---|---|
 | [CLAUDE.md](CLAUDE.md) | **문서 작성 규칙**(제목 계층, aside, 컴포넌트, mermaid 팔레트), 깨뜨리면 안 되는 설정, 검증 절차 |
+| [docs/starlight-changes.md](docs/starlight-changes.md) | 기본 Starlight에서 바꾼 것 전체 목록 — 업그레이드 전에 볼 것 |
 | [docs/deploy.md](docs/deploy.md) | Cloudflare Pages 연동, `PNPM_VERSION`, 도메인 변경 |
 | [docs/cka-baseline.md](docs/cka-baseline.md) | cka 덱의 기준 커리큘럼·시험 환경 버전과 출처 |
