@@ -297,8 +297,8 @@ flowchart LR
 | **`PreferNoSchedule`** | 되도록 피한다. 자리가 없으면 배치한다 |
 | **`NoExecute`** | 배치도 안 하고, **이미 있는 Pod도 쫓아낸다** |
 
-**taint는 "노드에 붙이는 조건"**이고,
-**toleration은 "Pod이 그 조건을 견딜 수 있다는 선언"**이다.
+taint는 **노드에 붙이는 조건**이고,
+toleration은 **Pod이 그 조건을 견딜 수 있다는 선언**이다.
 toleration이 있다고 그 노드에 **가는 것은 아니다** — 갈 수 **있게** 될 뿐이다.
 
 ## toleration

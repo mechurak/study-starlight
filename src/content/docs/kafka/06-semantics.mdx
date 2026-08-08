@@ -6,7 +6,7 @@ description: "at-most-once · at-least-once · exactly-once — 유실과 중복
 import { LinkCard } from '@astrojs/starlight/components';
 import TermIntro from '../../../components/TermIntro.astro';
 
-> "정확히 한 번"을 약속하는 시스템은 없다 — **"중복이 와도 무해한 시스템"**을 만드는 것이다
+> "정확히 한 번"을 약속하는 시스템은 없다 — "**중복이 와도 무해한 시스템**"을 만드는 것이다
 
 <TermIntro
   terms={[
@@ -104,7 +104,7 @@ flowchart LR
 
 - 유실·중복의 근원은 **"두 동작 사이"의 장애** — 프로듀서 틈은 멱등성이(기본), 컨슈머 틈은 커밋 시점이 정한다
 - 실무 기본값: **at-least-once** (acks=all + RF3/min.insync=2 + 처리 후 커밋) — 그리고 랙 < 보존 기간
-- exactly-once는 **Kafka 안(트랜잭션 · Streams)**에서만 자동 — 외부로 나가면 **멱등 소비**가 답
+- exactly-once는 **Kafka 안**(트랜잭션 · Streams)에서만 자동 — 외부로 나가면 **멱등 소비**가 답
 - 순서는 같은 키까지만 — 컨슈머의 병렬 처리 코드가 순서를 깨지 않는지도 봐야 한다
 
 <LinkCard

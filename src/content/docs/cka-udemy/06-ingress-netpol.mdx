@@ -13,7 +13,7 @@ Ingress 실습은 두 벌이다 — 첫 벌은 **리소스**(라우팅 규칙)�
 
 ## Ingress 리소스 — Practice Test: CKA Ingress 1
 
-원본 랩: [practice-test-cka-ingress-networking-1](https://kodekloud.com/topic/practice-test-cka-ingress-networking-1/)
+원본 풀이: [24-Practice-Test-CKA-Ingress-Net-1.md](https://github.com/kodekloudhub/certified-kubernetes-administrator-course/blob/master/docs/09-Networking/24-Practice-Test-CKA-Ingress-Net-1.md)
 
 | 과제 | 명령 |
 |---|---|
@@ -58,7 +58,7 @@ Ingress 리소스는 **백엔드 Service가 있는 네임스페이스**에 만�
 
 ## Ingress 컨트롤러 배포 — Practice Test: CKA Ingress 2
 
-원본 랩: [practice-test-cka-ingress-networking-2](https://kodekloud.com/topic/practice-test-cka-ingress-networking-2/)
+원본 풀이: [25-Practice-Test-CKA-Ingress-Net-2.md](https://github.com/kodekloudhub/certified-kubernetes-administrator-course/blob/master/docs/09-Networking/25-Practice-Test-CKA-Ingress-Net-2.md)
 
 컨트롤러(nginx-ingress)를 구성 요소별로 직접 만든다 — 순서가 곧 답안이다:
 
@@ -75,11 +75,11 @@ kubectl create serviceaccount ingress-nginx-admission -n ingress-nginx
 - Deployment의 `namespace`가 다른 ns로 되어 있다
 - 들여쓰기 오류 (vi에서 `:set nu`로 줄 번호 켜고 찾는다)
 - Service `name` 오타
-- `nodeport` 소문자 — **`nodePort`**가 맞다 (YAML 키는 대소문자 구분)
+- `nodeport` 소문자 — `nodePort`가 맞다 (YAML 키는 대소문자 구분)
 
 ## NetworkPolicy — Practice Test: Network Policies
 
-원본 랩: [practice-test-network-policies](https://kodekloud.com/topic/practice-test-network-policies/)
+원본 풀이: [28-Practice-Test-Network-Policies.md](https://github.com/kodekloudhub/certified-kubernetes-administrator-course/blob/master/docs/07-Security/28-Practice-Test-Network-Policies.md)
 
 | 과제 | 명령 |
 |---|---|

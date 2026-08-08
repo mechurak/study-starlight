@@ -35,7 +35,7 @@ kubectl get pods -v=6      # 실제로 어떤 URL을 호출하는지 보인다
 # GET https://10.0.0.1:6443/api/v1/namespaces/default/pods?limit=500 200 OK
 ```
 
-이걸 알면 **"권한이 없다"**거나 **"연결이 안 된다"**는 에러를
+이걸 알면 "**권한이 없다**"거나 "**연결이 안 된다**"는 에러를
 "어느 주소로 어떤 신원으로 갔는가"로 환원해서 볼 수 있다.
 
 ## kubeconfig와 컨텍스트
@@ -448,7 +448,7 @@ flowchart LR
 :::caution[함정]
 배포용 이미지에는 `sh`조차 없는 경우가 많다(distroless).
 그럴 땐 `kubectl debug -it web --image=busybox --target=web` 로
-**임시 컨테이너(ephemeral container)**를 붙인다.
+**임시 컨테이너**(ephemeral container)를 붙인다.
 :::
 
 ### 이벤트 — 시간순으로 보는 클러스터의 일기

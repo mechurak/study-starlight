@@ -143,9 +143,9 @@ dev에서만 확인하고 배포하지 않는다. dev와 build는 전략이 다�
 
 ## 7장 요약
 
-- Vite의 정체 — **dev 서버(안 묶고 즉석 변환) + build 명령(묶고 다이어트)**의 묶음
+- Vite의 정체 — **dev 서버(안 묶고 즉석 변환) + build 명령**(묶고 다이어트)의 묶음
 - 발상의 핵심: 브라우저의 네이티브 ESM에 모듈 해석을 맡기고, 요청된 파일만 그때 변환한다
-- Vite 8부터 **Rolldown(Rust)**이 dev/build 단일 엔진 — 더 빠르고, dev/build 불일치가 사라졌다
+- Vite 8부터 **Rolldown**(Rust)이 dev/build 단일 엔진 — 더 빠르고, dev/build 불일치가 사라졌다
 - Astro·SvelteKit·Vitest가 전부 Vite 위에 있다 — 공통 기반의 표준화. 예외는 Next.js(Turbopack)
 - 배포 전 `pnpm preview`로 build 결과물을 확인하는 습관을 들인다
 

@@ -12,7 +12,7 @@ import { LinkCard } from '@astrojs/starlight/components';
 
 ## 수동 배치 — Practice Test: Manual Scheduling
 
-원본 랩: [practice-test-manual-scheduling](https://kodekloud.com/topic/practice-test-manual-scheduling/)
+원본 풀이: [03-Practice-Test-Manual-Scheduling.md](https://github.com/kodekloudhub/certified-kubernetes-administrator-course/blob/master/docs/03-Scheduling/03-Practice-Test-Manual-Scheduling.md)
 
 스케줄러가 없는 클러스터(kube-system에 kube-scheduler Pod이 없다)에서
 Pod이 Pending에 머무는 상황 — *Why is the POD in a pending state? Inspect the environment
@@ -34,7 +34,7 @@ spec:                  # — "Manually schedule the pod on node01."
 
 ## 라벨과 셀렉터 — Practice Test: Labels and Selectors
 
-원본 랩: [practice-test-labels-and-selectors](https://kodekloud.com/topic/practice-test-labels-and-selectors/)
+원본 풀이: [05-Practice-Test-Labels-and-Selectors.md](https://github.com/kodekloudhub/certified-kubernetes-administrator-course/blob/master/docs/03-Scheduling/05-Practice-Test-Labels-and-Selectors.md)
 
 ```bash
 # "We have deployed a number of PODs. They are labelled with tier, env and bu. How many PODs exist in the dev environment (env)?"
@@ -45,12 +45,12 @@ kubectl get pods -l env=dev --no-headers | wc -l             # 개수 세기 콤
 ```
 
 `--selector`와 `-l`은 같다. "PODs, ReplicaSets **포함 모든 오브젝트**"를 세라면
-`get pods`가 아니라 **`get all`**이다 — *How many objects are in the prod environment
+`get pods`가 아니라 `get all`이다 — *How many objects are in the prod environment
 including PODs, ReplicaSets and any other objects?*
 
 ## taint와 toleration — Practice Test: Taints and Tolerations
 
-원본 랩: [practice-test-taints-and-tolerations](https://kodekloud.com/topic/practice-test-taints-and-tolerations/)
+원본 풀이: [07-Practice-Test-Taints-and-Tolerations.md](https://github.com/kodekloudhub/certified-kubernetes-administrator-course/blob/master/docs/03-Scheduling/07-Practice-Test-Taints-and-Tolerations.md)
 
 ```bash
 # "Do any taints exist on node01 node?"
@@ -87,7 +87,7 @@ toleration을 줘도 그 노드로 **유도되지는 않는다** — 갈 수 있
 
 ## nodeAffinity — Practice Test: Node Affinity
 
-원본 랩: [practice-test-node-affinity](https://kodekloud.com/topic/practice-test-node-affinity-2/)
+원본 풀이: [10-Practice-Test-Node-Affinity.md](https://github.com/kodekloudhub/certified-kubernetes-administrator-course/blob/master/docs/03-Scheduling/10-Practice-Test-Node-Affinity.md)
 
 ```bash
 # "How many Labels exist on node node01?"
@@ -116,7 +116,7 @@ with the nginx image and 2 replicas, and ensure it gets placed on the controlpla
 
 ## 리소스 요청과 제한 — Practice Test: Resource Limits
 
-원본 랩: [practice-test-resource-limits](https://kodekloud.com/topic/practice-test-resource-limits/)
+원본 풀이: [13-Practice-Test-Resource-Limits.md](https://github.com/kodekloudhub/certified-kubernetes-administrator-course/blob/master/docs/03-Scheduling/13-Practice-Test-Resource-Limits.md)
 
 - `k describe pod rabbit` → Requests/Limits 확인 — *Run the command 'kubectl describe pod rabbit' and inspect requests.*
 - STATUS `OOMKilled` = 메모리 limit 초과로 죽음 → limit을 올려서 재생성 — *The status 'OOMKilled' indicates that the pod ran out of memory. Identify the memory limit set on the POD.*
@@ -134,7 +134,7 @@ Pod 수준 리소스 수정도 원칙은 재생성이지만, 요즘 시험 기�
 
 ## DaemonSet — Practice Test: DaemonSets
 
-원본 랩: [practice-test-daemonsets](https://kodekloud.com/topic/practice-test-daemonsets/)
+원본 풀이: [15-Practice-Test-DaemonSets.md](https://github.com/kodekloudhub/certified-kubernetes-administrator-course/blob/master/docs/03-Scheduling/15-Practice-Test-DaemonSets.md)
 
 ```bash
 # "Run the command kubectl get daemonsets --all-namespaces"
@@ -156,7 +156,7 @@ kubectl create deployment elasticsearch -n kube-system \
 
 ## 스태틱 Pod — Practice Test: Static Pods
 
-원본 랩: [practice-test-static-pods](https://kodekloud.com/topic/practice-test-static-pods/)
+원본 풀이: [17-Practice-Test-StaticPods.md](https://github.com/kodekloudhub/certified-kubernetes-administrator-course/blob/master/docs/03-Scheduling/17-Practice-Test-StaticPods.md)
 
 | 과제 | 명령 |
 |---|---|

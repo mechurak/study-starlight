@@ -21,7 +21,7 @@ vi pod.yaml && kubectl create -f pod.yaml   # 3) 고쳐서 다시 만든다
 
 ## command와 args — Practice Test: Commands and Arguments
 
-원본 랩: [practice-test-commands-and-arguments](https://kodekloud.com/topic/practice-test-commands-and-arguments/)
+원본 풀이: [06-Practice-Test-Commands-and-Arguments.md](https://github.com/kodekloudhub/certified-kubernetes-administrator-course/blob/master/docs/05-Application-Lifecycle-Management/06-Practice-Test-Commands-and-Arguments.md)
 
 Dockerfile의 ENTRYPOINT/CMD와 Pod 스펙의 command/args가 어떻게 덮어쓰는지가 전부다 —
 
@@ -47,7 +47,7 @@ YAML 배열 안의 값은
 
 ## 환경 변수와 ConfigMap — Practice Test: Env Variables
 
-원본 랩: [practice-test-env-variables](https://kodekloud.com/topic/practice-test-env-variables/)
+원본 풀이: [09-Practice-Test-Env-Variables.md](https://github.com/kodekloudhub/certified-kubernetes-administrator-course/blob/master/docs/05-Application-Lifecycle-Management/09-Practice-Test-Env-Variables.md)
 
 ```bash
 # "Create a new ConfigMap for the 'webapp-color' POD. Use the spec given on the right."
@@ -69,7 +69,7 @@ kubectl create configmap webapp-config-map --from-literal=APP_COLOR=darkblue
 
 ## Secret — Practice Test: Secrets
 
-원본 랩: [practice-test-secrets](https://kodekloud.com/topic/practice-test-secrets/)
+원본 풀이: [11.Practice-Test-Secrets.md](https://github.com/kodekloudhub/certified-kubernetes-administrator-course/blob/master/docs/05-Application-Lifecycle-Management/11.Practice-Test-Secrets.md)
 
 ```bash
 # "Run command kubectl create secret generic db-secret --from-literal=DB_Host=sql01 --from-literal=DBUser=root --from-literal=DB_Password=password123"
@@ -95,7 +95,7 @@ Pod에 통째로 주입은 ConfigMap과 대칭이다 —
 
 ## securityContext — Practice Test: Security Contexts
 
-원본 랩: [practice-test-security-contexts](https://kodekloud.com/topic/practice-test-security-contexts/)
+원본 풀이: [26-Practice-Test-Security-Context.md](https://github.com/kodekloudhub/certified-kubernetes-administrator-course/blob/master/docs/07-Security/26-Practice-Test-Security-Context.md)
 
 | 과제 | 위치 |
 |---|---|
@@ -122,7 +122,7 @@ spec:
 
 ## 멀티 컨테이너 — Practice Test: Multi-Container Pods
 
-원본 랩: [practice-test-multi-container-pods](https://kodekloud.com/topic/practice-test-multi-container-pods/)
+원본 풀이: [13-Practice-Test-Multi-Container-Pods.md](https://github.com/kodekloudhub/certified-kubernetes-administrator-course/blob/master/docs/05-Application-Lifecycle-Management/13-Practice-Test-Multi-Container-Pods.md)
 
 - 컨테이너 수는 `k get pod red`의 READY 열(`x/y`의 y) — *Identify the number of containers running in the 'red' pod.*
 - 이름은 `k describe pod blue` — *Identify the name of the containers running in the 'blue' pod.*
@@ -135,7 +135,7 @@ spec:
 
 ## init 컨테이너 — Practice Test: Init-Containers
 
-원본 랩: [practice-test-init-containers](https://kodekloud.com/topic/practice-test-init-containers/)
+원본 풀이: [16-Practice-Test-Init-Containers.md](https://github.com/kodekloudhub/certified-kubernetes-administrator-course/blob/master/docs/05-Application-Lifecycle-Management/16-Practice-Test-Init-Containers.md)
 
 | 과제 | 보는 곳 |
 |---|---|

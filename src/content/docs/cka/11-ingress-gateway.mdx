@@ -9,9 +9,9 @@ import { Steps, Card, CardGrid, Tabs, TabItem } from '@astrojs/starlight/compone
 
 ## Service만으로는 부족한 이유
 
-Service는 **L4(전송 계층 — IP와 포트만 본다)**에서 동작한다.
+Service는 **L4**(전송 계층 — IP와 포트만 본다)에서 동작한다.
 호스트 이름이나 URL 경로로 트래픽을 나누려면
-**L7(애플리케이션 계층 — HTTP 호스트·경로·헤더까지 본다)**이 필요하다.
+**L7**(애플리케이션 계층 — HTTP 호스트·경로·헤더까지 본다)이 필요하다.
 
 ```mermaid
 flowchart LR

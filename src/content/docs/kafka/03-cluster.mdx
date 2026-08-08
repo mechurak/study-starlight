@@ -6,7 +6,7 @@ description: "브로커 · 복제 · ISR · KRaft — 브로커가 죽어도 데
 import { LinkCard } from '@astrojs/starlight/components';
 import TermIntro from '../../../components/TermIntro.astro';
 
-> 복제는 **"몇 부를 두는가"**가 아니라 **"몇 부가 따라와야 성공으로 치는가"**까지 정해야 완성된다
+> 복제는 "**몇 부를 두는가**"가 아니라 "**몇 부가 따라와야 성공으로 치는가**"까지 정해야 완성된다
 
 <TermIntro
   terms={[
@@ -109,7 +109,7 @@ Strimzi에서는 이 역할 배치를 `KafkaNodePool`로 선언한다 ([9장](/k
 
 ## 3장 요약
 
-- 파티션은 브로커들에 흩어지고, **복제(RF=3)**로 브로커 장애를 견딘다 — 읽기·쓰기는 리더로만
+- 파티션은 브로커들에 흩어지고, **복제**(RF=3)로 브로커 장애를 견딘다 — 읽기·쓰기는 리더로만
 - ISR은 "따라온 복제본" 명단 — **명단 안에서만 리더를 뽑기에** 장애 극복이 유실 없이 된다
 - 표준 조합: **RF=3 + min.insync.replicas=2 + acks=all**. 하나만 빠져도 구멍
 - 메타데이터는 KRaft 컨트롤러(보통 3대)가 관리 — ZooKeeper는 이제 없다

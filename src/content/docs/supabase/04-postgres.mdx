@@ -199,7 +199,7 @@ create index comments_author_id_idx on public.comments (author_id);
 ```
 
 `on delete cascade` / `on delete set null` / 기본값(`restrict`) —
-**"부모가 사라지면 자식은 어떻게 되어야 하는가"**를 스키마에 명시하는 것이다.
+"**부모가 사라지면 자식은 어떻게 되어야 하는가**"를 스키마에 명시하는 것이다.
 애플리케이션 코드에 두는 것보다 안전하다.
 
 ### N:M — 사용자와 팀
@@ -410,7 +410,7 @@ create trigger posts_set_updated_at
 - **외래 키에는 인덱스를 직접 만든다.** RLS 비교 컬럼에도 만든다
 - 제약 조건은 마지막 방어선이다 — 클라이언트가 DB에 직접 쓰는 구조라 더 중요하다
 - 여러 단계를 원자적으로 처리해야 하면 **데이터베이스 함수(RPC)** 로 묶는다
-- 뷰를 만들 때는 **`security_invoker = on`**을 기억한다
+- 뷰를 만들 때는 `security_invoker = on`을 기억한다
 
 <LinkCard
   title="5. Data API와 supabase-js"

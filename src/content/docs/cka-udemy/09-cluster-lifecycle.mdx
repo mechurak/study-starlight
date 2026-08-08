@@ -12,7 +12,7 @@ cka 15장이 "시험의 승부처"라 부르는 영역의 실습판이다. 다�
 
 ## kubeadm 설치 — Practice Test: Deploy a Cluster using Kubeadm
 
-원본 랩: [practice-test-deploy-a-kubernetes-cluster-using-kubeadm](https://kodekloud.com/topic/practice-test-deploy-a-kubernetes-cluster-using-kubeadm/)
+원본 풀이: [05-Practice-Test-Deploy-Kubernetes-Cluster-using-Kubeadm.md](https://github.com/kodekloudhub/certified-kubernetes-administrator-course/blob/master/docs/11-Install-Kubernetes-the-kubeadm-way/05-Practice-Test-Deploy-Kubernetes-Cluster-using-Kubeadm.md)
 
 (원본의 버전 번호·apt 저장소는 낡았다 — 패턴만 가져가고, 저장소 주소와 버전은
 시험 문제가 주는 값과 [kubernetes.io 설치 문서](https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/install-kubeadm/)를 따른다.)
@@ -61,7 +61,7 @@ cka 15장이 "시험의 승부처"라 부르는 영역의 실습판이다. 다�
 
 ## 노드 비우기 — Practice Test: OS Upgrades
 
-원본 랩: [practice-test-os-upgrades](https://kodekloud.com/topic/practice-test-os-upgrades/)
+원본 풀이: [03-Practice-Test-OS-Upgrades.md](https://github.com/kodekloudhub/certified-kubernetes-administrator-course/blob/master/docs/06-Cluster-Maintenance/03-Practice-Test-OS-Upgrades.md)
 
 ```bash
 # "Run the command kubectl drain node01 --ignore-daemonsets"
@@ -85,7 +85,7 @@ uncordon은 "다시 스케줄 가능"으로 돌릴 뿐이다. 기존 Pod이 재�
 
 ## 버전 업그레이드 — Practice Test: Cluster Upgrade Process
 
-원본 랩: [practice-test-cluster-upgrade-process](https://kodekloud.com/topic/practice-test-cluster-upgrade-process/)
+원본 풀이: [06-Practice-Test-Cluster-Upgrade-Process.md](https://github.com/kodekloudhub/certified-kubernetes-administrator-course/blob/master/docs/06-Cluster-Maintenance/06-Practice-Test-Cluster-Upgrade-Process.md)
 
 전략 질문의 답: VM을 추가할 수 없다면 **한 노드씩 비우고 올리고 되돌린다.** —
 *You are tasked to upgrade the cluster. User's accessing the applications must not be impacted. And you cannot provision new VMs. What strategy would you use to upgrade the cluster?*
@@ -114,7 +114,7 @@ uncordon은 "다시 스케줄 가능"으로 돌릴 뿐이다. 기존 Pod이 재�
 
 ## etcd 백업과 복구 — Practice Test: Backup and Restore Methods
 
-원본 랩: [practice-test-backup-and-restore-methods](https://kodekloud.com/topic/practice-test-backup-and-restore-methods/)
+원본 풀이: [09-Practice-Test-Backup-and-Restore-Methods.md](https://github.com/kodekloudhub/certified-kubernetes-administrator-course/blob/master/docs/06-Cluster-Maintenance/09-Practice-Test-Backup-and-Restore-Methods.md)
 
 ```bash
 # 백업 — 인증서 세 개는 etcd 스태틱 Pod 매니페스트에서 확인
@@ -150,7 +150,7 @@ ETCDCTL_API=3 etcdctl snapshot restore /opt/snapshot-pre-boot.db \
 
 ## 스택 vs 외부 etcd — Practice Test: Backup and Restore Methods 2
 
-원본 랩: [practice-test-backup-and-restore-methods-2](https://kodekloud.com/topic/practice-test-backup-and-restore-methods-2-2/)
+원본 풀이: [10-Practice-Test-Backup-and-Restore-Methods-2.md](https://github.com/kodekloudhub/certified-kubernetes-administrator-course/blob/master/docs/06-Cluster-Maintenance/10-Practice-Test-Backup-and-Restore-Methods-2.md)
 
 멀티 클러스터 환경 — 먼저 `kubectl config get-contexts` / `use-context`로 오간다 —
 *Explore the student-node and the clusters it has access to.*

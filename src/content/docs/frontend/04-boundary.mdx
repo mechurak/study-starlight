@@ -63,8 +63,8 @@ flowchart TB
 ```
 
 :::tip[핵심]
-금지된 것은 **"클라이언트 컴포넌트가 서버 컴포넌트를 import하는 것"**이지
-**"감싸는 것"**이 아니다.
+금지된 것은 "**클라이언트 컴포넌트가 서버 컴포넌트를 import하는 것**"이지
+"**감싸는 것**"이 아니다.
 
 import는 번들러가 정적으로 따라가지만, `children`으로 넘긴 JSX는 **이미 렌더된 결과**다.
 그래서 서버에 남을 수 있다.
@@ -298,7 +298,7 @@ flowchart TB
 - `use client` 없는 라이브러리는 **한 줄 re-export로 감싼다**
 - 클라이언트에 데이터가 필요하면 **props** 또는 **Promise + `use()`**
 - Context를 쓰기 전에 **URL(searchParams)로 올릴 수 있는지** 먼저 본다
-- **`server-only` / `client-only`**로 경계 위반을 빌드 타임에 잡는다
+- `server-only` / `client-only`로 경계 위반을 빌드 타임에 잡는다
 - 원칙 하나: **경계를 아래로, 작게**
 
 <LinkCard

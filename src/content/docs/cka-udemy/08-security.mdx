@@ -12,7 +12,7 @@ import { LinkCard } from '@astrojs/starlight/components';
 
 ## 인증서 읽기 — Practice Test: View Certificate Details
 
-원본 랩: [practice-test-view-certificate-details](https://kodekloud.com/topic/practice-test-view-certificate-details/)
+원본 풀이: [10-Practice-Test-View-Certificate-Details.md](https://github.com/kodekloudhub/certified-kubernetes-administrator-course/blob/master/docs/07-Security/10-Practice-Test-View-Certificate-Details.md)
 
 kubeadm 클러스터의 인증서 위치는 정해져 있다 —
 
@@ -44,7 +44,7 @@ etcd는 **자체 CA**(`pki/etcd/ca.crt`)를 쓴다. API 서버의 `--etcd-cafile
 
 ## CSR 승인 — Practice Test: Certificates API
 
-원본 랩: [practice-test-certificates-api](https://kodekloud.com/topic/practice-test-certificates-api/)
+원본 풀이: [12-Practice-Test-Certificates-API.md](https://github.com/kodekloudhub/certified-kubernetes-administrator-course/blob/master/docs/07-Security/12-Practice-Test-Certificates-API.md)
 
 새 사용자의 인증서 서명 요청(CSR, CertificateSigningRequest) 처리 —
 
@@ -72,7 +72,7 @@ CSR YAML의 뼈대(`signerName: kubernetes.io/kube-apiserver-client`, `usages: [
 
 ## kubeconfig — Practice Test: KubeConfig
 
-원본 랩: [practice-test-kubeconfig](https://kodekloud.com/topic/practice-test-kubeconfig/)
+원본 풀이: [14-Practice-Test-KubeConfig.md](https://github.com/kodekloudhub/certified-kubernetes-administrator-course/blob/master/docs/07-Security/14-Practice-Test-KubeConfig.md)
 
 ```bash
 # "Run the kubectl config view command and count the number of clusters"
@@ -96,7 +96,7 @@ kubectl config --kubeconfig=/root/my-kube-config use-context research
 
 ## Role과 RoleBinding — Practice Test: RBAC
 
-원본 랩: [practice-test-role-based-access-controls](https://kodekloud.com/topic/practice-test-role-based-access-controls/)
+원본 풀이: [18-Practice-Test-RBAC.md](https://github.com/kodekloudhub/certified-kubernetes-administrator-course/blob/master/docs/07-Security/18-Practice-Test-RBAC.md)
 
 ```bash
 # "Run the command kubectl describe pod kube-apiserver-controlplane -n kube-system and look for --authorization-mode"
@@ -124,7 +124,7 @@ edit로 고칠 때 이 필드를 놓치면 계속 403이다.
 
 ## ClusterRole — Practice Test: Cluster Roles
 
-원본 랩: [practice-test-cluster-roles](https://kodekloud.com/topic/practice-test-cluster-roles/)
+원본 풀이: [20-Practice-Test-Cluster-Roles.md](https://github.com/kodekloudhub/certified-kubernetes-administrator-course/blob/master/docs/07-Security/20-Practice-Test-Cluster-Roles.md)
 
 - ClusterRole/ClusterRoleBinding은 **네임스페이스가 없다** — "어느 ns 소속인가"는 함정 질문 — *What namespace is the cluster-admin clusterrole part of?*
 - 개수 세기: `kubectl get clusterroles --no-headers | wc -l` — *Run the command `kubectl get clusterroles --no-headers | wc -l` or `kubectl get clusterroles --no-headers -o json | jq '.items | length'`*
@@ -146,7 +146,7 @@ kubectl create clusterrolebinding michelle-storage-admin \
 
 ## ServiceAccount — Practice Test: Service Accounts
 
-원본 랩: [practice-test-service-accounts](https://uklabs.kodekloud.com/topic/practice-test-service-accounts-2/)
+원본 풀이: [22-Practice-Test-Service-Accounts.md](https://github.com/kodekloudhub/certified-kubernetes-administrator-course/blob/master/docs/07-Security/22-Practice-Test-Service-Accounts.md)
 
 ```bash
 # "How many service accounts exist in the default namespace?"
@@ -169,7 +169,7 @@ kubectl create token dashboard-sa            # 수명 있는 토큰 발급 (Toke
 
 ## 프라이빗 레지스트리 — Practice Test: Image Security
 
-원본 랩: [practice-test-image-security](https://kodekloud.com/topic/practice-test-image-security/)
+원본 풀이: [24-Practice-Test-Image-Security.md](https://github.com/kodekloudhub/certified-kubernetes-administrator-course/blob/master/docs/07-Security/24-Practice-Test-Image-Security.md)
 
 ```bash
 # "Run command kubectl create secret docker-registry private-reg-cred --docker-username=dock_user --docker-password=dock_password …"

@@ -687,7 +687,7 @@ NFS·CephFS·EFS로 바꾸면 **여러 노드에서 동시 마운트**가 된다
 
 :::tip[시험]
 `Multi-Attach error` 를 보면
-**"RWO인데 두 노드에서 쓰려 한다"**로 바로 판정하면 된다.
+"**RWO인데 두 노드에서 쓰려 한다**"로 바로 판정하면 된다.
 :::
 
 ### 정적 프로비저닝 실습 흐름
@@ -738,7 +738,7 @@ NFS·CephFS·EFS로 바꾸면 **여러 노드에서 동시 마운트**가 된다
 - **emptyDir**은 Pod과 함께 죽고, **컨테이너 재시작에는 살아남는다**
 - **PV(관리자) / PVC(개발자)** 분리 덕분에 매니페스트가 환경에 독립적이다
 - 바인딩 조건: **storageClassName · accessModes · 용량**. 1:1이고 남는 용량은 낭비된다
-- **RWO는 "노드 하나"**다. Pod 하나로 제한하려면 `ReadWriteOncePod`
+- **RWO는 "노드 하나"다**. Pod 하나로 제한하려면 `ReadWriteOncePod`
 - `Retain`이면 PVC 삭제 후 **`Released`** — `claimRef`를 지워야 재사용된다
 - **`WaitForFirstConsumer`에서의 Pending은 정상**이다
 - 확장은 **`allowVolumeExpansion: true`** 필요, **늘리기만** 가능
