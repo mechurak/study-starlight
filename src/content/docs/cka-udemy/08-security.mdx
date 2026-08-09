@@ -1,13 +1,13 @@
 ---
 title: "8. 인증서 · kubeconfig · RBAC — 접근 제어 일곱 벌"
-description: "인증서 읽기, CSR 승인/거부, kubeconfig 수리, Role과 ClusterRole, ServiceAccount, 프라이빗 레지스트리"
+description: "인증서 읽기, CSR 승인/거부, kubeconfig 수리, Role과 ClusterRole, ServiceAccount, 프라이빗 레지스트리, admission 컨트롤러"
 ---
 
 import { LinkCard } from '@astrojs/starlight/components';
 
 > 짝이 되는 개념 장: [cka 14. 인증 · 인가 · RBAC](/cka/14-rbac/)
 
-일곱 실습이 전부 "요청이 통과해야 하는 세 관문"(인증 → 인가 → admission) 위에 있다.
+아홉 실습이 전부 "요청이 통과해야 하는 세 관문"(인증 → 인가 → admission) 위에 있다.
 어느 관문의 문제인지부터 가르면 절반은 푼 것이다.
 
 ## 인증서 읽기 — Practice Test: View Certificate Details
@@ -194,6 +194,105 @@ kubectl create secret docker-registry private-reg-cred \
 이 Secret이 없다는 신호다 — *Use the kubectl edit deployment command to edit the image name
 to myprivateregistry.com:5000/nginx:alpine*. Secret 타입은 `docker-registry`라는 것까지 기억.
 
+## admission 플러그인 켜고 끄기 — Lab: Admission Controllers (2025 신규)
+
+소스: 강의 노트 [(2025 Updates) Admission Controllers](https://notes.kodekloud.com/docs/Certified-Kubernetes-Administrator-CKA/Scheduling/2025-Updates-Admission-Controllers/page)
+— 원본 레포에는 이 랩의 풀이 문서가 없다 (2025년 추가 랩).
+개념은 [cka 14장의 admission 절](/cka/14-rbac/#admission-컨트롤러)이 맡는다.
+
+조회 문제부터 — "어떤 플러그인이 켜져 있나"는 **어디를 보느냐**가 곧 답이다.
+
+```bash
+# 기본으로 켜진 플러그인 목록 — 바이너리에 직접 물어본다
+kubectl exec -n kube-system kube-apiserver-controlplane -- kube-apiserver -h | grep enable-admission-plugins
+# 이 클러스터에 설정된 값 — 스태틱 Pod 매니페스트
+grep admission-plugins /etc/kubernetes/manifests/kube-apiserver.yaml
+# 실제 떠 있는 프로세스 기준 — 편집 직후의 검증은 이쪽이 확실하다
+ps -ef | grep kube-apiserver | grep admission-plugins
+```
+
+수정 문제의 패턴은 둘 — **켜기**(`NamespaceAutoProvision` 등)와 **끄기**(`DefaultStorageClass` 등).
+`/etc/kubernetes/manifests/kube-apiserver.yaml`의 `command`를 고친다.
+
+```yaml
+    - --enable-admission-plugins=NodeRestriction,NamespaceAutoProvision
+    - --disable-admission-plugins=DefaultStorageClass
+```
+
+효과 확인까지가 한 문제다 — `kubectl run nginx --image nginx -n blue`처럼
+**없는 네임스페이스에 만들어 본다**. `NamespaceAutoProvision`이 켜져 있으면
+네임스페이스가 자동 생성되며 성공하고, 꺼져 있으면 거부된다.
+
+:::caution[함정 — 저장하면 API 서버가 재시작된다]
+스태틱 Pod라 매니페스트를 저장하는 순간 API 서버가 재시작된다 —
+**몇십 초 kubectl이 안 먹는 게 정상**이다. 플래그에 오타가 있으면 아예 안 올라오는데,
+그때는 kubectl이 아니라 `crictl ps -a`와 컨테이너 로그로 본다 ([10장](/cka-udemy/10-troubleshooting/)의 진단 순서).
+검증은 매니페스트 grep이 아니라 `ps -ef` 쪽으로 — 매니페스트는 "설정한 값"이고
+프로세스가 "실제 적용된 값"이다.
+:::
+
+:::tip[기본값을 묻는 문제]
+`NamespaceAutoProvision`과 `NamespaceExists`는 **기본 비활성**이다.
+"없는 네임스페이스 거부"라는 기본 동작은 요즘은 `NamespaceLifecycle`이 맡는다 —
+"다음 중 기본으로 켜져 있지 않은 것은?" 유형의 답이 된다.
+:::
+
+## admission webhook 등록 — Lab: Validating and Mutating Admission Controllers (2025 신규)
+
+소스: 강의 노트 [(2025 Updates) Validating and Mutating Admission Controllers](https://notes.kodekloud.com/docs/Certified-Kubernetes-Administrator-CKA/Scheduling/2025-Updates-Validating-and-Mutating-Admission-Controllers/page).
+내장 플러그인이 아니라 **직접 만든 규칙**을 거는 쪽 — [cka 14장의 외부 webhook 절](/cka/14-rbac/#외부-webhook--직접-만드는-admission)이 개념 짝이다.
+
+랩의 흐름은 세 단계다. webhook 서버 자체(코드)는 랩이 주고, **배포와 등록**이 문제다.
+
+1. **webhook 서버 배포** — 랩이 주는 Deployment + Service를 적용한다.
+   클러스터 안에서 돌면 API 서버가 Service 이름으로 호출한다
+2. **TLS Secret** — API 서버 → webhook 통신은 HTTPS 의무라, 서버 인증서·키로
+   `tls` 타입 Secret을 만든다 (파일 경로·이름은 문제가 준다)
+
+   ```bash
+   kubectl -n webhook-demo create secret tls webhook-server-tls \
+     --cert=/root/keys/webhook-server-tls.crt --key=/root/keys/webhook-server-tls.key
+   ```
+
+3. **WebhookConfiguration 등록** — 이것이 API 서버에게 "이런 요청이 오면 저기 물어봐라"를
+   알리는 리소스다. 강의 노트의 예시 —
+
+   ```yaml
+   apiVersion: admissionregistration.k8s.io/v1
+   kind: MutatingWebhookConfiguration    # 검사만 하면 ValidatingWebhookConfiguration
+   metadata:
+     name: pod-policy.example.com
+   webhooks:
+   - name: pod-policy.example.com
+     clientConfig:
+       service:
+         namespace: webhook-demo         # webhook 서버 Service의 위치
+         name: webhook-server
+       caBundle: "Ci0tLS0tQk...(서버 인증서를 검증할 CA를 base64로)"
+     rules:
+     - apiGroups: [""]
+       apiVersions: ["v1"]
+       operations: ["CREATE"]            # Pod 생성 때마다 호출
+       resources: ["pods"]
+       scope: "Namespaced"
+   ```
+
+검증도 Pod를 만들어 보는 것이다 — **mutating**이면 만든 Pod에 없던 필드
+(예: securityContext 기본값)가 **주입되어** 나오고, **validating**이면
+규칙 위반 Pod가 생성 자체를 거부당한다.
+
+:::tip[개념 문제 — ImagePolicyWebhook]
+webhook 계열의 내장판인 `ImagePolicyWebhook` 정의를 묻는 문제가 같이 나온다 —
+*The ImagePolicyWebhook admission controller intercepts pod creation and update requests,
+extracts the container images, and sends them to an external webhook for validation.
+Based on the webhook's response, it either allows or denies the pod creation.
+It does not perform authentication, post-deployment scanning, or image encryption.*
+아닌 것 셋은 단계로 가른다 — 인증은 관문 ①의 일, 배포 후 스캔은 생성 시점 관문이 아니며,
+mutating이 아니라 validating이라 내용을 바꾸지도 않는다. 그리고 이쪽 설정은
+webhook 리소스가 아니라 `AdmissionConfiguration` **파일**이다 —
+`kubectl api-resources`에 안 나온다 ([cka 14장](/cka/14-rbac/#세부-설정--admissionconfiguration-파일)).
+:::
+
 ## 이 장에서 남길 것
 
 - 인증서 문제의 근거는 항상 `/etc/kubernetes/manifests/`의 플래그다. etcd CA는 따로
@@ -201,6 +300,9 @@ to myprivateregistry.com:5000/nginx:alpine*. Secret 타입은 `docker-registry`�
 - RBAC는 만들기보다 **`--as`/`auth can-i`로 검증**까지가 한 문제
 - 클러스터 범위 리소스(nodes·pv·sc)는 ClusterRole
 - SA 토큰은 `create token`, 레지스트리 인증은 `docker-registry` 타입 Secret + imagePullSecrets
+- admission 플러그인은 kube-apiserver **플래그**로 켜고 끄고, 검증은 `ps -ef`로.
+  직접 만든 규칙은 WebhookConfiguration **리소스**, `ImagePolicyWebhook` 세부 설정은
+  `AdmissionConfiguration` **파일**
 
 <LinkCard
   title="9. 클러스터 라이프사이클"

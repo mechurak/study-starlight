@@ -653,6 +653,11 @@ kubectl run tmp --image=curlimages/curl --rm -it --restart=Never \
 
 인가를 통과한 뒤 **내용을 검사하거나 고치는** 단계다.
 
+왜 따로 있는가 — **인가(RBAC)는 요청의 내용을 보지 않기 때문**이다.
+RBAC의 관할은 "누가 · 어떤 동사를 · 어떤 리소스에"까지다. dev에게 Pod 생성 권한이
+있으면 `latest` 태그든, 미승인 레지스트리 이미지든, limit 없는 Pod든 **전부 통과**한다.
+"생성은 허용하되, **이런 내용이면 고치거나 거부한다**"는 규칙을 걸 자리가 admission이다.
+
 ```mermaid
 flowchart LR
     Z["인가 통과"] --> MU["Mutating<br/>요청을 고친다"]
@@ -677,23 +682,85 @@ flowchart LR
 | **Mutating** | 요청을 **고친다** | `DefaultStorageClass`, `ServiceAccount` 주입 |
 | **Validating** | **거부하거나 통과**시킨다 | `ResourceQuota`, `PodSecurity`, `LimitRanger` |
 
+Mutating이 먼저 돌고 Validating이 고쳐진 결과를 검사한다.
+**스케줄링과는 무관하다** — admission은 etcd 저장 **전**의 관문이라,
+여기서 거부된 Pod는 스케줄러가 본 적도 없다.
+
+### 켜고 끄기 — kube-apiserver 플래그
+
+admission 컨트롤러는 별도 설치물이 아니라 **API 서버 안에 내장**돼 있고,
+플래그로 켜고 끈다. kubeadm 클러스터라면 static Pod 매니페스트를 고친다.
+
 ```bash
 # 활성 목록 확인
-sudo grep enable-admission-plugins /etc/kubernetes/manifests/kube-apiserver.yaml
+sudo grep admission-plugins /etc/kubernetes/manifests/kube-apiserver.yaml
+
+# command에 추가 — 기본 셋에 더하거나 뺀다
+- --enable-admission-plugins=NodeRestriction,ImagePolicyWebhook
+- --disable-admission-plugins=DefaultStorageClass
 ```
 
 **중요한 내장 플러그인**
 
-- `NamespaceLifecycle` — Terminating 네임스페이스에 생성 금지
+- `NamespaceLifecycle` — 없는 네임스페이스로의 생성을 거부하고, `kube-system` 같은
+  시스템 네임스페이스의 삭제를 막는다 (옛 `NamespaceExists`·`NamespaceAutoProvision`을 대체)
 - `LimitRanger` / `ResourceQuota` — 6장
 - `PodSecurity` — 7장
-- `DefaultStorageClass` — PVC에 기본 클래스를 채운다
-- `MutatingAdmissionWebhook` / `ValidatingAdmissionWebhook` — 외부 정책 엔진 연동
+- `DefaultStorageClass` — PVC에 기본 클래스를 채운다 (mutating의 대표 예)
+- `NodeRestriction` — kubelet이 **자기 노드의 리소스만** 만지게 제한한다
+- `MutatingAdmissionWebhook` / `ValidatingAdmissionWebhook` — 외부 정책 엔진 연동 (아래)
+
+### 세부 설정 — AdmissionConfiguration 파일
+
+일부 플러그인은 켜는 것만으로 끝나지 않고 **세부 설정 파일이 따로** 필요하다.
+대표가 `ImagePolicyWebhook` — Pod 생성·수정 요청에서 **컨테이너 이미지 이름을 뽑아
+외부 webhook 서버에 물어보고**, 응답대로 통과시키거나 거부한다.
+"미승인 레지스트리 이미지를 클러스터에 아예 못 들어오게" 하는 관문의 구현이다.
+
+```yaml
+# 예: /etc/kubernetes/admission/admission-config.yaml
+apiVersion: apiserver.config.k8s.io/v1
+kind: AdmissionConfiguration
+plugins:
+  - name: ImagePolicyWebhook
+    configuration:
+      imagePolicy:
+        kubeConfigFile: /etc/kubernetes/admission/imagepolicy.kubeconfig  # webhook 서버 주소·인증서
+        defaultAllow: false   # webhook이 응답 없을 때 — false면 전부 거부
+```
+
+이 파일을 API 서버 플래그 `--admission-control-config-file=<경로>`로 넘긴다.
+
+:::caution[함정 — kubectl로는 안 보인다]
+`kubectl api-resources`에 `AdmissionConfiguration`이 **없는 게 정상**이다.
+이것은 etcd에 저장되는 API 오브젝트가 아니라 **API 서버가 기동할 때 디스크에서 읽는
+설정 파일의 형식**이고, `apiVersion`은 파일 파싱용 스키마 표시일 뿐이다 —
+6장의 `EncryptionConfiguration`, kubelet의 `KubeletConfiguration`과 같은 부류다.
+따라서 `kubectl explain`도 안 되고, 스키마는 kubernetes.io에서
+**ImagePolicyWebhook을 검색**해 찾는다. 그리고 API 서버는 static Pod라서
+설정 파일 경로를 **hostPath 볼륨으로 마운트까지** 해 줘야 읽는다 — 빼먹기 쉽다.
+:::
+
+### 외부 webhook — 직접 만드는 admission
+
+내장 플러그인에 없는 규칙은 webhook 리소스 두 종으로 건다. 이쪽은 설정 파일이 아니라
+**진짜 API 리소스**라(`admissionregistration.k8s.io` 그룹) kubectl로 만들고 조회한다.
+
+| 리소스 | 시점 | 쓰임 |
+|---|---|---|
+| `MutatingWebhookConfiguration` | validating보다 먼저 | 사이드카 주입, 라벨·기본값 추가 |
+| `ValidatingWebhookConfiguration` | 저장 직전 마지막 검사 | 정책 위반 거부 (OPA Gatekeeper, Kyverno) |
+
+API 서버는 등록된 `rules`에 걸리는 요청마다 **AdmissionReview** JSON을
+webhook 서버(대개 클러스터 안의 Service)로 보내고,
+응답의 `allowed: true/false`대로 통과 여부를 정한다.
 
 :::caution[함정]
 외부 webhook이 응답하지 않으면
 `failurePolicy: Fail`일 때 **해당 리소스 생성이 전부 막힌다.**
 "갑자기 아무것도 안 만들어진다"의 원인이 될 수 있다.
+`ImagePolicyWebhook`의 `defaultAllow: false`도 같은 성격이다 —
+**정책 서버의 장애가 클러스터 전체의 생성 장애**가 된다.
 :::
 
 ## RBAC 진단 순서
@@ -766,6 +833,8 @@ flowchart TD
 - **ClusterRole + RoleBinding = 그 네임스페이스로 범위가 좁혀진다** ← 가장 유용한 조합
 - **`pods` 권한이 있어도 `logs`는 `pods/log`가 따로** 필요하다
 - 검산은 **`kubectl auth can-i --as=...`**
+- **admission은 인가가 못 보는 "내용"의 관문** — mutating(고침) → validating(거부) 순.
+  `AdmissionConfiguration`은 API 리소스가 아니라 **API 서버의 설정 파일**이다
 
 :::note[손 연습]
 이 장 범위의 KodeKloud 실습 풀이 — [CKA 실습 8장 · 인증서·kubeconfig·RBAC](/cka-udemy/08-security/)
