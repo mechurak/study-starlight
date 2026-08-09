@@ -107,7 +107,9 @@ uncordon은 "다시 스케줄 가능"으로 돌릴 뿐이다. 기존 Pod이 재�
 
 (원본은 `apt install kubeadm=1.18...` 시절 답안이다. 지금은 pkgs.k8s.io 저장소의
 **마이너 버전별 리포지터리**를 먼저 바꿔야 다음 마이너가 보인다 — 절차 전문은
-[cka 15장](/cka/15-cluster-lifecycle/) 업그레이드 절.)
+[cka 15장](/cka/15-cluster-lifecycle/) 업그레이드 절. 시험 중에는 공식
+[Upgrading kubeadm clusters](https://kubernetes.io/docs/tasks/administer-cluster/kubeadm/kubeadm-upgrade/)
+페이지를 열어 놓고 그대로 따라가는 게 정석이다 — 저장소 교체 명령까지 다 있다.)
 
 :::caution[함정 — 워커는 apply가 아니라 node]
 `kubeadm upgrade apply`는 **첫 컨트롤 플레인에서 한 번**이다.
@@ -121,6 +123,8 @@ uncordon은 "다시 스케줄 가능"으로 돌릴 뿐이다. 기존 Pod이 재�
 
 ```bash
 # 백업 — 인증서 세 개는 etcd 스태틱 Pod 매니페스트에서 확인
+# 플래그가 기억 안 나면 공식 문서 "Operating etcd clusters for Kubernetes"에서 복사:
+# https://kubernetes.io/docs/tasks/administer-cluster/configure-upgrade-etcd/
 # ETCDCTL_API=3: v3 API 강제 — 요즘 etcdctl은 3이 기본이라 없어도 되지만, 답안 관습으로 남아 있다
 # "Take a snapshot of the ETCD database using the built-in snapshot functionality. Store the backup file at location /opt/snapshot-pre-boot.db"
 ETCDCTL_API=3 etcdctl snapshot save /opt/snapshot-pre-boot.db \

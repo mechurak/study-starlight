@@ -91,6 +91,9 @@ kubectl get ds -n kube-system                       # 모든 노드에 하나씩
 | Corefile은 어떻게 주입되나 | ConfigMap `coredns`로 마운트 |
 | 루트 도메인 | Corefile의 `kubernetes cluster.local ...` |
 
+이름 규칙의 공식 근거는
+[DNS for Services and Pods 문서](https://kubernetes.io/docs/concepts/services-networking/dns-pod-service/)다 —
+시험 중 형식이 헷갈릴 때 여기를 연다.
 이름 규칙 문제는 [1장에서 본 규칙](/cka-udemy/01-basics/)의 반복이다 —
 같은 ns면 `web-service`, 다른 ns면 `web-service.payroll`,
 풀 네임은 `web-service.payroll.svc.cluster.local`.

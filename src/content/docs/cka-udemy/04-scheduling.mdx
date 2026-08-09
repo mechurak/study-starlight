@@ -64,7 +64,9 @@ kubectl taint nodes controlplane node-role.kubernetes.io/control-plane:NoSchedul
 (원본은 옛 `master` 키로 쓰여 있다 — 현 시험 환경의 컨트롤 플레인 taint 키는
 `node-role.kubernetes.io/control-plane`이다.)
 
-toleration은 **Pod 스펙 수준**(containers와 같은 들여쓰기)에 넣는다 —
+toleration은 **Pod 스펙 수준**(containers와 같은 들여쓰기)에 넣는다 — 필드 철자는
+[Taints and Tolerations 문서](https://kubernetes.io/docs/concepts/scheduling-eviction/taint-and-toleration/)에서
+복사하면 안전하다 —
 
 ```yaml
 spec:                # — "Create another pod named bee with the nginx image, which has a toleration set to the taint mortein."
@@ -96,7 +98,9 @@ kubectl get node node01 --show-labels
 kubectl label node node01 color=blue
 ```
 
-Deployment의 **Pod 템플릿 쪽**(`spec.template.spec`)에 붙인다 —
+affinity YAML은 시험장에서 외워 쓰기보다 공식 문서
+[Assign Pods to Nodes using Node Affinity](https://kubernetes.io/docs/tasks/configure-pod-container/assign-pods-nodes-using-node-affinity/)에서
+복사해 오는 게 정석이다. Deployment의 **Pod 템플릿 쪽**(`spec.template.spec`)에 붙인다 —
 
 ```yaml
       affinity:      # — "Set Node Affinity to the deployment to place the pods on node01 only."

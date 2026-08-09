@@ -140,6 +140,7 @@ kubectl get node node01 -o jsonpath='{.status.capacity.cpu}'
 ```
 
 값 하나를 정확히 꺼낼 때. 다른 명령에 넘겨 쓰기 좋다.
+`range`나 필터 문법이 기억나지 않으면 시험 중에는 공식 [JSONPath 문서](https://kubernetes.io/docs/reference/kubectl/jsonpath/)의 예시를 복사해 경로만 바꾸는 게 가장 빠르다.
 
 </TabItem>
 <TabItem label="custom-columns — 표로 뽑는다">
@@ -235,6 +236,7 @@ kubectl create ingress web --rule="example.com/*=web-svc:80"
 ```
 
 **이 목록을 손에 붙이는 것이 곧 시험 시간이다.** 19장에 전체 치트시트가 있다.
+막히면 시험 중에도 열 수 있는 공식 [kubectl Quick Reference](https://kubernetes.io/docs/reference/kubectl/quick-reference/)에 같은 목록이 정리되어 있다.
 
 ### dry-run — 명령형으로 YAML을 뽑는다
 

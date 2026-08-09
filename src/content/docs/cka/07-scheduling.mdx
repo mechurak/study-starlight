@@ -207,7 +207,8 @@ flowchart TB
 
 :::tip[시험]
 이 YAML은 **손으로 치면 거의 틀린다.**
-공식 문서 `assign pod node` 페이지에서 **복사해서 값만 바꾸는 게** 정답이다.
+공식 [Assign Pods to Nodes using Node Affinity](https://kubernetes.io/docs/tasks/configure-pod-container/assign-pods-nodes-using-node-affinity/)에서
+**복사해서 값만 바꾸는 게** 정답이다.
 :::
 
 ### podAffinity / podAntiAffinity
@@ -322,6 +323,10 @@ spec:
 - `operator: Exists` 면 `value`를 쓰지 않는다
 - `effect`를 생략하면 **모든 effect**에 대해 적용된다
 - `key`까지 생략하고 `Exists`만 두면 **전부 무시** — DaemonSet에서 쓰는 패턴
+
+toleration 블록도 필드 이름을 외워 쓰기보다 공식
+[Taints and Tolerations](https://kubernetes.io/docs/concepts/scheduling-eviction/taint-and-toleration/)에서
+복사해 key·value·effect만 바꾸는 게 빠르다.
 
 ### taint × toleration 조합표
 

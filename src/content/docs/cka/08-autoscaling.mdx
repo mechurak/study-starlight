@@ -125,6 +125,10 @@ kubectl get hpa
 kubectl describe hpa web
 ```
 
+명령 한 줄이면 대부분 끝나지만, `autoscaling/v2` YAML을 직접 써야 하는 문제라면 공식
+[HorizontalPodAutoscaler Walkthrough](https://kubernetes.io/docs/tasks/run-application/horizontal-pod-autoscale-walkthrough/)에서
+매니페스트를 복사해 오는 게 정석이다.
+
 ```yaml
 apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler

@@ -96,6 +96,9 @@ kubectl create ingress web --class=nginx \
   --rule="shop.example.com/api*=api-svc:8080" --rule="shop.example.com/*=web-svc:80"
 ```
 
+시험 중에는 공식 [Ingress 문서](https://kubernetes.io/docs/concepts/services-networking/ingress/)의
+예시 YAML을 복사해 이름·경로·서비스·포트만 바꾸는 게 가장 빠르다.
+
 ### pathType — 세 가지
 
 ```mermaid
@@ -473,6 +476,8 @@ flowchart LR
 :::tip[시험]
 Gateway API 문서(`gateway-api.sigs.k8s.io`)는
 **시험 중 열 수 있는 사이트**다. HTTPRoute YAML은 거기서 복사해 오는 것이 정답이다.
+kubernetes.io 쪽에도 공식 [Gateway API 문서](https://kubernetes.io/docs/concepts/services-networking/gateway/)가 있어
+Gateway·HTTPRoute 기본 예시는 여기서도 복사할 수 있다.
 :::
 
 ## Ingress에서 Gateway API로

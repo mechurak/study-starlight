@@ -67,6 +67,9 @@ kubectl create configmap webapp-config-map --from-literal=APP_COLOR=darkblue
 ```
 
 세 가지 주입 방식(env/envFrom/volume)의 전체 지도는 [cka 6장](/cka/06-config/)에 있다.
+시험 중 YAML 뼈대는 공식 문서
+[Configure a Pod to Use a ConfigMap](https://kubernetes.io/docs/tasks/configure-pod-container/configure-pod-configmap/)에서
+복사하는 게 빠르다.
 
 ## Secret — Practice Test: Secrets
 
@@ -104,6 +107,10 @@ Pod에 통째로 주입은 ConfigMap과 대칭이다 —
 | 실행 유저 확인 — *Run the command 'kubectl exec ubuntu-sleeper -- whoami'…* | `k exec ubuntu-sleeper -- whoami` |
 | 유저 바꾸기 — *Set a security context to run as user 1010.* | `securityContext.runAsUser: 1010` |
 | 커널 능력 추가 — *Add SYS_TIME capability to the container's securityContext* | 컨테이너 쪽 `securityContext.capabilities.add: ["SYS_TIME"]` |
+
+필드 이름이 헷갈리면 공식 문서
+[Configure a Security Context](https://kubernetes.io/docs/tasks/configure-pod-container/security-context/)에서
+예시 YAML을 그대로 가져온다.
 
 ```yaml
 spec:

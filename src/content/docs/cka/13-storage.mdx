@@ -692,6 +692,10 @@ NFS·CephFS·EFS로 바꾸면 **여러 노드에서 동시 마운트**가 된다
 
 ### 정적 프로비저닝 실습 흐름
 
+PV·PVC·Pod 세 YAML을 손으로 처음부터 치는 건 낭비다 — 시험 중에는 공식
+[Configure a Pod to Use a PersistentVolume for Storage](https://kubernetes.io/docs/tutorials/configuration/configure-persistent-volume-storage/)
+페이지를 열어 뼈대를 복사해 오고, 이름·용량·경로만 문제에 맞게 고치는 게 정석이다.
+
 <Steps>
 
 1. **PV 생성** — 관리자의 몫

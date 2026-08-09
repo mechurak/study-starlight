@@ -100,6 +100,9 @@ flowchart LR
 
 `describe`(Events) → `logs` → `-o yaml`.
 로그부터 보면 스케줄링·볼륨·이미지 문제는 **아무것도 안 나온다.**
+막혔을 때 시험 중에 열어 볼 곳도 정해져 있다 — 공식
+[Monitoring, Logging, and Debugging 문서](https://kubernetes.io/docs/tasks/debug/)가
+애플리케이션/클러스터 갈래로 이 장과 같은 층 구분을 쓴다.
 
 ## 애플리케이션 층
 
@@ -148,6 +151,9 @@ flowchart LR
 :::tip[시험]
 이 표가 애플리케이션 층 문제의 **거의 전체**다.
 STATUS를 보는 순간 다음 명령이 정해져야 한다.
+`kubectl debug`의 ephemeral 컨테이너 문법처럼 손에 안 붙는 명령은 공식
+[Debug Running Pods 문서](https://kubernetes.io/docs/tasks/debug/debug-application/debug-running-pod/)에서
+복사해 온다.
 :::
 
 ### Pending

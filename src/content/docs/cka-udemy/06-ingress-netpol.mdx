@@ -23,6 +23,8 @@ Ingress 실습은 두 벌이다 — 첫 벌은 **리소스**(라우팅 규칙)�
 
 새 Ingress를 만드는 문제 — 현행 API(`networking.k8s.io/v1`)로 쓴다.
 (원본 랩 답안 일부는 폐기된 `extensions/v1beta1`로 남아 있다 — 그대로 쓰면 안 된다.)
+시험 중에는 공식 [Ingress 문서](https://kubernetes.io/docs/concepts/services-networking/ingress/)의
+예시 YAML을 복사해 이름·경로·포트만 바꾸는 게 가장 빠르다.
 
 ```yaml
 apiVersion: networking.k8s.io/v1
@@ -88,7 +90,10 @@ kubectl create serviceaccount ingress-nginx-admission -n ingress-nginx
 | 어느 Pod에 적용되나 | `k describe netpol` → PodSelector |
 | 무엇을 막나 — *What is the impact of the rule configured on this Network Policy?* | PolicyTypes + Ingress/Egress 규칙 읽기 |
 
-작성 문제의 정석 — internal Pod에서 **나가는(Egress)** 트래픽을
+작성 문제는 공식
+[Network Policies 문서](https://kubernetes.io/docs/concepts/services-networking/network-policies/)의
+전체 예시(ingress·egress를 다 갖춘 YAML)를 복사해 깎아내는 게 정석이다.
+정석 답안 — internal Pod에서 **나가는(Egress)** 트래픽을
 mysql(3306)과 payroll(8080)로만 허용:
 
 ```yaml

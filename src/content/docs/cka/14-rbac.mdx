@@ -110,6 +110,10 @@ flowchart LR
 
 ### 사용자 인증서 만들기 (CSR API)
 
+CSR 오브젝트의 YAML은 외우지 말고, 시험 중에는 공식
+[Certificate Signing Requests](https://kubernetes.io/docs/reference/access-authn-authz/certificate-signing-requests/)
+페이지를 열어 뼈대를 복사한 뒤 `request` 필드만 채우는 게 정석이다.
+
 <Steps>
 
 1. **키와 CSR 생성** — `CN`이 사용자, `O`가 그룹이다
@@ -351,6 +355,9 @@ rules:
 kubectl create role pod-reader --verb=get,list,watch --resource=pods -n dev
 kubectl create role pod-reader --verb=get --resource=pods --resource-name=web -n dev
 ```
+
+Role·RoleBinding YAML 뼈대는 공식 [Using RBAC Authorization](https://kubernetes.io/docs/reference/access-authn-authz/rbac/)
+페이지에 그대로 있다 — 시험 중 `kubectl create role`로 부족한 복잡한 rules는 여기서 복사해 고친다.
 
 ### verbs와 apiGroups
 

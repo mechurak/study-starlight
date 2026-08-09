@@ -15,6 +15,9 @@ PVC가 Pending인 이유가 랩마다 다르고, 그 차이가 곧 출제 포인
 원본 풀이: [10-Practice-Test-Persistent-Volume-Claims.md](https://github.com/kodekloudhub/certified-kubernetes-administrator-course/blob/master/docs/08-Storage/10-Practice-Test-Persistent-Volume-Claims.md)
 
 흐름: hostPath 볼륨 → PV(PersistentVolume) → PVC(PersistentVolumeClaim) → Pod 마운트.
+세 YAML의 뼈대는 공식 문서
+[Configure a Pod to Use a PersistentVolume for Storage](https://kubernetes.io/docs/tutorials/configuration/configure-persistent-volume-storage/)에
+한 페이지로 다 있다 — 시험 중 여기서 복사한다.
 
 ```yaml
 # 1) Pod에 hostPath 볼륨

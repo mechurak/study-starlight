@@ -111,6 +111,10 @@ spec:
           port: 5432
 ```
 
+NetworkPolicy는 `kubectl create`로 못 만든다 — 시험 중에는 공식
+[Network Policies 문서](https://kubernetes.io/docs/concepts/services-networking/network-policies/)의
+예시 YAML을 복사해 셀렉터·포트만 바꾸는 게 가장 빠르다.
+
 **네 부분이 각각 다른 질문에 답한다.**
 
 ```mermaid

@@ -186,6 +186,10 @@ spec:
 - **키 하나 = 파일 하나.** `/etc/app/nginx.conf` 로 보인다
 - `items`를 쓰면 **명시한 키만** 마운트된다
 
+`volumes`·`volumeMounts` 짝은 손으로 치다 들여쓰기가 틀리기 쉽다 — 시험장에서는 공식
+[Configure a Pod to Use a ConfigMap](https://kubernetes.io/docs/tasks/configure-pod-container/configure-pod-configmap/)에서
+복사해 이름만 바꾸는 게 정석이다 (env·envFrom 예시도 같은 페이지에 있다).
+
 :::caution[함정]
 `mountPath`에 원래 있던 파일들은 **가려진다.**
 `/etc/nginx` 에 통째로 마운트하면 기존 설정이 전부 사라진다.
@@ -326,6 +330,8 @@ flowchart LR
 - **누구나 디코딩할 수 있다.** 인코딩은 바이너리를 담기 위한 것이지 보호가 아니다
 - 읽을 수 있는 주체를 좁히는 것은 **RBAC**(Role-Based Access Control — 역할 기반 접근 제어, 14장)의 몫이다
 - 기본 설정에서 **etcd에 평문으로 저장**된다
+- Secret type 목록과 YAML 형식이 헷갈리면 공식
+  [Secrets](https://kubernetes.io/docs/concepts/configuration/secret/) 페이지를 연다 — `data`/`stringData` 예시가 다 있다
 
 ```yaml
 # /etc/kubernetes/enc/enc.yaml  → apiserver의 --encryption-provider-config 로 지정

@@ -190,6 +190,10 @@ spec:
         - { name: Schedule, type: string, jsonPath: .spec.schedule }
 ```
 
+이 골격을 손으로 치지 않는다 — 시험 중에는 공식
+[CustomResourceDefinition 문서](https://kubernetes.io/docs/tasks/extend-kubernetes/custom-resources/custom-resource-definitions/)의
+전체 예시를 복사해 이름·스키마만 깎아내는 게 정석이다.
+
 ### CRD를 만들면 무슨 일이 생기나
 
 ```mermaid

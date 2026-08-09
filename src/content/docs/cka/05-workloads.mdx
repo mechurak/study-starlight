@@ -374,6 +374,10 @@ flowchart TB
 - 노드가 추가되면 **자동으로 하나 더** 생긴다
 - 쓰임: 로그 수집기, 모니터링 에이전트, **kube-proxy**, **CNI 플러그인**
 
+DaemonSet은 `kubectl create` 단축 명령이 없다 — 시험장에서는 공식
+[DaemonSet](https://kubernetes.io/docs/concepts/workloads/controllers/daemonset/) 페이지의
+YAML 뼈대를 복사해 오거나, `create deploy`로 뽑은 YAML에서 kind를 바꾸고 `replicas`·`strategy`를 지운다.
+
 ### DaemonSet의 배치 제어
 
 ```bash
@@ -658,7 +662,7 @@ kubectl logs job/nightly-28901234
 :::tip[시험]
 cron 표현식은 **분 시 일 월 요일** 순서다.
 `*/5 * * * *` = 5분마다, `0 3 * * *` = 매일 새벽 3시.
-헷갈리면 `kubernetes.io/docs`의 CronJob 페이지에 표가 있다.
+헷갈리면 공식 [CronJob](https://kubernetes.io/docs/concepts/workloads/controllers/cron-jobs/) 페이지에 형식 표가 있다 — 시험 중 열어 볼 수 있는 문서다.
 :::
 
 ## PodDisruptionBudget — 자발적 중단으로부터 보호

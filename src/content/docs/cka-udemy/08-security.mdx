@@ -63,7 +63,8 @@ kubectl delete csr agent-smith
 ```
 
 CSR YAML의 뼈대(`signerName: kubernetes.io/kube-apiserver-client`, `usages: [client auth]`)는
-공식 문서에서 복사한다 — [cka 14장](/cka/14-rbac/)에 전체 흐름이 있다.
+공식 문서 [Certificate Signing Requests](https://kubernetes.io/docs/reference/access-authn-authz/certificate-signing-requests/)에서
+복사한다 — [cka 14장](/cka/14-rbac/)에 전체 흐름이 있다.
 
 :::tip[누가 요청했는지 의심하기]
 `kubectl get csr <name> -o yaml`로 **groups와 usages**를 본다 — *Run the command kubectl get csr agent-smith -o yaml*.
@@ -142,7 +143,8 @@ kubectl create clusterrolebinding michelle-storage-admin \
 ```
 
 노드·PV·StorageClass처럼 **클러스터 범위 리소스에는 Role이 아니라 ClusterRole**이다 —
-가르는 기준은 [cka 14장](/cka/14-rbac/).
+가르는 기준은 [cka 14장](/cka/14-rbac/). rules YAML을 직접 써야 하면 공식
+[RBAC 문서](https://kubernetes.io/docs/reference/access-authn-authz/rbac/)의 예시에서 복사한다.
 
 ## ServiceAccount — Practice Test: Service Accounts
 

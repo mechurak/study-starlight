@@ -82,6 +82,9 @@ Recreate 전략에는 rollingUpdate 파라미터가 있을 수 없다.
 롤아웃이 실제로 어떻게 진행되는지는 `kubectl rollout status deploy/frontend`,
 되돌리기는 `kubectl rollout undo deploy/frontend`.
 히스토리 관리와 원리는 [cka 5장 Deployment 절](/cka/05-workloads/)에 있다.
+시험 중 전략 필드가 헷갈리면 공식
+[Deployments 문서](https://kubernetes.io/docs/concepts/workloads/controllers/deployment/)에서
+`strategy` 예시를 복사해 온다.
 :::
 
 ## 이 장에서 남길 것

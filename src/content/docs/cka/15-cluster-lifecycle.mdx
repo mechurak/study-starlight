@@ -301,6 +301,9 @@ flowchart TD
 
 ### 업그레이드 — 노드 유형별 절차
 
+시험 중에는 공식 [Upgrading kubeadm clusters](https://kubernetes.io/docs/tasks/administer-cluster/kubeadm/kubeadm-upgrade/)
+페이지를 열어 놓고 그대로 따라가는 게 정석이다 — 저장소 URL 변경부터 uncordon까지 명령이 순서대로 다 있다.
+
 **7단계가 똑같고, 3번만 다르다.**
 
 <Tabs>
@@ -529,6 +532,10 @@ sudo etcdctl \
 :::
 
 ### etcd 백업
+
+인증서 3종을 붙인 긴 `etcdctl` 명령은 손으로 치다 틀리기 쉽다 — 시험 중에는 공식
+[Operating etcd clusters for Kubernetes](https://kubernetes.io/docs/tasks/administer-cluster/configure-upgrade-etcd/)
+페이지의 백업·복구 절에서 명령을 복사해 경로만 바꾸는 게 정석이다.
 
 <Steps>
 
