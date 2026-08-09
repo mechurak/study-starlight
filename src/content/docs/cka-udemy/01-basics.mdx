@@ -23,6 +23,9 @@ import { LinkCard } from '@astrojs/starlight/components';
 | Pod 삭제 (빠르게) — *Delete the webapp Pod.* | `k delete pod webapp --force` |
 | YAML 뽑아서 생성 — *Create a new pod with the name redis and with the image redis123. Use a pod-definition YAML file.* | `k run redis --image=redis123 --dry-run=client -o yaml > redis.yaml` |
 
+(`--dry-run=client`는 서버에 요청을 보내지 않고 클라이언트에서 검증만 하고 끝낸다는 뜻이다 —
+`-o yaml`과 짝지으면 "만들지 말고 YAML만 뽑기"가 된다. 이 덱 전체에서 반복되는 콤보다.)
+
 *Now change the image on this pod to redis. Once done, the pod should be in a running state.* —
 이미지 이름이 틀린 Pod(`redis123`)을 고치는 방법은 셋 다 알아둔다 —
 
@@ -81,7 +84,7 @@ kubectl run redis --image=redis:alpine -l tier=db          # 라벨 지정
 # "Create a new pod called custom-nginx using the nginx image and expose it on container port 8080."
 kubectl run custom-nginx --image=nginx --port=8080          # containerPort 지정
 # "Create a service redis-service to expose the redis application within the cluster on port 6379."
-kubectl expose pod redis --port=6379 --name redis-service   # ClusterIP Service
+kubectl expose pod redis --port=6379 --name redis-service   # ClusterIP Service. 여기의 --port는 Service 포트 — run의 --port(containerPort)와 다른 뜻
 # "Create a new namespace called dev-ns."
 kubectl create ns dev-ns
 # "Create a deployment named webapp using the image kodekloud/webapp-color with 3 replicas."
@@ -109,13 +112,13 @@ kubectl run httpd --image=httpd:alpine --expose --port 80
 ```bash
 # 1) JSON 통째로 저장
 kubectl get nodes -o json > /opt/outputs/nodes.json
-# 2) JSONPath로 필드만 뽑기
+# 2) JSONPath로 필드만 뽑기 — get <복수 리소스>의 출력은 List라 .items[*]로 전 항목을 편다
 kubectl get nodes -o jsonpath='{.items[*].metadata.name}'
 kubectl get nodes -o jsonpath='{.items[*].status.nodeInfo.osImage}'
 # 3) 정렬과 커스텀 열
 kubectl get pv --sort-by=.spec.capacity.storage \
   -o custom-columns=NAME:.metadata.name,CAPACITY:.spec.capacity.storage
-# 4) 필터 표현식 — 특정 user를 쓰는 context 이름 찾기
+# 4) 필터 표현식 — ?()가 필터, @는 검사 중인 항목 자신 (특정 user를 쓰는 context 찾기)
 kubectl config view --kubeconfig=my-kube-config \
   -o jsonpath="{.contexts[?(@.context.user=='aws-user')].name}"
 ```

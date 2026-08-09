@@ -53,7 +53,8 @@ Ingress 리소스는 **백엔드 Service가 있는 네임스페이스**에 만�
 
 :::tip[명령형 생성]
 `kubectl create ingress ingress-pay -n critical-space --rule="/pay=pay-service:8282"`
-한 줄로도 만들 수 있다 — 뼈대를 뽑고 annotation만 edit로 붙이는 편이 빠르다.
+한 줄로도 만들 수 있다 (`--rule`은 `경로=서비스:포트` 형식) —
+뼈대를 뽑고 annotation만 edit로 붙이는 편이 빠르다.
 :::
 
 ## Ingress 컨트롤러 배포 — Practice Test: CKA Ingress 2

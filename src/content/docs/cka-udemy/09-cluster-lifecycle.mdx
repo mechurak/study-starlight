@@ -34,13 +34,16 @@ cka 15장이 "시험의 승부처"라 부르는 영역의 실습판이다. 다�
    ```bash
    # "Install the kubeadm, kubelet and kubectl packages at exact version 1.24.0 on the controlplane and node01."
    apt-get install -y kubelet=<버전> kubeadm=<버전> kubectl=<버전>
-   apt-mark hold kubelet kubeadm kubectl
+   apt-mark hold kubelet kubeadm kubectl   # hold = apt 자동 업그레이드 금지 — 버전이 몰래 틀어지는 걸 막는다
    ```
 
 3. 컨트롤 플레인에서 init — advertise 주소는 `eth0`의 IP(`ip a` 확인)
 
    ```bash
    # "Initialize Control Plane Node (Master Node)."
+   # cert-extra-sans: API 서버 인증서 SAN에 이름 추가 — 그 이름으로 접속해도 TLS가 안 깨지게
+   # advertise-address: 다른 노드에 알릴 API 서버 IP — NIC이 여럿인 실습 환경이라 명시한다
+   # pod-network-cidr: Pod IP 대역 — 설치할 CNI(flannel)의 기본값과 맞춘다
    kubeadm init \
      --apiserver-cert-extra-sans=controlplane \
      --apiserver-advertise-address <eth0 IP> \
@@ -65,7 +68,7 @@ cka 15장이 "시험의 승부처"라 부르는 영역의 실습판이다. 다�
 
 ```bash
 # "Run the command kubectl drain node01 --ignore-daemonsets"
-kubectl drain node01 --ignore-daemonsets   # 비우고 + cordon
+kubectl drain node01 --ignore-daemonsets   # 비우고 + cordon. DS Pod은 쫓아내도 되살아나니 무시하고 진행하라는 플래그 — 없으면 drain이 거부된다
 # "Run the command kubectl uncordon node01"
 kubectl uncordon node01                    # 다시 받게
 # "Run the command kubectl cordon node03"
@@ -118,6 +121,7 @@ uncordon은 "다시 스케줄 가능"으로 돌릴 뿐이다. 기존 Pod이 재�
 
 ```bash
 # 백업 — 인증서 세 개는 etcd 스태틱 Pod 매니페스트에서 확인
+# ETCDCTL_API=3: v3 API 강제 — 요즘 etcdctl은 3이 기본이라 없어도 되지만, 답안 관습으로 남아 있다
 # "Take a snapshot of the ETCD database using the built-in snapshot functionality. Store the backup file at location /opt/snapshot-pre-boot.db"
 ETCDCTL_API=3 etcdctl snapshot save /opt/snapshot-pre-boot.db \
   --cacert=/etc/kubernetes/pki/etcd/ca.crt \

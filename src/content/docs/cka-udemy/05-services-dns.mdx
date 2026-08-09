@@ -41,13 +41,13 @@ service-definition-1.yaml file.* — 는 정의 파일의 빈칸(셀렉터·포�
 kubectl get nodes -o wide                 # INTERNAL-IP
 # "What is the network interface configured for cluster connectivity on the controlplane node?"
 # "What is the MAC address of the interface on the controlplane node?"
-ip a | grep -B2 <그 IP>                   # 해당 IP를 가진 인터페이스와 MAC(link/ether)
+ip a | grep -B2 <그 IP>                   # -B2 = 매칭 앞 2줄까지 출력 — 인터페이스명과 MAC(link/ether)이 그 줄에 있다
 # "If you were to ping google from the controlplane node, which route does it take?"
 ip route show default                     # 기본 게이트웨이
 # "What is the port the kube-scheduler is listening on in the controlplane node?"
-netstat -nplt | grep kube-scheduler       # 프로세스가 듣는 포트 (스케줄러: 10259)
+netstat -nplt | grep kube-scheduler       # n(숫자 주소) p(프로세스명) l(리스닝만) t(TCP) — 듣는 포트 (스케줄러: 10259)
 # "Notice that ETCD is listening on two ports. Which of these have more client connections established?"
-netstat -anp | grep etcd                  # etcd: 클라이언트 2379, 피어 2380
+netstat -anp | grep etcd                  # a = 리스닝뿐 아니라 맺힌 연결까지 전부 — 클라이언트 2379, 피어 2380
 ```
 
 - 인터페이스 이름 규칙: `eth*`는 물리, `lo`는 루프백, `veth*`는 Pod 쪽 터널 —

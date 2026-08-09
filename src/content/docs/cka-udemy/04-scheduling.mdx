@@ -41,7 +41,7 @@ spec:                  # — "Manually schedule the pod on node01."
 kubectl get pods --selector env=dev                          # 하나
 # "Identify the POD which is part of the prod environment, the finance BU and of frontend tier?"
 kubectl get all --selector env=prod,bu=finance,tier=frontend # AND 조건은 쉼표
-kubectl get pods -l env=dev --no-headers | wc -l             # 개수 세기 콤보
+kubectl get pods -l env=dev --no-headers | wc -l             # 개수 세기 콤보 — 헤더 줄이 세어지지 않게 뗀다
 ```
 
 `--selector`와 `-l`은 같다. "PODs, ReplicaSets **포함 모든 오브젝트**"를 세라면
@@ -166,9 +166,19 @@ kubectl create deployment elasticsearch -n kube-system \
 | 지우기 — *Identify which node the static pod is created on, ssh to the node and delete the pod definition file.…* | 해당 노드에 ssh → 매니페스트 파일 삭제 |
 
 ```bash
+# --command: 뒤의 sleep 1000을 args가 아니라 command(ENTRYPOINT 대체)로 넣는다 — 없으면 args로 들어간다
 kubectl run static-busybox --image=busybox --restart=Never \
   --dry-run=client -o yaml --command -- sleep 1000 > /etc/kubernetes/manifests/static-busybox.yaml
 ```
+
+:::tip[--restart=Never는 옛 generator 관용구다]
+1.17까지는 `kubectl run`의 `--restart` 값이 만들어지는 리소스 종류를 정했다 —
+기본값 `Always`면 Deployment, `Never`여야 단독 Pod. 스태틱 Pod 매니페스트에는
+`kind: Pod`이 필요하니 필수 플래그였다. 지금은 generator가 제거돼 `run`이 항상
+Pod만 만들므로 **이 플래그 없이도 `kind: Pod`이 나온다**. 남는 효과는
+`restartPolicy: Never` 지정 하나 — 계속 떠 있어야 하는 스태틱 Pod이라면
+오히려 기본값 `Always`가 맞다. 원문 명령이라 그대로 두되, 몰라서 넣는 건 아니게.
+:::
 
 :::caution[함정 — 다른 노드의 스태틱 Pod]
 `kubectl delete`로 지우면 kubelet이 다시 만든다. **파일이 원본**이다 —

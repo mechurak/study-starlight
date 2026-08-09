@@ -31,7 +31,7 @@ kubeadm 클러스터의 인증서 위치는 정해져 있다 —
 # "Run the command openssl x509 -in /etc/kubernetes/pki/apiserver.crt -text and look for issuer"
 # "Run the command openssl x509 -in /etc/kubernetes/pki/apiserver.crt -text and look at Alternative Names"
 # "Run the command openssl x509 -in /etc/kubernetes/pki/apiserver.crt -text and check on the Expiry date."
-openssl x509 -in /etc/kubernetes/pki/apiserver.crt -text -noout
+openssl x509 -in /etc/kubernetes/pki/apiserver.crt -text -noout   # -text 사람이 읽게 풀기, -noout 인코딩된 원문은 생략
 # 볼 곳: Subject CN / Issuer / X509v3 Subject Alternative Name / Validity(Not After)
 ```
 
@@ -50,7 +50,7 @@ etcd는 **자체 CA**(`pki/etcd/ca.crt`)를 쓴다. API 서버의 `--etcd-cafile
 
 ```bash
 # "A new member akshay joined our team. He requires access to our cluster. The Certificate Signing Request is at the /root location."
-cat akshay.csr | base64 -w 0     # request 필드에 넣을 값
+cat akshay.csr | base64 -w 0     # request 필드에 넣을 값. -w 0 = 줄바꿈 없이 한 줄로 — YAML에 그대로 붙이려면 필수
 kubectl apply -f akshay-csr.yaml # kind: CertificateSigningRequest
 # "Run the command kubectl get csr"
 kubectl get csr
