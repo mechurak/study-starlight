@@ -16,38 +16,17 @@ dev 서버는 백그라운드 모드로 띄운다: `astro dev --background`
 ## 덱
 
 덱 목록의 원본은 `astro.config.mjs`의 topics와 랜딩(`src/content/docs/index.mdx`)이다.
-여기에는 **고치기 전에 알아야 할 것이 있는 덱만** 적는다 — 특별한 규칙이 없는 덱은
-새로 만들어도 이 문서를 고칠 필요가 없다.
 
-- `cka` — **[docs/cka-baseline.md](docs/cka-baseline.md)를 먼저 읽는다** (기준 커리큘럼과 버전 고정)
-- `shadcn` — 아래 절의 전용 규칙 셋을 따른다
-- `shadcn` · `web` · `keycloak` · `kafka` · `server` — 각 장 첫머리의 `<TermIntro>` 상자가 의무다 (아래 절)
-- `server` — Ubuntu **24.04 LTS 고정**이 기준이다. 명령·기본값·파일 경로를 쓸 때
-  22.04나 RHEL 계열과 섞지 않는다. 다른 배포판 이야기는 "비고"로만 단다
+**덱 폴더에 `_baseline.md`가 있으면 그 덱을 고치기 전에 반드시 먼저 읽는다**
+(`src/content/docs/<덱>/_baseline.md`). 덱별 기준·규칙 — 기준 버전 고정, 전용 서술 규칙,
+"이 덱은 왜 이렇게 쓰였는가" — 은 이 문서가 아니라 그 파일에 적는다.
+`_`로 시작하는 파일은 콘텐츠 컬렉션에서 제외되므로 빌드·검색·사이드바 어디에도 안 잡힌다.
+특별한 규칙이 없는 덱은 이 파일 없이 만들면 되고, 어느 쪽이든 이 문서를 고칠 필요가 없다.
 
-### shadcn 덱
-
-`frontend` 13~16장과 주제가 겹치지만 **동기화 대상이 아니다** — 목적이 다르다.
-`frontend`는 세 도구의 흐름, `shadcn`은 shadcn/ui 하나를 **테마 = 리소스 목록** 관점으로 깊게 판다.
-`frontend` 13~16장과 index에는 이쪽으로 오는 aside 링크만 걸어 뒀다.
-
-이 덱은 **읽기 어렵다는 피드백에서 나왔다.** 그래서 규칙이 셋 더 있다 —
-
-- **용어 규칙("콘텐츠 규칙" 절)을 각 장 첫머리의 `<TermIntro>` 상자로 강제한다**
-  (`src/components/TermIntro.astro`). `web`·`keycloak`·`kafka`·`server` 덱도 이 규칙을 같이 쓴다.
-  `terms`는 `[용어, 풀 이름(없으면 ''), 한 줄 설명][]`이다. 설명은 **평문**이고
-  `` `코드` ``와 `**굵게**`만 컴포넌트가 직접 치환한다 (`DeckMap`의 `desc`·`note`도 같은 규칙).
-  치환은 비탐욕 매칭이라 굵게 안에 `*`가 들어가도(`/var/log/*.log`) 안 깨진다
-- **곁가지를 넣지 않는다.** 뺀 것은 [0장의 "다루지 않는 것" 표](src/content/docs/shadcn/00-intro.mdx)에
-  이름만 남긴다. 새 내용을 넣을 때 그 표와 충돌하는지 먼저 본다
-- **12장은 용어 사전**이다. 새 약어를 본문에 쓰면 여기에도 추가한다
-
-## 외관 — 세 겹
-
-- **테마**: `starlight-theme-rapide` (코드 블록 테마도 Vitesse 계열로 함께 바뀐다)
-- **폰트**: Pretendard Variable 셀프호스팅. `customCss`의 **dynamic subset** CSS가 핵심이다
-  — 한글 폰트는 웨이트당 수 MB라, 쓰인 글자의 조각만 내려받는 이 방식이 아니면 못 쓴다
-- **본문 폭**: `--sl-content-width: 55rem` (기본 45rem은 다이어그램·표 위주 문서에 좁다)
+덱을 가로지르는 규칙 하나만 여기 둔다 —
+`shadcn` · `web` · `keycloak` · `kafka` · `server` 덱은 **각 장 첫머리의 `<TermIntro>` 상자가
+의무다.** 용어 규칙("콘텐츠 규칙" 절)을 상자로 강제하는 장치다.
+`terms` 형식과 치환 규칙은 `src/components/TermIntro.astro` 머리 주석에 있다.
 
 ## 절대 깨뜨리면 안 되는 것
 
@@ -57,18 +36,11 @@ dev 서버는 백그라운드 모드로 띄운다: `astro dev --background`
   config의 slug도 같이 바꿔야 한다 — 빌드가 sidebar 참조 오류로 실패하니 바로 잡힌다.
 - **랜딩(`/`)은 어느 topic에도 속하지 않는다** — plugin 옵션 `exclude: ['/']`가 그 처리다.
   topic 밖 페이지를 새로 만들면 여기에 추가해야 경고가 안 난다.
-- **덱 목록은 사이드바 상단 드롭다운이다** — `src/components/Sidebar.astro`가
-  starlight-sidebar-topics의 `Sidebar` override를 대체하고
-  `starlight-sidebar-topics-dropdown`의 `TopicsDropdown`을 끼운다.
-  플러그인이 자기 `components` 뒤에 사용자 `components`를 스프레드해서 이게 성립한다 —
-  **덱 목록을 다시 나열하고 싶으면 config의 `Sidebar` 줄을 지우면 원래대로 돌아온다.**
-  `src/components/SiteTitle.astro`(헤더의 "Study Note / <덱>")도 같은 라우트 데이터를 쓴다.
-- **사이드바 접기 버튼은 `SiteTitle` override에 얹혀 있다** — 헤더에서 갈아끼울 수 있는
-  자리가 SiteTitle·Search·SocialIcons뿐이라 `src/components/SidebarToggle.astro`를
-  SiteTitle이 렌더한다. 버튼은 `<html data-sidebar-collapsed>`만 토글하고(localStorage에 저장),
-  **실제로 레이아웃을 접는 CSS는 `src/styles/custom.css`에 있다** — Starlight의
-  `.sidebar-pane`과 `--sl-content-inline-start`를 덮는 전역 규칙이라 컴포넌트 스코프로는 안 닿는다.
-  첫 페인트 전에 상태를 복원해야 해서 그 스크립트만 `is:inline`이다(기본 `<script>`는 defer라 깜빡인다).
+- **사이드바 UI(덱 드롭다운·접기 토글·헤더의 덱 표시)는 컴포넌트 override 세트다** —
+  `src/components/`의 `Sidebar`·`SiteTitle`·`SidebarToggle`. 왜 이 구조인지는 각 파일
+  머리 주석에 있으니 **고치기 전에 그걸 먼저 읽는다.** 파일 밖에 걸치는 것 둘만 여기 적는다:
+  실제로 레이아웃을 접는 CSS는 `src/styles/custom.css`의 전역 규칙이고,
+  덱 목록을 다시 세로로 나열하고 싶으면 config의 `Sidebar` 줄을 지우면 원래대로 돌아온다.
 - **`pnpm-workspace.yaml`은 워크스페이스가 아니라 `allowBuilds`(esbuild·sharp) 설정용**이다.
   지우면 설치 시 빌드 스크립트가 막히고, **sharp가 안 빌드돼 `astro build`가 깨진다.**
   CI에서 실제로 걸리는 지점이라 pnpm 버전을 고정해야 한다 — 이유는 [docs/deploy.md](docs/deploy.md).
@@ -81,7 +53,7 @@ dev 서버는 백그라운드 모드로 띄운다: `astro dev --background`
 
 - **새 용어·약어는 처음 나올 때 풀 이름을 주고, 새 개념은 "왜 필요한지"부터 설명한다.**
   "이게 뭔지"보다 "**없으면 무슨 문제가 생기는지**"가 잘 읽힌다 — 문제 → 해법 순서로 쓴다.
-  (shadcn·web·keycloak·kafka 덱은 여기에 더해 `<TermIntro>` 상자가 의무다 — 위 "덱" 절.)
+  (shadcn·web·keycloak·kafka·server 덱은 여기에 더해 `<TermIntro>` 상자가 의무다 — 위 "덱" 절.)
 - **제목 계층으로 우측 목차(TOC)를 조직한다.** 목차에는 h2·h3만 나온다.
   h2는 **주제 묶음 5~9개**로 세우고 상세 절은 h3로 내린다 — h2만 나열하면 목차가
   평면이 되어 안 읽히고, h4는 목차에 안 잡히니 만들지 않는다.
@@ -140,26 +112,15 @@ import { Steps, Card, CardGrid, Tabs, TabItem, FileTree, LinkCard, Badge } from 
 
 ### 덱 index의 "구성" 절 — `<DeckMap>`
 
-원래 이 자리에는 `flowchart LR` mermaid와 `장 | 주제 | …` 표가 나란히 있었다.
-둘이 장 범위·주제를 중복해서 담았고, **mermaid는 SVG라 폭에 맞춰 글자까지 같이 줄어들어**
-노드가 6개만 넘으면 안 읽혔다. `src/components/DeckMap.astro`가 둘을 대체한다 —
-세로 스테퍼라 글자 크기가 유지되고, 텍스트가 검색되고, 장 범위가 링크가 된다.
-
-**덱 index에는 mermaid를 쓰지 않는다.** 새 덱도 처음부터 `<DeckMap>`으로 만든다.
-
-- `steps[]` = `{ label, title, href?, badge?, desc?, note?, items?, tone? }`
-- `tone`은 mermaid classDef와 **같은 여섯 개**(`key`·`ok`·`warn`·`bad`·`mute`·`zone`) —
-  덱 전체의 색 의미가 index에서도 이어진다
-- `note`는 덱마다 달랐던 표의 세 번째 열이다 (답하는 질문 / 층 / 도메인)
-- `badge`는 제목 옆 짧은 라벨 (CKA 시험 비중처럼)
-- `items`는 **장을 하나씩 나열해야 하는 덱용**(shadcn) — `[텍스트, href][]`
-- `desc`·`note`는 평문이고 `` `코드` ``와 `**굵게**`만 처리된다 (`TermIntro`와 같은 규칙)
+**덱 index에는 mermaid를 쓰지 않는다.** 새 덱도 처음부터 `<DeckMap>`으로 만든다
+(mermaid+표 조합은 SVG가 폭에 맞춰 글자까지 줄여서 안 읽혀 대체했다).
+props와 각각의 의미는 `src/components/DeckMap.astro` 머리 주석에 있다.
+`tone`은 mermaid classDef와 **같은 여섯 개** — 덱 전체의 색 의미가 index에서도 이어진다.
 
 ### 부딪힌 것들
 
-- **`astro-mermaid`는 `.mdx`에서도 동작한다.** 빌드 로그에
-  `[astro-mermaid] Sätteri transformed mermaid block in ...mdx` 가 찍히면 잡힌 것이다.
-  단 **빌드 성공 ≠ 렌더 성공** — 렌더는 클라이언트에서 일어나니 브라우저로 확인해야 한다.
+- **빌드 성공 ≠ mermaid 렌더 성공** — 변환은 빌드에서 되지만(`.mdx` 포함)
+  렌더는 클라이언트에서 일어난다. 브라우저로 확인해야 한다.
 - **JSX 안의 마크다운은 들여쓰기하지 않는다.** `<Card>`·`<TabItem>` 자식을 2칸 이상 들여쓰면
   마크다운이 이를 코드 블록으로 먹는다. 컴포넌트 태그와 내용을 **전부 0칸**에 두고 빈 줄로 띄운다.
   (`<Steps>` 안의 번호 목록은 예외 — 목록 항목에 딸린 코드 블록은 3칸 들여쓴다.)

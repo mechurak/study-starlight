@@ -46,8 +46,9 @@ pnpm preview
    (label / link / icon / items — 사이드바 그룹과 페이지 slug를 여기서 정한다)
 3. `src/content/docs/index.mdx` 랜딩의 카드 목록과 hero 액션에 항목을 추가한다
 
-README나 CLAUDE.md는 고칠 필요가 없다 — 단, 덱에 특별한 규칙·기준 문서가 생기면
-[CLAUDE.md](CLAUDE.md)의 "덱" 절에만 한 줄 추가한다.
+README나 CLAUDE.md는 고칠 필요가 없다 — 덱에 특별한 규칙·기준이 생기면
+그 덱 폴더에 `_baseline.md`를 만들어 적는다 ([CLAUDE.md](CLAUDE.md)의 "덱" 절 참고.
+`_`로 시작하는 파일이라 빌드에는 안 잡힌다).
 
 ## 더 읽을 것
 
@@ -56,4 +57,4 @@ README나 CLAUDE.md는 고칠 필요가 없다 — 단, 덱에 특별한 규칙�
 | [CLAUDE.md](CLAUDE.md) | **문서 작성 규칙**(제목 계층, aside, 컴포넌트, mermaid 팔레트), 깨뜨리면 안 되는 설정, 검증 절차 |
 | [docs/starlight-changes.md](docs/starlight-changes.md) | 기본 Starlight에서 바꾼 것 전체 목록 — 업그레이드 전에 볼 것 |
 | [docs/deploy.md](docs/deploy.md) | Cloudflare Pages 연동, `PNPM_VERSION`, 도메인 변경 |
-| [docs/cka-baseline.md](docs/cka-baseline.md) | cka 덱의 기준 커리큘럼·시험 환경 버전과 출처 |
+| `src/content/docs/<덱>/_baseline.md` | 덱별 기준·규칙 — 있으면 그 덱을 고치기 전에 읽는다 (cka: 커리큘럼·버전, shadcn: 서술 규칙, server: Ubuntu 24.04 고정) |

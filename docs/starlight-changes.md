@@ -18,8 +18,15 @@
 | 검색 덱 라벨 위치·모양 | Pagefind UI 태그 칩 재스타일 | `src/styles/custom.css` |
 | 한국어 단일 로케일 | `defaultLocale: 'root'` + `ko` | `astro.config.mjs` |
 
-플러그인·테마·폰트·본문 폭의 "왜"는 [CLAUDE.md](../CLAUDE.md)의 "외관 — 세 겹" 절과
-"절대 깨뜨리면 안 되는 것" 절에 있다. 아래는 그 밖의 항목.
+mermaid 통합 순서·topics slug처럼 "깨뜨리면 안 되는" 항목은
+[CLAUDE.md](../CLAUDE.md)에 있다. 아래는 그 밖의 항목.
+
+## 외관 — 세 겹
+
+- **테마**: `starlight-theme-rapide` (코드 블록 테마도 Vitesse 계열로 함께 바뀐다)
+- **폰트**: Pretendard Variable 셀프호스팅. `customCss`의 **dynamic subset** CSS가 핵심이다
+  — 한글 폰트는 웨이트당 수 MB라, 쓰인 글자의 조각만 내려받는 이 방식이 아니면 못 쓴다
+- **본문 폭**: `--sl-content-width: 55rem` (기본 45rem은 다이어그램·표 위주 문서에 좁다)
 
 ## 검색 결과의 덱 이름 표시
 
