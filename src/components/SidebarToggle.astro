@@ -1,0 +1,124 @@
+---
+// 헤더 왼쪽의 사이드바 접기/펼치기 버튼.
+//
+// Starlight은 넓은 화면(≥50rem)에서 사이드바를 항상 켜 두고 끄는 수단을 주지 않는다.
+// 다이어그램·표가 넓은 문서에서는 본문 폭을 더 받고 싶을 때가 있어 토글을 붙였다.
+// 좁은 화면에는 이미 햄버거(MobileMenuToggle)가 있으므로 이 버튼은 ≥50rem에서만 보인다.
+//
+// 접힘 상태는 <html data-sidebar-collapsed>로 표현하고, 실제로 레이아웃을 접는 규칙은
+// src/styles/custom.css에 있다 (Starlight의 .sidebar-pane / --sl-content-inline-start를
+// 건드리는 전역 조정이라 컴포넌트 스코프로는 닿지 않는다).
+//
+// 사이드바가 없는 페이지(랜딩)에서는 버튼 자체를 렌더하지 않는다.
+const { hasSidebar } = Astro.locals.starlightRoute;
+---
+
+{
+	hasSidebar && (
+		<Fragment>
+			<sidebar-toggle>
+				<button
+					type="button"
+					class="sidebar-toggle"
+					aria-controls="starlight__sidebar"
+					aria-expanded="true"
+					title="사이드바 접기 / 펼치기"
+				>
+					<svg
+						viewBox="0 0 16 16"
+						width="18"
+						height="18"
+						fill="none"
+						stroke="currentColor"
+						stroke-width="1.4"
+						aria-hidden="true"
+					>
+						<rect class="frame" x="1.5" y="2.5" width="13" height="11" rx="1.5" />
+						<rect class="pane" x="1.5" y="2.5" width="4.5" height="11" rx="1.5" />
+					</svg>
+					<span class="sr-only">사이드바 접기 / 펼치기</span>
+				</button>
+			</sidebar-toggle>
+
+			{/* 접힘 상태를 첫 페인트 전에 적용한다 — 헤더는 body의 첫 요소라
+			    이 시점엔 사이드바가 아직 파싱되지 않았다. 그래서 is:inline이어야 한다
+			    (Astro의 기본 <script>는 defer라 깜빡임이 남는다). */}
+			<script is:inline>
+				(() => {
+					let collapsed = false;
+					try {
+						collapsed = localStorage.getItem('starlight-sidebar-collapsed') === 'true';
+					} catch {}
+					if (collapsed) document.documentElement.setAttribute('data-sidebar-collapsed', '');
+					const btn = document.querySelector('sidebar-toggle button');
+					if (btn) btn.setAttribute('aria-expanded', String(!collapsed));
+				})();
+			</script>
+		</Fragment>
+	)
+}
+
+<script>
+	class SidebarToggle extends HTMLElement {
+		constructor() {
+			super();
+			const btn = this.querySelector('button')!;
+			btn.addEventListener('click', () => {
+				const collapsed = document.documentElement.toggleAttribute('data-sidebar-collapsed');
+				btn.setAttribute('aria-expanded', String(!collapsed));
+				try {
+					localStorage.setItem('starlight-sidebar-collapsed', String(collapsed));
+				} catch {}
+			});
+		}
+	}
+
+	customElements.define('sidebar-toggle', SidebarToggle);
+</script>
+
+<style>
+	/* 좁은 화면은 햄버거 메뉴가 담당한다 — 버튼을 아예 감춘다. */
+	sidebar-toggle {
+		display: none;
+	}
+
+	@media (min-width: 50rem) {
+		sidebar-toggle {
+			display: flex;
+			align-items: center;
+		}
+	}
+
+	.sidebar-toggle {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		width: 2rem;
+		height: 2rem;
+		margin-inline-end: 0.5rem;
+		flex-shrink: 0;
+		border: 0;
+		border-radius: 0.25rem;
+		padding: 0;
+		background: none;
+		color: var(--sl-color-gray-3);
+		cursor: pointer;
+	}
+
+	.sidebar-toggle:hover,
+	.sidebar-toggle:focus-visible {
+		color: var(--sl-color-white);
+		background-color: var(--sl-color-gray-6);
+	}
+
+	/* 채워진 왼쪽 칸 = 사이드바가 펼쳐진 상태. 접히면 빈 액자만 남는다. */
+	.pane {
+		fill: currentColor;
+		stroke: none;
+		opacity: 0.4;
+	}
+
+	:global([data-sidebar-collapsed]) .pane {
+		opacity: 0;
+	}
+</style>

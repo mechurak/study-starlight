@@ -32,6 +32,22 @@
   vertical-align: middle;
 }
 
+/* 사이드바 접기 — 버튼은 src/components/SidebarToggle.astro, 여기는 레이아웃만.
+   Starlight의 규칙은 @layer starlight.core 안에 있고 customCss는 레이어 밖이라
+   특이도와 무관하게 이 파일이 이긴다.
+   --sl-content-inline-start는 Page.astro가 레이어 없이 [data-has-sidebar]로 주므로
+   html[...]로 특이도를 한 칸 올려야 덮인다.
+   좁은 화면은 건드리지 않는다 — 거기선 사이드바가 햄버거 메뉴이고 토글 버튼도 감춰진다. */
+@media (min-width: 50rem) {
+  html[data-sidebar-collapsed] .sidebar-pane {
+    display: none;
+  }
+
+  html[data-sidebar-collapsed] {
+    --sl-content-inline-start: 0rem;
+  }
+}
+
 /* mermaid 다이어그램 — 폭이 넘치면 다이어그램 안에서만 가로 스크롤 */
 .mermaid {
   overflow-x: auto;

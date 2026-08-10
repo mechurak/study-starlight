@@ -1,7 +1,11 @@
 ---
 import Default from '@astrojs/starlight/components/SiteTitle.astro';
+import SidebarToggle from './SidebarToggle.astro';
 
-// 헤더에 "스터디 노트 / <현재 덱>"을 만든다.
+// 헤더에 "[토글] Study Note / <현재 덱>"을 만든다.
+// 사이드바 토글이 여기 붙는 이유: 헤더에서 사용자가 override할 수 있는 자리는
+// SiteTitle·Search·SocialIcons뿐인데, 접기 버튼은 사이드바 위(헤더 맨 왼쪽)에
+// 있어야 관례에 맞는다 — 그 자리가 title-wrapper다.
 // 덱 목록이 드롭다운으로 접히면서 어느 덱을 보고 있는지가 사이드바 상단
 // 버튼 하나에만 남았다 — 헤더에도 띄워 스크롤 위치와 무관하게 보이게 한다.
 // 라벨은 topics 플러그인의 라우트 데이터에서 오므로 astro.config.mjs와 항상 일치하고,
@@ -9,6 +13,7 @@ import Default from '@astrojs/starlight/components/SiteTitle.astro';
 const topic = Astro.locals.starlightSidebarTopics?.topics.find((t) => t.isCurrent);
 ---
 
+<SidebarToggle />
 <Default />
 {
 	topic && (

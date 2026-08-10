@@ -58,7 +58,13 @@ dev 서버는 백그라운드 모드로 띄운다: `astro dev --background`
   `starlight-sidebar-topics-dropdown`의 `TopicsDropdown`을 끼운다.
   플러그인이 자기 `components` 뒤에 사용자 `components`를 스프레드해서 이게 성립한다 —
   **덱 목록을 다시 나열하고 싶으면 config의 `Sidebar` 줄을 지우면 원래대로 돌아온다.**
-  `src/components/SiteTitle.astro`(헤더의 "스터디 노트 / <덱>")도 같은 라우트 데이터를 쓴다.
+  `src/components/SiteTitle.astro`(헤더의 "Study Note / <덱>")도 같은 라우트 데이터를 쓴다.
+- **사이드바 접기 버튼은 `SiteTitle` override에 얹혀 있다** — 헤더에서 갈아끼울 수 있는
+  자리가 SiteTitle·Search·SocialIcons뿐이라 `src/components/SidebarToggle.astro`를
+  SiteTitle이 렌더한다. 버튼은 `<html data-sidebar-collapsed>`만 토글하고(localStorage에 저장),
+  **실제로 레이아웃을 접는 CSS는 `src/styles/custom.css`에 있다** — Starlight의
+  `.sidebar-pane`과 `--sl-content-inline-start`를 덮는 전역 규칙이라 컴포넌트 스코프로는 안 닿는다.
+  첫 페인트 전에 상태를 복원해야 해서 그 스크립트만 `is:inline`이다(기본 `<script>`는 defer라 깜빡인다).
 - **`pnpm-workspace.yaml`은 워크스페이스가 아니라 `allowBuilds`(esbuild·sharp) 설정용**이다.
   지우면 설치 시 빌드 스크립트가 막히고, **sharp가 안 빌드돼 `astro build`가 깨진다.**
   CI에서 실제로 걸리는 지점이라 pnpm 버전을 고정해야 한다 — 이유는 [docs/deploy.md](docs/deploy.md).
