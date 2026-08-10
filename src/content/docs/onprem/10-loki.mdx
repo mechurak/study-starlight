@@ -97,7 +97,7 @@ chunk가 잘게 쪼개져 압축이 안 되고, 인덱스가 커지고, ingester
 
 ## 수집 — Grafana Alloy
 
-```alloy
+```hcl
 // 쿠버네티스 파드를 찾고, 로그를 읽어, Loki로 보낸다
 discovery.kubernetes "pods" {
   role = "pod"
@@ -188,7 +188,7 @@ Loki Helm 차트는 **2026-03-16부터 `grafana-community/helm-charts`** 에 있
 <Tabs>
 <TabItem label="찾기">
 
-```logql
+```text
 {namespace="prod", app="api"} |= "error" != "healthcheck"
 ```
 
@@ -197,7 +197,7 @@ Loki Helm 차트는 **2026-03-16부터 `grafana-community/helm-charts`** 에 있
 </TabItem>
 <TabItem label="파싱해서 필터">
 
-```logql
+```text
 {namespace="prod", app="api"}
   | json
   | status >= 500
@@ -210,7 +210,7 @@ JSON 로그면 `| json`, key=value 형식이면 `| logfmt`.
 </TabItem>
 <TabItem label="로그에서 메트릭">
 
-```logql
+```text
 sum by (app) (rate({namespace="prod"} |= "error" [5m]))
 ```
 
@@ -220,7 +220,7 @@ Grafana에서 메트릭 패널과 나란히 놓을 수 있다.
 </TabItem>
 <TabItem label="트레이스로 건너뛰기">
 
-```logql
+```text
 {namespace="prod", app="api"} | json | trace_id != ""
 ```
 

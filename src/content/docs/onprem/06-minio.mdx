@@ -28,7 +28,7 @@ import TermIntro from '../../../components/TermIntro.astro';
 | **Loki** | 로그 chunk와 인덱스 | 로그를 며칠치밖에 못 들고 있다 ([10장](/onprem/10-loki/)) |
 | **Tempo** | 트레이스 블록 | 추적을 아예 못 켠다 ([11장](/onprem/11-tempo/)) |
 | **CloudNativePG** | 베이스 백업 · WAL 아카이브 | **시점 복구(PITR)가 불가능하다** ([7장](/onprem/07-cnpg/)) |
-| **Velero** | 클러스터 백업 | 클러스터를 다시 못 세운다 ([14장](/onprem/14-backup/)) |
+| **Velero** | 클러스터 백업 | 클러스터를 다시 못 세운다 ([15장](/onprem/15-backup/)) |
 | Prometheus 장기 저장 | 압축된 블록 | 메트릭 보존이 로컬 디스크 크기에 묶인다 |
 | 사내 앱 | 첨부파일 · 리포트 · 모델 | 앱이 PVC에 파일을 쌓다가 노드에 묶인다 |
 
@@ -112,7 +112,7 @@ flowchart LR
 **백업과 로그를 백업 대상과 같은 실패 도메인에 두지 않는다.**
 "클러스터가 죽었는데 Velero 백업이 그 클러스터 안 MinIO에 있다"는 온프렘에서 실제로
 자주 나오는 사고다. 클러스터 안에 둘 수밖에 없다면 **최소한 백업만은 오프사이트로 복제**한다
-([14장](/onprem/14-backup/)).
+([15장](/onprem/15-backup/)).
 :::
 
 ## 버킷 설계 — 도구마다 버킷과 키를 나눈다
@@ -140,7 +140,7 @@ root 키를 여기저기 넣지 않는다. 키가 유출됐을 때 **무엇이 �
 </Card>
 <Card title="키는 시크릿 관리 체계로" icon="setting">
 평문 Secret으로 두지 않는다. Sealed Secrets나 External Secrets로
-관리한다 ([13장](/onprem/13-gitops/)).
+관리한다 ([14장](/onprem/14-secrets/)).
 </Card>
 <Card title="버저닝은 신중하게" icon="information">
 실수 복구에는 좋지만 **용량이 조용히 몇 배가 된다.**

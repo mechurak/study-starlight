@@ -168,15 +168,19 @@ export default defineConfig({
 								},
 								{
 									label: '배포와 복구',
-									items: ['onprem/13-gitops', 'onprem/14-backup'],
+									items: [
+										'onprem/13-gitops',
+										'onprem/14-secrets',
+										'onprem/15-backup',
+									],
 								},
 								{
 									label: '운영',
-									items: ['onprem/15-ops'],
+									items: ['onprem/16-ops'],
 								},
 								{
 									label: '마무리',
-									items: ['onprem/16-glossary', 'onprem/17-wrapup'],
+									items: ['onprem/17-glossary', 'onprem/18-wrapup'],
 								},
 							],
 						},

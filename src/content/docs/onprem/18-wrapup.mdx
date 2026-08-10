@@ -1,5 +1,5 @@
 ---
-title: "17. 마무리"
+title: "18. 마무리"
 description: "전체 지도와 장별 한 문장, 처음 세울 때의 구축 순서, 그리고 급할 때 보는 사고 대응 카드"
 ---
 
@@ -27,9 +27,9 @@ flowchart LR
     end
     subgraph L4["④ 운영 도구"]
         direction TB
-        ARGO["Argo CD · 시크릿 — 13장"]
+        ARGO["Argo CD · 시크릿 — 13~14장"]
         OBS["Prometheus · Loki · Tempo · Grafana — 8~12장"]
-        VEL["Velero · etcd 스냅샷 — 14장"]
+        VEL["Velero · etcd 스냅샷 — 15장"]
     end
     subgraph L3["③ 상태"]
         direction TB
@@ -78,9 +78,10 @@ flowchart LR
 | [10](/onprem/10-loki/) | Loki는 **라벨만 인덱싱**한다 — 그래서 싸고, 그래서 **라벨 설계가 전부**다 |
 | [11](/onprem/11-tempo/) | 추적은 **앱을 고쳐야** 시작된다. 가장 싼 첫걸음은 **로그에 `trace_id`** |
 | [12](/onprem/12-grafana/) | Grafana의 값은 대시보드가 아니라 **신호 사이의 이동을 없애는 것**이다 |
-| [13](/onprem/13-gitops/) | "뭐가 깔려 있죠?"에 **Git 주소로** 답한다. **마스터키 백업이 곧 복구 가능성** |
-| [14](/onprem/14-backup/) | GitOps는 **절반만** 백업한다. **복구는 리허설한 것만** 된다 |
-| [15](/onprem/15-ops/) | 운영의 8할은 **디스크 · 인증서 · 버전**. 진단은 **층을 위에서 아래로** |
+| [13](/onprem/13-gitops/) | "뭐가 깔려 있죠?"에 **Git 주소로** 답한다. 순서는 sync wave가 인코딩한다 |
+| [14](/onprem/14-secrets/) | 시크릿에는 **네 문제**가 섞여 있다 — 저장 · NS 경계 · 갱신 · 복구. **마스터키 백업이 곧 복구 가능성** |
+| [15](/onprem/15-backup/) | GitOps는 **절반만** 백업한다. **복구는 리허설한 것만** 된다 |
+| [16](/onprem/16-ops/) | 운영의 8할은 **디스크 · 인증서 · 버전**. 진단은 **층을 위에서 아래로** |
 
 ## 구축 체크리스트 — 처음 세울 때
 
@@ -126,15 +127,19 @@ flowchart LR
 8. **배포** ([13장](/onprem/13-gitops/))
    - Argo CD를 손으로 1회 설치 → root Application → **자기 자신도 Git으로**
    - sync wave로 위 순서를 그대로 인코딩
-   - 시크릿 체계 + **마스터키를 클러스터 밖 금고에**
    - 사내 레지스트리 미러, 태그 고정
 
-9. **백업과 리허설** ([14장](/onprem/14-backup/))
-   - etcd 스냅샷 cron + 노드 밖 전송
-   - Velero 스케줄, **오프사이트 복제**
-   - **분기 리허설 일정을 달력에 등록** — 여기까지 해야 끝이다
+9. **시크릿 체계** ([14장](/onprem/14-secrets/))
+   - Sealed Secrets 컨트롤러 → 값 봉인 → Git. 스코프는 기본 strict로
+   - **마스터키를 SOPS/age로 암호화해 클러스터 밖 금고에.** 키가 갱신되면 다시 뜬다
+   - 여러 NS가 쓰는 값(와일드카드 TLS · pull 시크릿)의 복제 방식을 정한다
 
-10. **운영 루틴** ([15장](/onprem/15-ops/))
+10. **백업과 리허설** ([15장](/onprem/15-backup/))
+    - etcd 스냅샷 cron + 노드 밖 전송
+    - Velero 스케줄, **오프사이트 복제**
+    - **분기 리허설 일정을 달력에 등록** — 여기까지 해야 끝이다
+
+11. **운영 루틴** ([16장](/onprem/16-ops/))
     - 일·주·월·분기 항목 정하기
     - 알림마다 runbook 링크
     - 만료 달력(클러스터 인증서 · 사내 CA · 서명 키)
@@ -169,10 +174,10 @@ Loki도 Tempo도 Velero도 Keycloak도 Grafana도 이 둘을 전제로 설정되
 
 3. 볼륨 사용률 · StorageClass
 
-4. 되돌려야 하면 **새 Cluster로 PITR** — 원본은 건드리지 않는다 ([14장](/onprem/14-backup/))
+4. 되돌려야 하면 **새 Cluster로 PITR** — 원본은 건드리지 않는다 ([15장](/onprem/15-backup/))
 </Card>
 <Card title="로그·메트릭이 안 보인다" icon="warning">
-1. **관측 스택 자체가 살아 있나** — 그래프가 평평한 것과 정상은 다르다 ([15장](/onprem/15-ops/))
+1. **관측 스택 자체가 살아 있나** — 그래프가 평평한 것과 정상은 다르다 ([16장](/onprem/16-ops/))
 
 2. Prometheus `/targets` — DOWN 급증
 

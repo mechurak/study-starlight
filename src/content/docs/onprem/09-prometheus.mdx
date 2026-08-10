@@ -240,7 +240,7 @@ inhibit_rules:
 
 ## 카디널리티 관리
 
-```promql
+```text
 # 시계열이 많은 메트릭 상위 (Prometheus UI에서 실행)
 topk(10, count by (__name__)({__name__=~".+"}))
 

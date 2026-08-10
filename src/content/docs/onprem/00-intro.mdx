@@ -47,7 +47,7 @@ MinIO(와 대안) · CloudNativePG — 상태를 맡는 바닥 둘.
 
 Prometheus · Loki · Tempo · Grafana — 관측 네 조각과 셋을 잇는 법.
 
-Argo CD · 시크릿 관리 · Velero — 재현과 복구.
+Argo CD · 시크릿 관리(봉인 · 스코프 · 회전) · Velero — 재현과 복구.
 
 업그레이드 · 용량 · 진단 순서 같은 운영 루틴.
 </Card>
@@ -164,7 +164,8 @@ flowchart LR
 | ingress-nginx를 쓰고 있어서 갈아타야 한다 | [3장](/onprem/03-gateway/)의 결정표 |
 | 로그·메트릭을 어디서 보는지부터 만들어야 한다 | [8장](/onprem/08-observability/) → [9장](/onprem/09-prometheus/) · [10장](/onprem/10-loki/) |
 | DB를 클러스터에 올려야 한다 | [7장](/onprem/07-cnpg/) (그 전에 [2장](/onprem/02-foundation/) 스토리지 절) |
-| 이미 다 떠 있고 운영만 물려받았다 | [15장](/onprem/15-ops/) → [17장](/onprem/17-wrapup/) 체크리스트 |
+| 시크릿을 어떻게 넣고 관리할지 막혔다 | [14장](/onprem/14-secrets/) |
+| 이미 다 떠 있고 운영만 물려받았다 | [16장](/onprem/16-ops/) → [18장](/onprem/18-wrapup/) 체크리스트 |
 
 ## 0장 요약
 
