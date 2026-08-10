@@ -1,0 +1,180 @@
+---
+title: "0. 시작하기 전에"
+description: "이 덱의 대상과 범위, 그리고 2026년 8월의 온프렘 지형 — 무엇이 끝났고 무엇으로 갈아타는가"
+---
+
+import { Card, CardGrid, LinkCard } from '@astrojs/starlight/components';
+import TermIntro from '../../../components/TermIntro.astro';
+
+> 이 덱은 도구 열세 개의 매뉴얼이 아니라 **한 판의 배치도**다 — 어느 자리에 왜 들어가는가
+
+<TermIntro
+  terms={[
+    ['온프렘', 'On-premises', '클라우드 관리형 서비스가 아니라 **자체 인프라(사내 서버실·데이터센터)에서 직접 운영**하는 것. 남이 해 주던 일이 전부 내 일이 된다.'],
+    ['플랫폼', 'Platform', '앱을 올리기만 하면 돌아가게 만드는 **공통 기반 한 벌**. 이 덱에서는 클러스터 + 입구 + 인증 + 스토리지 + DB + 관측 + 배포 파이프라인 전체를 가리킨다.'],
+    ['오퍼레이터', 'Operator', '사람이 하던 운영 절차(설치·페일오버·백업)를 **컨트롤러 코드로 옮긴 것**. CRD로 원하는 상태를 선언하면 오퍼레이터가 그 상태를 유지한다. CloudNativePG가 대표적이다(7장).'],
+    ['LGTM 스택', 'Loki · Grafana · Tempo · Mimir', 'Grafana Labs의 관측 도구 묶음을 부르는 말. 이 덱은 Mimir 대신 Prometheus를 쓰는 조합을 기준으로 한다(8~12장).'],
+    ['에어갭', 'Air-gap', '네트워크가 인터넷과 **물리적으로 끊겨 있는** 환경. 이미지·차트·CRL을 사람이 반입해야 한다. 온프렘의 극단이지만 드물지 않다.'],
+    ['egress 프록시', 'Egress Proxy', '내부에서 외부로 나가는 트래픽을 대신 내보내는 사내 중계 서버. 온프렘 클러스터는 보통 인터넷에 직접 못 나가서 이걸 거친다(4장).'],
+  ]}
+/>
+
+## 이 덱은 누구를 위한 것인가
+
+- 사내 인프라에 **쿠버네티스 클러스터를 세웠고, 그 위에 서비스를 올려야 하는** 사람
+- 쿠버네티스 오브젝트는 다룰 줄 아는데 (이 사이트의 [CKA 덱](/cka/) 수준),
+  **클러스터 밖의 것들 — LB · 인증서 · SSO · 스토리지 · DB · 관측 — 을 직접 세워 본 적은 없는** 사람
+- 클라우드(EKS 등) 경험이 있어서 **"거기서 그냥 되던 게 왜 여기선 안 되는지"** 를 하나씩 확인하고 싶은 사람
+- "로그는 어디서 보나요", "인증서 만료됐대요", "DB가 안 뜹니다" 문의를 받았을 때
+  **어느 층의 일인지** 바로 가르고 싶은 사람
+
+전제하는 것: 쿠버네티스 기본기(Deployment · Service · PV/PVC · Helm), 리눅스 서버 운영,
+터미널. 전제하지 않는 것: 이 덱에 나오는 도구들의 사용 경험.
+
+### 다루는 것과 다루지 않는 것
+
+<CardGrid>
+<Card title="다룬다" icon="approve-check">
+클라우드 관리형 서비스가 사라진 자리의 목록과 그 대체품.
+
+MetalLB · Gateway API — 외부 IP와 HTTP 라우팅.
+
+cert-manager · external-dns — 인증서와 이름.
+
+Keycloak · oauth2-proxy — 도구 열 개의 로그인을 한 곳으로.
+
+MinIO(와 대안) · CloudNativePG — 상태를 맡는 바닥 둘.
+
+Prometheus · Loki · Tempo · Grafana — 관측 네 조각과 셋을 잇는 법.
+
+Argo CD · 시크릿 관리 · Velero — 재현과 복구.
+
+업그레이드 · 용량 · 진단 순서 같은 운영 루틴.
+</Card>
+<Card title="다루지 않는다" icon="close">
+쿠버네티스 기초 (→ [CKA 덱](/cka/)).
+
+리눅스·네트워크 기초 (→ [서버 관리 덱](/server/)).
+
+Keycloak 내부 — realm · mapper · 토큰 수명 (→ [Keycloak 덱](/keycloak/)).
+
+Kafka 운영 (→ [Kafka 덱](/kafka/)).
+
+클러스터를 처음 세우는 절차 자체 (kubeadm · RKE2 설치 단계) — 형태 선택까지만.
+
+서비스 메시(Istio · Linkerd) — 자리만 잡아 준다.
+
+하드웨어·스토리지 어플라이언스 벤더별 설정.
+
+애플리케이션 코드 계측의 언어별 상세 (11장은 개념과 경계까지).
+</Card>
+</CardGrid>
+
+## 미리 잡아두면 좋은 멘탈 모델
+
+### 1. 온프렘은 "빈칸 채우기"다
+
+클라우드에서 `type: LoadBalancer` 서비스를 만들면 IP가 붙는 건 **클라우드 컨트롤러가
+그 일을 대신 해 줬기 때문**이다. 온프렘엔 그 컨트롤러가 없다 — 그래서 `EXTERNAL-IP`가
+영원히 `<pending>`이다. 인증서도, DNS도, IAM도, 백업도 전부 같은 구조다.
+
+**"이건 왜 안 되지"가 아니라 "이 자리를 누가 채우고 있었지"** 로 물으면 답이 바로 나온다.
+1장이 그 빈칸 목록을 표 하나로 만든다.
+
+### 2. 위층은 전부 바닥 두 개에 떨어진다
+
+얹은 도구가 열 개가 넘어도 **상태가 저장되는 곳은 몇 군데뿐**이다.
+
+```mermaid
+flowchart LR
+    subgraph up["상태를 갖는 위층"]
+        direction TB
+        LOKI["Loki (로그)"]
+        TEMPO["Tempo (트레이스)"]
+        VEL["Velero (백업)"]
+        KC["Keycloak"]
+        GRAF["Grafana"]
+    end
+    subgraph base["바닥"]
+        direction TB
+        S3[("오브젝트 스토리지<br/>MinIO 또는 대안")]
+        PG[("PostgreSQL<br/>CloudNativePG")]
+    end
+    LOKI --> S3
+    TEMPO --> S3
+    VEL --> S3
+    PG -->|"베이스백업 · WAL"| S3
+    KC --> PG
+    GRAF --> PG
+
+    classDef ok   fill:#dcfce7,stroke:#16a34a,color:#14532d
+    classDef key  fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
+    class S3,PG key
+    class LOKI,TEMPO,VEL,KC,GRAF ok
+```
+
+그래서 **바닥을 어디에 두느냐**가 이 덱에서 제일 큰 결정이다. 관측 백엔드의 저장소를
+같은 클러스터 안에 두면, 그 클러스터가 죽는 순간 **죽은 이유를 볼 수단도 같이 죽는다**
+([6장](/onprem/06-minio/)).
+
+### 3. 운영 부담은 도구 수가 아니라 "연결의 수"로 커진다
+
+도구 열세 개를 각각 설치하는 건 하루면 된다. 진짜 비용은
+**cert-manager가 발급한 인증서를 Gateway가 쓰고, 그 Gateway 뒤의 Grafana가 Keycloak으로
+로그인하고, 그 Grafana가 CloudNativePG의 DB를 쓰고, 그 DB의 백업이 MinIO로 가는**
+연결들에서 나온다. 하나를 업그레이드할 때 무엇이 같이 흔들리는지가 안 보이면
+운영이 도박이 된다 — 이 덱이 도구별이 아니라 **층별로** 쓰인 이유다.
+
+:::tip[핵심]
+이 셋 — **빈칸 목록 / 바닥 두 개 / 연결의 수** — 만 잡고 있으면
+나머지 장은 이 그림의 칸을 채우는 일이다.
+:::
+
+## 이 덱의 기준 시점
+
+**2026년 8월** 기준이다. 온프렘 스택은 2025~2026년에 **두 개의 기둥이 동시에 무너진**
+드문 시기를 지났다 — ingress-nginx와 MinIO 커뮤니티판이다.
+둘 다 "그냥 쓰면 된다"고 쓰인 문서가 검색 결과에 훨씬 많이 남아 있어서, 시점 확인이 특히 중요하다.
+
+| 항목 | 지금 | 낡은 정보 (검색 결과에 많이 남아 있음) |
+|---|---|---|
+| HTTP 입구 | **ingress-nginx는 2026-03에 은퇴**했다 — 릴리스도 보안 패치도 없다. 후속으로 예고됐던 InGate도 무산 | "온프렘 인그레스는 ingress-nginx가 표준"이라는 글 전부 |
+| 그 대체 | **Gateway API v1.5**(2026-02) + 구현체(Envoy Gateway · NGINX Gateway Fabric · Traefik · Cilium) | Ingress 리소스와 annotation만 다루는 자료 |
+| 사내 S3 | MinIO **커뮤니티판은 2026-02 저장소 아카이브**(상용 AIStor로 이동). 신규는 대안 검토 | "MinIO 웹 콘솔에서 버킷·사용자 만들기" (2025-05에 관리 기능 제거됨) |
+| 로그 수집기 | **Grafana Alloy** | **Promtail은 2026-03-02 EOL** — 대부분의 Loki 튜토리얼이 아직 Promtail 기준 |
+| Loki Helm 차트 | 2026-03-16부터 `grafana-community/helm-charts` | `grafana/helm-charts` 저장소를 가리키는 설치 명령 |
+| 트레이스 | **Tempo 3.0** — 인입과 질의를 분리한 새 아키텍처. ingester · compactor · v2 블록 제거, **2.x로 되돌릴 수 없다** | ingester/compactor를 튜닝하는 2.x 기준 운영 글 |
+| Postgres | **CloudNativePG 1.30** (오퍼레이터가 사실상 기본값) | `StatefulSet`으로 Postgres를 직접 띄우는 예제 |
+| 메트릭 | **Prometheus 3.13 LTS** — OTLP 수신 · UTF-8 라벨 | 2.x 기준 설정 (대부분 그대로 통하지만 새 기능이 빠져 있다) |
+
+:::caution[함정]
+**"ingress-nginx를 설치한다"로 시작하는 온프렘 가이드는 지금 전부 낡았다.**
+설치 자체는 여전히 되지만 **보안 취약점이 나와도 고쳐 줄 사람이 없다** — 인터넷에 노출되는
+입구에 그런 물건을 두는 셈이다. 지금 새로 세운다면 [3장](/onprem/03-gateway/)의 결정표부터 본다.
+:::
+
+## 읽는 순서
+
+앞에서 뒤로 읽으면 **실제 구축 순서**와 대체로 같다 — 바닥(2장) → 입구(3~5장) →
+상태 저장소(6~7장) → 관측(8~12장) → 배포·복구(13~14장). 다만 급하면:
+
+| 지금 처지 | 먼저 볼 장 |
+|---|---|
+| 클러스터는 있는데 외부에서 못 들어온다 | [3장](/onprem/03-gateway/) → [4장](/onprem/04-tls-dns/) |
+| ingress-nginx를 쓰고 있어서 갈아타야 한다 | [3장](/onprem/03-gateway/)의 결정표 |
+| 로그·메트릭을 어디서 보는지부터 만들어야 한다 | [8장](/onprem/08-observability/) → [9장](/onprem/09-prometheus/) · [10장](/onprem/10-loki/) |
+| DB를 클러스터에 올려야 한다 | [7장](/onprem/07-cnpg/) (그 전에 [2장](/onprem/02-foundation/) 스토리지 절) |
+| 이미 다 떠 있고 운영만 물려받았다 | [15장](/onprem/15-ops/) → [17장](/onprem/17-wrapup/) 체크리스트 |
+
+## 0장 요약
+
+- 대상은 **사내 인프라 위의 쿠버네티스에 플랫폼을 세우고 굴려야 하는 사람**이다
+- 멘탈 모델 셋: **빈칸 채우기 / 바닥 두 개 / 연결의 수**
+- 기준 시점은 2026년 8월. **ingress-nginx 은퇴(2026-03)와 MinIO 커뮤니티판 아카이브(2026-02)** 가
+  이 시점 온프렘 지형의 가장 큰 변화다 — 옛 가이드를 그대로 따르면 안 된다
+
+<LinkCard
+  title="1. 클라우드가 대신 해 주던 것"
+  description="관리형 서비스가 사라진 자리를 표 하나로 세어 본다 — 이 목록이 곧 이 덱의 목차다."
+  href="/onprem/01-why/"
+/>

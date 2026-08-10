@@ -131,6 +131,56 @@ export default defineConfig({
 							],
 						},
 						{
+							label: '온프렘 쿠버네티스',
+							link: '/onprem/',
+							icon: 'server',
+							items: [
+								'onprem',
+								{
+									label: '시작',
+									items: ['onprem/00-intro', 'onprem/01-why'],
+								},
+								{
+									label: '기반',
+									items: ['onprem/02-foundation'],
+								},
+								{
+									label: '바깥으로 여는 길',
+									items: [
+										'onprem/03-gateway',
+										'onprem/04-tls-dns',
+										'onprem/05-identity',
+									],
+								},
+								{
+									label: '상태를 맡는 것들',
+									items: ['onprem/06-minio', 'onprem/07-cnpg'],
+								},
+								{
+									label: '관측',
+									items: [
+										'onprem/08-observability',
+										'onprem/09-prometheus',
+										'onprem/10-loki',
+										'onprem/11-tempo',
+										'onprem/12-grafana',
+									],
+								},
+								{
+									label: '배포와 복구',
+									items: ['onprem/13-gitops', 'onprem/14-backup'],
+								},
+								{
+									label: '운영',
+									items: ['onprem/15-ops'],
+								},
+								{
+									label: '마무리',
+									items: ['onprem/16-glossary', 'onprem/17-wrapup'],
+								},
+							],
+						},
+						{
 							label: '웹 개발 일반',
 							link: '/web/',
 							icon: 'rocket',
