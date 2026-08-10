@@ -1,0 +1,57 @@
+---
+title: 개요
+description: Starlight — 이 사이트를 만든 도구의 선택 이유, MDX와 컴포넌트, 문서 작성법, 빌드와 배포까지
+---
+
+import { LinkCard, LinkButton } from '@astrojs/starlight/components';
+import DeckMap from '../../../components/DeckMap.astro';
+
+> 이 덱의 실습 환경은 따로 없다 — **지금 보고 있는 이 사이트가 실습 환경**이다
+
+이 사이트 자체를 다루는 덱이다. 문서 도구의 지형에서 왜 Starlight를 골랐는지,
+밑에 깔린 Astro와 MDX는 어떤 물건인지, 컴포넌트는 언제 쓰고 언제 만드는지,
+그리고 **축적·검색·참조에 맞는 문서는 어떻게 쓰는지** — 사이트를 고치다 막히는
+순서대로 묶었다.
+
+**Starlight 0.41 · Astro 7 (2026년 8월)** 기준이고, 모든 예제는 이 레포의 실물이다.
+
+<LinkButton href="/starlight/00-intro/" icon="right-arrow">첫 장부터 읽기</LinkButton>
+
+## 구성
+
+<DeckMap
+  steps={[
+    { label: '0~1장', href: '/starlight/00-intro/', title: '시작', tone: 'mute',
+      desc: '범위와 3층 멘탈 모델 · 문서 도구 지형과 Starlight를 고른 이유',
+      note: '왜 노션이 아니라 문서 사이트이고, 왜 그중 Starlight인가' },
+    { label: '2~3장', href: '/starlight/02-astro/', title: '기반', tone: 'key',
+      desc: 'Astro의 zero-JS 기본값과 아일랜드 · Starlight의 라우팅과 topics',
+      note: '파일 하나가 페이지가 되기까지 밑에서 무슨 일이 일어나나' },
+    { label: '4~6장', href: '/starlight/04-mdx/', title: '콘텐츠', tone: 'ok',
+      desc: 'MDX의 문법과 함정 · 내장 컴포넌트의 역할 분담 · 커스텀 컴포넌트와 override',
+      note: '본문에 무엇을 어떻게 쓰고, 어디서 조용히 깨지나' },
+    { label: '7~8장', href: '/starlight/07-writing/', title: '글쓰기와 운영', tone: 'warn',
+      desc: '검색으로 착지하는 독자를 위한 글쓰기 · 빌드 · Pagefind · Cloudflare Pages',
+      note: '빌드가 못 잡는 것은 무엇으로 판정하나' },
+    { label: '9장', href: '/starlight/09-wrapup/', title: '마무리', tone: 'mute',
+      desc: '새 덱 추가 절차 · 명령 치트시트 · 조용히 깨지는 것들 목록',
+      note: '다음 덱을 만들 때 무엇부터 하나' },
+  ]}
+/>
+
+## 전체를 관통하는 두 문장
+
+**콘텐츠 · 구조 · 표현은 다른 층이다.** 글은 `src/content/docs/`의 마크다운,
+덱 목록과 순서는 `astro.config.mjs`, 시각 패턴은 `src/components/` — 층이 분리되어
+있어서 글을 고치다 사이트 구조를 깨뜨릴 수 없고, 그 역도 성립한다.
+무언가 이상하면 "어느 층인가"부터 묻는다.
+
+**빌드 통과가 끝이 아니다.** MDX 문법과 slug 참조는 빌드가 잡지만, mermaid 렌더 ·
+깨진 굵게 · 모바일 넘침은 **빌드가 통과한 채로 깨져 있다.** 고친 것에 맞는 판정자
+(브라우저 두 테마, grep)를 골라 쓰는 것까지가 수정이다([8장](/starlight/08-pipeline/)).
+
+<LinkCard
+  title="0. 시작하기 전에"
+  description="이 덱의 대상과 범위, 왜 노션이 아니라 문서 사이트인가, 콘텐츠·구조·표현의 3층 멘탈 모델."
+  href="/starlight/00-intro/"
+/>

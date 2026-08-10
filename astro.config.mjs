@@ -436,6 +436,38 @@ export default defineConfig({
 								},
 							],
 						},
+						{
+							label: 'Starlight',
+							link: '/starlight/',
+							icon: 'star',
+							items: [
+								'starlight',
+								{
+									label: '시작',
+									items: ['starlight/00-intro', 'starlight/01-landscape'],
+								},
+								{
+									label: '기반',
+									items: ['starlight/02-astro', 'starlight/03-starlight'],
+								},
+								{
+									label: '콘텐츠',
+									items: [
+										'starlight/04-mdx',
+										'starlight/05-components',
+										'starlight/06-custom',
+									],
+								},
+								{
+									label: '글쓰기와 운영',
+									items: ['starlight/07-writing', 'starlight/08-pipeline'],
+								},
+								{
+									label: '마무리',
+									items: ['starlight/09-wrapup'],
+								},
+							],
+						},
 					],
 					{
 						// 랜딩 페이지는 어느 topic에도 속하지 않는다

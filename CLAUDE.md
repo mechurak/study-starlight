@@ -24,7 +24,7 @@ dev 서버는 백그라운드 모드로 띄운다: `astro dev --background`
 특별한 규칙이 없는 덱은 이 파일 없이 만들면 되고, 어느 쪽이든 이 문서를 고칠 필요가 없다.
 
 덱을 가로지르는 규칙 하나만 여기 둔다 —
-`shadcn` · `web` · `keycloak` · `kafka` · `server` 덱은 **각 장 첫머리의 `<TermIntro>` 상자가
+`shadcn` · `web` · `keycloak` · `kafka` · `server` · `starlight` 덱은 **각 장 첫머리의 `<TermIntro>` 상자가
 의무다.** 용어 규칙("콘텐츠 규칙" 절)을 상자로 강제하는 장치다.
 `terms` 형식과 치환 규칙은 `src/components/TermIntro.astro` 머리 주석에 있다.
 
