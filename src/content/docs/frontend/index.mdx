@@ -4,6 +4,7 @@ description: 프론트엔드 실전 스택 — Next.js · Tailwind CSS · shadcn
 ---
 
 import { Card, CardGrid, LinkCard, LinkButton } from '@astrojs/starlight/components';
+import DeckMap from '../../../components/DeckMap.astro';
 
 > Next.js · Tailwind CSS · shadcn/ui — 세 도구가 각각 무엇을 푸는가
 
@@ -20,37 +21,22 @@ shadcn/ui를 복붙 컴포넌트 모음 정도로만 알고 있는 사람을 위
 세 도구는 경쟁하지 않는다. **컴포넌트 / 스타일 언어 / 실행 환경**이라는 서로 다른 층에 있다.
 덱도 그 층을 따라간다.
 
-```mermaid
-flowchart LR
-    I["0~1장<br/>읽는 법 · 지형도"] --> N["2~8장<br/>Next.js<br/>실행 환경"]
-    N --> T["9~12장<br/>Tailwind CSS<br/>스타일 언어"]
-    T --> S["13~16장<br/>shadcn/ui<br/>컴포넌트"]
-    S --> D["17~19장<br/>디자인 시스템 · 접근성 · 폼"]
-    D --> E["20~21장<br/>실전 패턴 · 마무리"]
-
-    classDef key  fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
-    classDef ok   fill:#dcfce7,stroke:#16a34a,color:#14532d
-    classDef warn fill:#fef3c7,stroke:#d97706,color:#78350f
-    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
-    class N key
-    class T ok
-    class S warn
-    class I,D,E mute
-```
-
-| 장 | 주제 | 층 |
-|---|---|---|
-| [0](/frontend/00-intro/)–[1](/frontend/01-landscape/) | 읽는 법 · 세 도구의 지형도 | — |
-| [2](/frontend/02-rsc/)–[8](/frontend/08-performance/) | 서버 컴포넌트 · 라우팅 · 경계 · 데이터 · 캐싱 · 뮤테이션 · 성능 | Next.js |
-| [9](/frontend/09-css-history/)–[12](/frontend/12-tokens/) | CSS의 문제 · Tailwind v4 · 실전 규칙 · 디자인 토큰 | Tailwind CSS |
-| [13](/frontend/13-shadcn/)–[16](/frontend/16-asset/) | 소유권 모델 · 설치 · 컴포넌트 해부 · 자산화 | shadcn/ui |
-| [17](/frontend/17-design-system/)–[19](/frontend/19-forms-state/) | 디자인 시스템 적용 · 접근성 · 폼과 상태 | 시스템화 |
-| [20](/frontend/20-patterns/)–[21](/frontend/21-wrapup/) | 실전 패턴 · 안티패턴 · 정리 | — |
-
-:::tip[shadcn/ui만 따로 보고 싶다면]
-13~16장을 **용어부터 풀어 쓰고 테마 중심으로 재구성한** [shadcn/ui 덱](/shadcn/)이 따로 있다.
-이 덱은 세 도구의 흐름을, 그쪽은 shadcn/ui 하나를 깊게 다룬다.
-:::
+<DeckMap
+  steps={[
+    { label: '0~1장', href: '/frontend/00-intro/', title: '시작', tone: 'mute',
+      desc: '읽는 법 · 세 도구의 지형도' },
+    { label: '2~8장', href: '/frontend/02-rsc/', title: 'Next.js', badge: '실행 환경', tone: 'key',
+      desc: '서버 컴포넌트 · 라우팅 · 경계 · 데이터 · 캐싱 · 뮤테이션 · 성능' },
+    { label: '9~12장', href: '/frontend/09-css-history/', title: 'Tailwind CSS', badge: '스타일 언어', tone: 'ok',
+      desc: 'CSS의 문제 · Tailwind v4 · 실전 규칙 · 디자인 토큰' },
+    { label: '13~16장', href: '/frontend/13-shadcn/', title: 'shadcn/ui', badge: '컴포넌트', tone: 'warn',
+      desc: '소유권 모델 · 설치 · 컴포넌트 해부 · 자산화' },
+    { label: '17~19장', href: '/frontend/17-design-system/', title: '시스템으로 만들기', tone: 'mute',
+      desc: '디자인 시스템 적용 · 접근성 · 폼과 상태' },
+    { label: '20~21장', href: '/frontend/20-patterns/', title: '마무리', tone: 'mute',
+      desc: '실전 패턴 · 안티패턴 · 정리' },
+  ]}
+/>
 
 ## 전체를 관통하는 두 문장
 

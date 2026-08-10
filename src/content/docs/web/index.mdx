@@ -4,6 +4,7 @@ description: 웹 개발 일반 — 기술 스택 지형, 도구 사슬(pnpm·Vit
 ---
 
 import { Card, CardGrid, LinkCard, LinkButton } from '@astrojs/starlight/components';
+import DeckMap from '../../../components/DeckMap.astro';
 
 > 프레임워크를 배우기 전에 — **지도**부터
 
@@ -20,33 +21,27 @@ Next.js 튜토리얼은 따라 했는데 `pnpm install`이 정확히 뭘 하는�
 
 ## 구성
 
-```mermaid
-flowchart LR
-    A["0~2장<br/>웹의 뼈대<br/>요청 · 렌더링"] --> B["3장<br/>기술 스택<br/>지형도"]
-    B --> C["4~7장<br/>도구 사슬<br/>런타임 · pnpm · 번들러 · Vite"]
-    C --> D["8~9장<br/>품질과 규모<br/>린트 · 테스트 · 모노레포"]
-    D --> E["10~12장<br/>서비스가 되기까지<br/>백엔드 · 브라우저 보안 · 배포"]
-    E --> F["13~14장<br/>용어 사전 · 마무리"]
-
-    classDef key  fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
-    classDef ok   fill:#dcfce7,stroke:#16a34a,color:#14532d
-    classDef warn fill:#fef3c7,stroke:#d97706,color:#78350f
-    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
-    class A key
-    class B warn
-    class C ok
-    class D,E key
-    class F mute
-```
-
-| 장 | 주제 | 답하는 질문 |
-|---|---|---|
-| [0](/web/00-intro/)–[2](/web/02-rendering/) | 요청의 일생 · 렌더링 전략 | 브라우저에 주소를 치면 무슨 일이 일어나는가 |
-| [3](/web/03-landscape/) | 기술 스택 지형도 | 요즘 뭘 많이 쓰고, 각각 어느 층의 물건인가 |
-| [4](/web/04-runtime/)–[7](/web/07-vite/) | 런타임 · 패키지 매니저 · 번들러 · Vite | `pnpm dev` 한 줄 뒤에서 무엇이 도는가 |
-| [8](/web/08-quality/)–[9](/web/09-monorepo/) | 품질 도구 · 모노레포 | 코드가 커져도 무너지지 않게 하는 장치들 |
-| [10](/web/10-backend/)–[12](/web/12-deploy/) | 백엔드와 데이터 · 브라우저 보안(CORS·PKCE) · 배포 | 내 코드는 어떻게 서비스가 되는가 |
-| [13](/web/13-glossary/)–[14](/web/14-wrapup/) | 용어 사전 · 마무리 | — |
+<DeckMap
+  steps={[
+    { label: '0~2장', href: '/web/00-intro/', title: '웹의 뼈대', tone: 'key',
+      desc: '요청의 일생 · 렌더링 전략',
+      note: '브라우저에 주소를 치면 무슨 일이 일어나는가' },
+    { label: '3장', href: '/web/03-landscape/', title: '기술 스택 지형도', tone: 'warn',
+      desc: '무엇이 어느 층의 물건인가',
+      note: '요즘 뭘 많이 쓰고, 각각 어느 층의 물건인가' },
+    { label: '4~7장', href: '/web/04-runtime/', title: '도구 사슬', tone: 'ok',
+      desc: '런타임 · 패키지 매니저 · 번들러 · Vite',
+      note: '`pnpm dev` 한 줄 뒤에서 무엇이 도는가' },
+    { label: '8~9장', href: '/web/08-quality/', title: '품질과 규모', tone: 'key',
+      desc: '품질 도구 · 모노레포',
+      note: '코드가 커져도 무너지지 않게 하는 장치들' },
+    { label: '10~12장', href: '/web/10-backend/', title: '서비스가 되기까지', tone: 'key',
+      desc: '백엔드와 데이터 · 브라우저 보안(CORS · PKCE) · 배포',
+      note: '내 코드는 어떻게 서비스가 되는가' },
+    { label: '13~14장', href: '/web/13-glossary/', title: '마무리', tone: 'mute',
+      desc: '용어 사전 · 마무리' },
+  ]}
+/>
 
 ## 전체를 관통하는 두 질문
 

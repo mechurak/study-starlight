@@ -1,0 +1,213 @@
+---
+/*
+  덱 index의 "구성" — 덱을 몇 덩어리로 읽는가.
+
+  원래 이 자리에는 `flowchart LR` mermaid와 `장 | 주제 | 답하는 질문` 표가
+  나란히 있었다. 둘이 장 범위·주제를 중복해서 담았고, 무엇보다
+  mermaid는 SVG라 **폭에 맞춰 글자까지 같이 줄어들어** 노드가 6개만 넘어도 안 읽혔다.
+  세로 스테퍼로 바꾸면 본문 글자 크기가 유지되고, 텍스트가 선택·검색되고,
+  장 범위가 링크가 된다 (mermaid 노드는 클릭할 수 없었다).
+
+  steps: 덱의 덩어리 하나 = 카드 하나
+    label  범위 라벨 ("0~1장"). href가 있으면 링크가 된다
+    title  덩어리 이름
+    badge  제목 옆 짧은 라벨 (CKA 시험 비중 등)
+    desc   그 덩어리가 다루는 것
+    note   답하는 질문 / 층 / 도메인 — 덱마다 세 번째 열이 달랐던 그 값
+    items  장을 하나씩 나열해야 하는 덱용 (shadcn) — [텍스트, href][]
+    tone   mermaid classDef와 같은 의미 팔레트
+
+  desc · note는 평문이다. `코드`와 **굵게**만 아래에서 직접 처리한다.
+*/
+type Tone = 'key' | 'ok' | 'warn' | 'bad' | 'mute' | 'zone';
+
+interface Step {
+  label: string;
+  title: string;
+  href?: string;
+  badge?: string;
+  desc?: string;
+  note?: string;
+  items?: [string, string][];
+  tone?: Tone;
+}
+
+interface Props {
+  steps: Step[];
+}
+
+const { steps } = Astro.props;
+
+const escape = (s: string) =>
+  s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+// 비탐욕 매칭이라 굵게 안에 `*`가 들어가도(`/var/log/*.log`) 깨지지 않는다
+const format = (s: string) =>
+  escape(s)
+    .replace(/`(.+?)`/g, '<code>$1</code>')
+    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+---
+
+<ol class="deckmap">
+  {steps.map((step) => (
+    <li class="deckmap__step" data-tone={step.tone ?? 'mute'}>
+      <span class="deckmap__dot" aria-hidden="true" />
+      <div class="deckmap__body">
+        <div class="deckmap__head">
+          {step.href ? (
+            <a class="deckmap__label" href={step.href}>{step.label}</a>
+          ) : (
+            <span class="deckmap__label deckmap__label--flat">{step.label}</span>
+          )}
+          <span class="deckmap__title">{step.title}</span>
+          {step.badge && <span class="deckmap__badge">{step.badge}</span>}
+        </div>
+        {step.desc && <p class="deckmap__desc" set:html={format(step.desc)} />}
+        {step.note && <p class="deckmap__note" set:html={format(step.note)} />}
+        {step.items && (
+          <ul class="deckmap__items">
+            {step.items.map(([text, href]) => (
+              <li><a href={href}>{text}</a></li>
+            ))}
+          </ul>
+        )}
+      </div>
+    </li>
+  ))}
+</ol>
+
+<style>
+  .deckmap {
+    list-style: none;
+    margin: 1.4rem 0 1.8rem;
+    padding: 0;
+    display: grid;
+    gap: 0;
+  }
+
+  /* 의미 팔레트 — mermaid classDef와 같은 색을 쓴다 (CLAUDE.md의 그 여섯 개) */
+  .deckmap__step[data-tone='key']  { --dm-line: #2563eb; --dm-bg: #dbeafe; --dm-fg: #1e3a8a; }
+  .deckmap__step[data-tone='ok']   { --dm-line: #16a34a; --dm-bg: #dcfce7; --dm-fg: #14532d; }
+  .deckmap__step[data-tone='warn'] { --dm-line: #d97706; --dm-bg: #fef3c7; --dm-fg: #78350f; }
+  .deckmap__step[data-tone='bad']  { --dm-line: #dc2626; --dm-bg: #fee2e2; --dm-fg: #7f1d1d; }
+  .deckmap__step[data-tone='zone'] { --dm-line: #7c3aed; --dm-bg: #ede9fe; --dm-fg: #4c1d95; }
+  .deckmap__step[data-tone='mute'] { --dm-line: #94a3b8; --dm-bg: #f1f5f9; --dm-fg: #334155; }
+
+  :global([data-theme='dark']) .deckmap__step[data-tone='key']  { --dm-bg: #1e3a8a; --dm-fg: #bfdbfe; }
+  :global([data-theme='dark']) .deckmap__step[data-tone='ok']   { --dm-bg: #14532d; --dm-fg: #bbf7d0; }
+  :global([data-theme='dark']) .deckmap__step[data-tone='warn'] { --dm-bg: #78350f; --dm-fg: #fde68a; }
+  :global([data-theme='dark']) .deckmap__step[data-tone='bad']  { --dm-bg: #7f1d1d; --dm-fg: #fecaca; }
+  :global([data-theme='dark']) .deckmap__step[data-tone='zone'] { --dm-bg: #4c1d95; --dm-fg: #ddd6fe; }
+  :global([data-theme='dark']) .deckmap__step[data-tone='mute'] { --dm-bg: #334155; --dm-fg: #cbd5e1; }
+
+  .deckmap__step {
+    position: relative;
+    display: grid;
+    grid-template-columns: 1.1rem 1fr;
+    gap: 0 0.85rem;
+    padding: 0 0 1.05rem;
+  }
+  /* 순서를 잇는 세로선 — 마지막 항목 아래로는 안 내려간다 */
+  .deckmap__step::before {
+    content: '';
+    position: absolute;
+    left: 0.5rem;
+    top: 0.95rem;
+    bottom: 0;
+    width: 2px;
+    background: var(--sl-color-gray-4, #a1a1aa);
+    opacity: 0.55;
+  }
+  .deckmap__step:last-child { padding-bottom: 0; }
+  .deckmap__step:last-child::before { display: none; }
+
+  .deckmap__dot {
+    width: 0.7rem;
+    height: 0.7rem;
+    margin-top: 0.3rem;
+    margin-left: 0.1rem;
+    border-radius: 50%;
+    background: var(--dm-line);
+    box-shadow: 0 0 0 3px var(--sl-color-bg, #fff);
+    z-index: 1;
+  }
+
+  .deckmap__head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0.35rem 0.55rem;
+  }
+  .deckmap__label {
+    flex: none;
+    font-size: 0.72rem;
+    font-weight: 700;
+    line-height: 1.5;
+    padding: 0.1rem 0.45rem;
+    border-radius: 0.25rem;
+    background: var(--dm-bg);
+    color: var(--dm-fg);
+    text-decoration: none;
+    white-space: nowrap;
+  }
+  a.deckmap__label:hover {
+    background: var(--dm-line);
+    color: #fff;
+  }
+  .deckmap__title {
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--sl-color-white);
+    line-height: 1.4;
+  }
+  .deckmap__badge {
+    font-size: 0.68rem;
+    font-weight: 600;
+    padding: 0.05rem 0.35rem;
+    border-radius: 0.25rem;
+    border: 1px solid var(--dm-line);
+    color: var(--dm-line);
+    white-space: nowrap;
+  }
+
+  .deckmap__desc,
+  .deckmap__note {
+    margin: 0.28rem 0 0;
+    line-height: 1.6;
+  }
+  .deckmap__desc {
+    font-size: 0.875rem;
+    color: var(--sl-color-gray-2);
+  }
+  .deckmap__note {
+    font-size: 0.85rem;
+    color: var(--sl-color-gray-3);
+  }
+  .deckmap__note::before {
+    content: '→ ';
+    color: var(--dm-line);
+    font-weight: 700;
+  }
+
+  .deckmap__items {
+    list-style: none;
+    margin: 0.4rem 0 0;
+    padding: 0;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.15rem 0.9rem;
+    font-size: 0.82rem;
+  }
+  /* 장 목록은 링크가 촘촘히 붙어 있어, 밑줄을 기본으로 두면 줄이 지저분해진다 */
+  .deckmap__items a {
+    color: var(--sl-color-gray-2);
+    text-decoration: none;
+  }
+  .deckmap__items a:hover {
+    color: var(--dm-line);
+    text-decoration: underline;
+  }
+
+  @media (max-width: 30rem) {
+    .deckmap__title { font-size: 0.95rem; }
+  }
+</style>

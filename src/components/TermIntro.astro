@@ -14,10 +14,11 @@ const { title = '이 장에서 처음 나오는 말', terms } = Astro.props;
 // 설명은 평문이라 마크다운이 안 먹는다. `코드`와 **굵게**만 직접 처리한다.
 const escape = (s: string) =>
   s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+// 비탐욕 매칭이라 굵게 안에 `*`가 들어가도(`/var/log/*.log`) 깨지지 않는다
 const format = (s: string) =>
   escape(s)
-    .replace(/`([^`]+)`/g, '<code>$1</code>')
-    .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+    .replace(/`(.+?)`/g, '<code>$1</code>')
+    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
 ---
 
 <div class="terms">

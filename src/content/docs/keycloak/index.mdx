@@ -4,6 +4,7 @@ description: Keycloak — 사내 AD 인증을 SSO로, 온프렘 쿠버네티스 
 ---
 
 import { LinkCard, LinkButton } from '@astrojs/starlight/components';
+import DeckMap from '../../../components/DeckMap.astro';
 
 > 앱은 AD를 모르고, AD는 앱을 모른다 — 가운데서 **통역**하는 것이 Keycloak이다
 
@@ -20,34 +21,27 @@ import { LinkCard, LinkButton } from '@astrojs/starlight/components';
 
 ## 구성
 
-```mermaid
-flowchart LR
-    A["0~1장<br/>왜 SSO인가<br/>Keycloak의 자리"] --> B["2장<br/>OAuth 2.0 · OIDC<br/>토큰의 문법"]
-    B --> C["3~5장<br/>Keycloak 들여다보기<br/>realm · AD 연동 · 세션"]
-    C --> D["6~7장<br/>연동<br/>k8s API 서버 · 앱"]
-    D --> E["8~10장<br/>온프렘 배포 · 운영<br/>트러블슈팅"]
-    E --> F["11~12장<br/>용어 사전 · 마무리"]
-
-    classDef key  fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
-    classDef ok   fill:#dcfce7,stroke:#16a34a,color:#14532d
-    classDef warn fill:#fef3c7,stroke:#d97706,color:#78350f
-    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
-    class A key
-    class B warn
-    class C ok
-    class D key
-    class E ok
-    class F mute
-```
-
-| 장 | 주제 | 답하는 질문 |
-|---|---|---|
-| [0](/keycloak/00-intro/)–[1](/keycloak/01-why/) | 범위 · 왜 SSO인가 | AD가 이미 있는데 Keycloak은 왜 필요한가 |
-| [2](/keycloak/02-oauth-oidc/) | OAuth 2.0 · OIDC | 토큰 세 종류는 각각 무엇이고 누가 검증하는가 |
-| [3](/keycloak/03-structure/)–[5](/keycloak/05-sessions/) | realm · client · AD 연동 · 세션 | AD 그룹이 앱의 토큰까지 어떻게 오는가 |
-| [6](/keycloak/06-k8s-oidc/)–[7](/keycloak/07-apps/) | k8s API 서버 · 앱 연동 | kubectl과 사내 앱이 어떻게 SSO를 타는가 |
-| [8](/keycloak/08-deploy/)–[10](/keycloak/10-troubleshooting/) | 배포 · 운영 · 트러블슈팅 | 온프렘 k8s에서 Keycloak 자체를 어떻게 돌리는가 |
-| [11](/keycloak/11-glossary/)–[12](/keycloak/12-wrapup/) | 용어 사전 · 마무리 | — |
+<DeckMap
+  steps={[
+    { label: '0~1장', href: '/keycloak/00-intro/', title: '왜 SSO인가', tone: 'key',
+      desc: '범위 · Keycloak의 자리',
+      note: 'AD가 이미 있는데 Keycloak은 왜 필요한가' },
+    { label: '2장', href: '/keycloak/02-oauth-oidc/', title: 'OAuth 2.0 · OIDC', tone: 'warn',
+      desc: '토큰의 문법',
+      note: '토큰 세 종류는 각각 무엇이고 누가 검증하는가' },
+    { label: '3~5장', href: '/keycloak/03-structure/', title: 'Keycloak 들여다보기', tone: 'ok',
+      desc: 'realm · client · AD 연동 · 세션',
+      note: 'AD 그룹이 앱의 토큰까지 어떻게 오는가' },
+    { label: '6~7장', href: '/keycloak/06-k8s-oidc/', title: '연동', tone: 'key',
+      desc: 'k8s API 서버 · 사내 앱',
+      note: 'kubectl과 사내 앱이 어떻게 SSO를 타는가' },
+    { label: '8~10장', href: '/keycloak/08-deploy/', title: '배포와 운영', tone: 'ok',
+      desc: '온프렘 배포 · 운영 · 트러블슈팅',
+      note: '온프렘 k8s에서 Keycloak 자체를 어떻게 돌리는가' },
+    { label: '11~12장', href: '/keycloak/11-glossary/', title: '마무리', tone: 'mute',
+      desc: '용어 사전 · 마무리' },
+  ]}
+/>
 
 ## 전체를 관통하는 두 문장
 

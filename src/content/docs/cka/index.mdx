@@ -4,6 +4,7 @@ description: CKA 시험 대비 노트 — 무엇을 어떤 순서로 읽을 것�
 ---
 
 import { Card, CardGrid, LinkCard, LinkButton } from '@astrojs/starlight/components';
+import DeckMap from '../../../components/DeckMap.astro';
 
 > Certified Kubernetes Administrator — 개념부터 트러블슈팅까지
 
@@ -17,36 +18,26 @@ kubectl은 써봤지만 "안에서 무슨 일이 벌어지는지"가 흐릿한 �
 배점 순서와 학습 순서는 다르다. 트러블슈팅(30%)이 마지막에 있는 이유는,
 앞의 전부를 알아야 진단이 되기 때문이다.
 
-```mermaid
-flowchart LR
-    I["0~1장<br/>읽는 법 · 시험 해부"] --> B["2~3장<br/>아키텍처 · kubectl"]
-    B --> W["4~8장<br/>Workloads and Scheduling<br/>15%"]
-    W --> N["9~12장<br/>Servicing and Networking<br/>20%"]
-    N --> S["13장<br/>Storage<br/>10%"]
-    S --> C["14~17장<br/>Cluster Architecture<br/>25%"]
-    C --> T["18장<br/>Troubleshooting<br/>30%"]
-    T --> E["19~20장<br/>시험 전략 · 마무리"]
-
-    classDef big fill:#fee2e2,stroke:#dc2626,color:#7f1d1d
-    classDef mid fill:#fef3c7,stroke:#d97706,color:#78350f
-    classDef base fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
-    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
-    class T,C big
-    class N,W mid
-    class B base
-    class I,S,E mute
-```
-
-| 장 | 주제 | CKA 도메인 |
-|---|---|---|
-| [0](/cka/00-intro/)–[1](/cka/01-exam/) | 읽는 법 · 시험 자체의 해부 | — |
-| [2](/cka/02-architecture/)–[3](/cka/03-kubectl/) | 클러스터 아키텍처 · kubectl | 기초 |
-| [4](/cka/04-pods/)–[8](/cka/08-autoscaling/) | Pod · 워크로드 · 설정 · 스케줄링 · 오토스케일링 | Workloads and Scheduling (15%) |
-| [9](/cka/09-services/)–[12](/cka/12-networkpolicy/) | Service · DNS · Ingress/Gateway · NetworkPolicy | Servicing and Networking (20%) |
-| [13](/cka/13-storage/) | 스토리지 | Storage (10%) |
-| [14](/cka/14-rbac/)–[17](/cka/17-extensions/) | RBAC · 클러스터 라이프사이클 · Helm/Kustomize · 확장 | Cluster Architecture (25%) |
-| [18](/cka/18-troubleshooting/) | 트러블슈팅 | Troubleshooting (30%) |
-| [19](/cka/19-exam-strategy/)–[20](/cka/20-wrapup/) | 시험 전략 · 치트시트 · 마무리 | — |
+<DeckMap
+  steps={[
+    { label: '0~1장', href: '/cka/00-intro/', title: '시험 소개', tone: 'mute',
+      desc: '이 덱을 읽는 법 · 시험 자체의 해부 (환경 · 채점 · 시간 배분)' },
+    { label: '2~3장', href: '/cka/02-architecture/', title: '기초', tone: 'key',
+      desc: '클러스터 아키텍처 · kubectl' },
+    { label: '4~8장', href: '/cka/04-pods/', title: 'Workloads and Scheduling', badge: '15%', tone: 'warn',
+      desc: 'Pod · 워크로드 · 설정 · 스케줄링 · 오토스케일링' },
+    { label: '9~12장', href: '/cka/09-services/', title: 'Services and Networking', badge: '20%', tone: 'warn',
+      desc: 'Service · DNS · Ingress/Gateway · NetworkPolicy' },
+    { label: '13장', href: '/cka/13-storage/', title: 'Storage', badge: '10%', tone: 'mute',
+      desc: 'PV · PVC · StorageClass · 볼륨' },
+    { label: '14~17장', href: '/cka/14-rbac/', title: 'Cluster Architecture', badge: '25%', tone: 'bad',
+      desc: 'RBAC · 클러스터 라이프사이클 · Helm/Kustomize · 확장' },
+    { label: '18장', href: '/cka/18-troubleshooting/', title: 'Troubleshooting', badge: '30%', tone: 'bad',
+      desc: '증상에서 원인으로 — 앞의 전부가 여기서 쓰인다' },
+    { label: '19~20장', href: '/cka/19-exam-strategy/', title: '시험 대비', tone: 'mute',
+      desc: '시험 전략 · 치트시트 · 마무리' },
+  ]}
+/>
 
 ## 전체를 관통하는 한 문장
 

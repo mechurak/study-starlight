@@ -35,9 +35,9 @@ dev 서버는 백그라운드 모드로 띄운다: `astro dev --background`
 
 - **용어 규칙("콘텐츠 규칙" 절)을 각 장 첫머리의 `<TermIntro>` 상자로 강제한다**
   (`src/components/TermIntro.astro`). `web`·`keycloak`·`kafka`·`server` 덱도 이 규칙을 같이 쓴다.
-  설명의 `**굵게**` 안에 `*`를 넣으면 안 된다 (`/var/log/*.log` 같은 글롭) —
-  치환 정규식이 `[^*]+`라 매칭이 깨져 **`**`가 화면에 그대로 나온다.** 빌드는 통과한다.
-  `terms`는 `[용어, 풀 이름(없으면 ''), 한 줄 설명][]`이고, 설명 안의 백틱은 코드로 안 바뀐다 — 평문이다
+  `terms`는 `[용어, 풀 이름(없으면 ''), 한 줄 설명][]`이다. 설명은 **평문**이고
+  `` `코드` ``와 `**굵게**`만 컴포넌트가 직접 치환한다 (`DeckMap`의 `desc`·`note`도 같은 규칙).
+  치환은 비탐욕 매칭이라 굵게 안에 `*`가 들어가도(`/var/log/*.log`) 안 깨진다
 - **곁가지를 넣지 않는다.** 뺀 것은 [0장의 "다루지 않는 것" 표](src/content/docs/shadcn/00-intro.mdx)에
   이름만 남긴다. 새 내용을 넣을 때 그 표와 충돌하는지 먼저 본다
 - **12장은 용어 사전**이다. 새 약어를 본문에 쓰면 여기에도 추가한다
@@ -132,10 +132,28 @@ import { Steps, Card, CardGrid, Tabs, TabItem, FileTree, LinkCard, Badge } from 
 | `<LinkButton>` | 덱 index의 "첫 장부터 읽기" 시작 CTA — 덱마다 하나. 본문 중간에는 안 쓴다 (`<LinkCard>`와 역할이 겹친다) |
 | `<Badge>` | 표·제목 옆의 짧은 상태 라벨 — 성숙도(`alpha`/`GA`), deprecated, 기본값, 시험 비중. variant 색이 aside 체계와 같다 |
 | 아이콘 | 인라인 `<Icon>`이 아니라 **prop으로** — `<Card icon>`, topics의 덱 icon. 본문 문장 속 아이콘은 스캔을 방해한다 |
+| `<DeckMap>` | **덱 index의 "구성" 절 — 덱마다 하나.** 아래 절 참고. 본문에는 안 쓴다 |
 | mermaid 펜스 | 결정 트리, 관계도, 상태 머신, 시퀀스 |
 
 `<FileTree>` 항목은 **`- 경로/` 뒤에 설명을 그냥 이어 쓰면** 회색 주석으로 붙고,
 `**굵게**` 하면 강조 표시가 된다 — 중요한 파일을 눈에 띄게 하는 데 쓴다.
+
+### 덱 index의 "구성" 절 — `<DeckMap>`
+
+원래 이 자리에는 `flowchart LR` mermaid와 `장 | 주제 | …` 표가 나란히 있었다.
+둘이 장 범위·주제를 중복해서 담았고, **mermaid는 SVG라 폭에 맞춰 글자까지 같이 줄어들어**
+노드가 6개만 넘으면 안 읽혔다. `src/components/DeckMap.astro`가 둘을 대체한다 —
+세로 스테퍼라 글자 크기가 유지되고, 텍스트가 검색되고, 장 범위가 링크가 된다.
+
+**덱 index에는 mermaid를 쓰지 않는다.** 새 덱도 처음부터 `<DeckMap>`으로 만든다.
+
+- `steps[]` = `{ label, title, href?, badge?, desc?, note?, items?, tone? }`
+- `tone`은 mermaid classDef와 **같은 여섯 개**(`key`·`ok`·`warn`·`bad`·`mute`·`zone`) —
+  덱 전체의 색 의미가 index에서도 이어진다
+- `note`는 덱마다 달랐던 표의 세 번째 열이다 (답하는 질문 / 층 / 도메인)
+- `badge`는 제목 옆 짧은 라벨 (CKA 시험 비중처럼)
+- `items`는 **장을 하나씩 나열해야 하는 덱용**(shadcn) — `[텍스트, href][]`
+- `desc`·`note`는 평문이고 `` `코드` ``와 `**굵게**`만 처리된다 (`TermIntro`와 같은 규칙)
 
 ### 부딪힌 것들
 
