@@ -3,7 +3,7 @@ title: "10. 클러스터 DNS"
 description: "이름이 IP가 되는 과정"
 ---
 
-import { Steps, Card, CardGrid, Tabs, TabItem } from '@astrojs/starlight/components';
+import { Steps, Card, CardGrid, Tabs, TabItem, Badge } from '@astrojs/starlight/components';
 
 > 이름이 IP가 되는 과정
 
@@ -44,6 +44,8 @@ flowchart LR
 - CoreDNS는 **평범한 Deployment**다. 보통 2개의 레플리카로 돈다
 - 앞에 **`kube-dns`라는 Service**가 있다 (이름이 옛날 그대로다)
 - 그 ClusterIP가 **모든 Pod의 네임서버**로 들어간다
+- 레코드는 어디서 얻나 — CoreDNS도 다른 컴포넌트처럼 **kube-apiserver를 watch한다**
+  (0장의 루프). Service가 생기면 DNS 레코드가 따라 생기고, 별도의 등록 절차가 없는 이유다
 
 :::caution[함정]
 **CoreDNS Pod이 죽으면 클러스터 전체의 이름 해석이 죽는다.**
@@ -52,7 +54,10 @@ flowchart LR
 
 ## 이름 규칙
 
-Service의 정식 이름(FQDN)은 이렇게 생겼다.
+이름이 겹치면 어디로 보낼지 알 수 없다 — 네임스페이스가 다른 두 `web-svc`가
+같은 이름일 수는 없다. 그래서 클러스터의 모든 Service에는 **겹치지 않는 정식 이름**이
+계층으로 붙는다. 이것이 FQDN(Fully Qualified Domain Name — 상위 도메인까지 다 붙인
+완전한 이름)이고, 이렇게 생겼다.
 
 ```mermaid
 flowchart LR
@@ -79,12 +84,21 @@ flowchart LR
 `파드이름.서비스이름.네임스페이스.svc.cluster.local`\
 예: `db-0.db-headless.default.svc.cluster.local`
 
+headless Service(9장)에서만 나오는 이름이다. Pod 이름이 `db-0`, `db-1`처럼
+고정되는 StatefulSet(5장)과 짝을 이뤄, **특정 인스턴스를 이름으로 지목**할 때 쓴다.
+일반 ClusterIP Service에는 이런 Pod별 이름이 생기지 않는다.
+
 :::tip[시험]
 "다른 네임스페이스의 서비스에 연결하시오" 문제는
 **이름에 네임스페이스를 붙이는 것**이 답인 경우가 많다.
 :::
 
 ## Pod 안의 resolv.conf
+
+Pod이 어느 네임서버에 물어볼지는 컨테이너 이미지가 아니라
+**Pod을 만들 때 kubelet이 써 넣는 resolv.conf가** 정한다 (2장의 노드 컴포넌트).
+아래 `dnsPolicy`에 따라 내용이 달라지므로 Pod마다 다를 수 있다 —
+DNS가 이상하면 이 파일부터 열어보는 이유다.
 
 ```bash
 kubectl exec -it web -- cat /etc/resolv.conf
@@ -131,6 +145,11 @@ flowchart TD
 
 ### dnsPolicy와 dnsConfig
 
+위 resolv.conf는 kubelet이 자동으로 써 주지만, 그 기본값이 안 맞는 Pod이 있다 —
+노드의 네트워크를 그대로 쓰는 Pod, 사내 DNS를 먼저 봐야 하는 Pod처럼.
+**어떤 규칙으로 써 넣을지를 고르는 스위치**가 `dnsPolicy`, 그 결과를 항목 단위로
+덧쓰는 것이 `dnsConfig`다.
+
 ```yaml
 spec:
   dnsPolicy: ClusterFirst        # 기본
@@ -163,6 +182,10 @@ spec:
 </Card>
 </CardGrid>
 
+넷 중 시험 단골은 아래의 `ClusterFirstWithHostNet` 함정이다.
+`Default`와 `None`은 깊게 팔 필요 없이 이름과 역할만 구분해 두면 된다 —
+특히 `Default`가 기본값이 **아니라는** 점만 조심한다.
+
 ```mermaid
 flowchart LR
     H["hostNetwork: true Pod"] --> D{"dnsPolicy"}
@@ -184,6 +207,11 @@ flowchart LR
 :::
 
 ## Corefile — CoreDNS 설정
+
+CoreDNS의 동작을 바꾸고 싶을 때 — 사내 DNS로 존을 넘기거나, 특정 이름을 고정하거나 —
+코드를 고치는 게 아니라 설정을 고친다. **평범한 Deployment이니 설정도 평범한 ConfigMap이다.**
+`kube-system`의 `coredns` ConfigMap에 든 설정 파일이 Corefile이고,
+질의를 어떻게 처리할지가 전부 여기 적혀 있다.
 
 ```bash
 kubectl get cm coredns -n kube-system -o yaml
@@ -230,8 +258,17 @@ flowchart LR
 - **`kubernetes` 플러그인**이 Service/Pod 이름을 담당한다
 - **`forward`** 가 그 밖의 도메인을 노드의 리졸버로 넘긴다
 - `reload` 덕분에 ConfigMap을 고치면 **재시작 없이 반영**된다 (몇십 초)
+- 그 밖의 플러그인(errors·health·ready·prometheus·loop·loadbalance)은
+  로깅·헬스체크·메트릭 노출 같은 운영 보조다 — 이름만 알아두면 된다.
+  시험 관점의 중심은 `kubernetes`와 `forward` 둘이다
+- `kubernetes` 안의 `pods insecure`는 `10-244-1-5.default.pod.cluster.local` 같은
+  **Pod IP 기반 이름**을 켜는 옵션이다 — 실무에서 거의 안 쓴다. 이런 옵션이 있다는 것만 알아두자
 
-### 특정 도메인을 다른 곳으로 보내기
+### 특정 도메인을 다른 곳으로 보내기<Badge text="시험 비중 낮음" variant="note" />
+
+기본 Corefile은 클러스터 밖 도메인을 전부 노드의 리졸버로 넘긴다. 그런데 사내 존
+하나만 별도의 DNS 서버가 알고 있다면 그 넘김이 실패한다 — **존별로 목적지를 갈라주는**
+스탠자(존 하나에 대한 설정 블록)를 추가하는 것이 해법이다.
 
 ```
 # Corefile에 스탠자를 추가한다
@@ -243,7 +280,9 @@ example.internal:53 {
 ```
 
 - 사내 DNS로 특정 존만 보낼 때 쓰는 표준 패턴이다
-- `hosts` 플러그인으로 정적 매핑도 가능하다
+- `hosts` 플러그인으로 정적 매핑도 가능하다 — 리눅스의 `/etc/hosts`를 클러스터 DNS에
+  넣은 것이라고 보면 된다. `fallthrough`는 여기서 못 찾은 이름은 다음 플러그인으로
+  넘기라는 뜻이다 (빼면 못 찾은 이름이 그대로 실패한다)
 
 ```
 hosts {
@@ -256,6 +295,10 @@ hosts {
 `kubectl logs -n kube-system -l k8s-app=kube-dns`
 
 ## DNS 진단
+
+"연결이 안 된다"는 증상만으로는 이름이 안 풀린 것인지, 이름은 풀렸는데 Service가
+잘못된 것인지 구분되지 않는다 (9장의 진단 표와 같은 문제다). 그래서
+**항상 되는 이름 하나를 기준점으로 잡고** 거기서부터 층을 벗긴다.
 
 <Steps>
 

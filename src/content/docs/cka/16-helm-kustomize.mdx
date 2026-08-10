@@ -53,6 +53,15 @@ flowchart LR
 
 ## Helm
 
+Helm이 푸는 문제는 "**남이 만든 수십 장짜리 매니페스트를, 내 환경 값으로 바꿔서 통째로
+설치하고 통째로 되돌리는 일**"이다. 여기서 두 가지 장치가 나온다 —
+바뀔 자리를 구멍으로 뚫어 둔 **템플릿**, 그리고 설치한 결과를 한 덩어리로 기억하는
+**릴리스**. 앞의 것이 있어서 값 하나만 바꿔 재사용할 수 있고,
+뒤의 것이 있어서 `kubectl apply`로는 불가능한 **롤백과 일괄 삭제**가 된다.
+
+선언된 상태를 apiserver에 넣는 주체가 하나 더 생기는 것일 뿐,
+그 뒤의 루프(0장)는 달라지지 않는다 — Helm은 **클러스터 밖에서 YAML을 만들어 보내는 도구**다.
+
 ### Helm의 구성 요소
 
 <CardGrid>
@@ -84,9 +93,20 @@ flowchart LR
 
 </FileTree>
 
+트리에서 **시험에 필요한 것은 `values.yaml`(무엇을 바꿀 수 있는가)과
+`Chart.yaml`(무엇을 설치하는가) 둘**이다. `templates/`의 Go 템플릿 문법이나
+공용 조각을 모아두는 `_helpers.tpl`, 의존 차트를 담는 `charts/`는
+**차트를 만드는 쪽 이야기**라 이름만 알아두면 된다.
+
 같은 차트를 **다른 이름의 릴리스로 여러 번** 설치할 수 있다.
 릴리스 정보는 **네임스페이스의 Secret**에 저장된다
 (Helm 3부터. Helm 2의 서버 컴포넌트였던 Tiller는 없어졌다).
+
+이 "릴리스 정보"가 Helm의 상태 관리 전부다 — 어떤 차트를 어떤 값으로 설치했고
+지금 리비전이 몇 번인지가 그 Secret에 들어 있다. `helm rollback`이 가능한 이유이자,
+**클러스터에 Helm 전용 서버가 따로 없는 이유**이기도 하다. Helm 2 시절에는 그 역할을
+클러스터 안의 Tiller가 맡았고 권한 문제로 악명이 높았다 —
+지금은 없어졌으니 **이름만 알고 지나가면 된다.**
 
 ### Helm 기본 명령
 
@@ -128,6 +148,14 @@ flowchart LR
 
 </Steps>
 
+헷갈리기 쉬운 짝 두 개 —
+
+- **`helm search repo` vs `search hub`** — `repo`는 **내가 `helm repo add`로 등록한 저장소
+  안**을 찾고, `hub`는 공개 카탈로그(Artifact Hub) 전체를 찾는다.
+  시험처럼 네트워크가 제한된 환경에서 실제로 쓰는 것은 `repo` 쪽이다
+- **`helm get values` vs `get manifest`** — 앞은 **내가 준 값**, 뒤는 그 값으로 렌더된
+  **최종 YAML**이다. "무엇이 실제로 적용됐나"를 볼 때는 `get manifest`다
+
 ### 값 오버라이드 — 실무의 핵심
 
 <Tabs>
@@ -141,6 +169,9 @@ helm install my-ingress ingress-nginx/ingress-nginx \
 ```
 
 값 한두 개만 바꿀 때. **시험에서 가장 자주 쓰는 형태.**
+
+`--set-string`은 값을 **무조건 문자열로** 넣는다. `true`나 `1.10` 같은 값을 `--set`으로 주면
+YAML이 불리언·숫자로 해석해 버려 차트가 기대한 타입과 어긋나는 일이 있는데, 그때 쓴다.
 
 </TabItem>
 <TabItem label="-f — values 파일 (권장)">
@@ -163,6 +194,12 @@ helm template my-ingress ingress-nginx/ingress-nginx -f my-values.yaml
 helm install my-ingress ingress-nginx/ingress-nginx --dry-run --debug
 ```
 
+둘의 차이 — **`helm template`은 클러스터에 붙지 않고 로컬에서 렌더만** 한다.
+`--dry-run`은 릴리스를 **실제로 설치하지 않으면서** 설치 경로를 그대로 밟아 보는 것이라,
+클러스터에 연결해 API 버전 같은 정보를 반영한 결과를 보여준다
+(서버 쪽 검증까지 받으려면 `--dry-run=server`).
+값이 제대로 꽂혔는지 눈으로 보는 목적이면 `template`이 가볍고 빠르다.
+
 ```mermaid
 flowchart LR
     Q["이 차트의 어떤 값을 바꾸시오"] --> S1["helm show values 차트<br/>키 이름을 찾는다"]
@@ -182,6 +219,11 @@ flowchart LR
 :::
 
 ### 업그레이드와 롤백
+
+**릴리스가 있어서 가능해지는 것이 이 절이다.** `kubectl apply`로 설치한 것은
+"어제 상태로 되돌려라"가 안 된다 — 무엇을 적용했는지 아무도 기억하지 않기 때문이다.
+Helm은 설치·업그레이드마다 **리비전 번호를 붙여 값과 매니페스트를 통째로 보관**하므로,
+번호 하나만 대면 그 시점으로 되돌아간다.
 
 ```bash
 helm upgrade my-ingress ingress-nginx/ingress-nginx --set controller.replicaCount=5
@@ -223,7 +265,22 @@ flowchart LR
 차트가 만든 CRD는 남는다. 의도된 동작이다(데이터 보호).
 :::
 
+CRD(CustomResourceDefinition)는 **쿠버네티스에 새로운 리소스 종류를 등록하는 오브젝트**다
+(17장에서 자세히 본다). cert-manager를 설치하면 `Certificate` 같은 종류가 생기는데,
+그 종류를 정의한 것이 CRD다. **CRD를 지우면 그 종류로 만들어 둔 오브젝트가 전부 함께
+사라지므로** — 위 예로 치면 발급해 둔 인증서가 다 날아간다 — Helm은 일부러 남긴다.
+지우려면 `kubectl delete crd <이름>`으로 직접 지워야 한다.
+
 ## Kustomize
+
+Helm은 재사용 문제를 템플릿으로 풀었는데, 그 대가가 있다 —
+차트의 `templates/`를 열면 **YAML이 아니라 Go 템플릿 코드**라 그냥 읽히지 않고,
+`helm template`을 돌려 봐야 결과를 안다. 남이 배포한 컴포넌트라면 감수할 만하지만,
+**내가 쓴 매니페스트를 dev·prod로 나누는 데 그 대가를 치를 이유는 없다.**
+
+Kustomize는 같은 문제를 반대로 푼다 — 원본 YAML은 **끝까지 평범한 YAML로 두고**,
+바꿀 부분만 따로 적어 위에 얹는다. 그래서 `kubectl apply -f`로 쓰던 파일을
+한 줄도 고치지 않고 그대로 베이스로 삼을 수 있다.
 
 ### Kustomize — 템플릿 없는 커스터마이징
 
@@ -329,6 +386,10 @@ kubectl apply -k overlays/prod               # 적용 (delete -k 로 제거)
 kustomize build overlays/prod | kubectl apply -f -   # 독립 바이너리를 쓸 때
 ```
 
+독립 바이너리 `kustomize`와 `kubectl -k`는 같은 코드지만,
+**kubectl에 박혀 있는 쪽이 대체로 버전이 낮다.** 최신 필드를 썼는데 `kubectl -k`가
+모른다고 하면 그 차이일 수 있다. 시험에서는 `kubectl -k` 하나로 충분하다.
+
 **패치 두 가지 방식**
 
 <Tabs>
@@ -354,6 +415,11 @@ spec:
 
 JSON Patch 표준(RFC 6902) 방식. 경로를 직접 지정한다. 리스트 항목 교체·삭제에 정확하다.
 
+전략적 병합 패치는 리스트를 **합치려** 들기 때문에 "세 번째 항목을 지워라" 같은 요구를
+표현하기 어렵다. `op`(`replace`·`add`·`remove`)와 `path`로 한 지점을 콕 집는 이 방식이
+그 자리를 메운다. 다만 실제로 필요한 경우는 드무니, **먼저 전략적 병합으로 쓰고
+안 될 때 떠올리는 정도**면 된다.
+
 ```yaml
 # kustomization.yaml 안에 인라인
 patches:
@@ -368,6 +434,10 @@ patches:
 </Tabs>
 
 ### generator의 해시 접미사
+
+6장에서 본 문제 하나가 여기서 풀린다 — **ConfigMap의 내용을 바꿔도 Deployment의
+spec은 그대로**라, 루프가 볼 때 "달라진 것이 없으니" 롤아웃이 일어나지 않는다.
+결국 손으로 재시작을 걸어야 했다. generator는 이 문제를 **이름을 바꿔 버리는 방식**으로 푼다.
 
 ```bash
 kubectl kustomize overlays/prod | grep -A2 'kind: ConfigMap'
@@ -426,6 +496,8 @@ helm template prom prometheus/kube-prometheus-stack > base/all.yaml
 
 - 커리큘럼의 초점은 **"설치하고 값을 바꾸기"** — 차트 작성이 아니다
 - Helm: **Chart(패키지) + Values(설정) + Release(인스턴스)**
+- 릴리스 정보는 **네임스페이스의 Secret에 있다** — `helm rollback`이 되는 이유다.
+  `templates/`의 템플릿 문법은 차트를 만드는 쪽 이야기라 이름만 알면 된다
 - **`helm show values`로 키를 찾고 `--set` 또는 `-f`로 덮어쓴다**
 - 적용 전 확인은 **`helm template`** 또는 **`--dry-run --debug`**
 - **`helm uninstall`은 CRD를 남긴다**

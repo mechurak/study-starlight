@@ -43,8 +43,9 @@ NetworkPolicy는 이 기본값을 **선택적으로 좁히는** 도구다.
 
 ## CNI — 누가 네트워크를 만드는가
 
-CNI(Container Network Interface — kubelet이 Pod 네트워크를 만들 때 호출하는 표준 인터페이스)가
-위의 "평평한 네트워크"를 실제로 만드는 주체다.
+쿠버네티스는 위의 네트워크 모델을 **요구사항으로 정의만 하고 직접 구현하지 않는다.**
+구현이 없으면 Pod은 IP조차 받지 못한다. 그 구현을 맡아 "평평한 네트워크"를 실제로 만드는 주체가
+CNI(Container Network Interface — kubelet이 Pod 네트워크를 만들 때 호출하는 표준 인터페이스)다.
 
 ```mermaid
 sequenceDiagram
@@ -58,7 +59,8 @@ sequenceDiagram
     Note over KL: 실패하면 Pod 은 ContainerCreating 에서 멈춘다
 ```
 
-- kubelet은 Pod을 만들 때 **CNI 플러그인을 호출**해 IP를 할당하고 인터페이스를 붙인다
+- kubelet은 Pod을 만들 때 **CNI 플러그인을 호출**해 IP를 할당하고
+  veth(virtual ethernet — Pod과 노드를 잇는 한 쌍의 가상 케이블) 인터페이스를 붙인다
 - 설정은 **`/etc/cni/net.d/`** 에 있고, 바이너리는 `/opt/cni/bin/` 에 있다
 - CNI가 없거나 고장나면 Pod은 **`ContainerCreating`** 에서 멈춘다
 
@@ -68,6 +70,14 @@ sequenceDiagram
 | **Cilium** | eBPF(커널 내장 프로그래밍 기술) 기반. L7 정책까지 | 지원 (강력) |
 | **Flannel** | 가장 단순한 오버레이 | **미지원** |
 | **Weave** | 오버레이 | 지원 |
+
+표의 내부 구현 방식 — BGP·eBPF·오버레이(노드 사이 패킷을 캡슐화해 터널로 나르는 방식) — 은
+깊게 팔 필요 없다. 시험 관점에서는 **어느 CNI가 NetworkPolicy를 지원하는지**와
+아래 파일 경로 정도면 충분하다.
+
+덱의 축으로 보면 NetworkPolicy도 **선언(spec)일 뿐이고, 실제 상태로 만드는 쪽은 CNI다.**
+다만 다른 리소스와 달리 이 루프가 비어 있어도 — CNI가 정책을 지원하지 않아도 —
+**아무 에러가 나지 않는다.** 첫머리 함정의 "조용히 실패한다"가 여기서 나온다.
 
 ```bash
 kubectl get pods -n kube-system | grep -Ei 'calico|cilium|flannel|weave'
@@ -334,6 +344,10 @@ spec:
         - { protocol: TCP, port: 53 }
 ```
 
+셀렉터가 가리키는 것은 CoreDNS — 클러스터 내부 DNS 서버 — Pod이다.
+kube-system 네임스페이스에서 도는데, 라벨이 `k8s-app: kube-dns` 인 것은
+예전 구현(kube-dns)의 라벨을 호환 목적으로 그대로 쓰기 때문이다.
+
 **DNS를 안 열면 증상이 엉뚱한 곳에서 나타난다.**
 
 ```mermaid
@@ -369,6 +383,8 @@ ports:
     port: 8000
     endPort: 9000       # 범위
 ```
+
+이름 있는 포트와 `endPort` 범위는 **있다는 것만 알아두면 된다.** 이 절의 포인트는 아래 둘이다.
 
 - `ports`를 **생략하면 모든 포트**가 허용된다
 - **`port`는 Pod의 포트(targetPort)** 다. Service의 `port`가 아니다

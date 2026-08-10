@@ -3,7 +3,7 @@ title: "15. 클러스터 라이프사이클"
 description: "설치 · 업그레이드 · 백업 · 복구"
 ---
 
-import { Steps, Card, CardGrid, Tabs, TabItem, FileTree } from '@astrojs/starlight/components';
+import { Steps, Card, CardGrid, Tabs, TabItem, FileTree, Badge } from '@astrojs/starlight/components';
 
 > 설치 · 업그레이드 · 백업 · 복구
 
@@ -24,7 +24,13 @@ import { Steps, Card, CardGrid, Tabs, TabItem, FileTree } from '@astrojs/starlig
 
 ## 클러스터 설치
 
-설치의 주인공은 **kubeadm** — 공식 클러스터 부트스트랩 도구다.
+지금까지의 장은 전부 **클러스터가 이미 돌고 있다는 전제** 위에 있었다.
+"선언된 상태(spec)와 실제 상태(status)의 차이를 줄이는 루프"(0장)가 돌려면
+그 루프를 돌리는 주체 — apiserver·etcd·scheduler·controller-manager·kubelet(2장) — 가
+먼저 어딘가에 떠 있어야 한다. **이 절은 그 주체를 맨땅에서 만드는 일**이다.
+
+이 일을 손으로 하면 인증서 수십 장을 직접 서명하고 컴포넌트마다 kubeconfig를 써야 한다.
+설치의 주인공인 **kubeadm** — 공식 클러스터 부트스트랩 도구 — 이 그 과정을 대신해 준다.
 인증서·kubeconfig·컨트롤 플레인 스태틱 Pod을 순서대로 만들어 준다.
 
 ### 클러스터가 만들어지는 전체 흐름
@@ -93,6 +99,15 @@ flowchart LR
 :::
 
 ### 컨테이너 런타임과 kubeadm 설치
+
+kubelet은 컨테이너를 직접 만들지 않고 **CRI(Container Runtime Interface) 런타임에 시킨다**(2장).
+그래서 노드에는 containerd 같은 런타임이 먼저 깔려 있어야 한다.
+
+여기서 `SystemdCgroup`이 나오는 이유 — cgroup(control group)은 리눅스가 프로세스의
+CPU·메모리를 제한하는 커널 기능이고, **누가 그 cgroup 트리를 관리하느냐를 정하는 것이
+cgroup 드라이버**다. systemd를 쓰는 배포판에서 kubelet과 런타임이 서로 다른 드라이버를
+쓰면 **같은 노드를 두 관리자가 각자 나눠 관리하는 상태**가 되어, 리소스 제한이 어긋나고
+Pod이 이유 없이 죽는다. 그래서 양쪽을 systemd로 맞춘다.
 
 ```bash
 # containerd 설치 후 — SystemdCgroup을 켜야 한다
@@ -229,6 +244,16 @@ Calico 기본은 `192.168.0.0/16`, Flannel은 `10.244.0.0/16`이다.
 
 ### 워커 노드 조인
 
+조인은 **처음 만나는 두 쪽이 서로를 믿을 근거를 만드는 일**이다.
+새 노드는 apiserver에게 "나를 이 클러스터의 노드로 등록해 달라"고 해야 하는데,
+아직 아무 인증서도 없다. 그래서 두 값이 오간다 —
+
+- **토큰**(`--token`) — 새 노드가 자신을 증명하는 임시 암호. 이걸로 최소 권한의
+  부트스트랩 kubeconfig를 받아 정식 kubelet 인증서를 발급받는다
+- **CA 해시**(`--discovery-token-ca-cert-hash`) — 반대 방향의 증명이다.
+  새 노드가 "지금 접속한 이 apiserver가 진짜 그 클러스터인가"를 확인하는 지문 —
+  가짜 apiserver에 조인해 버리는 것을 막는다
+
 ```bash
 # init 출력에 있던 명령을 워커에서 실행
 sudo kubeadm join 192.168.1.10:6443 \
@@ -257,9 +282,20 @@ openssl x509 -pubkey -in /etc/kubernetes/pki/ca.crt \
 
 ## 업그레이드와 인증서
 
+클러스터는 만들어 놓고 끝나지 않는다. **쿠버네티스는 마이너 버전이 1년에 세 번 나오고
+한 버전의 패치 지원은 1년 남짓**이라, 손을 놓으면 보안 패치를 못 받는 버전에 남는다.
+게다가 kubeadm이 만들어 준 인증서에는 **1년짜리 만료일**이 박혀 있다 —
+아무것도 안 해도 시간이 지나면 클러스터가 스스로 멈춘다는 뜻이다.
+이 절의 두 작업은 그 두 가지 시한을 다루는 일이다.
+
 ### 버전 스큐 규칙 — 업그레이드 순서의 근거
 
-**apiserver가 기준점**이고, 나머지는 그보다 낮을 수만 있다.
+컴포넌트를 한 번에 다 올릴 수는 없다. 올리는 동안에는 필연적으로
+**새 버전과 옛 버전이 섞여 돈다.** 그 섞임이 어디까지 허용되는지를 정한 것이
+버전 스큐(version skew) 정책이고, 업그레이드 순서는 전부 여기서 따라 나온다.
+
+모든 컴포넌트가 apiserver하고만 이야기하므로(2장) **apiserver가 기준점**이고,
+나머지는 그보다 낮을 수만 있다.
 
 ```mermaid
 flowchart TD
@@ -463,6 +499,11 @@ kubectl get nodes          # 전부 새 VERSION 인지 확인 — 이게 채점 
 
 ### 인증서 관리
 
+클러스터 안의 모든 대화는 **양쪽이 서로 인증서를 내미는 mTLS로** 이뤄진다
+(mutual TLS·상호 TLS) — kubelet이 apiserver를 부를 때도, apiserver가 etcd를 읽을 때도 그렇다.
+그 인증서에 만료일이 있으니, **인증서가 만료되면 루프 전체가 한꺼번에 멈춘다.**
+증상은 "갑자기 `kubectl`이 전부 안 된다"로 나타나 원인을 짐작하기 어렵다.
+
 ```bash
 sudo kubeadm certs check-expiration
 # CERTIFICATE              EXPIRES                RESIDUAL TIME
@@ -506,6 +547,15 @@ flowchart LR
 :::
 
 ## etcd 백업과 복구
+
+**클러스터에서 백업할 것은 사실상 etcd 하나뿐이다.**
+2장에서 본 대로 선언된 상태(spec)는 전부 etcd에 저장되고,
+나머지 컴포넌트는 그 상태를 읽어 움직이는 **상태 없는 프로세스**다.
+apiserver나 scheduler가 죽으면 다시 띄우면 그만이지만,
+**etcd 데이터를 잃으면 Deployment도 Secret도 RBAC도 전부 사라진다** — 복구할 원본이 없다.
+
+그래서 백업은 "혹시 모르니"가 아니라 **클러스터를 되살릴 수 있는 유일한 수단**이고,
+시험에서도 이 장에서 가장 자주 나오는 작업이다.
 
 ### etcd 접근 준비
 
@@ -658,7 +708,17 @@ flowchart LR
 
 ## HA와 클러스터 운영
 
-### HA 컨트롤 플레인 — 두 가지 토폴로지
+여기까지가 "클러스터를 만들고 유지하는" 이야기였다면, 이 절은
+**컨트롤 플레인 자체가 하나뿐일 때 생기는 문제**를 다룬다.
+컨트롤 플레인 노드가 한 대면 그 노드가 죽는 순간 루프 전체가 멈춘다 —
+apiserver가 없으니 새 배포도, 스케줄링도, 장애 복구도 안 된다
+(이미 떠 있는 Pod은 계속 돌지만, 그것뿐이다).
+
+### HA 컨트롤 플레인 — 두 가지 토폴로지<Badge text="개념 위주" variant="note" />
+
+HA를 실제로 구축하는 문제는 로드밸런서까지 준비해야 해서 시험 시간 안에 내기 어렵다.
+**토폴로지 두 가지의 차이와 아래의 "공통 요구사항" 세 줄** 정도를 이해해 두고,
+구축 절차 자체를 외우는 데 시간을 쓰지는 않는 편이 낫다.
 
 <Tabs>
 <TabItem label="Stacked etcd (kubeadm 기본)">
@@ -748,10 +808,21 @@ flowchart LR
 - 앞단에 **로드밸런서**가 필요하다 (haproxy + keepalived 등)
 - `kubeadm init --control-plane-endpoint=<LB주소>:6443` 으로 시작해야 한다
 
+로드밸런서가 필요한 이유는 단순하다 — apiserver가 세 대가 되어도
+kubelet과 `kubectl`은 **주소 하나만** 알고 있다. 그 하나의 주소를 살아 있는 apiserver로
+넘겨주는 것이 앞단의 haproxy이고, keepalived는 그 haproxy마저 죽었을 때
+가상 IP를 옆 서버로 넘겨 준다. **둘 다 쿠버네티스 컴포넌트가 아니라 리눅스 도구**이니
+이름과 역할만 알아두면 된다.
+
 ```bash
 kubeadm token create --print-join-command --certificate-key $(kubeadm init phase upload-certs --upload-certs | tail -1)
 # → 여기에 --control-plane 을 붙이면 컨트롤 플레인으로 조인한다
 ```
+
+`--certificate-key`가 더 붙는 이유 — 컨트롤 플레인으로 조인하는 노드는
+워커와 달리 **CA 키까지 포함한 인증서 일습을 그대로 받아야** 한다.
+`upload-certs`가 그 인증서들을 암호화해 클러스터에 잠시 올려두고,
+이 키가 그것을 푸는 열쇠다 (기본 2시간 뒤 만료). 이 명령 자체는 외울 필요 없다.
 
 ### etcd 멤버 관리
 
@@ -773,6 +844,11 @@ sudo ETCDCTL_API=3 etcdctl --endpoints=https://127.0.0.1:2379 \
 | **3** | 2 | **1** |
 | 4 | 3 | 1 (4대는 3대보다 낫지 않다) |
 | **5** | 3 | **2** |
+
+이 표의 근거가 **Raft**다. etcd 멤버 여러 대가 같은 데이터를 갖게 하려면
+"무엇을 썼는가"에 대해 서로 합의해야 하는데, Raft는 그 합의 방식으로
+**과반(quorum)이 동의한 쓰기만 확정**한다. 과반을 못 채우면 etcd는 틀린 값을 주느니
+**쓰기를 거부하고 멈춘다** — 클러스터가 읽기 전용처럼 굳는 상황이 이것이다.
 
 **짝수는 의미가 없다.** 4대는 3대와 내결함성이 같으면서 쓰기 지연만 늘어난다.
 그래서 항상 **3 또는 5**다.
@@ -816,6 +892,11 @@ flowchart LR
 
 ### kubelet 설정 바꾸기
 
+kubelet은 **클러스터 안의 Pod이 아니라 노드의 systemd 서비스다**(2장).
+그래서 다른 컴포넌트처럼 매니페스트를 고쳐 반영시키는 게 아니라,
+노드의 설정 파일을 고치고 **systemd 서비스를 직접 재시작**해야 한다.
+"스태틱 Pod을 놔뒀는데 안 뜬다", "노드가 Pod을 자꾸 축출한다" 류의 원인이 여기 있다.
+
 ```bash
 # kubelet 설정 파일
 sudo vim /var/lib/kubelet/config.yaml
@@ -839,7 +920,17 @@ sudo journalctl -u kubelet -f --no-pager
 kubeadm 클러스터에서는 이 설정이 `kube-system`의
 `kubelet-config` ConfigMap에도 있다. 노드 파일이 실제로 쓰이는 것이다.
 
+둘이 있는 이유는 역할이 달라서다 — ConfigMap 쪽은 **새로 조인하는 노드와
+`kubeadm upgrade node`가 참고하는 원본**이고, 노드의 `/var/lib/kubelet/config.yaml`은
+**지금 이 kubelet이 읽는 실물**이다. 그래서 노드 파일만 고치면 그 노드에만 적용되고,
+ConfigMap만 고치면 이미 떠 있는 kubelet은 꿈쩍도 하지 않는다.
+지금 동작을 바꾸려면 **노드 파일을 고치고 kubelet을 재시작한다.**
+
 ## 클러스터 건강 점검 루틴
+
+문제를 만났을 때 제일 비싼 실수는 **짐작한 곳부터 파는 것**이다.
+아래 순서는 바깥층(노드)에서 안쪽(컨트롤 플레인 → 시스템 서비스 → 데이터)으로
+한 층씩 좁혀 가며 **루프가 끊긴 층을 먼저 확정**하려는 것이다.
 
 <Steps>
 
@@ -856,6 +947,10 @@ kubeadm 클러스터에서는 이 설정이 `kube-system`의
    kubectl get pods -n kube-system
    kubectl get componentstatuses           # deprecated지만 시험에 나올 수 있다
    ```
+
+   `componentstatuses`(줄여서 `cs`)는 scheduler·controller-manager·etcd의 health 엔드포인트를
+   찔러 보는 옛 명령이다. **deprecated이고 결과가 부정확할 때가 있으니**,
+   판단은 위의 `kubectl get pods -n kube-system` 쪽을 믿는다. 이름만 알아두면 된다
 
 3. **시스템 서비스** — 노드에서
 
@@ -894,8 +989,10 @@ kubeadm 클러스터에서는 이 설정이 `kube-system`의
 - 조인 토큰은 **`kubeadm token create --print-join-command`**
 - etcd 백업은 **인증서 3종 + `snapshot save`**, 경로는 `etcd.yaml`에서 읽는다
 - 복구는 **새 디렉터리로 restore → `etcd.yaml`의 `hostPath` 변경**
-- **etcd 멤버는 홀수(3, 5).** 짝수는 이득이 없다
+- **etcd 멤버는 홀수(3, 5).** 짝수는 이득이 없다 — Raft가 **과반으로 합의하기 때문이다**
 - 인증서는 1년. **`kubeadm certs check-expiration` / `renew all`**
+- HA는 **토폴로지 두 가지와 홀수·로드밸런서·`--control-plane-endpoint`까지만** —
+  구축 절차 자체를 외우는 데 시간을 쓰지 않는다
 
 :::note[손 연습]
 이 장 범위의 KodeKloud 실습 풀이 — [CKA 실습 9장 · 클러스터 라이프사이클](/cka-udemy/09-cluster-lifecycle/)

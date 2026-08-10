@@ -3,7 +3,7 @@ title: "4. Pod — 배포의 최소 단위"
 description: "컨테이너가 아니라 Pod이 단위인 이유"
 ---
 
-import { Steps, Card, CardGrid, Tabs, TabItem } from '@astrojs/starlight/components';
+import { Steps, Card, CardGrid, Tabs, TabItem, Badge } from '@astrojs/starlight/components';
 
 > 컨테이너가 아니라 Pod이 단위인 이유
 
@@ -87,7 +87,14 @@ sudo crictl pods                 # Pod 샌드박스 = pause 컨테이너
 이걸 알면 "**컨테이너는 죽었는데 Pod IP는 그대로**"가 자연스러워진다.
 Pod IP가 바뀌는 것은 **Pod 자체가 새로 만들어질 때**다.
 
+pause 자체가 문제로 나오는 일은 드물다 — "컨테이너 재시작 ≠ Pod 재생성"을 구분하고,
+노드에서 `crictl ps`에 앱 컨테이너만 보이는 이유를 이해하는 배경 지식으로 이만큼이면 충분하다.
+
 ## 매니페스트 작성
+
+이 YAML이 0장에서 말한 "**선언된 상태**"(spec) 그 자체다. `kubectl apply`로 API 서버에
+넣는 순간 일이 끝나는 게 아니라 시작된다 — 스케줄러가 노드를 정하고 kubelet이 컨테이너를
+띄우며, 실제 상태(status)를 여기 적힌 모습에 맞춰 간다.
 
 ### Pod 매니페스트
 
@@ -163,6 +170,9 @@ DB 프록시, 커넥션 풀.
 앱 로그를 Prometheus 형식으로.
 </Card>
 </CardGrid>
+
+세 이름 중 커리큘럼에 올라 있는 것은 사이드카뿐이다 (아래 "네이티브 사이드카").
+앰배서더·어댑터는 분류용 이름이라 깊게 팔 필요는 없다 — 이름만 알아두자.
 
 **함께 넣을지는 세 질문으로 판단한다.**
 
@@ -266,9 +276,15 @@ flowchart LR
 - **Job에서 특히 중요하다** — 예전에는 사이드카가 안 끝나서 Job이 완료되지 않았다
 
 예전 방식(그냥 `containers`에 두 개)도 여전히 동작한다. 다만 순서 보장이 없다.
+네이티브 사이드카는 커리큘럼에 이름이 올라 있는 항목이다 —
+"`initContainers`에 넣고 `restartPolicy: Always`를 준다"는 조합 자체를 기억해 두자.
 시험 중 init 컨테이너·사이드카 YAML 뼈대가 필요하면 공식 [Init Containers 문서](https://kubernetes.io/docs/concepts/workloads/pods/init-containers/)의 예시를 복사해 이름·이미지·command만 바꾸는 게 가장 빠르다.
 
 ## 상태와 재시작
+
+매니페스트가 "선언된 상태"라면 이 절은 전부 반대쪽, "**실제 상태**"(status) 이야기다 —
+0장의 루프에서 차이를 판정할 때 읽는 재료가 여기 모여 있다.
+문제가 생기면 결국 이 status를 읽는 것부터 시작한다.
 
 ### Pod의 phase
 
@@ -465,6 +481,7 @@ startupProbe:
 ```
 
 `grpc:` 방식도 있다 (`port` + `service`). gRPC 헬스체크 규약을 쓰는 앱용.
+시험에 주로 나오는 건 `httpGet`과 `exec`다 — `grpc:`는 이런 게 있다는 것만 알아두면 된다.
 
 ### 프로브 파라미터 읽는 법
 
@@ -525,7 +542,7 @@ flowchart TB
 **1번과 2번은 동시에 시작한다.** 그래서 엔드포인트 제거(Service의 대상 목록에서 빼는 것 — 9장)가
 전파되기 전에 SIGTERM이 도착할 수 있다 — `preStop`에 `sleep 5` 를 넣는 관행이 여기서 나온다.
 
-### lifecycle 훅
+### lifecycle 훅<Badge text="시험 비중 낮음" variant="note" />
 
 ```yaml
 containers:
@@ -545,6 +562,9 @@ spec:
 - `postStart` — 컨테이너 시작과 **동시에** 실행된다 (ENTRYPOINT보다 먼저라는 보장은 없다)
 - `preStop` — SIGTERM **전에** 실행된다. 여기서 시간을 쓰면 grace period에서 차감된다
 - 훅이 실패하면 컨테이너가 죽는다
+
+훅 자체를 깊게 묻는 일은 드물다 — 위 종료 흐름에서 `preStop`에 `sleep`을 넣는
+관행이 왜 생겼는지 이해하는 정도면 충분하다.
 
 :::caution[함정]
 `preStop`이 grace period보다 오래 걸리면
@@ -577,6 +597,11 @@ env:
         name: db-secret
         key: password
 ```
+
+`fieldRef`·`resourceFieldRef`로 값을 끌어오는 통로가 **Downward API**다 —
+Pod이 자기 자신의 정보(이름·노드·IP·리소스 값)를 API 서버에 물어보지 않고
+환경변수나 파일로 받는 방법이다. 앱이 "내가 어느 노드에 떠 있나"를 로그에 남길 때 같은 데 쓴다.
+깊게 팔 필요는 없다 — 이름과 "자기 정보를 받는 통로"라는 용도만 알아두자.
 
 `envFrom:` 을 쓰면 ConfigMap/Secret의 **모든 키를 한 번에** 환경변수로 넣을 수 있다 (6장).
 
@@ -669,6 +694,8 @@ API 쪽에서 지워도 kubelet이 파일을 보고 다시 만든다.
 
 ### 리소스 in-place 변경 (Kubernetes v1.35 GA)
 
+`resources`는 원래 만들고 나면 못 바꾸는 필드였다 — 조정하려면 Pod을 지우고
+다시 만드는 수밖에 없었고, 그때마다 재시작이 따라왔다.
 이제 Pod을 다시 만들지 않고 CPU·메모리를 바꿀 수 있다.
 
 ```yaml
@@ -689,6 +716,9 @@ kubectl patch pod web --subresource=resize \
 - **CPU와 메모리만** 가능하다. init/ephemeral 컨테이너는 안 된다
 - **QoS 클래스는 바뀔 수 없다** (6장)
 - `status.containerStatuses[*].resources` 에 **실제 적용된 값**이 보인다
+
+v1.35에서 GA가 되며 커리큘럼에 올라온 항목이다 —
+`kubectl patch`에 `--subresource=resize`를 붙이는 것이 핵심이다.
 
 ## 4장 요약
 

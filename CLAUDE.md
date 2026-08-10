@@ -153,6 +153,10 @@ import { Steps, Card, CardGrid, Tabs, TabItem, FileTree, LinkCard, Badge } from 
   `document.querySelectorAll('[role="tabpanel"]').forEach(p => p.hidden = false)` 로 열고 찍는다.
 - `src/content/docs/` 밑에 새 페이지를 만들면 **topics에 넣거나 `exclude`에 추가해야** 빌드가 통과한다
   (`Failed to find the topic for the ... page`). 파일명이 `_`로 시작하면 아예 빌드되지 않는다.
+- **제목에 `<Badge>`를 달 때는 공백 없이 붙여 쓴다.** `### 집계 ClusterRole <Badge …/>` 처럼
+  띄우면 앵커 slug 끝에 `-`가 붙어(`집계-clusterrole-`) 링크가 조용히 바뀐다 — 빌드는 통과한다.
+  `### 집계 ClusterRole<Badge …/>` 로 붙이면 slug가 유지되고,
+  간격은 `custom.css`의 `:is(h2, h3) > .sl-badge` 규칙이 준다.
 
 ## 검증
 

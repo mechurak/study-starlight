@@ -3,11 +3,17 @@ title: "8. 오토스케일링"
 description: "부하에 따라 개수를 바꾼다"
 ---
 
-import { Steps, Card, CardGrid, Tabs, TabItem } from '@astrojs/starlight/components';
+import { Steps, Card, CardGrid, Tabs, TabItem, Badge } from '@astrojs/starlight/components';
 
 > 부하에 따라 개수를 바꾼다
 
 ## 세 가지 오토스케일링
+
+지금까지 Deployment의 `replicas`는 **사람이 정한 고정값**이었다. 부하는 시간에 따라
+변하는데 선언은 안 변하니, 피크에 맞추면 평시에 낭비고 평시에 맞추면 피크에 죽는다.
+오토스케일러는 **지표를 보고 선언(spec) 자체를 고쳐 쓰는 컨트롤러다** —
+0장의 "선언된 상태 ↔ 실제 상태를 좁히는 루프" 위에,
+**선언 쪽을 갱신하는 루프가 하나 더** 얹힌다.
 
 <CardGrid>
 <Card title="HPA — Pod 개수" icon="random">
@@ -61,6 +67,10 @@ VPA·CA는 개념만 알면 된다. **metrics-server 설치**가 함께 나올 �
 
 ### metrics-server가 먼저다
 
+"현재 지표"를 판단하려면 사용량 데이터가 필요한데, **코어 Kubernetes에는 사용량을 재는
+컴포넌트가 없다** — etcd에 있는 것은 spec과 status지, CPU 사용률이 아니다.
+그 구멍을 메우는 애드온이 metrics-server다.
+
 HPA는 메트릭이 없으면 **아무것도 하지 않는다.**
 
 ```bash
@@ -111,9 +121,13 @@ flowchart LR
     class K,API,HPA,TOP,D mute
 ```
 
-- metrics-server는 **APIService로 등록**된다 (`metrics.k8s.io`) — 그래서 `kubectl top`이 동작한다
+- 출발점은 각 노드 kubelet에 내장된 **cAdvisor**(Container Advisor — 컨테이너 사용량 수집기)다 — 이름만 알면 된다
+- metrics-server는 **APIService로 등록**된다 (`metrics.k8s.io`) — APIService는 kube-apiserver에
+  **외부 API 그룹을 이어 붙이는 확장점**이라, `kubectl top`도 HPA도 별도 통로 없이
+  평범한 API 호출로 동작한다. 그래서 진단도 `kubectl get apiservice`로 한다
 - **메모리에만 저장**한다. 과거 데이터가 없다 — 모니터링 도구가 아니다
-- 장기 메트릭이나 커스텀 메트릭이 필요하면 **Prometheus + adapter**를 쓴다
+- 장기 메트릭이나 커스텀 메트릭이 필요하면 **Prometheus + adapter**를 쓴다 —
+  깊게 팔 필요는 없다, 이름만 알아두자
 
 ## HPA
 
@@ -231,6 +245,9 @@ HPA 문제에서 `<unknown>`이 보이면 순서대로 확인한다.\
 
 ### 여러 메트릭 쓰기
 
+CPU 하나로는 안 잡히는 부하가 있다 — 메모리가 먼저 차는 워크로드, 큐 길이나
+요청 수가 먼저 튀는 워크로드. 그래서 메트릭을 여러 개 걸 수 있다.
+
 ```yaml
 metrics:
   - type: Resource
@@ -272,8 +289,13 @@ flowchart LR
 
 - 여러 메트릭이 있으면 **각각 계산해서 가장 큰 값을 택한다**
 - 즉 **하나라도 넘치면 늘어난다.** 축소는 전부 여유가 있어야 한다
+- `type: Pods` 같은 커스텀 메트릭은 adapter가 있어야 돌아간다 — 깊게 팔 필요는 없다.
+  시험 대비로는 **Resource(CPU·메모리) 메트릭**이면 충분하다
 
 ### behavior — 확장·축소 속도 제어
+
+계산식대로만 움직이면 지표가 출렁일 때마다 replicas도 출렁인다 — 확장은 즉시가 좋지만,
+축소가 성급하면 트래픽이 다시 튈 때 그대로 맞는다. behavior는 이 **방향별 속도**를 정한다.
 
 ```yaml
 spec:
@@ -312,15 +334,21 @@ flowchart LR
 
 - **기본은 "빠르게 늘리고 천천히 줄인다"** — 축소 안정화 창이 300초다
 - `selectPolicy: Disabled` 로 두면 **그 방향으로는 아예 안 움직인다**
+- 세부 필드까지 외울 항목은 아니다 — **기본값의 방향성**(빠른 확장·느린 축소)이 핵심이다
 
 ## VPA와 Cluster Autoscaler
+
+<Badge text="시험 비중 낮음" variant="note" /> 둘 다 **기본 내장이 아니라 별도 설치물**이라
+시험 클러스터에 없다. 설치·설정을 묻는 문제로 나오기는 어렵고, "이 상황에 무엇이 필요한가"를
+가르는 데 쓴다 — **Pod이 부족하면 HPA, Pod 하나가 작으면 VPA, 노드가 부족하면 CA**.
 
 <Tabs>
 <TabItem label="VPA — Pod 크기">
 
 - Pod의 **requests/limits를 자동 조정**
 - 별도 설치(CRD). 기본 내장이 아니다
-- 모드: `Off`(추천만) / `Initial` / `Auto`
+- 모드(`updateMode`): `Off` — 계산만 하고 **추천값을 status에 적어둔다**(사람이 보고 반영),
+  `Initial` — Pod이 **새로 생길 때만** 값을 넣는다, `Auto` — 실행 중인 Pod에도 적용한다
 - 예전에는 적용에 Pod 재생성이 필요했다
   → **in-place resize(v1.35 GA)** 로 개선되는 중 (4장)
 
@@ -329,8 +357,8 @@ flowchart LR
 
 - **Pending Pod이 있으면 노드를 늘린다**
 - 노드가 오래 비어 있으면 줄인다
-- 클라우드 제공자 API가 필요하다
-  (EKS: 노드그룹, 또는 **Karpenter**)
+- 클라우드 제공자 API가 필요하다 — 노드를 실제로 만들어내는 일은 Kubernetes 밖이기 때문이다
+  (EKS: 노드그룹, 또는 노드그룹 없이 인스턴스를 직접 고르는 **Karpenter** — 이름만 알면 된다)
 - 온프레미스에서는 대개 못 쓴다
 
 </TabItem>
@@ -375,6 +403,10 @@ flowchart LR
 
 HPA는 `scale` 서브리소스가 있는 리소스면 무엇이든 대상이 된다
 — Deployment, ReplicaSet, StatefulSet. **DaemonSet은 안 된다**(개수를 노드가 정하므로).
+
+`scale` 서브리소스는 "**개수만 읽고 쓰는 전용 창구**"다 (`/apis/apps/v1/.../web/scale`).
+HPA는 대상이 Deployment인지 StatefulSet인지 몰라도 이 창구로 replicas만 바꾸면 된다 —
+그래서 커스텀 리소스(CRD)도 `scale`만 열어두면 HPA로 스케일된다.
 
 ## 8장 요약
 

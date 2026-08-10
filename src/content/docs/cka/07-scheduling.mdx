@@ -3,7 +3,7 @@ title: "7. 스케줄링"
 description: "Pod을 어느 노드에 놓을 것인가"
 ---
 
-import { Steps, Card, CardGrid, Tabs, TabItem } from '@astrojs/starlight/components';
+import { Steps, Card, CardGrid, Tabs, TabItem, Badge } from '@astrojs/starlight/components';
 
 > Pod을 어느 노드에 놓을 것인가
 
@@ -42,13 +42,17 @@ flowchart LR
 - 노드에 남은 **request 여유가 부족**하다
 - **taint**가 있는데 Pod에 **toleration**이 없다
 - **nodeSelector / nodeAffinity**가 안 맞는다
-- **포트 충돌**(hostPort), 볼륨의 노드 제약(topology)
+- **포트 충돌**(`hostPort` — Pod이 노드의 포트를 직접 점유하는 설정. 드물게 쓴다), 볼륨의 노드 제약(topology)
 - 노드가 **unschedulable**(cordon 됨)이다
 
 **Pending의 원인은 대부분 이 목록 안에 있다.**
 그리고 `describe pod`의 Events가 **어느 항목에서 걸렸는지 문장으로 알려준다.**
 
 ## 배치를 제어하는 도구들
+
+기본 스케줄러는 리소스 여유와 균형만 본다 — **어떤 Pod이 어떤 노드에 가야 하는지의
+사정**(GPU 노드, 전용 노드, 존 분산 같은 요구)은 모른다. 그 사정을 spec에 적어
+Filtering·Scoring에 반영시키는 것이 이 절의 도구들이다.
 
 **방향이 반대인 두 축**이 핵심이다.
 
@@ -429,7 +433,7 @@ kubectl drain node01 \
 
 - **`cordon`** = 노드에 `unschedulable` 표시 (taint가 붙는다)
 - **`drain`** = cordon + 기존 Pod을 전부 **축출(evict)**
-- 축출은 **PDB를 존중**한다 — 위반하면 기다린다 (5장)
+- 축출은 **PDB**(PodDisruptionBudget — "동시에 죽어도 되는 Pod 수"의 하한 선언, 5장)를 존중한다 — 위반하면 기다린다
 
 :::tip[시험]
 노드 업그레이드 문제의 정해진 순서다.
@@ -440,6 +444,10 @@ kubectl drain node01 \
 ## 그 밖의 배치 제어
 
 ### topologySpreadConstraints — 균등 분산
+
+podAntiAffinity는 "떨어뜨려라"까지만 말할 수 있다 — "**몇 개씩 고르게**"는 표현하지
+못한다. 그 한계가 위 함정(노드 수보다 많은 replicas가 Pending)으로 나타난다.
+균등 분산이 목적이라면 처음부터 이걸 쓴다.
 
 ```yaml
 spec:
@@ -522,7 +530,14 @@ sequenceDiagram
 
 축출된 Pod은 `describe`에 `Preempted by ...` 로 기록된다.
 
+출제 비중이 높은 항목은 아니다 — 선점이라는 개념과 `priorityClassName` 필드만
+알아두면 충분하다.
+
 ### 여러 스케줄러 쓰기
+
+<Badge text="시험 비중 낮음" variant="note" /> 커스텀 스케줄러를 만드는 법까지 팔
+필요는 없다 — `schedulerName` 필드의 존재와, 아래 함정이 Pending 트러블슈팅에서
+쓸모 있다는 것만 챙긴다.
 
 ```yaml
 spec:
@@ -579,6 +594,13 @@ kubectl label ns dev \
 | `enforce` | **거부**한다 |
 | `audit` | 감사 로그에 남긴다 |
 | `warn` | 사용자에게 경고를 보여준다 |
+
+**세 모드는 동시에, 서로 다른 레벨로 걸 수 있다.** 위 예시가 그렇다 —
+`enforce=baseline`으로 실제 차단은 느슨하게 두고 `warn=restricted`로 경고만 먼저 띄우면,
+기존 워크로드를 깨뜨리지 않고 조이는 방향을 예고할 수 있다. 이것이 실무의 이행 순서다.
+
+이 장에서는 배치 이전의 관문이라는 위치만 잡는다 — 요청이 지나는
+admission 파이프라인 전체는 2장, 컨트롤러를 켜고 끄는 방법은 14장이다.
 
 ## 스케줄링 실패 진단 순서
 

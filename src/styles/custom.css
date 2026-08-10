@@ -25,6 +25,13 @@
   color: var(--sl-color-gray-3);
 }
 
+/* 제목 옆 Badge — 제목 텍스트와 <Badge> 사이에 공백을 두면 앵커 slug 끝에 '-'가
+   붙어 링크가 바뀐다. MDX에서는 공백 없이 붙여 쓰고, 간격은 여기서 준다. */
+:is(h2, h3) > .sl-badge {
+  margin-inline-start: 0.5em;
+  vertical-align: middle;
+}
+
 /* mermaid 다이어그램 — 폭이 넘치면 다이어그램 안에서만 가로 스크롤 */
 .mermaid {
   overflow-x: auto;

@@ -9,6 +9,9 @@ import { Steps, Card, CardGrid, Tabs, TabItem } from '@astrojs/starlight/compone
 
 ## kubectl은 무엇인가
 
+2장의 그림에서 모든 화살표는 API 서버를 향했다 — kubectl은 그중 **사람이 쏘는 화살표**다.
+시험의 모든 조작이 이 클라이언트를 거치니, 이 장은 곧 손 속도를 버는 장이다.
+
 ```mermaid
 flowchart LR
     U["당신"] --> KC["kubectl"]
@@ -39,6 +42,10 @@ kubectl get pods -v=6      # 실제로 어떤 URL을 호출하는지 보인다
 "어느 주소로 어떤 신원으로 갔는가"로 환원해서 볼 수 있다.
 
 ## kubeconfig와 컨텍스트
+
+API 서버는 아무 요청이나 받지 않는다 — 2장에서 본 첫 관문(인증)을 통과해야 한다.
+그렇다고 매 명령마다 서버 주소와 인증서를 플래그로 줄 수는 없으니,
+"어디로 · 누구로"를 파일 하나에 묶어 둔다. 그게 kubeconfig다.
 
 ### kubeconfig 구조 — 세 덩어리 + 조합
 
@@ -79,6 +86,10 @@ flowchart LR
 
 **context = cluster + user + namespace.** 셋을 묶은 것이 컨텍스트다.
 
+`certificate-authority`는 CA(Certificate Authority · 인증 기관) 인증서다 —
+"이 API 서버가 진짜인가"를 클라이언트 쪽에서 검증하는 뿌리이고,
+반대로 `client-certificate`는 서버에게 "나는 admin이다"를 증명한다. 인증서 체계 자체는 14장.
+
 ### 컨텍스트 다루기
 
 ```bash
@@ -96,6 +107,9 @@ kubectl config view --raw                      # 마스킹 없이
 KUBECONFIG=~/.kube/config:~/other.conf kubectl config view --flatten > merged.conf
 ```
 
+합치는 문법까지 외울 필요는 없다 — "이런 것도 된다" 정도만 알아두면 된다.
+시험에서는 kubeconfig가 이미 세팅된 채로 시작한다.
+
 :::tip[시험]
 문제마다 컨텍스트 전환 명령이 지문에 주어진다.
 **무조건 복사해서 먼저 실행**하고, 불안하면 `kubectl config current-context`로 확인.
@@ -103,6 +117,10 @@ KUBECONFIG=~/.kube/config:~/other.conf kubectl config view --flatten > merged.co
 :::
 
 ## 조회와 출력
+
+트러블슈팅은 **실제 상태(status)를 읽는 것**에서 시작한다 (커리큘럼의 30%가 여기다).
+같은 `get`이라도 출력 형식을 바꾸면 보이는 정보가 달라지므로, 조회는
+"**무엇을 보고 싶은가**"에 맞춰 형식을 고르는 일이다.
 
 ### 출력을 다루는 법
 
@@ -124,6 +142,9 @@ ConfigMap, Secret, PV, PVC, Ingress, RBAC은 안 나온다. "다 지웠는데 �
 
 ### 정렬과 필드 추출
 
+시험은 "**보시오**"가 아니라 "**파일에 쓰시오**"로 묻는다 — 이름만, 이미지만, 정렬해서.
+사람 눈으로 골라 옮겨 적으면 오타로 점수를 잃으니, 처음부터 필요한 값만 뽑는 형식을 쓴다.
+
 ```bash
 kubectl get pods --sort-by=.metadata.creationTimestamp
 kubectl get nodes --sort-by=.metadata.name
@@ -138,6 +159,10 @@ kubectl get pods -o jsonpath='{.items[*].metadata.name}'
 kubectl get pods -o jsonpath='{range .items[*]}{.metadata.name}{"\t"}{.status.podIP}{"\n"}{end}'
 kubectl get node node01 -o jsonpath='{.status.capacity.cpu}'
 ```
+
+JSONPath는 `-o json`으로 받은 응답 안에서 **경로로 값을 지목하는 문법**이다.
+`.items[*]`는 목록 전체, `{range}…{end}`는 그 목록을 한 줄씩 돌며 찍으라는 뜻이고,
+`{"\t"}` · `{"\n"}` 같은 리터럴로 구분자를 직접 넣는다.
 
 값 하나를 정확히 꺼낼 때. 다른 명령에 넘겨 쓰기 좋다.
 `range`나 필터 문법이 기억나지 않으면 시험 중에는 공식 [JSONPath 문서](https://kubernetes.io/docs/reference/kubectl/jsonpath/)의 예시를 복사해 경로만 바꾸는 게 가장 빠르다.
@@ -187,6 +212,10 @@ Events 한 줄에 답이 있는 경우가 대부분이다. (18장)
 
 ## 리소스 만들기
 
+만드는 것은 결국 **spec을 API 서버에 밀어 넣는 일**이다 (2장). 방법은 두 갈래인데,
+시험에서 갈리는 것은 "무엇을 만드느냐"가 아니라 **몇 초 만에 만드느냐**다 —
+그래서 두 방식의 장단을 알고 섞어 쓰는 것이 이 절의 목적이다.
+
 ### 명령형 vs 선언형 — 시험에서는 섞어 쓴다
 
 ```mermaid
@@ -211,6 +240,10 @@ flowchart LR
 :::
 
 ### 생성기(generator) — 시험의 핵심 무기
+
+생성기는 `create`·`run`·`expose`가 **플래그 몇 개로 오브젝트 뼈대를 대신 써 주는 기능**이다.
+손으로 YAML을 치면 20줄인 것이 한 줄이 된다. 지금의 `kubectl run`은 **Pod만** 만든다 —
+Deployment가 필요하면 `kubectl create deploy`를 쓴다.
 
 ```bash
 # Pod
@@ -239,6 +272,10 @@ kubectl create ingress web --rule="example.com/*=web-svc:80"
 막히면 시험 중에도 열 수 있는 공식 [kubectl Quick Reference](https://kubernetes.io/docs/reference/kubectl/quick-reference/)에 같은 목록이 정리되어 있다.
 
 ### dry-run — 명령형으로 YAML을 뽑는다
+
+생성기만으로는 표현할 수 없는 필드(볼륨, 프로브, tolerations…)가 많다.
+그렇다고 빈 파일에서 시작할 필요는 없다 — **만들지 말고 YAML만 내놓으라**고 하면
+생성기가 뼈대를 써 주고, 거기에 필요한 필드만 얹으면 된다. 그게 `--dry-run=client -o yaml`이다.
 
 ```bash
 kubectl create deploy web --image=nginx --dry-run=client -o yaml > web.yaml
@@ -272,6 +309,10 @@ kubectl run nginx --image=nginx $do > pod.yaml
 :::
 
 ## 수정과 삭제
+
+만드는 문제만큼 자주 나오는 것이 "**이미 있는 것을 고치시오**"다.
+고치는 길이 넷이나 되는 이유는 각각 대가가 다르기 때문이다 —
+빠르지만 표현이 제한적인 것부터, 느리지만 무엇이든 되는 것까지 순서대로 본다.
 
 ### 수정하는 네 가지 방법
 
@@ -309,6 +350,11 @@ kubectl run nginx --image=nginx $do > pod.yaml
 
 </Steps>
 
+`patch`의 기본 형식은 **strategic merge**다 — 준 필드만 병합하고 나머지는 그대로 둔다.
+`--type=json`은 `op`(연산)와 `path`(위치)로 지목하는 방식이라, 위 예처럼
+**배열 원소 하나**(`/spec/containers/0/image`)를 정확히 바꿀 때 쓴다.
+세 번째 형식인 `--type=merge`도 있지만 깊게 팔 필요는 없다 — 이름만 알아두자.
+
 :::caution[함정]
 Pod의 **대부분 필드는 수정할 수 없다.**
 `image`, `tolerations`(추가), `activeDeadlineSeconds` 정도만 가능하고,
@@ -317,6 +363,10 @@ Pod의 **대부분 필드는 수정할 수 없다.**
 :::
 
 ### apply가 하는 일 — 3-way merge
+
+같은 오브젝트를 파일과 명령형 조작이 번갈아 건드린다. 파일을 그대로 덮어쓰면
+파일에 안 적힌 것(다른 도구가 넣은 필드)이 통째로 날아간다.
+`apply`가 단순 덮어쓰기가 아닌 이유가 이것이다.
 
 ```mermaid
 flowchart LR
@@ -343,6 +393,9 @@ flowchart LR
 ```bash
 kubectl diff -f web.yaml        # 적용하면 무엇이 바뀌는지 미리 본다
 ```
+
+병합을 클라이언트가 아니라 서버가 하는 `--server-side` 방식도 있다.
+시험에서는 기본(클라이언트 쪽 3-way merge)으로 충분하다 — 이름만 알아두자.
 
 :::caution[함정]
 `create`로 만든 리소스에 `apply`를 하면
@@ -389,6 +442,10 @@ Deployment가 관리하는 Pod을 지우면 **즉시 다시 생긴다.**
 
 ## 진단 도구
 
+여기부터는 **루프가 어디서 멈췄는지**를 알아내는 도구다 (0장의 축, 커리큘럼의 30%).
+순서가 있다 — 이벤트는 "스케줄링·이미지·볼륨" 같은 **Pod이 뜨기까지의 실패**를,
+로그는 "떴는데 앱이 죽는" **뜬 다음의 실패**를 보여준다. `exec`·`debug`는 그래도 모를 때 안으로 들어가는 것이다.
+
 ### 로그 — 커리큘럼의 "컨테이너 출력 스트림"
 
 ```bash
@@ -412,6 +469,12 @@ kubectl logs deploy/web                    # 컨트롤러를 지정해도 된다
 API 서버가 죽어 `kubectl logs`가 안 될 때 직접 읽는다.
 
 ### exec · cp · port-forward
+
+셋 다 **컨테이너 안쪽에 손을 넣는** 명령이다 — 역할이 다르다.
+`exec`는 이미 도는 컨테이너에서 명령을 실행하고, `cp`는 파일을 넣거나 꺼내고,
+`port-forward`는 클러스터 안의 포트를 내 로컬 포트로 끌어온다.
+`port-forward`는 Service를 만들지 않고도 앱에 붙어 볼 때 쓰지만, 시험에서는
+클러스터 **안에서** 임시 Pod으로 확인하는 쪽이 더 흔하다 — 쓰임을 알아 두는 정도면 된다.
 
 ```bash
 kubectl exec web -- ls /app
@@ -453,6 +516,10 @@ flowchart LR
 **임시 컨테이너**(ephemeral container)를 붙인다.
 :::
 
+임시 컨테이너는 **Pod을 다시 만들지 않고 나중에 끼워 넣는 컨테이너**다.
+`--target=web`을 주면 대상 컨테이너와 프로세스 네임스페이스를 공유해 그쪽 프로세스까지 보인다.
+한 번 붙인 것은 뗄 수 없고, Pod을 지우면 같이 사라진다.
+
 ### 이벤트 — 시간순으로 보는 클러스터의 일기
 
 ```bash
@@ -463,7 +530,12 @@ kubectl get events --field-selector involvedObject.name=web
 kubectl events --for pod/web              # 새 전용 명령
 ```
 
+이벤트도 **etcd에 저장되는 오브젝트다** — 스케줄러·kubelet·컨트롤러가 "무엇을 했는지,
+왜 못 했는지"를 남긴 기록이다. 로그와 달리 컴포넌트를 가리지 않고 한 줄로 모이기 때문에
+"Pod이 안 뜬다"류에서 가장 먼저 볼 곳이 된다.
+
 - 이벤트는 **기본 1시간 후 사라진다.** 오래된 문제는 이벤트로 못 잡는다
+  (무한정 쌓으면 etcd가 감당하지 못하니 수명을 짧게 둔다)
 - `describe`의 아래쪽 Events 섹션이 사실 이것이다
 
 :::tip[시험]

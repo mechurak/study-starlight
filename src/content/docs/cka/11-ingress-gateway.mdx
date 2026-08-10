@@ -41,6 +41,10 @@ Gateway API가 최근 추가된 항목이니 특히 챙길 것.
 
 ## Ingress = 리소스 + 컨트롤러
 
+0장의 축으로 보면 — Deployment는 선언만 하면 내장 컨트롤러가 실제 상태로 만들어 주지만,
+**Ingress를 조정하는 컨트롤러는 쿠버네티스에 내장되어 있지 않다.** 직접 하나 골라 설치해야
+"선언 → 실제 상태" 루프가 돌기 시작한다. 이 장의 함정 대부분이 여기서 나온다.
+
 ```mermaid
 flowchart LR
     C["클라이언트"] --> LB["LoadBalancer Service<br/>컨트롤러 앞단"]
@@ -221,6 +225,8 @@ flowchart LR
 
 - Secret은 **`kubernetes.io/tls` 타입**이어야 하고 **Ingress와 같은 네임스페이스**에 있어야 한다
 - TLS는 컨트롤러에서 종료(terminate)되고, 백엔드로는 평문으로 간다
+- 종료란 암호화를 진입점에서 풀어 준다는 뜻이다 — 인증서를 백엔드마다 두지 않고
+  컨트롤러 한 곳에서 관리하려는 설계다
 
 ### 기본 백엔드와 애노테이션
 
@@ -234,6 +240,7 @@ spec:
 ```
 
 **애노테이션은 컨트롤러마다 다르다** — 표준이 아니다.
+개별 애노테이션을 외울 필요는 없다 — 아래처럼 생겼다는 것과, 표준 밖이라는 사실이 포인트다.
 
 ```yaml
 metadata:
@@ -422,6 +429,8 @@ flowchart LR
     class R,F1,F2,F3 mute
 ```
 
+`weight`가 곧 카나리 배포다 — 새 버전에 트래픽 일부만 먼저 흘려보고,
+문제가 없으면 비중을 올리는 방식이다.
 Ingress에서 컨트롤러별 애노테이션이었던 것들이 **전부 스펙 안에 있다.**
 
 ### 네임스페이스를 넘을 때 — ReferenceGrant
@@ -473,6 +482,11 @@ flowchart LR
 - 설치 매니페스트가 **Standard / Experimental 두 채널**로 나뉜다
 - 실습·시험에서는 **Standard**를 쓰면 된다
 
+깊게 팔 것은 **HTTPRoute 하나**다. GRPCRoute는 gRPC(HTTP/2 위에서 도는 원격 호출 프로토콜)
+트래픽용으로 HTTPRoute와 문법이 거의 같고, TCPRoute·UDPRoute와
+TLSRoute(TLS를 종료하지 않고 암호화된 채 백엔드까지 통과시키는 패스스루)는
+이름과 용도만 알아두면 된다.
+
 :::tip[시험]
 Gateway API 문서(`gateway-api.sigs.k8s.io`)는
 **시험 중 열 수 있는 사이트**다. HTTPRoute YAML은 거기서 복사해 오는 것이 정답이다.
@@ -518,7 +532,8 @@ flowchart TB
 </TabItem>
 </Tabs>
 
-Ingress는 **없어지지 않는다.** 동결(frozen)된 상태로 계속 지원된다.
+Ingress는 **없어지지 않는다.** 동결(frozen)은 제거 예정이라는 뜻이 아니라
+**새 기능이 더 추가되지 않는다는** 뜻이고, 기존 기능은 계속 지원된다.
 시험에서도 **둘 다** 나올 수 있으니 양쪽 문법을 알아야 한다.
 
 ## 진단
@@ -540,6 +555,9 @@ kubectl describe httproute shop -n shop          # ★ parents[].conditions
 ```
 
 **Gateway API는 `status.conditions`에 답이 다 있다.**
+여기서 **데이터 플레인**(data plane)은 실제 트래픽이 지나가는 프록시 — nginx 같은 구현체 — 를 말한다.
+Gateway·HTTPRoute는 선언일 뿐이고, 그 선언이 프록시 설정에 반영됐는지를 conditions가 알려준다 —
+0장의 "선언과 실제 상태의 간극"을 리소스가 스스로 보고하는 셈이다.
 
 ```mermaid
 flowchart TD

@@ -3,7 +3,7 @@ title: "9. Service"
 description: "변하는 Pod 앞의 고정된 주소"
 ---
 
-import { Steps, Card, CardGrid, Tabs, TabItem } from '@astrojs/starlight/components';
+import { Steps, Card, CardGrid, Tabs, TabItem, Badge } from '@astrojs/starlight/components';
 
 > 변하는 Pod 앞의 고정된 주소
 
@@ -20,6 +20,10 @@ Service는 **고정된 이름과 IP**를 주고,
 이 점이 처음에 가장 헷갈린다 — 바로 아래에서 정체를 본다.
 
 ## Service의 정체 — 가상 IP와 커널 규칙
+
+답부터 말하면 **노드마다 도는 kube-proxy가 커널에 심어 둔 규칙**이다 (2장의 노드 컴포넌트).
+0장의 축이 여기에도 그대로 적용된다 — Service·EndpointSlice라는 **선언**을 kube-proxy가
+watch하고 있다가, 커널의 NAT 규칙이라는 **실제 상태를 선언에 맞게** 계속 고쳐 놓는 루프다.
 
 ```mermaid
 sequenceDiagram
@@ -168,6 +172,10 @@ ports:
 
 ## 셀렉터와 엔드포인트 — 실제 연결의 실체
 
+Service의 spec에는 **셀렉터라는 조건**만 있지, 실제 Pod IP는 한 줄도 없다.
+그 조건을 "지금 이 순간의 IP 목록"으로 계속 번역해 주는 무언가가 없으면
+kube-proxy는 규칙을 만들 수 없다 — 그 번역 결과를 담는 오브젝트가 엔드포인트다.
+
 ```mermaid
 flowchart LR
     SVC["Service<br/>selector: app=web"] --> EC["엔드포인트 컨트롤러"]
@@ -194,7 +202,8 @@ kubectl get endpointslices -l kubernetes.io/service-name=web-svc
 kubectl describe svc web-svc        # Endpoints 줄을 본다
 ```
 
-- 엔드포인트 컨트롤러가 **셀렉터에 맞고 Ready인 Pod의 IP**를 여기에 채운다
+- 엔드포인트 컨트롤러(kube-controller-manager 안의 제어 루프 중 하나 — 2장)가
+  **셀렉터에 맞고 Ready인 Pod의 IP**를 여기에 채운다
 - **`ENDPOINTS`가 비어 있으면 Service는 아무 데도 못 보낸다**
 
 :::tip[시험]
@@ -209,7 +218,8 @@ kubectl get endpoints web-svc
 ### EndpointSlice — Endpoints의 후계자
 
 - 옛 `Endpoints`는 **오브젝트 하나에 모든 IP**를 담았다 → Pod이 수천 개면 갱신 비용이 폭발
-- `EndpointSlice`는 **100개씩 쪼개서** 담는다. 지금은 이쪽이 실제 데이터 소스다
+- `EndpointSlice`는 **100개씩 쪼개서** 담는다. 지금은 이쪽이 실제 데이터 소스다 —
+  시험 커리큘럼에도 명시된 항목이니 두 이름의 관계는 알아둘 가치가 있다
 - `kubectl get endpoints`는 여전히 동작한다 (호환용으로 유지)
 
 ```bash
@@ -225,6 +235,9 @@ kubectl get endpointslice web-svc-x7k2p -o yaml
 ```
 
 **`conditions.ready`가 readinessProbe의 결과다.** 이 한 줄이 트래픽을 켜고 끈다.
+나머지 둘은 종료 처리용이다 — `terminating`은 Pod이 삭제 중이라는 표시,
+`serving`은 종료 중이어도 아직 응답은 가능하다는 표시다. 종료 중인 Pod에도
+트래픽을 흘리는 특수한 경우에만 쓰이니 이름만 알아두면 된다.
 
 ```mermaid
 flowchart LR
@@ -299,7 +312,8 @@ spec:
 
 - 클라우드 컨트롤러가 **실제 LB를 프로비저닝**하고 `status.loadBalancer.ingress`에 주소를 채운다
 - **온프레미스에는 그 컨트롤러가 없다** → `EXTERNAL-IP`가 영원히 `<pending>`
-  (MetalLB 같은 것을 설치해야 한다)
+  (MetalLB 같은 것을 설치해야 한다 — 온프레미스에서 LB 프로비저닝을 대신해 주는
+  오픈소스다. 이름만 알아두면 된다)
 
 ```mermaid
 flowchart LR
@@ -323,9 +337,13 @@ spec:
 ```
 
 클러스터 안에서 `my-db.default.svc.cluster.local` 을 조회하면
-`db.example.com` 으로 CNAME이 돌아온다. **셀렉터도 엔드포인트도 없다.**
+`db.example.com` 으로 CNAME(Canonical Name — "이 이름은 저 이름의 별칭"이라는
+DNS 레코드)이 돌아온다. **셀렉터도 엔드포인트도 없다.**
 
-### 셀렉터 없는 Service — 외부를 클러스터 이름으로
+실무에서도 드물게 쓰는 타입이다 — 깊게 팔 필요는 없고,
+"프록시 없이 DNS 별칭만 준다"는 한 줄이면 충분하다.
+
+### 셀렉터 없는 Service — 외부를 클러스터 이름으로<Badge text="시험 비중 낮음" variant="note" />
 
 ```yaml
 apiVersion: v1
@@ -369,7 +387,15 @@ flowchart LR
 - 클러스터 밖의 DB를 **`external-db`라는 이름으로** 부를 수 있다
 - 나중에 DB를 클러스터 안으로 옮겨도 **앱은 그대로**다 — 마이그레이션 기법
 
+시험에 자주 나오는 패턴은 아니다 — "셀렉터 대신 수동 EndpointSlice로도
+Service를 채울 수 있다"는 것만 기억해 두면 된다.
+
 ### headless Service
+
+지금까지는 "여러 Pod을 IP 하나 뒤에 감춘다"가 장점이었다. 그런데 데이터베이스처럼
+**어느 인스턴스인지가 중요한 앱**은 그 감춤이 오히려 방해가 된다 — 리더에게만 쓰기를
+보내야 하는데 커널이 아무 Pod이나 고르기 때문이다.
+그래서 **가상 IP 없이 Pod IP 목록을 그대로 돌려주는** 모드가 따로 있다.
 
 <Tabs>
 <TabItem label="일반 ClusterIP">
@@ -438,7 +464,7 @@ DNS는 수동으로 등록한 IP 목록을 그대로 반환한다.
 | 모드 | 방식 | 특징 |
 |---|---|---|
 | **iptables** | NAT 규칙 체인 | 기본값. 서비스가 많으면 규칙이 선형적으로 늘어난다 |
-| **ipvs** | 커널 L4 로드밸런서 | 대규모에 유리. 여러 알고리즘(rr, lc, sh…) |
+| **ipvs** | 커널 L4 로드밸런서 | 대규모에 유리. 여러 분배 알고리즘(rr 라운드 로빈 · lc 최소 연결 · sh 소스 해싱…) |
 | **nftables** | iptables의 후속 | 신규 클러스터용. 성능 개선 |
 
 ```bash
@@ -450,11 +476,16 @@ kubectl logs -n kube-system -l k8s-app=kube-proxy --tail=20
 **어느 모드든 동작은 같다.** 트래픽 경로가 아니라
 **규칙을 심는 방식**이 다를 뿐이다.
 
+시험에서 모드별 내부 구현까지 파고들지는 않는다 — 위 명령으로
+지금 클러스터가 어느 모드인지 확인할 수 있으면 충분하다.
+
 ### sessionAffinity와 externalTrafficPolicy
 
 **`sessionAffinity`** — 기본값은 매 요청을 아무 Pod에나 분배하는 것이라,
 로그인 세션처럼 **Pod 안에 상태가 남는 앱**은 요청이 다른 Pod으로 가면 깨진다.
 같은 클라이언트를 같은 Pod에 고정하고 싶을 때 `ClientIP`를 준다.
+시험에서 무게가 실리는 쪽은 아래 `externalTrafficPolicy`다 —
+`sessionAffinity`는 이런 필드가 있다는 것만 알아두면 된다.
 
 ```yaml
 spec:
@@ -537,7 +568,9 @@ spec:
 ```
 
 - **포트가 둘 이상이면 `name`을 반드시 줘야 한다** (하나면 생략 가능)
-- 이 이름은 DNS SRV 레코드와 Ingress의 `port.name`에서 참조된다
+- 이 이름은 DNS SRV(Service 레코드 — 이름으로 포트 번호까지 알려주는 DNS 레코드 종류)와
+  Ingress의 `port.name`에서 참조된다. SRV 쪽은 이름만 알아두면 된다 —
+  실제로 쓸 일은 Ingress·NetworkPolicy에서 포트를 이름으로 가리킬 때다
 
 ```bash
 kubectl create svc clusterip web-svc --tcp=80:8080 --tcp=443:8443

@@ -3,7 +3,7 @@ title: "13. 스토리지"
 description: "컨테이너가 죽어도 남는 데이터"
 ---
 
-import { Steps, Card, CardGrid, Tabs, TabItem } from '@astrojs/starlight/components';
+import { Steps, Card, CardGrid, Tabs, TabItem, Badge } from '@astrojs/starlight/components';
 
 > 컨테이너가 죽어도 남는 데이터
 
@@ -99,6 +99,10 @@ flowchart LR
 
 ### hostPath — 노드의 디렉터리
 
+`emptyDir`는 Pod이 사라지면 같이 사라지고, 무엇보다 **노드에 이미 있는 파일**을 볼 수 없다.
+노드의 로그 디렉터리나 컨테이너 런타임 소켓처럼 "Pod 밖에 이미 존재하는 것"을 읽어야 할 때
+쓰는 것이 `hostPath`다.
+
 ```yaml
 volumes:
   - name: docker-sock
@@ -110,6 +114,9 @@ volumes:
 - **노드의 파일시스템을 그대로** 마운트한다
 - Pod이 다른 노드로 가면 **거기엔 그 파일이 없다**
 - 보안상 위험하다 — 노드 전체를 노출할 수 있다
+- `type`은 **마운트 전에 그 경로가 무엇인지 검사하는 조건**이다. `Directory`/`File`/`Socket`은
+  "이미 그것이어야 한다"는 뜻이고, `DirectoryOrCreate`/`FileOrCreate`는 없으면 만든다.
+  비워 두면 검사를 하지 않아, 경로 오타가 조용히 빈 디렉터리로 만들어지는 사고가 난다
 
 **정당한 쓰임**
 
@@ -170,6 +177,8 @@ spec:
 
 - **클러스터 스코프**다 — 네임스페이스에 속하지 않는다
 - `storageClassName`이 PVC와 **일치해야** 바인딩된다
+- `volumeMode: Block`은 파일시스템 없이 **raw 블록 디바이스를 그대로** 넘기는 모드다 —
+  자체 포맷을 쓰는 DB 등 특수 용도라, 기본값이 `Filesystem`이라는 것과 이런 모드가 있다는 것만 알면 된다
 
 ```bash
 kubectl get pv
@@ -195,6 +204,10 @@ spec:
   #   matchLabels: { tier: fast }
 ```
 
+`selector`는 조건이 같은 PV가 여럿일 때 **라벨로 후보를 좁히는** 장치다.
+정적 PV를 등급별로 나눠 둔 환경에서 쓰이며, 동적 프로비저닝에서는 만들어질 PV에
+아직 라벨이 없으니 의미가 없다. 시험에서 쓸 일은 드물다 — 이런 필드가 있다는 것만 알면 된다.
+
 ```yaml
 # Pod에서 쓰기
 spec:
@@ -210,6 +223,11 @@ spec:
 ```
 
 ### 바인딩 규칙
+
+이 바인딩도 0장의 축 — **선언된 상태(spec)와 실제 상태(status)의 차이를 줄이는 루프** — 위에 있다.
+PVC의 spec이 "이런 저장소가 필요하다"는 선언이고, 컨트롤러는 그 선언을 만족하는 PV가
+나타날 때까지 계속 재시도한다. 그래서 지금 조건에 맞는 PV가 없어 `Pending`이어도,
+나중에 PV가 생기면 **알아서 묶인다**.
 
 PVC가 만들어지면 컨트롤러가 조건에 맞는 PV를 찾는다. **네 관문을 전부 통과해야** 묶인다.
 
@@ -287,6 +305,11 @@ flowchart TB
 블록 스토리지(EBS, GCE PD)는 RWO만 가능하다. RWX는 **NFS·CephFS·EFS 같은 파일 스토리지**가 필요하다.
 
 accessMode는 **스토리지의 실제 능력을 강제하지 않는다.** 바인딩 조건으로만 쓰인다.
+
+실제로 시험과 실무에서 마주치는 것은 **RWO와 RWX 둘**이다.
+`ReadOnlyMany`(ROX)는 여러 노드가 같은 데이터를 읽기만 하는 배포용 이미지·정적 자산에나 쓰이고,
+`ReadWriteOncePod`(RWOP)는 "동시 쓰기가 데이터를 깨뜨리는" 단일 인스턴스 DB를 위해 나중에 추가된 모드다.
+둘 다 이름과 뜻만 알아두면 된다.
 
 ### PV의 생애 — 상태가 어떻게 움직이는가
 
@@ -371,6 +394,10 @@ volumeBindingMode: WaitForFirstConsumer
 - PVC가 이 클래스를 요청하면 **프로비저너가 PV를 자동으로 만든다**
 - 관리자가 PV를 미리 만들어둘 필요가 없다
 - `provisioner: kubernetes.io/no-provisioner` 는 **동적 생성을 하지 않는다** (로컬 볼륨용)
+- `parameters`의 내용은 **프로비저너마다 완전히 다르다.** 위의 `type: gp3`는 AWS EBS 드라이버가
+  아는 값이고, 다른 드라이버에는 없는 키다 — 외울 것이 아니라 드라이버 문서를 보는 자리다
+- `is-default-class` 애너테이션이 붙은 클래스가 **`storageClassName`을 생략한 PVC의 기본값**이 된다.
+  기본 클래스는 하나여야 한다 — 여럿이면 어느 것이 붙을지 보장되지 않는다
 
 ```bash
 kubectl get sc
@@ -379,6 +406,10 @@ kubectl get sc
 ```
 
 ### volumeBindingMode — 언제 묶을 것인가
+
+볼륨은 대체로 **어디에 있는지가 정해진 물건**이다 — 클라우드 디스크는 특정 AZ(Availability Zone·가용 영역)에,
+로컬 디스크는 특정 노드에 붙어 있다. 그런데 볼륨을 먼저 만들어 버리면 스케줄러는 나중에 움직이므로,
+Pod이 그 볼륨에 닿을 수 없는 곳에 배정될 수 있다. `volumeBindingMode`는 **바인딩과 스케줄링 중 무엇을 먼저 할지**를 정한다.
 
 <Tabs>
 <TabItem label="Immediate">
@@ -434,6 +465,10 @@ PVC가 `Pending`이고 메시지가
 
 ### 볼륨 확장
 
+디스크가 꽉 찼다고 볼륨을 지우고 다시 만들면 데이터가 사라진다.
+그래서 **PVC의 요청 용량을 늘리면 실제 볼륨과 파일시스템까지 따라 커지는** 경로가 따로 있다.
+여기서도 축은 같다 — spec(요청 용량)을 고치면 컨트롤러가 status를 거기에 맞춰 간다.
+
 ```bash
 # StorageClass에 allowVolumeExpansion: true 가 있어야 한다
 kubectl patch pvc data -p '{"spec":{"resources":{"requests":{"storage":"20Gi"}}}}'
@@ -444,6 +479,10 @@ kubectl get pvc data -w
 - 대부분의 CSI 드라이버는 **온라인 확장**을 지원한다 (Pod 재시작 불필요)
 - 파일시스템 확장이 필요하면 PVC 상태에 `FileSystemResizePending` 이 뜬다
 
+`FileSystemResizePending`은 **블록 장치는 이미 커졌지만 그 위의 파일시스템은 아직**이라는 뜻이다.
+확장이 두 단계(장치 확장 → 파일시스템 확장)로 나뉘어 있고, 뒤 단계는 노드의 kubelet이 한다.
+온라인 확장을 지원하지 않는 드라이버라면 Pod을 한 번 재시작해야 이 상태가 풀린다.
+
 :::caution[함정]
 `allowVolumeExpansion`이 `false`(기본)면
 patch 자체가 **거부**된다. StorageClass를 먼저 고쳐야 하는데,
@@ -451,6 +490,11 @@ patch 자체가 **거부**된다. StorageClass를 먼저 고쳐야 하는데,
 :::
 
 ## StatefulSet과 volumeClaimTemplates
+
+Deployment의 Pod들은 서로 구별되지 않으므로 **PVC 하나를 모두가 나눠 갖는다** — DB 복제본처럼
+각자 자기 데이터를 가져야 하는 워크로드에는 맞지 않는다. PVC를 replica 수만큼 손으로 만들어도,
+어느 Pod이 어느 PVC를 잡을지 고정할 방법이 없다.
+`volumeClaimTemplates`는 **Pod의 고정된 신원(ordinal)에 PVC를 1:1로 붙여** 이 문제를 푼다.
 
 ```yaml
 spec:
@@ -500,8 +544,11 @@ kubectl delete pvc data-db-0        # 정말 지우려면 명시적으로
 
 ## CSI — 스토리지 확장 인터페이스
 
+스토리지 벤더가 새 제품을 지원하려면 예전에는 **Kubernetes 본체에 코드를 넣어야** 했다.
+드라이버 수정 하나가 Kubernetes 릴리스 주기를 기다려야 했고, 드라이버 버그가 kubelet을 같이 죽였다.
 CSI(Container Storage Interface)는 스토리지 벤더가 **Kubernetes 코드 밖에서**
-드라이버를 만들 수 있게 한 표준 인터페이스다.
+드라이버를 만들 수 있게 한 표준 인터페이스다 — 벤더는 정해진 gRPC 인터페이스만 구현하고
+자기 속도로 배포한다.
 
 - 예전에는 스토리지 드라이버가 **Kubernetes 코드 안에** 있었다 (in-tree)
 - 지금은 전부 **CSI 드라이버**로 분리되었다. 벤더가 독립적으로 배포한다
@@ -554,9 +601,23 @@ kubectl get pods -n kube-system | grep csi
 | **Node 플러그인** | 노드에서 마운트 (DaemonSet) |
 | **sidecar 컨테이너들** | `provisioner`, `attacher`, `resizer`, `snapshotter` |
 
+**sidecar 컨테이너들**은 벤더가 매번 다시 만들 필요가 없도록 Kubernetes 프로젝트가 제공하는
+공용 조각이다. 각자 API 서버를 지켜보다가(PVC가 생겼다, 크기가 바뀌었다) 그 요청을
+드라이버의 gRPC 호출로 번역한다 — 여기서도 축은 같다. **선언(PVC)과 실제(볼륨)의 차이를 줄이는 루프**가
+드라이버 바깥의 sidecar에 들어 있는 셈이다.
+
 CSI는 커리큘럼의 "확장 인터페이스(CNI, CSI, CRI) 이해" 항목이다. 17장에서 함께 정리한다.
 
+<Badge text="시험 비중 낮음" variant="note" /> 다만 드라이버를 직접 배포하거나 sidecar 구성을
+손보는 수준까지 팔 필요는 없다 — 층이 어떻게 나뉘는지와 `kubectl get csidrivers`로
+무엇이 설치돼 있는지 확인할 줄 알면 충분하다.
+
 ## 설정을 담는 볼륨들
+
+여기까지의 볼륨은 "**데이터를 어디에 둘 것인가**"였다. 그런데 볼륨 메커니즘은 설정을 넣는 데도 쓰인다 —
+설정 파일이나 인증서를 이미지에 구워 넣으면 값이 바뀔 때마다 이미지를 다시 만들어야 하고,
+환경 변수로 넣으면 파일을 기대하는 프로그램에는 쓸 수 없다.
+아래 볼륨 타입들은 **API 오브젝트의 내용을 컨테이너 안의 파일로** 보여 준다 (6장의 ConfigMap·Secret이 재료다).
 
 ```yaml
 volumes:
@@ -584,7 +645,16 @@ volumes:
             audience: vault
 ```
 
-`projected`의 `serviceAccountToken`이 **현재 SA(ServiceAccount) 토큰의 표준 주입 방식**이다 (14장).
+`downwardAPI`는 **Pod이 자기 자신에 대한 정보**(이름·네임스페이스·라벨·노드 이름, 리소스 요청량)를
+파일로 받는 통로다. 앱이 API 서버에 물어보지 않고도 "나는 어느 네임스페이스의 누구인가"를 알 수 있다 —
+로그에 Pod 이름을 찍는 용도가 대표적이다. 같은 값을 환경 변수로 받는 `fieldRef` 방식이 더 흔하고,
+**시험에서 파일 형태의 downwardAPI를 쓸 일은 드물다** — 이런 것이 있다는 정도로 충분하다.
+
+`projected`는 **여러 소스를 한 디렉터리로 합치는** 볼륨이다. ConfigMap·Secret·downwardAPI를
+따로 마운트하면 마운트 지점이 여러 개가 되는데, 이걸 하나로 모아 준다.
+`serviceAccountToken` 소스는 여기에만 있고, **현재 SA(ServiceAccount) 토큰의 표준 주입 방식**이다 (14장).
+`expirationSeconds`로 수명이 붙고 kubelet이 만료 전에 갈아 끼우며, `audience`는
+"이 토큰은 이 대상에게만 유효하다"는 표시라 토큰이 새어도 다른 곳에 못 쓰인다.
 
 ## 진단과 실습
 
@@ -632,6 +702,10 @@ kubectl get events --field-selector involvedObject.name=web
 kubectl get volumeattachments
 sudo journalctl -u kubelet | grep -i mount
 ```
+
+`VolumeAttachment`는 **"이 볼륨이 지금 어느 노드에 붙어 있는가"를 기록하는 클러스터 스코프 오브젝트**다.
+`Multi-Attach error`가 났을 때 여기서 옛 노드가 아직 볼륨을 잡고 있는지를 눈으로 확인할 수 있다.
+직접 만들거나 고치는 물건은 아니다 — 조회용으로만 알아 두면 된다.
 
 | Events 메시지 | 원인 |
 |---|---|
@@ -748,6 +822,7 @@ PV·PVC·Pod 세 YAML을 손으로 처음부터 치는 건 낭비다 — 시험 
 - 확장은 **`allowVolumeExpansion: true`** 필요, **늘리기만** 가능
 - **StatefulSet의 PVC는 남는다.** `volumeClaimTemplates`는 수정 불가
 - **`Multi-Attach error` = RWO를 두 노드에서** → `Recreate` 또는 StatefulSet
+- 설정도 같은 볼륨 메커니즘으로 들어온다 — `projected`의 `serviceAccountToken`이 **SA 토큰의 표준 주입 방식**
 
 :::note[손 연습]
 이 장 범위의 KodeKloud 실습 풀이 — [CKA 실습 7장 · 스토리지](/cka-udemy/07-storage/)

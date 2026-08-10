@@ -86,6 +86,9 @@ immutable: false               # true면 수정 불가 (성능 이점 + 실수 �
 - **값은 전부 문자열**이다. `100`이라고 쓰면 YAML 파서가 숫자로 읽어 **거부**한다 → `"100"`
 - `binaryData:` 로 바이너리도 담을 수 있다 (base64)
 - **크기 제한 1MiB** — etcd의 제약이다. 큰 파일은 볼륨을 쓰자
+- `immutable: true` 로 잠그면 수정 요청을 API 서버가 거부한다 — 실수 방지에 더해,
+  kubelet이 변경 감시(watch)를 끊어 대규모 클러스터의 부하를 줄인다.
+  바꾸려면 새 ConfigMap을 만들어 참조를 교체한다. 깊게 팔 필요는 없다 — **이름과 효과만 알면 된다**
 
 ## 주입 방식 세 가지 — 전체 지도
 
@@ -269,6 +272,11 @@ kubectl rollout restart deploy/web
 
 ### Secret — ConfigMap과 무엇이 다른가
 
+구조는 ConfigMap과 거의 같다 — 다른 것은 **취급**이다. 값이 base64로 담기고(`data`),
+노드에 볼륨으로 풀릴 때 디스크가 아니라 **메모리(tmpfs)에만** 풀리며, 별도 리소스라서
+RBAC으로 **ConfigMap과 다른 권한**을 걸 수 있다. 민감한 값을 ConfigMap에 넣으면
+이 구분이 전부 사라진다 — 그래서 그릇을 나눈다.
+
 ```yaml
 apiVersion: v1
 kind: Secret
@@ -333,6 +341,10 @@ flowchart LR
 - Secret type 목록과 YAML 형식이 헷갈리면 공식
   [Secrets](https://kubernetes.io/docs/concepts/configuration/secret/) 페이지를 연다 — `data`/`stringData` 예시가 다 있다
 
+`providers` 목록은 **순서에 의미가 있다** — 쓸 때는 첫 번째 provider로 암호화하고,
+읽을 때는 위에서부터 차례로 복호화를 시도한다. `identity`는 "암호화 없음(평문)"이라는
+뜻의 provider라, 목록 끝에 두면 아직 암호화되지 않은 기존 데이터도 읽을 수 있다.
+
 ```yaml
 # /etc/kubernetes/enc/enc.yaml  → apiserver의 --encryption-provider-config 로 지정
 apiVersion: apiserver.config.k8s.io/v1
@@ -349,6 +361,9 @@ resources:
 
 설정 후 기존 Secret을 다시 암호화하려면
 `kubectl get secrets -A -o json | kubectl replace -f -` 를 한 번 돌린다.
+
+EncryptionConfiguration 파일을 직접 쓰는 문제까지 깊게 팔 필요는 없다 —
+**기본은 평문 저장이고, apiserver 플래그로 켠다는** 사실 정도면 충분하다.
 
 ### imagePullSecrets
 
@@ -374,6 +389,11 @@ kubectl patch sa default -p '{"imagePullSecrets":[{"name":"regcred"}]}'
 :::
 
 ## 리소스 관리
+
+컨테이너는 선언이 없으면 노드의 CPU·메모리를 얼마든지 쓸 수 있다. 그러면 두 가지가
+무너진다 — 스케줄러는 Pod이 얼마나 쓸지 모르니 **배치를 판단할 근거가 없고**, 런타임은
+한 컨테이너가 폭주해도 **막을 수단이 없다.** requests/limits는 그 두 판단을 위해 spec에
+적어 두는 선언이다 — 2장 아키텍처에서 스케줄러와 kubelet이 각자 읽어 간다.
 
 ### requests와 limits
 
@@ -405,7 +425,7 @@ flowchart LR
 ```
 
 - **`requests`는 스케줄러가 본다.** 노드의 남은 용량과 비교해 배치 가능 여부를 판단
-- **`limits`는 kubelet/런타임이 강제한다.** 실제 cgroup 제한이 된다
+- **`limits`는 kubelet/런타임이 강제한다.** 실제 cgroup(control group — 리눅스 커널의 자원 제한 장치) 제한이 된다
 - **노드는 request의 합만 본다.** 실제 사용량이 아니다
 
 :::caution[함정]
@@ -479,6 +499,13 @@ kubectl get pod web -o jsonpath='{.status.qosClass}'
 
 ## 네임스페이스 단위 제약
 
+requests/limits는 Pod 하나 단위의 선언이라, **안 쓴 Pod은 그냥 통과한다.** 네임스페이스를
+팀·환경 단위로 나눠 쓰는 클러스터에서 이걸 방치하면 한 네임스페이스가 클러스터 자원을
+다 먹을 수 있다. 그래서 네임스페이스 단위로 거는 장치가 둘 있다 —
+기본값·개별 상한은 **LimitRange**, 총량은 **ResourceQuota**.
+둘 다 **admission**에서 동작한다 — 2장의 "인증 → 인가 → admission → etcd" 중 마지막 관문으로,
+요청이 저장되기 전에 값을 채우거나 거부하는 자리다 (admission 자체는 14장).
+
 ### LimitRange — 네임스페이스의 기본값과 상한
 
 ```yaml
@@ -506,7 +533,9 @@ spec:
 
 - **admission 단계에서 동작**한다 — Pod 생성 시 값을 채우거나 거부한다
 - 이미 떠 있는 Pod에는 **소급 적용되지 않는다**
-- `type`은 `Container` / `Pod` / `PersistentVolumeClaim`
+- `type`은 무엇을 한 단위로 볼지다 — `Container`는 컨테이너 하나씩,
+  `Pod`은 Pod 안 컨테이너들의 **합**, `PersistentVolumeClaim`은 요청 용량(13장).
+  기본값(`default` / `defaultRequest`)을 채워주는 것은 `Container`뿐이다
 
 ### ResourceQuota — 네임스페이스 총량 제한
 

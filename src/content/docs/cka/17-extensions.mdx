@@ -3,7 +3,7 @@ title: "17. 확장 인터페이스와 오퍼레이터"
 description: "CRI · CNI · CSI · CRD"
 ---
 
-import { Steps, Card, CardGrid, Tabs, TabItem } from '@astrojs/starlight/components';
+import { Steps, Card, CardGrid, Tabs, TabItem, Badge } from '@astrojs/starlight/components';
 
 > CRI · CNI · CSI · CRD
 
@@ -44,7 +44,13 @@ flowchart TB
 
 ### CRI — 컨테이너 런타임
 
-- kubelet ↔ 런타임 사이의 **gRPC 규약**이다
+kubelet은 컨테이너를 직접 만들지 못한다 — 실행은 전부 런타임에 시킨다.
+규약이 없으면 kubelet이 런타임마다 전용 연동 코드를 품어야 하고, 실제로
+Docker 전용 코드(dockershim)를 그렇게 품고 있다가 부담이 커져 떼어냈다.
+그 규약이 CRI다.
+
+- kubelet ↔ 런타임 사이의 **gRPC 규약**이다 — gRPC는 HTTP/2 기반의
+  원격 프로시저 호출(RPC) 프레임워크로, 여기선 "정해진 함수 목록"이라는 뜻만 알면 된다
 - 소켓 경로: `unix:///run/containerd/containerd.sock`
 - **Docker는 v1.24에서 제거**되었다 (dockershim 삭제). 지금은 containerd가 표준
 
@@ -68,7 +74,11 @@ sudo crictl rmi --prune              # 안 쓰는 이미지 정리
 
 ### CNI — Pod 네트워크
 
-kubelet이 Pod 샌드박스를 만들 때 **CNI 플러그인을 실행**한다.
+Pod마다 IP를 주고 노드 사이를 잇는 방법은 환경마다 다르다 — 온프렘·클라우드·
+베어메탈이 전부 다른 답을 쓴다. 그래서 코어는 "인터페이스를 만들고 IP를 붙여라"는
+호출 규약만 정하고, 방법은 플러그인에 맡긴다.
+kubelet이 Pod 샌드박스(Pod의 컨테이너들이 공유할 네트워크 네임스페이스 껍데기)를
+만들 때 **CNI 플러그인을 실행**한다.
 
 ```mermaid
 flowchart LR
@@ -107,6 +117,11 @@ flowchart LR
 
 ### CSI — 스토리지
 
+볼륨을 만들고 노드에 붙이는 방법은 스토리지 벤더마다 다르다. CSI가 없던 시절엔
+벤더 코드가 Kubernetes 코어 안에 들어 있어서(in-tree 드라이버), 새 스토리지를
+지원하려면 Kubernetes 릴리스를 기다려야 했다. CSI는 그 연동을 표준 규약으로
+떼어내, 벤더가 드라이버만 따로 배포하면 되게 한다.
+
 ```bash
 kubectl get csidrivers
 kubectl get csinodes
@@ -127,8 +142,22 @@ CSI 드라이버는 보통 **두 부분**으로 배포된다.
 </Card>
 </CardGrid>
 
-주변에 **sidecar 컨테이너**들이 붙는다 —
-`external-provisioner`, `external-attacher`, `external-resizer`, `external-snapshotter`, `node-driver-registrar`
+두 플러그인 주변에는 **sidecar 컨테이너**들이 붙는다. 벤더는 "볼륨을 만들어라"
+같은 실제 동작만 구현하고, **API 서버를 지켜보다가 그 동작을 호출하는 쪽은
+Kubernetes 프로젝트가 만든 공용 사이드카가 맡는다** — 벤더마다 같은 watch 코드를
+다시 짜지 않게 하려는 분업이다. 각 사이드카가 무엇을 감시하는지만 알면 된다.
+
+| 사이드카 | 무엇을 보고 무엇을 시키나 |
+|---|---|
+| `external-provisioner` | PVC를 watch → 드라이버에 볼륨 **생성·삭제** 요청 |
+| `external-attacher` | VolumeAttachment를 watch → 노드에 **attach·detach** 요청 |
+| `external-resizer` | PVC의 용량 변경을 watch → 볼륨 **확장** 요청 |
+| `external-snapshotter` | VolumeSnapshot을 watch → **스냅샷** 생성 |
+| `node-driver-registrar` | 노드의 kubelet에 드라이버를 **등록**한다 |
+
+이름을 외울 필요는 없다. 다만 **PVC가 Pending일 때 어느 로그를 볼지**를 이 표가
+정해 준다 — 볼륨이 안 만들어지면 `external-provisioner`, 만들어졌는데 노드에
+안 붙으면 `external-attacher` 쪽이다.
 
 ```mermaid
 flowchart LR
@@ -239,6 +268,11 @@ spec:
 
 ### 오퍼레이터 — CRD + 컨트롤러
 
+Deployment·StatefulSet은 "Pod을 몇 개 띄운다"까지만 안다. 그런데 Postgres 클러스터는
+초기화 순서, 페일오버 시 승격 대상, 백업 시점, 버전 업그레이드 절차가 전부 다르고,
+그건 **사람이 문서를 보고 손으로 하던 일**이다. 그 절차를 컨트롤러로 옮겨
+"선언 → 루프가 맞춰 준다"는 Kubernetes 방식 안으로 끌어들인 것이 오퍼레이터다.
+
 **운영자의 지식을 코드로 옮긴 컨트롤러.**\
 "이 상태여야 한다"를 CR(Custom Resource — CRD가 정의한 종류의 실제 오브젝트)로 선언하면,
 오퍼레이터가 그 상태를 만들고 유지한다. CRD가 클래스라면 CR은 인스턴스다.
@@ -342,11 +376,21 @@ kubectl patch backup nightly -p '{"metadata":{"finalizers":null}}' --type=merge
 :::
 
 :::caution[함정 3]
-CRD의 **버전을 올릴 때** conversion webhook이 없으면
+CRD의 **버전을 올릴 때** conversion webhook(옛 버전으로 저장된 오브젝트를
+새 버전 모양으로 변환해 주는 외부 서비스)이 없으면
 저장된 옛 버전 오브젝트를 읽지 못할 수 있다.
+오퍼레이터 업그레이드 후 CR이 안 읽히면 이걸 의심한다 —
+직접 만들 일은 없으니 **이런 게 있다는 것만 알아 두면 된다.**
 :::
 
-## 그 밖의 확장 지점
+## 그 밖의 확장 지점<Badge text="이름만 알면 된다" variant="note" />
+
+CRI·CNI·CSI는 "코어가 아예 구현을 안 갖고 있는" 자리였다. 여기서 볼 것들은
+그와 달리 **코어가 동작은 하는데, 그 동작에 끼어들거나 덧붙이는** 지점이다.
+어디에 끼어드는지만 알아 두면 "왜 이 컴포넌트가 있지"라는 의문이 대부분 풀린다.
+다섯 중 CKA에서 실제로 손을 대는 것은 admission(14장)과 다중 스케줄러(7장)
+정도이고, 나머지는 **이름과 역할만 알아 두면 충분하다** — 직접 구성하는 문제로
+나오지는 않는 편이다.
 
 ```mermaid
 flowchart LR
@@ -390,3 +434,4 @@ kubectl get apiservices | grep -v Local        # 집계된 외부 API 서버들
 - **오퍼레이터 = CRD + 컨트롤러.** 설치 확인은 **CRD / Pod / RBAC** 3단계
 - CR이 반응이 없으면 **`describe`의 conditions**와 **오퍼레이터 로그**
 - **finalizer + 죽은 오퍼레이터 = 삭제가 끝나지 않는다**
+- 그 밖의 확장 지점(Device Plugin · API Aggregation · CCM)은 **이름과 역할만** 알아 두면 된다
