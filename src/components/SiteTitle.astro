@@ -1,0 +1,61 @@
+---
+import Default from '@astrojs/starlight/components/SiteTitle.astro';
+
+// 헤더에 "스터디 노트 / <현재 덱>"을 만든다.
+// 덱 목록이 드롭다운으로 접히면서 어느 덱을 보고 있는지가 사이드바 상단
+// 버튼 하나에만 남았다 — 헤더에도 띄워 스크롤 위치와 무관하게 보이게 한다.
+// 라벨은 topics 플러그인의 라우트 데이터에서 오므로 astro.config.mjs와 항상 일치하고,
+// 랜딩처럼 topic 밖 페이지는 isCurrent가 없어 사이트 제목만 남는다.
+const topic = Astro.locals.starlightSidebarTopics?.topics.find((t) => t.isCurrent);
+---
+
+<Default />
+{
+	topic && (
+		<Fragment>
+			<span class="deck-crumb-sep" aria-hidden="true">
+				/
+			</span>
+			<a class="deck-crumb" href={topic.link}>
+				{topic.label}
+			</a>
+		</Fragment>
+	)
+}
+
+<style>
+	/* 좁은 화면에서는 감춘다 — 헤더가 제목·검색·메뉴 버튼으로 이미 꽉 찬다.
+	   50rem은 Starlight가 사이드바를 펼치는 것과 같은 분기점이다. */
+	.deck-crumb-sep,
+	.deck-crumb {
+		display: none;
+	}
+
+	@media (min-width: 50rem) {
+		.deck-crumb-sep,
+		.deck-crumb {
+			display: inline;
+			font-size: var(--sl-text-base);
+			white-space: nowrap;
+		}
+
+		/* .title-wrapper는 gap 없는 flex라 간격을 직접 준다 */
+		.deck-crumb-sep {
+			color: var(--sl-color-gray-4);
+			margin-inline: 0.5rem;
+		}
+
+		.deck-crumb {
+			color: var(--sl-color-gray-2);
+			font-weight: 600;
+			text-decoration: none;
+			overflow: hidden;
+			text-overflow: ellipsis;
+		}
+
+		.deck-crumb:hover,
+		.deck-crumb:focus-visible {
+			color: var(--sl-color-text-accent);
+		}
+	}
+</style>

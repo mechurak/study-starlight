@@ -1,0 +1,18 @@
+---
+import Default from '@astrojs/starlight/components/Sidebar.astro';
+import TopicsDropdown from 'starlight-sidebar-topics-dropdown/TopicsDropdown.astro';
+
+// 덱(topic) 목록을 사이드바 맨 위 드롭다운 하나로 접는다.
+// starlight-sidebar-topics의 기본 Sidebar override는 덱을 전부 세로로 나열해서,
+// 덱이 늘어날수록 정작 현재 덱의 목차가 화면 밖으로 밀렸다.
+// 여기서 갈아끼우면 플러그인 쪽 override는 무시된다 —
+// 플러그인이 자기 components 뒤에 사용자 components를 스프레드하기 때문이다.
+//
+// 가드는 플러그인 원본과 같다: 사이드바가 없거나(랜딩) topic 밖 페이지면
+// currentTopic이 undefined라 드롭다운이 렌더될 수 없다.
+const { hasSidebar } = Astro.locals.starlightRoute;
+const { isPageWithTopic } = Astro.locals.starlightSidebarTopics;
+---
+
+{hasSidebar && isPageWithTopic && <TopicsDropdown />}
+<Default><slot /></Default>

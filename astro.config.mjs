@@ -30,6 +30,10 @@ export default defineConfig({
 			components: {
 				// 검색 결과에 덱 이름을 표시하기 위한 Pagefind meta 주입 — 파일 안 주석 참고
 				MarkdownContent: './src/components/MarkdownContent.astro',
+				// 덱 목록을 드롭다운으로 접는다 (starlight-sidebar-topics의 override를 대체)
+				Sidebar: './src/components/Sidebar.astro',
+				// 헤더에 "스터디 노트 / <현재 덱>"
+				SiteTitle: './src/components/SiteTitle.astro',
 			},
 			plugins: [
 				starlightThemeRapide(),

@@ -53,6 +53,12 @@ dev 서버는 백그라운드 모드로 띄운다: `astro dev --background`
   config의 slug도 같이 바꿔야 한다 — 빌드가 sidebar 참조 오류로 실패하니 바로 잡힌다.
 - **랜딩(`/`)은 어느 topic에도 속하지 않는다** — plugin 옵션 `exclude: ['/']`가 그 처리다.
   topic 밖 페이지를 새로 만들면 여기에 추가해야 경고가 안 난다.
+- **덱 목록은 사이드바 상단 드롭다운이다** — `src/components/Sidebar.astro`가
+  starlight-sidebar-topics의 `Sidebar` override를 대체하고
+  `starlight-sidebar-topics-dropdown`의 `TopicsDropdown`을 끼운다.
+  플러그인이 자기 `components` 뒤에 사용자 `components`를 스프레드해서 이게 성립한다 —
+  **덱 목록을 다시 나열하고 싶으면 config의 `Sidebar` 줄을 지우면 원래대로 돌아온다.**
+  `src/components/SiteTitle.astro`(헤더의 "스터디 노트 / <덱>")도 같은 라우트 데이터를 쓴다.
 - **`pnpm-workspace.yaml`은 워크스페이스가 아니라 `allowBuilds`(esbuild·sharp) 설정용**이다.
   지우면 설치 시 빌드 스크립트가 막히고, **sharp가 안 빌드돼 `astro build`가 깨진다.**
   CI에서 실제로 걸리는 지점이라 pnpm 버전을 고정해야 한다 — 이유는 [docs/deploy.md](docs/deploy.md).
