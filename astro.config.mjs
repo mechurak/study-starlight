@@ -17,7 +17,7 @@ export default defineConfig({
 		// astro-mermaid는 starlight보다 먼저 와야 ```mermaid 펜스를 가로챈다
 		mermaid({ autoTheme: true }),
 		starlight({
-			title: '스터디 노트',
+			title: 'Study Note',
 			defaultLocale: 'root',
 			locales: {
 				root: { label: '한국어', lang: 'ko' },
@@ -32,7 +32,7 @@ export default defineConfig({
 				MarkdownContent: './src/components/MarkdownContent.astro',
 				// 덱 목록을 드롭다운으로 접는다 (starlight-sidebar-topics의 override를 대체)
 				Sidebar: './src/components/Sidebar.astro',
-				// 헤더에 "스터디 노트 / <현재 덱>"
+				// 헤더에 "[사이드바 토글] Study Note / <현재 덱>"
 				SiteTitle: './src/components/SiteTitle.astro',
 			},
 			plugins: [
