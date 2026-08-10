@@ -1,0 +1,222 @@
+---
+title: "4. 프로세스와 자원"
+description: "ps와 top 읽는 법, load average의 의미, 시그널과 kill, OOM killer, lsof로 포트 주인 찾기"
+---
+
+import { Tabs, TabItem, LinkCard } from '@astrojs/starlight/components';
+import TermIntro from '../../../components/TermIntro.astro';
+
+> "서버가 느려요"에 답하려면 **CPU인지 메모리인지 디스크인지**부터 갈라야 한다
+
+<TermIntro
+  terms={[
+    ['PID', 'Process ID', '실행 중인 프로세스에 붙는 번호. 모든 조작(`kill`·`lsof -p`·`/proc/PID`)의 열쇠다. PID 1은 systemd다.'],
+    ['시그널', 'Signal', '프로세스에게 보내는 짧은 알림. `kill`은 "죽이는" 명령이 아니라 **시그널을 보내는** 명령이다 — 기본값이 "정리하고 종료해라"(TERM)일 뿐이다.'],
+    ['load average', '', '**실행 중이거나 실행을 기다리는** 작업의 1·5·15분 평균 개수. 리눅스에서는 디스크 I/O 대기(D 상태)도 포함한다 — 그래서 CPU가 한가한데도 높을 수 있다.'],
+    ['OOM killer', 'Out Of Memory killer', '메모리가 진짜로 바닥나면 커널이 프로세스를 하나 골라 **강제로 죽이는** 최후의 장치. 앱 로그에는 아무 흔적이 없고 커널 로그에만 남는다.'],
+    ['좀비', 'zombie process', '이미 끝났지만 부모가 종료 코드를 안 거둬 가서 목록에만 남아 있는 프로세스. **자원을 안 쓴다** — 죽일 수도 없다. 많으면 부모 프로그램의 버그 신호다.'],
+  ]}
+/>
+
+## 무엇이 돌고 있나 — `ps`
+
+`ps`는 옵션 스타일이 세 가지가 섞여 있어 혼란스럽다. **두 개만 외운다.**
+
+```bash
+ps aux                     # 전체 프로세스 (BSD 스타일) — 가장 흔하다
+ps -ef                     # 전체 프로세스 (UNIX 스타일) — 부모 PID(PPID)가 보인다
+```
+
+필요한 열만 골라 정렬하는 쪽이 실전에서 더 유용하다.
+
+```bash
+ps -eo pid,ppid,user,%cpu,%mem,etime,cmd --sort=-%cpu | head -15   # CPU 상위
+ps -eo pid,user,rss,%mem,cmd --sort=-rss | head -15                # 메모리 상위
+ps -p 1234 -o pid,lstart,etime,cmd                                 # 이 프로세스 언제 떴나
+pgrep -a nginx                                                     # 이름으로 PID 찾기
+ps -ef --forest                                                    # 부모-자식 트리
+pstree -pa 1234                                                    # 특정 프로세스의 자식들
+```
+
+| `ps aux`의 열 | 읽는 법 |
+|---|---|
+| `%CPU` | **코어 1개 = 100%** 기준. 8코어 서버에서 400%는 4코어를 다 쓰는 중이라는 뜻이다 |
+| `RSS` | 실제 물리 메모리 점유(KB). **`VSZ`는 예약된 가상 주소 공간이라 커도 의미 없다** |
+| `STAT` | `R` 실행 · `S` 대기 · **`D` 디스크 I/O 대기(죽지도 않는다)** · `Z` 좀비 · `T` 정지 |
+| `START` / `TIME` | 시작 시각 / 누적 CPU 사용 시간 |
+
+## 실시간으로 보기 — `top`
+
+```bash
+top          # 어디에나 있다
+htop         # 훨씬 읽기 쉽다 (htop 패키지) — 설치할 수 있으면 이쪽
+btop         # 더 화려한 대안
+```
+
+`top` 안에서 쓰는 키 — `P`(CPU 정렬) · `M`(메모리 정렬) · `1`(코어별 표시) ·
+`c`(전체 명령줄) · `u`(사용자 필터) · `k`(kill) · `q`(종료).
+
+### 첫 줄 읽기 — load average
+
+```
+top - 14:03:11 up 21 days,  2:14,  2 users,  load average: 8.42, 6.10, 3.55
+```
+
+**코어 수와 비교해야 의미가 생긴다.** 8코어 서버의 load 8은 포화 직전이고,
+2코어 서버의 load 8은 심각한 과부하다 (`nproc`으로 코어 수 확인).
+1·5·15분 값의 **추세**가 더 중요하다 — 앞이 크면 지금 악화 중, 뒤가 크면 회복 중이다.
+
+:::caution[함정]
+**load가 높다고 CPU 문제인 것은 아니다.** 리눅스의 load에는 디스크 I/O를 기다리는
+`D` 상태 프로세스가 포함된다. `top` 상단의 CPU 줄에서 갈라 본다 —
+`us`/`sy`가 높으면 CPU, **`wa`(iowait)가 높으면 디스크**([3장](/server/03-storage/)),
+`st`(steal)가 높으면 **가상 머신의 호스트가 CPU를 안 주고 있는 것**이다.
+:::
+
+### 무엇이 병목인가 — 한 화면에 가르기
+
+```bash
+vmstat 1 5
+```
+
+```
+procs -----------memory---------- ---swap-- -----io---- -system-- ------cpu-----
+ r  b   swpd   free   buff  cache   si   so    bi    bo   in   cs us sy id wa st
+ 2  0      0 308000  92000 1100000    0    0     4    22  520 1100 12  3 84  1  0
+```
+
+| 볼 곳 | 높으면 |
+|---|---|
+| `r` | 실행 대기 큐. 코어 수보다 계속 크면 **CPU 부족** |
+| `b` | I/O 블록 대기. 크면 **디스크 병목** |
+| `si` / `so` | 스왑 in/out. 0이 아니면 **메모리 부족**이 진행 중 |
+| `wa` | iowait — 디스크 |
+| `st` | steal — 하이퍼바이저에 뺏기는 중 |
+
+## 죽이기 — 시그널과 `kill`
+
+```bash
+kill 1234                  # = kill -TERM. "정리하고 끝내라" — 기본이자 정답
+kill -HUP 1234             # 대개 "설정을 다시 읽어라" (프로그램마다 다르다)
+kill -QUIT 1234            # 종료 + 코어 덤프 (JVM은 스레드 덤프를 찍는다)
+kill -9 1234               # = KILL. 즉시 강제 종료 — 마지막 수단
+pkill -f "python app.py"   # 명령줄 전체로 매칭해서 종료
+pkill -u deploy            # 특정 사용자의 프로세스 전부
+kill -l                    # 시그널 목록
+```
+
+:::caution[함정 — `kill -9`를 먼저 쓰지 않는다]
+`-9`는 프로세스가 **정리할 기회를 주지 않는다.** 버퍼가 안 비워지고, 락 파일과 소켓이
+남고, DB라면 데이터가 깨질 수 있다. 순서는 항상 **`TERM` → 몇 초 기다리기 → `KILL`** 이다.
+서비스라면 `kill`이 아니라 **`systemctl stop`** 이 먼저다([5장](/server/05-systemd/)) —
+systemd가 이 순서를 알아서 지켜 준다.
+
+`kill -9`로도 안 죽으면 `STAT`가 **`D`** 일 확률이 높다. 커널 안에서 I/O를 기다리는 중이라
+어떤 시그널도 받지 않는다 — NFS 끊김·디스크 고장을 의심한다.
+:::
+
+## 포트와 파일 — 누가 쓰고 있나
+
+```bash
+sudo ss -tulpn | grep :8080        # 8080을 잡고 있는 프로세스 (가장 빠르다)
+sudo lsof -i :8080                 # 같은 질문, lsof 버전
+sudo lsof -p 1234                  # 이 프로세스가 연 파일 전부
+sudo lsof /var/log/app.log         # 이 파일을 누가 잡고 있나
+sudo fuser -k 8080/tcp             # 그 포트 쓰는 프로세스를 죽인다 (조심)
+```
+
+"Address already in use"로 서비스가 안 뜰 때 **첫 명령이 `ss -tulpn | grep 포트`** 다.
+
+### `/proc/PID` — 프로세스의 내부
+
+```bash
+sudo tr '\0' '\n' < /proc/1234/environ    # 이 프로세스가 받은 환경변수  ← 프록시 디버깅의 결정타
+sudo ls -l /proc/1234/cwd                 # 작업 디렉터리
+sudo ls -l /proc/1234/exe                 # 실행 파일 실제 경로
+cat /proc/1234/limits                     # 이 프로세스의 자원 한도 (열린 파일 수 등)
+ls /proc/1234/fd | wc -l                  # 열어 둔 파일 개수
+```
+
+`environ`은 특히 유용하다 — "서비스가 프록시 설정을 안 먹는다"([9장](/server/09-proxy/))는
+**실제로 받은 환경변수를 보면 1초에 판정된다.**
+
+## 메모리 부족 — OOM killer
+
+프로세스가 아무 로그도 안 남기고 사라졌다면 커널 로그를 본다.
+
+```bash
+sudo dmesg -T | grep -i -E "killed process|out of memory"
+sudo journalctl -k --since "1 hour ago" | grep -i oom
+sudo journalctl -u myapp --since today | tail -50
+```
+
+```
+Out of memory: Killed process 4821 (java) total-vm:8…kB, anon-rss:6…kB
+```
+
+이게 보이면 앱 버그가 아니라 **메모리 부족이 원인**이다. 대처는 세 가지 —
+메모리를 늘리거나, 앱의 힙 상한을 낮추거나, systemd 유닛에 `MemoryMax=`를 걸어
+**한 프로세스가 서버 전체를 흔들지 못하게** 한다.
+
+## 끊겨도 계속 돌게 하기
+
+<Tabs>
+<TabItem label="짧은 작업 — nohup">
+
+```bash
+nohup ./long-job.sh > /tmp/job.log 2>&1 &
+disown          # 현재 셸의 자식 목록에서도 떼어낸다
+```
+
+</TabItem>
+<TabItem label="대화형 작업 — tmux">
+
+```bash
+tmux new -s work        # 세션 시작
+# Ctrl-b d 로 떼어내기(detach). SSH가 끊겨도 살아 있다
+tmux ls && tmux attach -t work
+```
+
+원격에서 **오래 걸리거나 접속을 끊을 수 있는 작업**은 무조건 이 안에서 한다.
+
+</TabItem>
+<TabItem label="서비스로 — systemd-run">
+
+```bash
+sudo systemd-run --unit=migrate --scope ./migrate.sh   # 임시 유닛으로
+sudo systemd-run --on-active=10min /usr/local/bin/x.sh # 10분 뒤 한 번
+```
+
+로그가 journal에 남고 자원 제한도 걸 수 있다 — 반복될 작업이면 정식 유닛으로 만든다([5장](/server/05-systemd/)).
+
+</TabItem>
+</Tabs>
+
+## 우선순위 조절
+
+```bash
+nice -n 10 ./batch.sh          # 낮은 우선순위로 시작 (-20 높음 ~ 19 낮음)
+sudo renice -n 10 -p 1234      # 실행 중인 것 조정
+sudo ionice -c3 -p 1234        # I/O 우선순위를 idle로 (백업·rsync에 유용)
+```
+
+:::tip[핵심]
+느리다는 신고에는 **`top` 첫 두 줄 → `vmstat 1`** 로 층을 가른다.
+`us`/`sy` 높으면 CPU, **`wa` 높으면 디스크**, `si`/`so` 있으면 메모리, `st` 높으면 호스트.
+범인 프로세스는 `ps -eo … --sort=-%cpu`로, 포트 주인은 `ss -tulpn`으로 찾는다.
+:::
+
+## 4장 요약
+
+- `ps -eo pid,user,%cpu,rss,cmd --sort=-%cpu` 한 줄이 `ps aux`보다 실전적이다
+- `%CPU`는 **코어당 100% 기준**, 메모리는 `VSZ`가 아니라 **`RSS`** 를 본다
+- load average는 **코어 수와 비교**하고, I/O 대기도 포함한다는 것을 기억한다
+- `kill`은 `TERM` → 기다림 → `KILL` 순서. 서비스면 `systemctl stop`이 먼저
+- 포트 주인은 `ss -tulpn`, 프로세스의 실제 환경변수는 `/proc/PID/environ`
+- 소리 없이 죽었으면 **OOM** 을 의심하고 `journalctl -k | grep -i oom`
+
+<LinkCard
+  title="5. systemd — 서비스와 부팅"
+  description="systemctl로 서비스를 다루는 법, drop-in으로 안전하게 설정 덮기, 타이머로 cron 대체하기."
+  href="/server/05-systemd/"
+/>

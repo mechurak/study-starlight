@@ -1,0 +1,233 @@
+---
+title: "13. 방화벽과 기본 보안"
+description: "ufw 기본기, 열린 포트 점검, fail2ban, AppArmor, 시간 동기화, docker가 ufw를 우회하는 문제"
+---
+
+import { Steps, LinkCard } from '@astrojs/starlight/components';
+import TermIntro from '../../../components/TermIntro.astro';
+
+> 서버 보안의 8할은 화려한 도구가 아니라 **열려 있는 포트를 아는 것**과
+> **패치를 미루지 않는 것**이다
+
+<TermIntro
+  terms={[
+    ['ufw', 'Uncomplicated Firewall', 'Ubuntu의 방화벽 프론트엔드. 내부적으로는 nftables 규칙을 만든다 — 사람이 읽을 수 있는 명령으로 방화벽을 다루게 해 주는 껍데기다.'],
+    ['nftables', '', '지금 리눅스 커널의 패킷 필터링 프레임워크. 옛 `iptables`를 대체했고, `iptables` 명령을 쳐도 **뒤에서 nftables로 번역돼** 실행된다.'],
+    ['fail2ban', '', '로그를 감시하다가 인증 실패가 반복되는 IP를 **일정 시간 자동 차단**하는 도구. 인터넷에 노출된 SSH에 사실상 필수다.'],
+    ['AppArmor', '', 'Ubuntu의 강제 접근 제어(MAC) 시스템. 프로그램별로 "이 파일·네트워크만 쓸 수 있다"는 프로필을 강제한다. RHEL 계열의 SELinux에 해당하는 자리다.'],
+    ['NTP', 'Network Time Protocol', '서버 시각을 표준 시각에 맞추는 프로토콜. 시각이 틀어지면 **TLS 인증서 검증이 실패하고 로그 상관 분석이 무너진다** — 보안의 조용한 전제 조건이다.'],
+  ]}
+/>
+
+## 지금 무엇이 열려 있나
+
+방화벽을 건드리기 전에 **실제 상태를 먼저 읽는다.**
+
+```bash
+sudo ss -tulpn                     # 이 서버가 듣고 있는 포트 전부  ← 출발점
+sudo ufw status verbose            # 방화벽 규칙
+sudo nft list ruleset | head -40   # 실제 커널 규칙 (ufw가 만든 것 포함)
+```
+
+`ss` 출력에서 **바인딩 주소를 본다** —
+`127.0.0.1:5432`는 외부에서 못 닿고, `0.0.0.0:5432`는 방화벽만이 유일한 방어선이다.
+"열려 있을 이유가 없는데 열린 포트"를 찾는 것이 이 점검의 목적이다.
+
+바깥에서 본 모습도 확인할 가치가 있다 (다른 서버에서).
+
+```bash
+nmap -Pn -p- 10.20.30.41           # 전체 포트 스캔 (권한 있는 대상에만)
+nc -vz 10.20.30.41 22
+```
+
+## ufw
+
+```bash
+sudo ufw status numbered           # 규칙에 번호가 붙어 나온다 (삭제할 때 필요)
+sudo ufw allow 22/tcp
+sudo ufw allow from 10.20.0.0/16 to any port 5432 proto tcp   # 출처를 제한  ← 권장 형태
+sudo ufw deny 3306
+sudo ufw delete 3                  # 번호로 삭제
+sudo ufw app list                  # 앱 프로필 (OpenSSH, Nginx Full …)
+sudo ufw allow "Nginx Full"
+sudo ufw reload
+sudo ufw --dry-run allow 8080      # 어떤 규칙이 생길지 미리 보기
+```
+
+처음 켤 때의 순서는 **정해져 있다.**
+
+<Steps>
+
+1. **기본 정책을 정한다** — 들어오는 것은 막고 나가는 것은 허용
+
+   ```bash
+   sudo ufw default deny incoming
+   sudo ufw default allow outgoing
+   ```
+
+2. **SSH를 먼저 연다** — 이 단계를 빠뜨리면 접속이 끊긴다
+
+   ```bash
+   sudo ufw allow OpenSSH        # 또는 실제 포트: sudo ufw allow 22/tcp
+   ```
+
+3. 필요한 포트를 추가하고 **규칙을 검토한다**
+
+   ```bash
+   sudo ufw show added
+   ```
+
+4. **그때 켠다**
+
+   ```bash
+   sudo ufw enable
+   ```
+
+</Steps>
+
+:::caution[함정 — `ufw enable` 한 줄로 서버를 잃는다]
+기본 정책이 `deny incoming`인 상태에서 SSH 규칙 없이 `enable` 하면
+**그 즉시 자기 접속이 끊기고 다시 들어갈 수 없다.**
+원격 서버라면 안전장치를 걸어 두고 한다 —
+
+```bash
+sudo bash -c 'sleep 300 && ufw disable' &   # 5분 뒤 자동 해제 (성공하면 이 작업을 kill)
+```
+
+SSH 포트를 바꿔 뒀다면 `ufw allow OpenSSH`(22번 프로필)가 아니라
+**실제 포트 번호**를 열어야 한다.
+:::
+
+### docker가 ufw를 우회한다
+
+:::caution[함정 — 유명하고 위험하다]
+`docker run -p 8080:80`은 **ufw 규칙과 무관하게 포트를 인터넷에 노출한다.**
+도커가 nftables의 앞단(`DOCKER-USER`/PREROUTING)에 자기 규칙을 직접 넣기 때문에
+ufw의 INPUT 체인까지 오지 않는다.
+
+`sudo ufw status`가 "22만 열려 있음"이라고 말해도 8080이 열려 있을 수 있다 —
+**진실은 `ss -tulpn`과 외부 스캔에 있다.** 대처는 셋 중 하나 —
+
+- 바인딩을 제한한다: `-p 127.0.0.1:8080:80` (**가장 간단하고 확실하다**)
+- 리버스 프록시를 앞에 두고 컨테이너는 내부 네트워크에만 노출한다
+- `DOCKER-USER` 체인에 직접 규칙을 넣는다 (ufw 설정 파일 수정이 필요하다)
+:::
+
+## SSH 하드닝
+
+`/etc/ssh/sshd_config.d/99-hardening.conf` ([10장](/server/10-users/))
+
+```
+PermitRootLogin no
+PasswordAuthentication no
+KbdInteractiveAuthentication no
+MaxAuthTries 3
+LoginGraceTime 30
+AllowGroups sshusers          # 이 그룹만 SSH 허용 — 화이트리스트가 가장 강력하다
+ClientAliveInterval 300
+ClientAliveCountMax 2
+```
+
+```bash
+sudo sshd -t && sudo systemctl reload ssh
+```
+
+**포트를 22에서 바꾸는 것은 보안이 아니라 로그 노이즈 감소책이다** —
+스캔 봇은 줄지만 표적 공격은 못 막는다. 키 인증 + `AllowGroups`가 실질적인 방어다.
+
+## fail2ban
+
+```bash
+sudo apt install -y fail2ban
+sudo systemctl enable --now fail2ban
+sudo fail2ban-client status              # 활성 jail 목록
+sudo fail2ban-client status sshd         # 차단된 IP 목록
+sudo fail2ban-client set sshd unbanip 10.20.5.91   # 실수로 밴됐을 때
+```
+
+`/etc/fail2ban/jail.local` (원본 `jail.conf`는 건드리지 않는다)
+
+```ini
+[DEFAULT]
+bantime  = 1h
+findtime = 10m
+maxretry = 5
+ignoreip = 127.0.0.1/8 10.20.0.0/16      # 사내 대역은 밴하지 않는다
+
+[sshd]
+enabled = true
+```
+
+`ignoreip`에 **사내 대역과 본인 IP를 반드시 넣는다** —
+비밀번호를 몇 번 틀려 스스로 밴되는 사고가 실제로 흔하다.
+
+## 시간 동기화
+
+```bash
+timedatectl                              # 시각 · 타임존 · 동기화 상태
+timedatectl show-timesync --all          # 어느 NTP 서버와 맞추고 있나
+sudo timedatectl set-timezone Asia/Seoul
+sudo timedatectl set-ntp true
+systemctl status systemd-timesyncd
+```
+
+`System clock synchronized: yes`가 아니면 고친다. 사내망에서 외부 NTP가 막혀 있으면
+사내 NTP 서버를 지정한다 — `/etc/systemd/timesyncd.conf`의 `NTP=ntp.corp.local`.
+
+:::caution[함정]
+시각이 틀어지면 **TLS 인증서가 "아직 유효하지 않음"으로 거부되고**([8장](/server/08-connectivity/)),
+Kerberos·AD 인증이 실패하고, 여러 서버의 로그를 시간순으로 맞출 수 없게 된다.
+"어제부터 갑자기 HTTPS가 안 돼요"의 원인이 시계인 경우가 실제로 있다.
+:::
+
+## AppArmor
+
+```bash
+sudo aa-status                           # 적용 중인 프로필과 모드
+sudo journalctl -k | grep -i apparmor    # 차단 기록
+sudo aa-complain /etc/apparmor.d/usr.sbin.mysqld   # 강제 대신 기록만 (진단용)
+sudo aa-enforce  /etc/apparmor.d/usr.sbin.mysqld   # 다시 강제
+```
+
+**"권한도 맞고 경로도 맞는데 프로그램이 파일을 못 읽는다"** 면 AppArmor를 의심한다.
+커널 로그에 `apparmor="DENIED"` 줄이 있으면 확정이다 —
+프로필을 끄지 말고 필요한 경로를 프로필에 추가하는 것이 정석이다.
+
+## 최소한의 점검 목록
+
+| 항목 | 확인 명령 |
+|---|---|
+| 열린 포트가 의도한 것뿐인가 | `sudo ss -tulpn` |
+| 방화벽이 켜져 있고 규칙이 맞나 | `sudo ufw status verbose` |
+| SSH가 키 인증 전용인가 | `sudo sshd -T \| grep -E "passwordauth\|permitrootlogin"` |
+| 보안 업데이트가 자동 적용되나 | `systemctl status unattended-upgrades` ([12장](/server/12-packages/)) |
+| 재부팅 대기 중인가 | `ls /var/run/reboot-required` |
+| 안 쓰는 계정이 남아 있나 | `lastlog -b 90` ([11장](/server/11-audit/)) |
+| sudo 권한이 과하지 않은가 | `sudo grep -r "" /etc/sudoers.d/` |
+| 시각이 맞나 | `timedatectl` |
+| 실패한 로그인이 폭주하나 | `sudo lastb \| head -30` |
+
+`sshd -T`는 **최종 계산된 설정값 전체**를 출력한다 — 설정 파일이 여러 개로 나뉘어 있을 때
+실제로 무엇이 적용됐는지 확인하는 확실한 방법이다.
+
+:::tip[핵심]
+`ss -tulpn`(실제로 열린 것) → `ufw status`(막고 있는 것) → 둘의 **차이를 설명할 수 있는가**.
+이 질문에 답할 수 있으면 그 서버의 노출면을 안다는 뜻이다.
+그리고 도커가 있다면 **ufw의 말을 믿지 않는다.**
+:::
+
+## 13장 요약
+
+- 보안 점검의 출발점은 `ss -tulpn` — **바인딩이 `127.0.0.1`인지 `0.0.0.0`인지**를 본다
+- ufw는 **SSH를 먼저 허용하고 나서 `enable`** — 순서를 어기면 잠긴다
+- **도커 포트 매핑은 ufw를 우회한다** — `-p 127.0.0.1:8080:80`으로 바인딩을 제한한다
+- SSH는 키 전용 + `AllowGroups`가 실질적 방어, 포트 변경은 노이즈 감소책일 뿐
+- fail2ban의 `ignoreip`에 **사내 대역을 넣는다** (스스로 밴되지 않게)
+- 시각이 틀어지면 TLS와 인증이 무너진다 — `timedatectl`의 동기화 상태를 확인
+- 원인 모를 접근 거부는 **AppArmor** 를 의심 — `journalctl -k | grep DENIED`
+
+<LinkCard
+  title="14. 상황별 진단 플레이북"
+  description="느리다 · 디스크가 찼다 · 서비스가 안 뜬다 · 접속이 안 된다 — 증상에서 출발하는 순서."
+  href="/server/14-playbook/"
+/>

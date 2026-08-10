@@ -340,6 +340,54 @@ export default defineConfig({
 							],
 						},
 						{
+							label: '서버 관리 일반',
+							link: '/server/',
+							icon: 'linux',
+							items: [
+								'server',
+								{
+									label: '준비',
+									items: ['server/00-intro', 'server/01-shell'],
+								},
+								{
+									label: '이 서버는 무엇인가',
+									items: [
+										'server/02-hardware',
+										'server/03-storage',
+										'server/04-process',
+									],
+								},
+								{
+									label: '서비스와 로그',
+									items: ['server/05-systemd', 'server/06-logs'],
+								},
+								{
+									label: '네트워크',
+									items: [
+										'server/07-network',
+										'server/08-connectivity',
+										'server/09-proxy',
+									],
+								},
+								{
+									label: '사용자와 접근',
+									items: ['server/10-users', 'server/11-audit'],
+								},
+								{
+									label: '운영과 보안',
+									items: ['server/12-packages', 'server/13-security'],
+								},
+								{
+									label: '마무리',
+									items: [
+										'server/14-playbook',
+										'server/15-glossary',
+										'server/16-wrapup',
+									],
+								},
+							],
+						},
+						{
 							label: 'Supabase',
 							link: '/supabase/',
 							icon: 'seti:db',

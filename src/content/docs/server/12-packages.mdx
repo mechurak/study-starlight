@@ -1,0 +1,252 @@
+---
+title: "12. 패키지와 업데이트"
+description: "apt와 dpkg 실전, deb822 저장소와 서명 키, 자동 보안 업데이트, 버전 고정과 재부팅 판단"
+---
+
+import { Tabs, TabItem, Badge, LinkCard } from '@astrojs/starlight/components';
+import TermIntro from '../../../components/TermIntro.astro';
+
+> `apt update`는 **목록만** 갱신한다 — 실제로 설치하는 것은 `upgrade`다.
+> 이 둘을 헷갈린 채로 "업데이트했다"고 말하는 일이 놀랄 만큼 많다
+
+<TermIntro
+  terms={[
+    ['apt / dpkg', '', '`dpkg`는 .deb 파일 하나를 설치·제거하는 **저수준** 도구, `apt`는 저장소에서 받아 오고 의존성을 풀어 주는 **상위** 도구다. 문제가 나면 apt로 고치고, "이 파일 어느 패키지 거지"는 dpkg로 묻는다.'],
+    ['저장소', 'repository', '패키지를 배포하는 서버. Ubuntu는 `main`(공식 지원) · `universe`(커뮤니티) · `restricted` · `multiverse`로 나뉘고, 보안 패치는 `-security` 저장소로 온다.'],
+    ['deb822', '', '24.04부터 표준이 된 새 저장소 설정 형식. 한 줄짜리 `sources.list` 대신 **여러 줄 키–값 형태의 `.sources` 파일**을 쓴다 — 서명 키를 명시적으로 적을 수 있어 안전하다.'],
+    ['unattended-upgrades', '', '보안 업데이트를 **자동으로** 설치해 주는 패키지. Ubuntu 서버에 기본 설치·활성화돼 있다 — "아무도 안 건드렸는데 패키지가 바뀌었다"의 정체가 대개 이것이다.'],
+    ['ESM', 'Expanded Security Maintenance', 'Ubuntu Pro로 제공되는 연장 보안 지원. LTS의 표준 5년이 끝난 뒤, 그리고 `universe` 패키지까지 보안 패치를 준다 — 개인·소규모는 무료 등록이 가능하다.'],
+  ]}
+/>
+
+## 매일 쓰는 것
+
+```bash
+sudo apt update                      # 저장소 목록 갱신 (설치는 안 한다)
+apt list --upgradable                # 무엇이 올라갈 수 있나  ← 적용 전에 확인
+sudo apt upgrade                     # 설치. 패키지 제거는 하지 않는다
+sudo apt full-upgrade                # 필요하면 제거까지 하며 업그레이드
+sudo apt install nginx
+sudo apt remove nginx                # 설정 파일은 남긴다
+sudo apt purge nginx                 # 설정 파일까지 삭제
+sudo apt autoremove --purge          # 딸려 왔다가 이제 안 쓰이는 것 정리
+sudo apt -s upgrade                  # 시뮬레이션 (-s = --dry-run)
+```
+
+:::caution[함정 — `upgrade`와 `full-upgrade`]
+`apt upgrade`는 **어떤 패키지도 제거하지 않는다**는 원칙이 있어서, 제거가 필요한
+업그레이드는 조용히 보류(`The following packages have been kept back`)한다.
+그 상태가 쌓이면 시스템이 어정쩡해진다 — 보류가 보이면
+`sudo apt full-upgrade`로 무엇이 제거되는지 **읽어 보고** 진행한다.
+:::
+
+### 정보 조회
+
+```bash
+apt search nginx                     # 이름·설명 검색
+apt show nginx                       # 버전 · 의존성 · 설명
+apt policy nginx                     # 설치된 버전과 후보 버전, 어느 저장소에서 오는지
+apt depends nginx / apt rdepends nginx
+apt-cache madison nginx              # 사용 가능한 모든 버전
+```
+
+`apt policy`가 진단의 핵심이다 — "왜 옛 버전이 깔리지"의 답이 여기 있다.
+
+### dpkg — 파일과 패키지의 대응
+
+```bash
+dpkg -l | grep nginx                 # 설치 목록
+dpkg -L nginx                        # 이 패키지가 설치한 파일 전부
+dpkg -S /usr/sbin/nginx              # 이 파일은 어느 패키지 것인가  ← 자주 쓴다
+dpkg -s nginx                        # 상태 상세
+sudo dpkg -i ./something.deb         # 로컬 .deb 설치 (의존성은 안 풀어 준다)
+sudo apt install -f                  # 위에서 깨진 의존성 복구
+sudo dpkg --configure -a             # 설치가 중간에 끊겼을 때 이어서
+```
+
+`dpkg -l`의 앞 두 글자 — `ii`가 정상 설치, **`rc`는 제거됐지만 설정 파일이 남은 상태**,
+`iU`/`iF`는 설정 미완료다.
+
+## 저장소와 서명 키
+
+<Tabs>
+<TabItem label="24.04의 새 형식 (deb822)">
+
+`/etc/apt/sources.list.d/ubuntu.sources` — 24.04부터 공식 저장소가 이 형식이다.
+
+```
+Types: deb
+URIs: http://kr.archive.ubuntu.com/ubuntu/
+Suites: noble noble-updates noble-backports
+Components: main restricted universe multiverse
+Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg
+```
+
+`/etc/apt/sources.list`는 비어 있거나 안내 주석만 있다 — 놀라지 않아도 된다.
+
+</TabItem>
+<TabItem label="서드파티 저장소 추가">
+
+`apt-key`는 **제거됐다.** 키를 별도 파일로 두고 `Signed-By`로 연결한다.
+
+```bash
+sudo install -m 0755 -d /etc/apt/keyrings
+curl -fsSL https://example.com/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/example.gpg
+sudo chmod a+r /etc/apt/keyrings/example.gpg
+
+cat <<'EOF' | sudo tee /etc/apt/sources.list.d/example.sources
+Types: deb
+URIs: https://example.com/apt
+Suites: noble
+Components: main
+Signed-By: /etc/apt/keyrings/example.gpg
+EOF
+
+sudo apt update
+```
+
+`NO_PUBKEY` 또는 `is not signed` 오류는 대개 이 연결이 빠진 것이다.
+프록시 환경이라면 `apt`의 프록시 설정도 따로 필요하다([9장](/server/09-proxy/)).
+
+</TabItem>
+<TabItem label="PPA">
+
+```bash
+sudo add-apt-repository ppa:이름/저장소
+sudo add-apt-repository --remove ppa:이름/저장소
+ls /etc/apt/sources.list.d/
+```
+
+PPA는 개인이 올리는 저장소다 — **서버에서는 신중하게** 쓴다.
+LTS 업그레이드 때 깨지는 주요 원인이기도 하다.
+
+</TabItem>
+</Tabs>
+
+## 버전 고정
+
+```bash
+sudo apt install nginx=1.24.0-2ubuntu7      # 특정 버전 설치
+sudo apt-mark hold nginx                     # 업그레이드 금지
+apt-mark showhold                            # 고정 목록  ← 정기 점검 항목
+sudo apt-mark unhold nginx
+```
+
+:::caution[함정]
+`hold`는 편리하지만 **보안 패치도 같이 막는다.** 걸었으면 왜 걸었는지 기록하고,
+`apt-mark showhold`를 정기 점검에 넣는다 — 몇 달 뒤 "왜 이것만 옛 버전이지"의 답이 된다.
+:::
+
+## 자동 보안 업데이트
+
+Ubuntu 서버는 `unattended-upgrades`가 **기본으로 켜져 있다.**
+
+```bash
+systemctl status unattended-upgrades
+cat /etc/apt/apt.conf.d/20auto-upgrades          # 켜짐/주기
+grep -v "^\s*//" /etc/apt/apt.conf.d/50unattended-upgrades | grep -v "^$"
+sudo unattended-upgrade --dry-run -d             # 지금 뭘 할지 보기
+ls -l /var/log/unattended-upgrades/              # 결과 로그
+```
+
+기본은 **`-security` 저장소만** 자동 적용한다. 자주 켜는 옵션 둘 —
+
+```
+Unattended-Upgrade::Remove-Unused-Kernel-Packages "true";   // /boot 만석 예방
+Unattended-Upgrade::Automatic-Reboot "false";                // 서버는 대개 false
+```
+
+### 재부팅이 필요한가
+
+```bash
+ls -l /var/run/reboot-required            # 있으면 재부팅 필요
+cat /var/run/reboot-required.pkgs         # 어떤 패키지 때문인지
+```
+
+커널·glibc·systemd 업데이트가 여기에 해당한다.
+재부팅 없이 커널을 갈아 끼우는 Livepatch는 Ubuntu Pro 기능이다.
+
+:::caution[함정 — 24.04의 needrestart 프롬프트]
+업그레이드 도중 "다시 시작할 서비스를 고르세요" 화면이 떠서 **자동화 스크립트가 멈춘다.**
+비대화형으로 돌리려면 —
+
+```bash
+sudo DEBIAN_FRONTEND=noninteractive NEEDRESTART_MODE=a apt -y upgrade
+```
+
+또는 `/etc/needrestart/needrestart.conf`에서 `$nrconf{restart} = 'a';`
+(자동 재시작) 또는 `'l'`(목록만).
+:::
+
+## snap
+
+Ubuntu 24.04는 일부 도구를 snap으로 배포한다 (`lxd`, `certbot` 등).
+
+```bash
+snap list                          # 설치된 snap과 버전
+snap list --all                    # 옛 리비전까지 (디스크를 먹는 주범)
+snap refresh --list                # 갱신 가능한 것
+sudo snap refresh
+sudo snap revert 이름               # 직전 리비전으로 되돌리기  ← apt에는 없는 기능
+snap changes                       # 최근 작업 이력
+sudo snap set system refresh.hold="2026-09-01T00:00:00+09:00"   # 자동 갱신 잠시 보류
+```
+
+snap은 **자동으로 갱신된다** — apt와 달리 막을 수 없고 미룰 수만 있다.
+`df`에 `/dev/loop*` (squashfs)가 잔뜩 보이는 것은 snap 때문이고 정상이다.
+
+## Ubuntu Pro <Badge text="선택" variant="note" />
+
+```bash
+pro status                    # 어떤 서비스가 켜져 있나
+pro security-status           # 패키지별 지원 상태 요약  ← 유용하다
+sudo pro attach <토큰>
+sudo pro enable esm-apps
+```
+
+`pro security-status`는 **몇 개 패키지가 어떤 지원을 받고 있는지** 알려준다 —
+`universe` 패키지를 많이 쓰는 서버라면 확인해 볼 값이 있다.
+
+## LTS 업그레이드
+
+```bash
+lsb_release -a
+sudo do-release-upgrade -c        # 새 LTS가 나와 있는지 확인만
+sudo do-release-upgrade           # 실행 (반드시 콘솔 접근이 가능한 상태에서)
+```
+
+원격에서 하면 SSH가 끊길 때 복구할 수 없다 — `tmux` 안에서, 백업/스냅숏을 뜬 뒤에 한다.
+서드파티 저장소와 PPA는 미리 비활성화하는 편이 안전하다.
+
+## 문제 해결
+
+| 증상 | 대처 |
+|---|---|
+| `Could not get lock /var/lib/dpkg/lock` | 다른 apt가 실행 중 — `sudo lsof /var/lib/dpkg/lock-frontend`, 자동 업데이트면 기다린다 |
+| `NO_PUBKEY` · `not signed` | 서명 키 누락 — `Signed-By` 설정 확인 |
+| `Unable to locate package` | `apt update` 안 함, 또는 그 저장소(`universe`)가 비활성 |
+| 설치 중단 후 apt가 안 됨 | `sudo dpkg --configure -a` → `sudo apt install -f` |
+| `/boot` 만석 | `sudo apt autoremove --purge`로 옛 커널 정리 |
+| 프록시 뒤에서 `apt update` 실패 | apt는 환경변수를 안 본다 — [9장](/server/09-proxy/) |
+
+:::tip[핵심]
+`sudo apt update && apt list --upgradable`로 **먼저 보고**, `apt upgrade`로 적용하고,
+`ls /var/run/reboot-required`로 재부팅 여부를 판단한다.
+"누가 언제 무엇을 설치했나"는 **`/var/log/apt/history.log`** 에 다 있다([11장](/server/11-audit/)).
+:::
+
+## 12장 요약
+
+- `update`(목록) ≠ `upgrade`(설치). 보류가 쌓이면 **`full-upgrade`** 로 내용을 확인하고 처리
+- `apt policy`가 "왜 이 버전인가"의 답, `dpkg -S`가 "이 파일 누구 것인가"의 답
+- `apt-key`는 없다 — **`/etc/apt/keyrings/` + `Signed-By`**, 24.04는 deb822 `.sources`
+- `unattended-upgrades`가 기본으로 켜져 있다 — 바뀐 내역은 그 로그에 있다
+- `apt-mark hold`는 **보안 패치도 막는다** — `showhold`를 정기 점검에
+- 자동화 스크립트는 `NEEDRESTART_MODE=a`로 프롬프트를 막는다
+- 재부팅 필요 여부는 **`/var/run/reboot-required`** 파일 존재로 판단
+
+<LinkCard
+  title="13. 방화벽과 기본 보안"
+  description="ufw로 포트 열고 닫기, 열린 포트 점검, fail2ban, 시간 동기화, docker가 ufw를 뚫는 문제."
+  href="/server/13-security/"
+/>

@@ -1,0 +1,196 @@
+---
+title: "3. 디스크와 파일시스템"
+description: "df와 du, inode 만석, 지웠는데 안 줄어드는 파일, 마운트와 fstab, LVM 확장, I/O 병목"
+---
+
+import { Steps, FileTree, LinkCard } from '@astrojs/starlight/components';
+import TermIntro from '../../../components/TermIntro.astro';
+
+> "디스크가 찼다"는 신고의 절반은 **`df`와 `du`가 다른 값을 말하는** 상황이다
+
+<TermIntro
+  terms={[
+    ['마운트', 'mount', '블록 장치(디스크 파티션)를 디렉터리 트리의 한 지점에 **붙이는** 일. 리눅스에는 드라이브 문자가 없고, 모든 것이 `/` 아래 어딘가에 붙는다.'],
+    ['inode', 'index node', '파일 하나의 메타데이터(권한·소유자·크기·데이터 위치)를 담는 구조체. **파일 하나당 하나씩** 쓰고 개수가 포맷 시점에 고정된다 — 용량이 남아도 **파일 개수 때문에 꽉 찰 수 있다.**'],
+    ['LVM', 'Logical Volume Manager', '물리 디스크를 풀(볼륨 그룹)로 묶고 거기서 논리 볼륨을 잘라 쓰는 층. **서비스 중단 없이 파일시스템을 늘릴 수 있다** — Ubuntu 서버 기본 설치가 이 구성이다.'],
+    ['ext4 / XFS', '', '리눅스의 대표 파일시스템 둘. Ubuntu 기본은 ext4다. 둘 다 온라인 확장은 되지만 **축소는 ext4만** 되고 그마저 언마운트가 필요하다 — 파티션은 처음부터 크게 잡지 않는 편이 낫다.'],
+    ['tmpfs', '', '디스크가 아니라 **메모리 위에 만드는 파일시스템**. `/run`·`/dev/shm`이 이것이다. 빠르지만 재부팅하면 사라지고, 많이 쓰면 메모리를 먹는다.'],
+  ]}
+/>
+
+## 얼마나 남았나 — `df`
+
+```bash
+df -hT                    # 사람이 읽는 단위 + 파일시스템 타입
+df -h /var/log            # 이 경로가 속한 파일시스템만
+df -i                     # inode 사용량  ← 잊으면 안 되는 두 번째 확인
+```
+
+`tmpfs`·`squashfs`(snap) 줄이 시끄러우면 `df -hT -x tmpfs -x squashfs`로 걷어낸다.
+
+:::caution[함정 1 — 용량은 남았는데 "No space left on device"]
+**inode가 먼저 떨어진 것이다.** 작은 파일 수백만 개(세션 파일·메일 큐·캐시)가 흔한 원인이다.
+`df -i`에서 `IUse%`가 100%면 확정 — 해결은 용량 확보가 아니라 **파일 개수를 줄이는 것**이다.
+
+```bash
+df -i
+# 범인 찾기 — 하위 디렉터리별 파일 개수
+sudo find /var -xdev -type f | cut -d/ -f1-4 | sort | uniq -c | sort -rn | head
+```
+:::
+
+## 어디가 먹고 있나 — `du`
+
+```bash
+sudo du -xh --max-depth=1 / | sort -rh | head -20   # 루트에서 한 층씩 내려간다
+sudo du -sh /var/log                                 # 한 디렉터리 합계
+sudo ncdu -x /                                       # 대화형 탐색 (ncdu 패키지) — 가장 편하다
+```
+
+`-x`(다른 파일시스템으로 넘어가지 않는다)를 **반드시 붙인다** — 없으면 `/proc`·`/sys`·
+네트워크 마운트까지 헤매느라 끝나지 않는다.
+
+### `df`와 `du`가 다를 때
+
+| 증상 | 원인 | 확인 |
+|---|---|---|
+| `du` 합계보다 `df` 사용량이 훨씬 크다 | **삭제됐지만 프로세스가 붙잡고 있는 파일** (아래) | `sudo lsof +L1` |
+| `du`가 특정 디렉터리를 못 본다 | 그 위에 다른 파일시스템이 **덮어 마운트**돼 원본이 가려졌다 | `findmnt` |
+| 5% 정도 차이 | ext4의 **root 예약 블록**(기본 5%). 정상이다 | `tune2fs -l /dev/… \| grep Reserved` |
+
+:::caution[함정 2 — 로그를 지웠는데 용량이 안 줄어든다]
+프로세스가 열어 둔 파일을 `rm` 하면 **디렉터리에서 이름만 사라지고 디스크 블록은 그대로 남는다.**
+그 프로세스가 끝나거나 파일을 닫아야 실제로 반환된다.
+
+```bash
+sudo lsof +L1                     # 링크 수 0 = 삭제됐는데 열려 있는 파일
+sudo lsof -nP | grep '(deleted)'
+```
+
+해결은 **해당 서비스 재시작**(또는 `systemctl reload`). 애초에 `rm` 대신
+`sudo truncate -s 0 /var/log/큰파일.log`로 **비우면** 이 문제가 안 생긴다.
+:::
+
+## 무엇이 어디에 붙어 있나
+
+```bash
+lsblk -o NAME,SIZE,FSTYPE,MOUNTPOINTS,UUID
+findmnt                   # 마운트 트리 (mount 명령보다 읽기 쉽다)
+findmnt /var              # 이 경로는 어느 장치인가
+blkid                     # 장치별 UUID와 파일시스템 타입
+mount | column -t         # 마운트 옵션까지 (rw · noatime · nodev …)
+```
+
+<FileTree>
+
+- /etc/fstab **부팅할 때 자동 마운트할 목록 — 잘못 쓰면 부팅이 멈춘다**
+- /etc/mtab → /proc/self/mounts 지금 실제로 마운트된 것
+- /proc/mounts 커널이 보는 원본
+- /run/ tmpfs — 재부팅하면 사라진다
+
+</FileTree>
+
+### 수동 마운트와 fstab
+
+```bash
+sudo mount /dev/sdb1 /mnt/data          # 임시 (재부팅하면 사라진다)
+sudo umount /mnt/data
+sudo umount -l /mnt/data                # 사용 중이라 안 빠질 때 (지연 언마운트)
+sudo fuser -vm /mnt/data                # 누가 잡고 있나
+```
+
+영구 마운트는 `/etc/fstab`에 한 줄을 추가한다. **장치명(`/dev/sdb1`)이 아니라 UUID를 쓴다** —
+디스크 순서는 재부팅하면 바뀔 수 있다.
+
+```
+UUID=1234-abcd  /mnt/data  ext4  defaults,nofail  0  2
+```
+
+:::caution[함정 3 — fstab 오타로 부팅이 멈춘다]
+`/etc/fstab`에 없는 장치를 적으면 부팅이 emergency mode로 떨어져 **콘솔 없이는 복구할 수 없다.**
+두 가지로 예방한다 — 옵션에 **`nofail`**(실패해도 부팅은 진행)을 넣고,
+재부팅 전에 `sudo mount -a`로 **지금 문법이 맞는지 반드시 확인**한다.
+:::
+
+## 늘리기 — LVM과 파티션
+
+Ubuntu 서버 기본 설치는 LVM을 쓰는데, **설치 마법사가 디스크의 절반 정도만 논리 볼륨에
+할당하는 것이 기본**이라 "100GB 디스크인데 왜 50GB지?"가 자주 나온다.
+
+```bash
+sudo pvs && sudo vgs && sudo lvs    # 물리 볼륨 · 볼륨 그룹 · 논리 볼륨
+sudo vgdisplay ubuntu-vg | grep Free   # 볼륨 그룹에 남은 여유
+```
+
+<Steps>
+
+1. **볼륨 그룹에 여유가 있으면** 논리 볼륨을 늘린다 (`-r`이 파일시스템까지 같이 늘린다)
+
+   ```bash
+   sudo lvextend -l +100%FREE -r /dev/ubuntu-vg/ubuntu-lv
+   ```
+
+2. **여유가 없고 디스크에 빈 공간이 있으면** 파티션부터 늘린다
+
+   ```bash
+   sudo growpart /dev/sda 3            # 3번 파티션을 디스크 끝까지
+   sudo pvresize /dev/sda3             # LVM에 알린다
+   ```
+
+3. **LVM이 아니면** 파티션 확장 후 파일시스템만 늘린다
+
+   ```bash
+   sudo growpart /dev/sda 1
+   sudo resize2fs /dev/sda1            # ext4 (XFS는 xfs_growfs /마운트지점)
+   ```
+
+4. `df -h`로 확인. **셋 다 마운트한 채로 온라인 수행이 된다**
+
+</Steps>
+
+## I/O가 병목인가
+
+CPU는 한가한데 서버가 느리면 디스크를 본다.
+
+```bash
+vmstat 1 5                # wa(iowait) 열이 높으면 I/O 대기
+iostat -xz 1              # 장치별 %util · await (sysstat 패키지)
+sudo iotop -o             # 지금 I/O를 실제로 내는 프로세스 (iotop 패키지)
+```
+
+| 신호 | 읽는 법 |
+|---|---|
+| `vmstat`의 `wa`가 20% 이상 | CPU가 디스크를 기다리는 중 — I/O 병목 |
+| `iostat`의 `%util` 100% 근처 | 그 장치가 포화 |
+| `await`가 수십 ms 이상 (SSD인데) | 장치 이상 또는 과부하. `smartctl`도 같이 본다 |
+
+## 정리 — 안전하게 비우는 순서
+
+```bash
+sudo journalctl --disk-usage            # 저널이 얼마나 먹고 있나 (6장)
+sudo journalctl --vacuum-time=7d        # 7일치만 남긴다
+sudo apt clean                          # /var/cache/apt/archives 비우기
+sudo apt autoremove --purge             # 안 쓰는 패키지 · 옛 커널
+docker system df && docker system prune # 도커가 있다면 대개 여기가 범인
+sudo du -xh --max-depth=1 /var | sort -rh | head
+```
+
+:::tip[핵심]
+디스크 문제는 **`df -h` → `df -i` → `du -x` → `lsof +L1`** 네 단계로 거의 다 잡힌다.
+용량이 남았는데 실패하면 inode, `du`와 `df`가 다르면 삭제된 열린 파일이다.
+:::
+
+## 3장 요약
+
+- `df -h`만 보지 말고 **`df -i`(inode)** 를 같이 본다 — 용량이 남아도 꽉 찰 수 있다
+- `du`는 항상 **`-x`** 를 붙인다. 대화형 탐색은 `ncdu -x`가 제일 빠르다
+- `df` > `du`면 **삭제됐지만 열려 있는 파일** — `lsof +L1`, 해결은 서비스 재시작
+- 로그는 `rm` 대신 **`truncate -s 0`** 로 비운다
+- fstab에는 UUID와 **`nofail`**, 고친 뒤엔 재부팅 전에 **`mount -a`**
+- LVM 확장은 온라인으로 된다 — `lvextend -r` · `growpart` + `pvresize`
+
+<LinkCard
+  title="4. 프로세스와 자원"
+  description="지금 무엇이 CPU와 메모리를 먹고 있나 — ps · top · lsof · 시그널 · OOM killer."
+  href="/server/04-process/"
+/>

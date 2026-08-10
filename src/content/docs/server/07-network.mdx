@@ -1,0 +1,222 @@
+---
+title: "7. 네트워크 상태 보기"
+description: "ip · ss · netplan · resolvectl — 지금 이 서버의 주소·경로·포트·DNS가 어떤 상태인가"
+---
+
+import { Tabs, TabItem, FileTree, LinkCard } from '@astrojs/starlight/components';
+import TermIntro from '../../../components/TermIntro.astro';
+
+> 진단하기 전에 **정상일 때의 모습**을 읽을 줄 알아야 한다 — 이 장은 그 읽기다
+
+<TermIntro
+  terms={[
+    ['iproute2', '', '지금 리눅스의 표준 네트워크 도구 모음. `ip` · `ss` · `bridge`가 여기 들어 있다. 옛 `net-tools`(`ifconfig`·`netstat`·`route`)를 대체했고 **Ubuntu에는 기본 설치조차 안 된다.**'],
+    ['netplan', '', 'Ubuntu의 네트워크 설정 **추상화 층**. YAML 한 벌을 쓰면 뒤에서 systemd-networkd(서버) 또는 NetworkManager(데스크톱)용 설정으로 번역해 준다.'],
+    ['systemd-resolved', '', 'DNS 질의를 대신 처리하고 캐시하는 로컬 서비스. `/etc/resolv.conf`가 **`127.0.0.53`** 을 가리키는 이유가 이것이다 — 진짜 DNS 서버 주소는 `resolvectl status`에 있다.'],
+    ['MTU', 'Maximum Transmission Unit', '한 패킷에 실을 수 있는 최대 크기(보통 1500바이트). VPN·터널이 끼면 줄어드는데, 맞지 않으면 **작은 요청은 되고 큰 응답만 멈추는** 기묘한 증상이 난다.'],
+    ['LISTEN / ESTAB', '', '소켓의 상태. `LISTEN`은 **접속을 기다리는 서버 쪽 포트**, `ESTAB`(established)은 실제로 연결된 세션이다. `ss`의 출력에서 이 둘만 구분해도 절반은 읽힌다.'],
+  ]}
+/>
+
+## 주소와 링크 — `ip`
+
+```bash
+ip -br a            # 요약: 인터페이스 · 상태 · IP  ← 가장 먼저 치는 명령
+ip -br link         # 링크 상태와 MAC만
+ip a show enp1s0    # 한 인터페이스 상세
+ip -s link show enp1s0   # 송수신 통계와 에러·드롭 카운터  ← 중요
+ip r                # 라우팅 테이블
+ip r get 8.8.8.8    # "이 목적지로는 어느 인터페이스/게이트웨이로 나가나"  ← 매우 유용
+ip neigh            # ARP 테이블 (같은 랜에서 누가 보이나)
+```
+
+`-br`(brief)를 붙이면 사람이 읽을 수 있는 표가 된다.
+
+```
+$ ip -br a
+lo               UNKNOWN        127.0.0.1/8 ::1/128
+enp1s0           UP             10.20.30.41/24 fe80::5054:ff:fe12:3456/64
+docker0          DOWN           172.17.0.1/16
+```
+
+| 상태 | 뜻 |
+|---|---|
+| `UP` | 정상 |
+| `DOWN` | 인터페이스가 꺼져 있거나 **케이블이 안 꽂혀 있다** |
+| `UNKNOWN` | `lo`의 정상 상태다 — 문제가 아니다 |
+| 주소가 `169.254.x.x` | **DHCP를 못 받았다**(link-local 자동 할당). 아주 강한 신호다 |
+| 주소가 아예 없다 | 정적 설정 누락 또는 DHCP 실패 |
+
+```bash
+ip r
+# default via 10.20.30.1 dev enp1s0 proto static     ← 기본 게이트웨이. 없으면 외부로 못 나간다
+# 10.20.30.0/24 dev enp1s0 proto kernel scope link src 10.20.30.41
+```
+
+## 열린 포트와 연결 — `ss`
+
+```bash
+sudo ss -tulpn          # 듣고 있는 TCP/UDP 포트 + 프로세스  ← 이 장에서 제일 많이 쓴다
+ss -tn state established              # 지금 맺어진 TCP 연결
+ss -tn state established '( dport = :443 )'   # 443으로 나가는 연결만
+ss -s                                 # 소켓 요약 통계
+sudo ss -tp state established '( sport = :22 )'   # 지금 SSH로 붙어 있는 사람들
+```
+
+옵션 글자의 뜻 — `t`(TCP) `u`(UDP) `l`(LISTEN만) `p`(프로세스, root 필요)
+`n`(이름 해석 안 함 — 빠르다) `a`(전부).
+
+```
+$ sudo ss -tulpn
+Netid State  Local Address:Port   Peer Address:Port  Process
+tcp   LISTEN 0.0.0.0:22           0.0.0.0:*          users:(("sshd",pid=1103,fd=3))
+tcp   LISTEN 127.0.0.1:5432       0.0.0.0:*          users:(("postgres",pid=1521,fd=5))
+```
+
+:::caution[함정 — `127.0.0.1:포트` vs `0.0.0.0:포트`]
+로컬에서는 되는데 **다른 서버에서 접속이 안 된다**면 방화벽보다 이걸 먼저 본다.
+`127.0.0.1`에 바인딩된 서비스는 **외부에서 절대 닿을 수 없다** — 그 서비스의 설정에서
+bind 주소를 `0.0.0.0`(또는 특정 IP)으로 바꿔야 한다. 방화벽을 아무리 열어도 소용없다.
+:::
+
+## 설정 — netplan
+
+<FileTree>
+
+- /etc/netplan/
+  - 50-cloud-init.yaml 클라우드/설치 관리자가 만든 것
+  - 99-custom.yaml **직접 쓸 파일 — 숫자가 클수록 나중에 적용된다**
+- /run/systemd/network/ netplan이 번역해 낸 실제 설정 (직접 고치지 않는다)
+
+</FileTree>
+
+```bash
+netplan status --all        # 현재 적용 상태 요약 (24.04에서 잘 다듬어졌다)
+netplan get                 # 지금 설정을 YAML로 덤프
+sudo netplan try            # 적용 후 120초 안에 확인 못 하면 자동 롤백  ← 원격이면 필수
+sudo netplan apply          # 즉시 적용 (롤백 없음)
+```
+
+```yaml
+# /etc/netplan/99-custom.yaml
+network:
+  version: 2
+  renderer: networkd
+  ethernets:
+    enp1s0:
+      dhcp4: false
+      addresses: [10.20.30.41/24]
+      routes:
+        - to: default
+          via: 10.20.30.1
+      nameservers:
+        addresses: [10.20.0.53, 10.20.0.54]
+        search: [corp.local]
+```
+
+:::caution[함정 셋]
+- **원격 서버에서는 `apply`가 아니라 `try`** 를 쓴다. 설정이 틀리면 접속이 끊기고
+  콘솔 없이는 복구할 수 없다
+- netplan YAML은 **들여쓰기와 파일 권한**에 민감하다 — `sudo chmod 600 /etc/netplan/*.yaml`
+  (600이 아니면 경고가 뜬다)
+- 옛 문법 `gateway4:`는 **폐기됐다.** 위처럼 `routes: - to: default`로 쓴다
+:::
+
+## DNS — systemd-resolved
+
+```bash
+resolvectl status                 # 링크별 DNS 서버 · 검색 도메인 · DNSSEC  ← 진짜 설정은 여기
+resolvectl query intranet.corp.local
+resolvectl statistics             # 캐시 적중률
+sudo resolvectl flush-caches      # 캐시 비우기 (DNS를 방금 바꿨을 때)
+```
+
+```bash
+cat /etc/resolv.conf
+# nameserver 127.0.0.53      ← 스텁 리졸버. 이게 정상이다
+cat /run/systemd/resolve/resolv.conf   # 실제 업스트림 DNS 목록
+```
+
+:::caution[함정 — `/etc/resolv.conf`를 직접 고치지 않는다]
+그 파일은 `systemd-resolved`가 만드는 **심볼릭 링크이자 자동 생성물**이라
+직접 고쳐도 재부팅이나 네트워크 변경 때 덮어써진다. DNS를 바꾸려면
+**netplan의 `nameservers`** 를 고치고 `netplan apply` 한다.
+그리고 `nameserver 127.0.0.53`은 고장이 아니라 **정상 상태다** — 진짜 서버는
+`resolvectl status`에서 확인한다.
+:::
+
+### 이름 해석의 순서
+
+DNS만 보는 것이 아니다. `/etc/nsswitch.conf`의 `hosts:` 줄이 순서를 정한다 —
+보통 `files`(`/etc/hosts`) → `resolve`/`dns`.
+
+```bash
+getent hosts intranet.corp.local   # /etc/hosts까지 포함한 "실제 해석 결과"  ← dig보다 정확
+dig +short intranet.corp.local     # DNS에만 직접 물어본다 (dnsutils 패키지)
+dig @10.20.0.53 intranet.corp.local   # 특정 서버에 물어본다
+```
+
+`getent hosts`와 `dig`의 결과가 다르면 **`/etc/hosts`에 항목이 있다는 뜻**이다 —
+"내 노트북에선 되는데 서버에선 안 돼요"의 흔한 정체다.
+
+## 인터페이스 하드웨어 — `ethtool`
+
+```bash
+sudo ethtool enp1s0 | grep -E "Speed|Duplex|Link detected"
+sudo ethtool -S enp1s0 | grep -i -E "error|drop|crc"   # NIC 카운터
+ip -s link show enp1s0                                  # 커널이 센 에러/드롭
+```
+
+`Link detected: no`면 **케이블 또는 스위치 포트 문제**다. 그 위의 어떤 설정도 볼 필요가 없다.
+`errors`/`dropped`가 계속 증가하면 케이블 불량·MTU 불일치·스위치 문제를 의심한다.
+
+## 도구가 없다면
+
+<Tabs>
+<TabItem label="최소 진단 세트">
+
+```bash
+sudo apt install -y traceroute mtr-tiny dnsutils lsof net-tools tcpdump curl netcat-openbsd
+```
+
+`traceroute`·`mtr`·`dig`·`netstat`·`lsof`는 **Ubuntu 서버 기본 설치에 없다.**
+장애가 난 뒤에 (프록시 때문에 apt도 안 되는 상황에서) 깔려고 하면 늦는다 —
+서버를 받으면 미리 깔아 둔다.
+
+</TabItem>
+<TabItem label="아무것도 못 깔 때">
+
+```bash
+cat /proc/net/dev              # 인터페이스 통계
+cat /proc/net/tcp              # 소켓 (16진수라 읽기 힘들다)
+cat /etc/resolv.conf
+# TCP 연결 확인 — bash 내장 기능이라 nc 없이도 된다
+timeout 3 bash -c '</dev/tcp/10.20.30.50/443' && echo OPEN || echo CLOSED
+```
+
+마지막 줄은 **도구 없는 서버에서 포트 열림을 확인하는 유일한 방법**으로 종종 쓰인다.
+
+</TabItem>
+</Tabs>
+
+:::tip[핵심]
+`ip -br a` → `ip r` → `sudo ss -tulpn` → `resolvectl status`.
+이 넷이 "이 서버의 네트워크 현재 상태" 전부다. 여기서 이상한 값
+(`169.254.x.x`, default 경로 없음, `127.0.0.1` 바인딩)을 찾으면 진단은 거기서 끝난다.
+:::
+
+## 7장 요약
+
+- `ifconfig`·`netstat`은 없다 — **`ip -br a` · `ss -tulpn`** 이 지금의 표준이다
+- 주소가 `169.254.x.x`면 **DHCP 실패**, `ip r`에 default가 없으면 외부로 못 나간다
+- `127.0.0.1` 바인딩은 방화벽과 무관하게 **외부에서 못 닿는다**
+- 네트워크 설정은 netplan YAML. **원격에서는 `apply`가 아니라 `try`**
+- `/etc/resolv.conf`의 `127.0.0.53`은 정상 — 진짜 DNS는 `resolvectl status`
+- 실제 이름 해석 결과는 `dig`가 아니라 **`getent hosts`** 가 정확하다
+- 진단 도구는 기본 설치에 없다 — **장애 나기 전에** 깔아 둔다
+
+<LinkCard
+  title="8. 네트워크가 안 될 때 — 어디까지 되나"
+  description="링크부터 HTTP까지 층을 하나씩 올라가며 성공 지점을 찾는 진단 순서."
+  href="/server/08-connectivity/"
+/>

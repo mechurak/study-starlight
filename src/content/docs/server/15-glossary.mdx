@@ -1,0 +1,141 @@
+---
+title: "15. 용어 사전"
+description: "이 덱에 나온 용어 · 약어 · 주요 파일 경로 모음 — 처음 나온 장으로 가는 색인"
+---
+
+import { LinkCard } from '@astrojs/starlight/components';
+
+> 본문에서 처음 나올 때 풀어 쓴 용어들을 한 곳에 모았다 — 찾아보기용
+
+## 시스템 기본
+
+| 용어 | 풀 이름 | 뜻 | 장 |
+|---|---|---|---|
+| 배포판 | Distribution | 커널에 도구·정책을 얹어 묶은 제품. 기본값과 경로가 배포판마다 다르다 | [0](/server/00-intro/) |
+| LTS | Long Term Support | 장기 지원 버전. Ubuntu는 짝수 해 4월, 지원 5년(Pro 10년) | [0](/server/00-intro/) |
+| HWE | Hardware Enablement | LTS에 최신 커널을 얹어 주는 정책 — 같은 24.04라도 커널이 다른 이유 | [2](/server/02-hardware/) |
+| 커널 | Kernel | 하드웨어와 프로그램 사이의 핵심. `uname -r`의 버전 | [2](/server/02-hardware/) |
+| systemd | — | init 시스템 겸 서비스·로그·시간·세션 관리자 | [5](/server/05-systemd/) |
+| 유닛 / 타깃 | unit / target | systemd가 관리하는 대상 하나 / 유닛의 묶음이자 부팅 단계 | [5](/server/05-systemd/) |
+| drop-in | — | 원본을 안 건드리고 일부만 덮는 조각 설정 파일 | [5](/server/05-systemd/) |
+| cgroup | control group | 프로세스 묶음에 CPU·메모리 한도를 거는 커널 기능 | [5](/server/05-systemd/) |
+| DMI / SMBIOS | Desktop Management Interface | 펌웨어가 담은 하드웨어 정보표 — `dmidecode`가 읽는다 | [2](/server/02-hardware/) |
+| NUMA | Non-Uniform Memory Access | CPU 소켓마다 가까운 메모리가 따로인 구조 | [2](/server/02-hardware/) |
+
+## 셸과 프로세스
+
+| 용어 | 풀 이름 | 뜻 | 장 |
+|---|---|---|---|
+| 셸 | Shell | 명령을 해석해 실행하는 프로그램. Ubuntu 기본은 bash | [0](/server/00-intro/) |
+| stdout / stderr | standard output / error | 정상 출력(1) / 오류 출력(2). 오류는 파이프를 안 탄다 | [1](/server/01-shell/) |
+| 종료 코드 | exit status | 명령의 성공(0)·실패 신호. `$?`에 들어 있다 | [1](/server/01-shell/) |
+| 글로브 | glob | `*` `?` `[…]` — 셸이 먼저 펼치는 파일명 패턴 | [1](/server/01-shell/) |
+| PATH | — | 실행 파일을 찾을 디렉터리 목록. sudo는 별도(`secure_path`) | [1](/server/01-shell/) |
+| PID | Process ID | 프로세스 번호. 모든 조작의 열쇠. PID 1은 systemd | [4](/server/04-process/) |
+| 시그널 | Signal | 프로세스에 보내는 알림. TERM(정리 후 종료) · KILL(강제) · HUP(재읽기) | [4](/server/04-process/) |
+| load average | — | 실행 중 + 대기 중 작업 수의 평균. **I/O 대기도 포함** | [4](/server/04-process/) |
+| RSS / VSZ | Resident Set Size / Virtual Size | 실제 점유 물리 메모리 / 예약된 가상 주소 공간 | [4](/server/04-process/) |
+| OOM killer | Out Of Memory killer | 메모리 고갈 시 커널이 프로세스를 강제 종료하는 장치 | [4](/server/04-process/) |
+| 좀비 | zombie | 끝났지만 부모가 안 거둬 목록에만 남은 프로세스 | [4](/server/04-process/) |
+
+## 저장소
+
+| 용어 | 풀 이름 | 뜻 | 장 |
+|---|---|---|---|
+| 마운트 | mount | 블록 장치를 디렉터리 트리에 붙이는 일 | [3](/server/03-storage/) |
+| inode | index node | 파일 하나의 메타데이터. **개수가 고정이라 따로 고갈될 수 있다** | [3](/server/03-storage/) |
+| LVM | Logical Volume Manager | 디스크를 풀로 묶어 논리 볼륨으로 잘라 쓰는 층. 온라인 확장 가능 | [3](/server/03-storage/) |
+| ext4 / XFS | — | 대표 파일시스템 둘. Ubuntu 기본은 ext4 | [3](/server/03-storage/) |
+| tmpfs | — | 메모리 위의 파일시스템. `/run` · `/dev/shm` | [3](/server/03-storage/) |
+| SMART | Self-Monitoring, Analysis and Reporting Technology | 디스크의 자가 건강 진단 정보 | [2](/server/02-hardware/) |
+
+## 네트워크
+
+| 용어 | 풀 이름 | 뜻 | 장 |
+|---|---|---|---|
+| iproute2 | — | `ip` · `ss`를 담은 표준 도구 모음. net-tools의 후임 | [7](/server/07-network/) |
+| netplan | — | Ubuntu의 네트워크 설정 추상화 층 (YAML) | [7](/server/07-network/) |
+| systemd-resolved | — | 로컬 DNS 스텁·캐시. `/etc/resolv.conf`의 `127.0.0.53` | [7](/server/07-network/) |
+| LISTEN / ESTAB | — | 접속 대기 중인 서버 포트 / 실제로 맺어진 연결 | [7](/server/07-network/) |
+| MTU | Maximum Transmission Unit | 한 패킷의 최대 크기(보통 1500) | [7](/server/07-network/) |
+| MTU 블랙홀 | MTU black hole | 작은 요청은 되고 큰 전송만 조용히 사라지는 현상 | [8](/server/08-connectivity/) |
+| ICMP | Internet Control Message Protocol | ping·traceroute가 쓰는 프로토콜. **사내망에서 자주 차단** | [8](/server/08-connectivity/) |
+| 3-way handshake | — | TCP 연결 수립 절차 (SYN → SYN/ACK → ACK) | [8](/server/08-connectivity/) |
+| SNI | Server Name Indication | TLS 시작 시 접속 도메인을 알리는 확장 | [8](/server/08-connectivity/) |
+
+## 프록시와 인증서
+
+| 용어 | 풀 이름 | 뜻 | 장 |
+|---|---|---|---|
+| 포워드 프록시 | forward proxy | 내부→외부 요청을 대신 보내는 중계 서버 | [9](/server/09-proxy/) |
+| CONNECT | — | HTTPS를 프록시로 터널링할 때 쓰는 HTTP 메서드 | [8](/server/08-connectivity/) |
+| MITM 검사 | Man-In-The-Middle inspection | 프록시가 TLS를 풀어 검사하고 다시 암호화하는 것 | [9](/server/09-proxy/) |
+| CA | Certificate Authority | 인증서에 서명하는 기관. 사내 CA는 직접 신뢰 목록에 넣어야 한다 | [9](/server/09-proxy/) |
+| NO_PROXY | — | 프록시를 거치지 않을 주소 목록. 누락이 사고의 단골 원인 | [9](/server/09-proxy/) |
+| PAC | Proxy Auto-Config | 브라우저용 프록시 자동 설정 스크립트 — CLI 도구는 대개 못 읽는다 | [9](/server/09-proxy/) |
+
+## 사용자와 보안
+
+| 용어 | 풀 이름 | 뜻 | 장 |
+|---|---|---|---|
+| UID / GID | User / Group ID | 커널이 실제로 다루는 사용자·그룹 번호. root는 0 | [10](/server/10-users/) |
+| 보조 그룹 | supplementary group | 기본 그룹 외 추가 소속. **재로그인해야 반영** | [10](/server/10-users/) |
+| sudoers | — | sudo 권한 정의. **`visudo`로만 편집** | [10](/server/10-users/) |
+| umask | — | 새 파일에서 뺄 권한 마스크. Ubuntu 기본 022 | [10](/server/10-users/) |
+| 공개키 인증 | public key authentication | 키 쌍으로 하는 SSH 로그인 | [10](/server/10-users/) |
+| PAM | Pluggable Authentication Modules | 인증 절차를 모듈로 조립하는 프레임워크 | [11](/server/11-audit/) |
+| ufw | Uncomplicated Firewall | Ubuntu의 방화벽 프론트엔드 (내부는 nftables) | [13](/server/13-security/) |
+| nftables | — | 지금 리눅스의 패킷 필터 프레임워크. iptables의 후임 | [13](/server/13-security/) |
+| fail2ban | — | 인증 실패가 반복되는 IP를 자동 차단하는 도구 | [13](/server/13-security/) |
+| AppArmor | — | Ubuntu의 강제 접근 제어(MAC). SELinux에 해당하는 자리 | [13](/server/13-security/) |
+| NTP | Network Time Protocol | 시각 동기화. 틀어지면 TLS·인증이 무너진다 | [13](/server/13-security/) |
+
+## 로그와 감사
+
+| 용어 | 풀 이름 | 뜻 | 장 |
+|---|---|---|---|
+| journal | — | systemd가 로그를 모아 두는 **구조화된 바이너리** 저장소 | [6](/server/06-logs/) |
+| facility / priority | — | 로그의 출처 / 심각도(0 emerg ~ 7 debug) | [6](/server/06-logs/) |
+| 부팅 ID | boot ID | 부팅마다 새로 생기는 식별자. `-b -1`이 직전 부팅 | [6](/server/06-logs/) |
+| rsyslog | — | `/var/log/*.log` 텍스트 로그를 만드는 전통적 로그 데몬 | [6](/server/06-logs/) |
+| logrotate | — | 로그를 잘라 압축·보관·삭제하는 도구 | [6](/server/06-logs/) |
+| utmp / wtmp / btmp | — | 접속 중 / 로그인 이력 / 실패 이력 바이너리 파일 | [11](/server/11-audit/) |
+| lastlog | — | 계정별 마지막 로그인 시각 기록 | [11](/server/11-audit/) |
+| auditd | Linux Audit daemon | 커널 감사 데몬. **Ubuntu 기본 미설치** | [11](/server/11-audit/) |
+
+## 패키지
+
+| 용어 | 풀 이름 | 뜻 | 장 |
+|---|---|---|---|
+| apt / dpkg | — | 저장소에서 받아 의존성을 푸는 상위 도구 / .deb 하나를 다루는 하위 도구 | [12](/server/12-packages/) |
+| 저장소 | repository | 패키지 배포 서버. main · universe · restricted · multiverse | [12](/server/12-packages/) |
+| deb822 | — | 24.04부터 표준인 여러 줄 키–값 저장소 설정 형식(`.sources`) | [12](/server/12-packages/) |
+| unattended-upgrades | — | 보안 업데이트 자동 설치. **기본 활성** | [12](/server/12-packages/) |
+| needrestart | — | 업그레이드 후 재시작할 서비스를 묻는 도구 — 자동화의 걸림돌 | [12](/server/12-packages/) |
+| ESM | Expanded Security Maintenance | Ubuntu Pro의 연장 보안 지원 | [12](/server/12-packages/) |
+
+## 주요 파일·디렉터리 색인
+
+| 경로 | 무엇 | 장 |
+|---|---|---|
+| `/etc/os-release` | 배포판 정보 (표준) | [2](/server/02-hardware/) |
+| `/etc/fstab` | 부팅 시 자동 마운트 목록 — `nofail` 필수 | [3](/server/03-storage/) |
+| `/etc/systemd/system/<유닛>.d/` | 유닛 drop-in | [5](/server/05-systemd/) |
+| `/var/log/journal/` | journal 본체 (바이너리) | [6](/server/06-logs/) |
+| `/var/log/auth.log` | **인증 · sudo · SSH 기록** | [11](/server/11-audit/) |
+| `/var/log/apt/history.log` | 누가 언제 무슨 apt 명령을 실행했나 | [11](/server/11-audit/) |
+| `/etc/netplan/*.yaml` | 네트워크 설정 | [7](/server/07-network/) |
+| `/run/systemd/resolve/resolv.conf` | 실제 업스트림 DNS 목록 | [7](/server/07-network/) |
+| `/etc/environment` | 전역 환경변수 (프록시) | [9](/server/09-proxy/) |
+| `/etc/apt/apt.conf.d/95proxy` | apt 전용 프록시 | [9](/server/09-proxy/) |
+| `/usr/local/share/ca-certificates/*.crt` | 사내 CA 인증서 설치 위치 | [9](/server/09-proxy/) |
+| `/etc/sudoers.d/` | sudo 권한 조각 파일 | [10](/server/10-users/) |
+| `/etc/ssh/sshd_config.d/` | sshd 설정 조각 파일 | [10](/server/10-users/) |
+| `/var/run/reboot-required` | 있으면 재부팅 필요 | [12](/server/12-packages/) |
+| `/proc/<PID>/environ` | 그 프로세스가 실제로 받은 환경변수 | [4](/server/04-process/) |
+
+<LinkCard
+  title="16. 마무리 — 치트시트"
+  description="상황별 명령 한 장 요약과 정기 점검 루틴."
+  href="/server/16-wrapup/"
+/>

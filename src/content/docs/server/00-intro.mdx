@@ -1,0 +1,151 @@
+---
+title: "0. 시작하기 전에"
+description: "이 덱의 대상과 범위, 기준 배포판(Ubuntu 24.04), 그리고 낡은 명령 / 지금 명령 대응표"
+---
+
+import { Card, CardGrid, LinkCard } from '@astrojs/starlight/components';
+import TermIntro from '../../../components/TermIntro.astro';
+
+> 검색으로 나오는 리눅스 글의 절반은 **10년 전 명령**이다 — 기준 시점을 먼저 못 박는다
+
+<TermIntro
+  terms={[
+    ['배포판', 'Distribution', '리눅스 커널에 패키지 관리자·기본 도구·설정 정책을 얹어 하나로 묶은 제품. 명령의 이름은 같아도 **기본값과 설정 파일 위치가 배포판마다 다르다** — 그래서 "리눅스"가 아니라 "Ubuntu 24.04"를 기준으로 잡는다.'],
+    ['LTS', 'Long Term Support', '장기 지원 버전. Ubuntu는 짝수 해 4월에 LTS를 내고 **5년(Ubuntu Pro로 10년)** 동안 보안 패치를 준다. 서버는 사실상 LTS만 쓴다.'],
+    ['systemd', '', '지금 리눅스의 **init 시스템**이자 서비스 관리자. 부팅·서비스·로그·시간·네트워크·로그인 세션까지 관리한다. `systemctl`·`journalctl`이 그 얼굴이다(5~6장).'],
+    ['셸', 'Shell', '명령을 받아 해석해 실행하는 프로그램. Ubuntu의 로그인 셸 기본값은 `bash`이고, 스크립트에서 `/bin/sh`는 `dash`로 연결돼 있다 — bash 전용 문법이 스크립트에서 깨지는 흔한 원인이다.'],
+    ['루트', 'root', 'UID 0, 모든 권한을 가진 계정. Ubuntu는 root 로그인을 막아 두고 **`sudo`로 잠깐 빌려 쓰게** 한다 — 누가 무엇을 했는지 기록이 남는다는 점이 더 중요한 차이다(10~11장).'],
+  ]}
+/>
+
+## 이 덱은 누구를 위한 것인가
+
+- 사내망 안의 **Ubuntu 서버를 맡게 된** 사람 — 개발자든 인프라 담당이든
+- 명령을 몇 개 알긴 하는데, **문제가 났을 때 어느 순서로 쳐야 하는지** 모르는 사람
+- 사내 **프록시·사설 CA 환경**에서 "왜 이 도구만 안 되지"에 반복해서 부딪히는 사람
+
+전제하는 것: 터미널로 SSH 접속은 해 봤다, 파일 경로와 디렉터리 개념을 안다.
+전제하지 않는 것: 리눅스 관리 경험, 셸 스크립트, 네트워크 이론.
+
+### 다루는 것과 다루지 않는 것
+
+<CardGrid>
+<Card title="다룬다" icon="approve-check">
+OS · 커널 · 하드웨어 스펙 확인.
+디스크 · 파일시스템 · 프로세스 · 자원 사용량.
+systemd 서비스 관리와 journalctl 로그 읽기.
+네트워크 상태 확인과 **층별 연결 진단**.
+사내 프록시 · 사설 CA 인증서 설정 — 프로그램별로.
+사용자 · 권한 · SSH, **접속 이력과 명령 감사**.
+apt 패키지 · 업데이트 · ufw 방화벽.
+증상에서 출발하는 진단 플레이북.
+</Card>
+<Card title="다루지 않는다" icon="close">
+셸 스크립트 작성법 (읽을 만큼만).
+서버 애플리케이션 설치·설정 (nginx · DB 등).
+쿠버네티스 · 컨테이너 오케스트레이션 (→ [CKA 덱](/cka/)).
+Ansible · Terraform 등 구성 관리 도구.
+커널 튜닝 · 성능 벤치마킹 상세.
+SELinux (Ubuntu는 AppArmor를 쓴다 — 이름만).
+데스크톱 환경 · GUI.
+</Card>
+</CardGrid>
+
+## 미리 잡아두면 좋은 멘탈 모델
+
+### 1. 읽는 명령과 바꾸는 명령
+
+서버에서 실수는 대부분 **바꾸는 명령**에서 난다. 그래서 이 덱은 읽는 명령을 훨씬 많이 다룬다.
+
+| 성격 | 예 | 태도 |
+|---|---|---|
+| 읽기 — 상태를 보기만 한다 | `ip a` · `ss -tulpn` · `systemctl status` · `journalctl` · `lsblk` · `ps` | **마음껏 친다.** 진단은 여기서 다 끝난다 |
+| 쓰기 — 상태를 바꾼다 | `systemctl restart` · `netplan apply` · `ufw enable` · `apt upgrade` | 무엇이 바뀌는지 말할 수 있을 때만. 되돌릴 방법을 먼저 정한다 |
+| 쓰기 — **자기 접속을 끊을 수 있다** | `ufw enable` · `netplan apply` · `systemctl restart ssh` · `reboot` | 원격이면 콘솔 접근 수단을 확보하고 친다 |
+
+### 2. 층으로 가른다
+
+"안 돼요"라는 신고는 정보가 없다. 층을 세우고 **어디까지 성공하는지** 확인하면
+정보가 생긴다. 네트워크의 층이 가장 자주 쓰이지만([8장](/server/08-connectivity/)),
+같은 사고방식이 부팅에도(펌웨어 → GRUB → 커널 → initramfs → systemd),
+서비스에도(프로세스 살아 있나 → 포트 열었나 → 응답하나) 그대로 적용된다.
+
+### 3. 상태는 전부 파일에 있다
+
+리눅스에서 "설정을 본다"는 결국 파일을 읽는 일이다. 디렉터리의 역할만 알면 절반은 찾아진다.
+
+```mermaid
+flowchart LR
+    ETC["/etc<br/>사람이 쓴 설정<br/>(백업 대상)"] --> SYS["실행 중인 시스템"]
+    PROC["/proc · /sys<br/>커널이 실시간으로 만드는 가짜 파일<br/>(디스크에 없다)"] --> SYS
+    SYS --> VAR["/var<br/>변하는 것 — 로그 · 캐시 · DB"]
+    SYS --> RUN["/run<br/>재부팅하면 사라지는 실행 상태<br/>(PID · 소켓)"]
+
+    classDef key  fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
+    classDef ok   fill:#dcfce7,stroke:#16a34a,color:#14532d
+    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
+    class ETC key
+    class SYS ok
+    class PROC,VAR,RUN mute
+```
+
+`free`도 `top`도 `lscpu`도 결국 `/proc` 아래를 읽어 예쁘게 보여주는 프로그램이다 —
+명령이 없는 환경(최소 컨테이너 등)에서는 `cat /proc/meminfo`로 직접 볼 수 있다.
+
+:::tip[핵심]
+셋 — **읽기 먼저, 층으로 가르기, 상태는 파일** — 만 잡고 있으면
+나머지 장은 "어느 파일을 어느 명령으로 읽는가"의 목록이다.
+:::
+
+## 이 덱의 기준
+
+**Ubuntu 24.04 LTS (코드명 noble)** 기준이다. 24.04는 2024년 4월에 나와
+**2029년까지 표준 보안 지원**(Ubuntu Pro 적용 시 2034년까지)을 받는다.
+
+| 항목 | 24.04 LTS의 값 | 확인 방법 |
+|---|---|---|
+| 커널 | GA는 6.8. 포인트 릴리스(24.04.x)에서 **HWE 커널**로 더 올라간다 | `uname -r` |
+| init · 서비스 | systemd **255** | `systemctl --version` |
+| 패키지 | apt 2.7 · deb822 형식 `.sources` 도입 | `apt --version` |
+| 네트워크 설정 | **netplan** → 서버는 systemd-networkd, 데스크톱은 NetworkManager | `netplan status` |
+| DNS | systemd-resolved (스텁 리졸버 `127.0.0.53`) | `resolvectl status` |
+| 방화벽 | **ufw** (내부는 nftables) | `ufw status` |
+| 강제 접근 제어 | **AppArmor** (SELinux 아님) | `aa-status` |
+
+### 낡은 명령 / 지금 명령
+
+검색 결과 상단에 아직도 많이 남아 있는 옛 명령들이다.
+**왼쪽이 보이면 그 글 전체가 낡았다고 의심**한다.
+
+| 옛 명령 (net-tools 시대) | 지금 (iproute2 · systemd) | 비고 |
+|---|---|---|
+| `ifconfig` | `ip addr` · `ip -br a` | `net-tools`는 **기본 설치조차 안 된다** |
+| `route -n` | `ip route` | |
+| `netstat -tulpn` | `ss -tulpn` | `ss`가 훨씬 빠르다 |
+| `arp -a` | `ip neigh` | |
+| `service nginx restart` | `systemctl restart nginx` | `service`는 지금도 동작하는 얇은 래퍼다 |
+| `/etc/init.d/…` | `systemctl` | |
+| `/etc/network/interfaces` | `/etc/netplan/*.yaml` | 18.04부터 netplan |
+| `/etc/resolv.conf` 직접 편집 | `netplan` 또는 `resolvectl` | 그 파일은 **자동 생성물이라 덮어써진다** |
+| `iptables -L` | `nft list ruleset` · `ufw status` | iptables 명령은 nftables로 번역돼 실행된다 |
+| `apt-key add` | `/etc/apt/keyrings/` + `signed-by=` | `apt-key`는 제거됐다([12장](/server/12-packages/)) |
+
+:::caution[함정]
+"명령이 없다"(`command not found`)와 "명령이 실패했다"는 완전히 다른 문제인데
+당황하면 섞인다. Ubuntu 서버 최소 설치에는 `traceroute` · `mtr` · `dig` · `netstat` · `lsof` ·
+`strace`가 **아예 없다.** 진단 도구부터 깔아야 진단이 시작된다 —
+`sudo apt install -y traceroute mtr-tiny dnsutils lsof net-tools`.
+:::
+
+## 0장 요약
+
+- 대상은 **사내망 Ubuntu 24.04 서버를 맡은 사람**, 관점은 "명령어 사전"이 아니라 **상황**
+- 멘탈 모델 셋: **읽기 명령 먼저 / 층으로 가르기 / 상태는 전부 파일**
+- 기준은 Ubuntu 24.04 LTS · systemd 255 · netplan · systemd-resolved · ufw · AppArmor
+- `ifconfig` · `netstat` · `/etc/network/interfaces`가 보이면 **낡은 글이다**
+
+<LinkCard
+  title="1. 명령을 읽는 법"
+  description="모르는 명령을 만났을 때 스스로 알아내는 법 — man 섹션, 종료 코드, 파이프, 그리고 sudo가 환경을 버린다는 사실."
+  href="/server/01-shell/"
+/>

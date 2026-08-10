@@ -1,0 +1,253 @@
+---
+title: "10. 사용자 · 권한 · SSH"
+description: "계정과 그룹, sudo 설정, 파일 권한과 umask, SSH 키 인증과 접속이 안 될 때 보는 곳"
+---
+
+import { Steps, LinkCard } from '@astrojs/starlight/components';
+import TermIntro from '../../../components/TermIntro.astro';
+
+> 권한 문제의 대부분은 **파일 권한이 아니라 그 파일이 든 디렉터리의 권한**이다
+
+<TermIntro
+  terms={[
+    ['UID / GID', 'User ID / Group ID', '커널이 실제로 다루는 것은 이름이 아니라 숫자다. Ubuntu에서 일반 사용자는 1000번부터, **0번이 root**다. 컨테이너·NFS에서 "권한이 이상하다"는 대개 UID 불일치다.'],
+    ['보조 그룹', 'supplementary group', '기본 그룹 외에 추가로 속한 그룹들. `sudo`·`docker`·`adm` 같은 **권한이 그룹으로 주어지는** 경우가 많다 — 추가해도 **다시 로그인해야 반영된다.**'],
+    ['sudoers', '', '누가 무엇을 sudo로 실행할 수 있는지 정의하는 파일. **문법이 틀리면 아무도 sudo를 못 쓰게 되므로** 반드시 `visudo`로 편집한다(저장 시 검사한다).'],
+    ['공개키 인증', 'public key authentication', '비밀번호 대신 키 쌍으로 로그인하는 방식. 공개키를 서버의 `~/.ssh/authorized_keys`에 넣고, 개인키는 클라이언트에만 둔다 — 비밀번호 무차별 대입이 원천적으로 불가능해진다.'],
+    ['umask', '', '새로 만드는 파일에서 **뺄 권한**을 지정하는 마스크. Ubuntu 기본 `022`는 "그룹과 타인에게서 쓰기 권한을 뺀다"는 뜻이라 파일이 `644`, 디렉터리가 `755`로 생긴다.'],
+  ]}
+/>
+
+## 지금 나는 누구인가
+
+```bash
+id                       # uid · gid · 속한 그룹 전부  ← 권한 문제의 첫 명령
+whoami
+groups
+id -nG deploy            # 특정 사용자의 그룹
+getent passwd deploy     # 계정 정보 (LDAP/AD 연동까지 포함해서 조회한다)
+getent group docker      # 이 그룹에 누가 들어 있나
+```
+
+`getent`를 쓰는 이유 — `/etc/passwd`를 직접 읽으면 **LDAP·AD로 연동된 계정이 안 보인다.**
+`getent`는 `nsswitch.conf` 순서대로 전부 뒤진다.
+
+| 파일 | 내용 |
+|---|---|
+| `/etc/passwd` | 계정 목록 (누구나 읽을 수 있다 — 비밀번호는 여기 없다) |
+| `/etc/shadow` | 비밀번호 해시와 만료 정책 (**root만**) |
+| `/etc/group` | 그룹과 구성원 |
+| `/etc/sudoers`, `/etc/sudoers.d/` | sudo 권한 |
+
+## 계정 만들고 다루기
+
+```bash
+sudo adduser deploy                  # 대화형. 홈 디렉터리·기본 그룹까지 알아서  ← 권장
+sudo useradd -m -s /bin/bash svc     # 스크립트용 저수준 명령 (-m 없으면 홈이 안 생긴다)
+sudo usermod -aG sudo,docker deploy  # 보조 그룹 추가 (-a를 빠뜨리면 기존 그룹이 날아간다)
+sudo deluser deploy                  # 계정 삭제 (--remove-home 으로 홈까지)
+sudo passwd -l svc                   # 비밀번호 로그인 잠금
+sudo passwd -S deploy                # 상태 확인 (P=설정됨 L=잠김 NP=비밀번호 없음)
+sudo chage -l deploy                 # 비밀번호 만료 정책
+```
+
+:::caution[함정 둘]
+- **`usermod -G`에서 `-a`를 빠뜨리면 기존 보조 그룹이 전부 지워진다.**
+  `sudo` 그룹에서 자기를 빼 버리는 사고가 실제로 일어난다. 항상 **`-aG`**
+- 그룹을 추가해도 **이미 열려 있는 세션에는 반영되지 않는다.** 다시 로그인하거나
+  `newgrp docker`로 새 셸을 연다. `id`로 확인하는 습관이 안전하다
+:::
+
+서비스 전용 계정은 로그인이 필요 없다 — 셸을 막아 둔다.
+
+```bash
+sudo useradd -r -s /usr/sbin/nologin -M myapp    # 시스템 계정, 홈 없음, 로그인 불가
+```
+
+## sudo
+
+```bash
+sudo -l                     # 내가 sudo로 할 수 있는 것 목록
+sudo -u deploy -i           # 다른 사용자로 전환
+sudo -i                     # root 셸 (root의 환경까지)
+sudo -E command             # 내 환경변수를 유지한 채 ([1장](/server/01-shell/) · [9장](/server/09-proxy/))
+```
+
+설정은 **`/etc/sudoers`를 직접 고치지 않고** 조각 파일을 둔다.
+
+```bash
+sudo visudo -f /etc/sudoers.d/deploy      # visudo가 저장 시 문법을 검사해 준다
+```
+
+```
+# 특정 명령만 비밀번호 없이
+deploy ALL=(ALL) NOPASSWD: /usr/bin/systemctl restart myapp, /usr/bin/journalctl -u myapp
+# 프록시 환경변수 유지 (9장)
+Defaults env_keep += "http_proxy https_proxy no_proxy HTTP_PROXY HTTPS_PROXY NO_PROXY"
+```
+
+:::caution[함정 — sudoers 문법 오류]
+`/etc/sudoers`를 일반 편집기로 고치다 문법이 틀리면 **`sudo` 자체가 동작하지 않게 되고,
+sudo 없이는 되돌릴 수도 없다.** 반드시 `visudo`(또는 `visudo -f`)로 편집한다.
+`sudoers.d` 아래 파일 이름에 **`.`이나 `~`가 들어가면 무시된다** — 확장자를 붙이지 않는다.
+:::
+
+## 파일 권한
+
+```bash
+ls -l  /etc/ssh/sshd_config       # -rw-r--r-- 1 root root
+ls -ld /var/log                   # 디렉터리는 -d
+stat  /etc/ssh/sshd_config        # 권한 · 소유자 · 시각 상세
+namei -l /var/www/html/index.html # 경로의 각 단계 권한  ← 권한 문제의 결정타
+```
+
+```
+-rw-r--r--
+│└┬┘└┬┘└┬┘
+│ │  │  └── other (그 외 모두)
+│ │  └───── group
+│ └──────── owner
+└────────── 종류: - 파일, d 디렉터리, l 링크
+```
+
+| 숫자 | 뜻 | 파일에서 | **디렉터리에서** |
+|---|---|---|---|
+| `4` = `r` | 읽기 | 내용 읽기 | **목록 보기** (`ls`) |
+| `2` = `w` | 쓰기 | 내용 수정 | **파일 생성·삭제** |
+| `1` = `x` | 실행 | 실행하기 | **그 안으로 들어가기** (`cd`, 통과) |
+
+:::caution[함정 — 파일은 644인데 왜 못 읽지]
+디렉터리의 **`x`(실행)** 권한이 없으면 그 안의 파일에 아무리 권한이 있어도 접근할 수 없다.
+경로의 **모든 단계**에 `x`가 필요하다. `namei -l /전체/경로/파일` 로 어느 단계에서
+막히는지 한 줄에 확인한다 — 이 명령을 아는 사람이 의외로 적다.
+:::
+
+```bash
+sudo chmod 640 /etc/myapp/secret.conf
+sudo chmod u+x,g-w script.sh
+sudo chown myapp:myapp /opt/myapp -R
+sudo chmod -R g+rX /srv/share       # 대문자 X = "디렉터리에만" 실행 권한  ← 유용하다
+umask                                # 현재 마스크 (0022)
+```
+
+특수 비트 셋 — `setuid`(4000, 실행 시 소유자 권한으로), `setgid`(2000, 디렉터리에 걸면
+새 파일이 그 그룹을 물려받는다 — **공유 디렉터리에 유용**),
+`sticky`(1000, `/tmp`처럼 **자기 파일만 지울 수 있게**).
+
+세밀한 제어가 필요하면 ACL을 쓴다 — `getfacl 경로` · `sudo setfacl -m u:deploy:rx 경로`.
+
+## SSH
+
+### 키로 접속 설정하기
+
+<Steps>
+
+1. **클라이언트에서 키를 만든다** (이미 있으면 건너뛴다)
+
+   ```bash
+   ssh-keygen -t ed25519 -C "sshim@laptop"
+   ```
+
+   `ed25519`가 지금의 기본 권장이다 — RSA보다 짧고 빠르다.
+
+2. **공개키를 서버에 넣는다**
+
+   ```bash
+   ssh-copy-id deploy@10.20.30.41
+   ```
+
+   수동이면 서버의 `~/.ssh/authorized_keys`에 공개키(`.pub`) 한 줄을 붙인다.
+
+3. **권한을 맞춘다 — 틀리면 조용히 무시된다**
+
+   ```bash
+   chmod 700 ~/.ssh
+   chmod 600 ~/.ssh/authorized_keys
+   ```
+
+4. **접속을 확인한 뒤** 비밀번호 로그인을 끈다
+
+   ```bash
+   # /etc/ssh/sshd_config.d/99-hardening.conf   ← 원본 대신 이 디렉터리를 쓴다
+   PasswordAuthentication no
+   PermitRootLogin no
+   ```
+
+   ```bash
+   sudo sshd -t                      # 문법 검사 — 반드시 먼저
+   sudo systemctl reload ssh
+   ```
+
+   :::caution[함정]
+   **지금 접속을 끊지 않은 상태에서** 다른 터미널로 새로 접속해 보고 성공을 확인한 뒤
+   기존 세션을 닫는다. 순서를 반대로 하면 잠긴다.
+   Ubuntu 24.04의 서비스 이름은 `ssh`다(`sshd`가 아니다 — `systemctl reload ssh`).
+   :::
+
+</Steps>
+
+### 접속이 안 될 때
+
+```bash
+ssh -v deploy@10.20.30.41            # -vvv 까지 늘릴 수 있다. 어느 단계에서 멈추는지 나온다
+ssh -o PreferredAuthentications=publickey -v deploy@호스트
+```
+
+| 증상 | 확인 |
+|---|---|
+| `Connection refused` | sshd가 안 떠 있다 — `systemctl status ssh`, 포트 확인 `ss -tulpn \| grep :22` |
+| **타임아웃** | 방화벽/보안그룹 — 서버까지 못 갔다([8장](/server/08-connectivity/)) |
+| `Permission denied (publickey)` | 키 문제 — 서버의 `/var/log/auth.log`에 이유가 있다 |
+| 비밀번호를 계속 물어봄 | `authorized_keys` 권한 또는 홈 디렉터리 권한이 너무 열려 있다 |
+| `Too many authentication failures` | 에이전트가 키를 여러 개 던지는 중 — `ssh -o IdentitiesOnly=yes -i 키` |
+| `REMOTE HOST IDENTIFICATION HAS CHANGED` | 서버가 재설치됐거나 중간자 — `ssh-keygen -R 호스트` 후 재확인 |
+
+서버 쪽 로그가 가장 정확하다.
+
+```bash
+sudo journalctl -u ssh -f                 # 접속 시도를 실시간으로
+sudo tail -f /var/log/auth.log
+```
+
+`Authentication refused: bad ownership or modes for directory /home/deploy` —
+이 메시지가 **권한 문제의 자백**이다. 홈 디렉터리가 그룹 쓰기 가능(`775`)이어도 거부된다.
+
+### 클라이언트 설정으로 편하게
+
+`~/.ssh/config`
+
+```
+Host web01
+    HostName 10.20.30.41
+    User deploy
+    IdentityFile ~/.ssh/id_ed25519
+    ServerAliveInterval 60        # 유휴 끊김 방지
+
+Host *.internal
+    ProxyJump bastion.corp.local  # 점프 호스트 경유
+```
+
+`ssh web01` 한 줄로 붙는다. 사내망 점프 호스트가 있으면 `ProxyJump`가 정답이다.
+
+:::tip[핵심]
+권한 문제는 **`id`(나는 누구인가) → `namei -l`(경로 어디서 막히나) → `ls -l`(그 파일)** 순서다.
+SSH 문제는 **클라이언트 `ssh -v`와 서버 `journalctl -u ssh`를 나란히** 놓고 본다 —
+대개 서버 로그 한 줄에 답이 있다.
+:::
+
+## 10장 요약
+
+- 계정 조회는 `/etc/passwd`가 아니라 **`getent`** (AD·LDAP 연동까지 본다)
+- 그룹 추가는 반드시 **`usermod -aG`**, 그리고 **다시 로그인해야 반영된다**
+- sudoers는 **`visudo`로만** 편집하고 `/etc/sudoers.d/`에 조각으로 둔다
+- 디렉터리의 `x`가 없으면 안의 파일에 못 닿는다 — **`namei -l`** 로 경로를 훑는다
+- SSH 키는 `ed25519`, 권한은 **`.ssh` 700 · `authorized_keys` 600**
+- sshd 설정은 `/etc/ssh/sshd_config.d/`에 두고 **`sshd -t` 후 reload**,
+  기존 세션을 유지한 채 새 접속으로 검증한다
+- 서비스 이름은 `sshd`가 아니라 **`ssh`** 다
+
+<LinkCard
+  title="11. 누가 접속했고 무엇을 했나"
+  description="last · lastb · w · journalctl · auth.log · bash_history의 한계 · auditd."
+  href="/server/11-audit/"
+/>

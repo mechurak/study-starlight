@@ -21,7 +21,9 @@ dev 서버는 백그라운드 모드로 띄운다: `astro dev --background`
 
 - `cka` — **[docs/cka-baseline.md](docs/cka-baseline.md)를 먼저 읽는다** (기준 커리큘럼과 버전 고정)
 - `shadcn` — 아래 절의 전용 규칙 셋을 따른다
-- `shadcn` · `web` · `keycloak` · `kafka` — 각 장 첫머리의 `<TermIntro>` 상자가 의무다 (아래 절)
+- `shadcn` · `web` · `keycloak` · `kafka` · `server` — 각 장 첫머리의 `<TermIntro>` 상자가 의무다 (아래 절)
+- `server` — Ubuntu **24.04 LTS 고정**이 기준이다. 명령·기본값·파일 경로를 쓸 때
+  22.04나 RHEL 계열과 섞지 않는다. 다른 배포판 이야기는 "비고"로만 단다
 
 ### shadcn 덱
 
@@ -32,7 +34,9 @@ dev 서버는 백그라운드 모드로 띄운다: `astro dev --background`
 이 덱은 **읽기 어렵다는 피드백에서 나왔다.** 그래서 규칙이 셋 더 있다 —
 
 - **용어 규칙("콘텐츠 규칙" 절)을 각 장 첫머리의 `<TermIntro>` 상자로 강제한다**
-  (`src/components/TermIntro.astro`). `web`·`keycloak`·`kafka` 덱도 이 규칙을 같이 쓴다.
+  (`src/components/TermIntro.astro`). `web`·`keycloak`·`kafka`·`server` 덱도 이 규칙을 같이 쓴다.
+  설명의 `**굵게**` 안에 `*`를 넣으면 안 된다 (`/var/log/*.log` 같은 글롭) —
+  치환 정규식이 `[^*]+`라 매칭이 깨져 **`**`가 화면에 그대로 나온다.** 빌드는 통과한다.
   `terms`는 `[용어, 풀 이름(없으면 ''), 한 줄 설명][]`이고, 설명 안의 백틱은 코드로 안 바뀐다 — 평문이다
 - **곁가지를 넣지 않는다.** 뺀 것은 [0장의 "다루지 않는 것" 표](src/content/docs/shadcn/00-intro.mdx)에
   이름만 남긴다. 새 내용을 넣을 때 그 표와 충돌하는지 먼저 본다

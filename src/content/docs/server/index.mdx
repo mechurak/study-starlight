@@ -1,0 +1,70 @@
+---
+title: 개요
+description: 서버 관리 일반 — Ubuntu 24.04 서버를 읽고, 진단하고, 고치는 명령들
+---
+
+import { LinkCard, LinkButton } from '@astrojs/starlight/components';
+
+> 서버 관리의 8할은 **바꾸는 일이 아니라 읽는 일**이다 — 무엇이 지금 어떤 상태인지부터 안다
+
+사내망 안의 Ubuntu 24.04 LTS 서버를 맡은 사람을 전제로 한다.
+"리눅스 명령어 사전"이 아니라 **상황에서 출발하는 정리다** —
+네트워크가 안 될 때 어디까지 되는지, 이 서버가 무슨 하드웨어인지,
+누가 언제 들어와 무엇을 했는지 — 를 실제로 알아내는 순서로 묶었다.
+
+**2026년 8월 기준**으로 쓰였고 **Ubuntu 24.04 LTS (noble)** 를 기준 배포판으로 삼는다.
+22.04·debian 계열에서도 대부분 그대로 통하지만, 다른 곳은 표시해 뒀다.
+
+<LinkButton href="/server/00-intro/" icon="right-arrow">첫 장부터 읽기</LinkButton>
+
+## 구성
+
+```mermaid
+flowchart LR
+    A["0~1장<br/>준비<br/>범위 · 명령 읽는 법"] --> B["2~4장<br/>이 서버는 무엇인가<br/>OS · 디스크 · 프로세스"]
+    B --> C["5~6장<br/>서비스와 로그<br/>systemd · journalctl"]
+    C --> D["7~9장<br/>네트워크<br/>상태 · 층별 진단 · 프록시"]
+    D --> E["10~11장<br/>사용자와 접근<br/>권한 · 접속 이력 · 감사"]
+    E --> F["12~13장<br/>운영과 보안<br/>패키지 · 방화벽"]
+    F --> G["14~16장<br/>플레이북 · 용어 · 마무리"]
+
+    classDef key  fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
+    classDef ok   fill:#dcfce7,stroke:#16a34a,color:#14532d
+    classDef warn fill:#fef3c7,stroke:#d97706,color:#78350f
+    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
+    class A mute
+    class B key
+    class C ok
+    class D warn
+    class E key
+    class F ok
+    class G mute
+```
+
+| 장 | 주제 | 답하는 질문 |
+|---|---|---|
+| [0](/server/00-intro/)–[1](/server/01-shell/) | 범위 · 명령 읽는 법 | 모르는 명령을 만났을 때 스스로 알아내는 법은 |
+| [2](/server/02-hardware/)–[4](/server/04-process/) | OS · 하드웨어 · 디스크 · 프로세스 | 이 서버는 무슨 물건이고 지금 무엇이 자원을 쓰고 있나 |
+| [5](/server/05-systemd/)–[6](/server/06-logs/) | systemd · 로그 | 서비스는 어떻게 켜고 끄고, 무슨 일이 있었는지는 어디서 보나 |
+| [7](/server/07-network/)–[9](/server/09-proxy/) | 네트워크 · 층별 진단 · 사내 프록시 | 안 될 때 **어디까지** 되고 있는가 |
+| [10](/server/10-users/)–[11](/server/11-audit/) | 사용자 · 권한 · 접속 이력 | 누가 언제 들어와 무슨 명령을 썼나 |
+| [12](/server/12-packages/)–[13](/server/13-security/) | 패키지 · 방화벽 | 업데이트와 최소한의 보안은 |
+| [14](/server/14-playbook/)–[16](/server/16-wrapup/) | 플레이북 · 용어 사전 · 치트시트 | — |
+
+## 전체를 관통하는 두 문장
+
+**읽는 명령과 바꾸는 명령을 구분한다.** `ip a` · `ss` · `systemctl status` · `journalctl`처럼
+**상태를 읽기만 하는 명령은 언제 쳐도 안전하다** — 이런 명령을 먼저, 많이 친다.
+반대로 `netplan apply` · `ufw enable` · `systemctl restart`는 상태를 바꾸고,
+원격 서버에서는 **자기 접속을 끊어 먹을 수도 있다**. 이 덱의 대부분이 읽는 명령인 이유다.
+
+**"안 된다"는 층으로 가른다.** 네트워크든 서비스든 부팅이든, 문제는 항상 층으로 쌓여 있다 —
+링크 → IP → 라우팅 → DNS → TCP → TLS → HTTP. 어느 층까지 성공하는지 하나씩 확인하면
+"인터넷이 안 돼요"는 **"DNS는 되는데 443 연결이 프록시에서 막힌다"** 로 좁혀진다
+([8장](/server/08-connectivity/)). 좁혀진 문제는 이미 절반이 풀린 문제다.
+
+<LinkCard
+  title="0. 시작하기 전에"
+  description="이 덱의 대상과 범위, 기준 배포판, 그리고 낡은 명령/새 명령 대응표."
+  href="/server/00-intro/"
+/>

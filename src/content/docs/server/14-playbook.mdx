@@ -1,0 +1,264 @@
+---
+title: "14. 상황별 진단 플레이북"
+description: "느리다 · 디스크가 찼다 · 서비스가 안 뜬다 · 접속이 안 된다 · 부팅이 안 된다 — 증상에서 출발하는 순서"
+---
+
+import { Steps, LinkCard } from '@astrojs/starlight/components';
+import TermIntro from '../../../components/TermIntro.astro';
+
+> 앞의 장들이 도구라면, 이 장은 **어떤 순서로 꺼내 쓰는가**다
+
+<TermIntro
+  terms={[
+    ['MTTR', 'Mean Time To Recovery', '장애가 나서 복구되기까지의 평균 시간. **원인 규명보다 복구가 먼저**라는 원칙이 여기서 나온다 — 증거를 남기고 서비스를 살린 뒤 원인을 판다.'],
+    ['이머전시 모드', 'emergency mode', '부팅 중 치명적 문제(대개 `/etc/fstab` 오류)로 systemd가 최소 셸만 띄운 상태. 네트워크가 없어 **콘솔 접근이 필수**다.'],
+    ['recovery mode', '', 'GRUB 메뉴에서 고를 수 있는 복구 부팅. root 셸·파일시스템 검사·네트워크 활성화 같은 메뉴를 준다 — 물리/가상 콘솔이 있어야 쓸 수 있다.'],
+  ]}
+/>
+
+## 접속 직후 30초 점검
+
+무슨 신고를 받았든 이 다섯 줄을 먼저 친다. 여기서 이미 답이 나오는 경우가 많다.
+
+```bash
+uptime                    # load average, 그리고 얼마 전에 재부팅됐는지
+df -h | grep -v tmpfs     # 꽉 찬 파일시스템
+free -h                   # available
+systemctl --failed        # 실패한 유닛
+journalctl -p err -b --no-pager | tail -20    # 이번 부팅의 오류
+```
+
+## 1. "서버가 느려요"
+
+<Steps>
+
+1. **어느 자원인지 가른다**
+
+   ```bash
+   uptime                 # load를 코어 수(nproc)와 비교
+   vmstat 1 5
+   ```
+
+   `us`/`sy` 높음 → CPU · `wa` 높음 → **디스크** · `si`/`so` 있음 → **메모리** ·
+   `st` 높음 → **하이퍼바이저에 뺏기는 중**([4장](/server/04-process/))
+
+2. **범인 프로세스를 찾는다**
+
+   ```bash
+   ps -eo pid,user,%cpu,%mem,etime,cmd --sort=-%cpu | head -10
+   ps -eo pid,user,rss,%mem,cmd --sort=-rss | head -10
+   sudo iotop -o          # I/O가 원인일 때
+   ```
+
+3. **자원이 아니라 대기라면** — CPU도 디스크도 한가한데 느리다면 네트워크나 외부 의존이다
+
+   ```bash
+   ss -s                                    # 소켓 수, TIME-WAIT 폭증 여부
+   curl -o /dev/null -s -w 'dns=%{time_namelookup} conn=%{time_connect} total=%{time_total}\n' https://외부API/
+   ```
+
+   [8장](/server/08-connectivity/)의 시간 분해가 여기서 다시 쓰인다.
+
+4. **최근에 뭐가 바뀌었는지 본다** — 대개 여기에 답이 있다
+
+   ```bash
+   grep -E "install|upgrade" /var/log/apt/history.log | tail -20
+   sudo find /etc -mtime -3 -type f -ls
+   ```
+
+</Steps>
+
+## 2. "디스크가 찼어요"
+
+<Steps>
+
+1. `df -h` — 어느 파일시스템인가. **그리고 `df -i` — inode는 아닌가**([3장](/server/03-storage/))
+2. `sudo du -xh --max-depth=1 /경로 | sort -rh | head` 로 층을 내려간다 (또는 `sudo ncdu -x /`)
+3. **`du` 합계와 `df` 사용량이 다르면** `sudo lsof +L1` — 삭제됐는데 열려 있는 파일
+4. 흔한 범인 넷을 순서대로 확인한다
+
+   ```bash
+   journalctl --disk-usage                  # 저널 (상한이 기본으로 없다 — 6장)
+   sudo du -sh /var/log/*  | sort -rh | head
+   docker system df                         # 도커 이미지·볼륨·빌드 캐시
+   sudo du -sh /var/cache/apt /var/lib/snapd/snaps
+   ```
+
+5. 급하면 안전한 것부터 비운다
+
+   ```bash
+   sudo journalctl --vacuum-time=7d
+   sudo apt clean && sudo apt autoremove --purge
+   docker system prune          # 내용을 확인하고 실행한다
+   ```
+
+</Steps>
+
+**`rm` 대신 `truncate -s 0`** 을 쓰는 습관이 3번을 예방한다.
+
+## 3. "서비스가 안 떠요"
+
+<Steps>
+
+1. **상태와 로그를 나란히**
+
+   ```bash
+   systemctl status myapp
+   journalctl -u myapp -b --no-pager | tail -50
+   ```
+
+2. **설정 문법 검사** — 있는 것은 반드시 쓴다
+
+   ```bash
+   sudo nginx -t ; sudo sshd -t ; sudo netplan try
+   ```
+
+3. **포트 충돌** — `Address already in use`
+
+   ```bash
+   sudo ss -tulpn | grep :8080
+   ```
+
+4. **권한** — `Permission denied`
+
+   ```bash
+   namei -l /opt/myapp/config.yml           # 경로 각 단계의 권한 (10장)
+   sudo journalctl -k | grep -i apparmor    # AppArmor 차단 (13장)
+   ```
+
+5. **설정이 진짜 적용됐는지**
+
+   ```bash
+   systemctl cat myapp                      # 원본 + drop-in 합본
+   sudo tr '\0' '\n' < /proc/$(systemctl show -p MainPID --value myapp)/environ
+   ```
+
+6. **재시작 루프**라면 — `Restart=always`가 실패를 감추고 있을 수 있다
+
+   ```bash
+   systemctl show myapp -p NRestarts
+   journalctl -u myapp --since "10 min ago" | grep -c "Started"
+   ```
+
+</Steps>
+
+## 4. "SSH 접속이 안 돼요"
+
+먼저 **접속하는 쪽에서** 층을 가른다([8장](/server/08-connectivity/)).
+
+| 클라이언트에서 본 증상 | 뜻 | 다음 |
+|---|---|---|
+| `ssh: connect … Connection refused` | 패킷은 도착. **sshd가 안 떠 있다** | 콘솔로 `systemctl status ssh` |
+| 응답 없이 타임아웃 | **경로/방화벽**에서 버려지는 중 | ufw · 보안그룹 · 라우팅 |
+| `Permission denied (publickey)` | 접속은 됨. **인증 실패** | 서버의 `auth.log` |
+| 비밀번호를 물어봄 (키를 넣었는데) | 키가 거부됨 | `~/.ssh` 권한(700/600) |
+| `Connection reset` 직후 끊김 | fail2ban 밴 또는 `MaxStartups` | `fail2ban-client status sshd` |
+
+서버 쪽에 (콘솔이나 다른 경로로) 들어갈 수 있다면 —
+
+```bash
+systemctl status ssh
+sudo ss -tulpn | grep sshd
+sudo sshd -t                             # 설정 문법 — 여기서 실패하면 sshd가 안 뜬다
+sudo journalctl -u ssh -n 50
+sudo tail -50 /var/log/auth.log
+sudo fail2ban-client status sshd         # 내 IP가 밴됐나
+```
+
+:::caution[함정 — 설정을 고치고 restart 했다가 잠긴다]
+`sshd_config`를 고쳤으면 **`sudo sshd -t`로 검사한 뒤 `reload`** 하고,
+**기존 세션을 유지한 채 새 터미널로 접속을 확인**한다([10장](/server/10-users/)).
+정말 위험한 변경이라면 되돌리기 타이머를 걸어 둔다 —
+`sudo bash -c 'sleep 300 && cp /etc/ssh/sshd_config.bak /etc/ssh/sshd_config && systemctl reload ssh' &`
+:::
+
+## 5. "부팅이 안 돼요"
+
+콘솔(물리·IPMI·하이퍼바이저 화면)이 필요하다. SSH로는 할 수 있는 것이 없다.
+
+| 화면 | 원인 | 대처 |
+|---|---|---|
+| GRUB 메뉴도 안 나옴 | 부트로더·디스크 | 펌웨어 부팅 순서, 복구 미디어 |
+| `emergency mode` 셸 | **대개 `/etc/fstab` 오류** | `journalctl -xb`, fstab 수정 후 `mount -a`. 예방은 **`nofail`**([3장](/server/03-storage/)) |
+| 특정 유닛에서 멈춤 | 서비스가 시작을 붙잡는 중 | `systemd-analyze critical-chain`, 해당 유닛 `disable`/`mask` |
+| 2분씩 멈췄다 진행 | `network-online.target` 대기 | [5장](/server/05-systemd/) |
+| 파일시스템 오류 | 비정상 종료 | recovery mode → `fsck -f /dev/…` (**반드시 언마운트 상태에서**) |
+
+부팅에 성공한 뒤 원인은 **직전 부팅 로그**에서 찾는다 — `journalctl -b -1 -e`.
+
+## 6. "메모리가 부족해요"
+
+```bash
+free -h                                       # available만 본다 (2장)
+ps -eo pid,user,rss,%mem,cmd --sort=-rss | head
+sudo journalctl -k | grep -i -E "out of memory|killed process"
+swapon --show ; vmstat 1 5                    # 스왑을 쓰고 있나
+systemctl show myapp -p MemoryMax -p MemoryCurrent
+```
+
+프로세스가 흔적 없이 사라졌다면 **OOM killer**다([4장](/server/04-process/)).
+근본 대처는 셋 — 메모리 증설, 앱의 힙 상한 조정,
+유닛에 `MemoryMax=`를 걸어 **한 프로세스가 서버 전체를 흔들지 못하게** 하기.
+
+## 7. "왜 이렇게 됐는지 모르겠어요"
+
+변경 이력을 훑는 순서다([11장](/server/11-audit/)).
+
+```bash
+last -F -a | head -20                                   # 누가 들어왔나
+sudo grep COMMAND /var/log/auth.log | tail -50          # 무슨 sudo 명령을 썼나
+grep -E "install|remove|upgrade" /var/log/apt/history.log | tail -20
+sudo find /etc -mtime -3 -type f -ls                    # 최근 바뀐 설정 파일
+journalctl --since "3 days ago" | grep -iE "Started|Stopped|Failed" | tail -40
+last reboot | head
+```
+
+## 대응의 순서 — 복구가 먼저다
+
+```mermaid
+flowchart LR
+    A["1. 증거 남기기<br/>로그 · 상태 스냅숏"] --> B["2. 서비스 복구<br/>재시작 · 롤백 · 우회"]
+    B --> C["3. 원인 규명<br/>남긴 증거로"]
+    C --> D["4. 재발 방지<br/>알람 · 상한 · 문서"]
+
+    classDef warn fill:#fef3c7,stroke:#d97706,color:#78350f
+    classDef ok   fill:#dcfce7,stroke:#16a34a,color:#14532d
+    classDef key  fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
+    class A warn
+    class B ok
+    class C key
+    class D ok
+```
+
+재시작하면 증거가 사라진다. **재시작 전에 30초만 써서 상태를 남긴다.**
+
+```bash
+TS=$(date +%F-%H%M)
+{ date; uptime; free -h; df -hT; ps auxf; ss -tulpn; systemctl --failed; } \
+  | sudo tee /var/tmp/snapshot-$TS.txt
+sudo journalctl -b --no-pager > /var/tmp/journal-$TS.log
+```
+
+:::tip[핵심]
+증상마다 **첫 명령**만 정해 두면 나머지는 따라온다 —
+느리다 → `vmstat 1` · 디스크 → `df -h; df -i` · 서비스 → `journalctl -u … -b` ·
+접속 → `nc -vz`(refused냐 timeout이냐) · 사라졌다 → `journalctl -k | grep -i oom` ·
+왜 바뀌었나 → `find /etc -mtime -3`.
+그리고 **복구 전에 스냅숏**을 남긴다.
+:::
+
+## 14장 요약
+
+- 접속 직후 `uptime` · `df -h` · `free -h` · `systemctl --failed` · `journalctl -p err -b`
+- 느림은 `vmstat 1`로 **CPU / 디스크(wa) / 메모리(si·so) / steal** 을 가르는 것부터
+- 디스크는 `df -h` → **`df -i`** → `du -x` → `lsof +L1`
+- 서비스는 `status` + `journalctl -u -b` + **문법 검사기**(`-t`) + 포트 충돌
+- SSH는 클라이언트에서 **refused / timeout / publickey** 를 먼저 가른다
+- 부팅 실패는 콘솔이 필요하다 — `emergency mode`면 **fstab을 먼저 의심**
+- **복구 전에 스냅숏을 남긴다** — 재시작은 증거를 지운다
+
+<LinkCard
+  title="15. 용어 사전"
+  description="이 덱에 나온 용어·약어·파일 경로를 한 곳에서 다시 찾기."
+  href="/server/15-glossary/"
+/>

@@ -1,0 +1,138 @@
+---
+title: "16. 마무리"
+description: "상황별 명령 치트시트, 새 서버를 받았을 때의 초기 점검, 정기 점검 루틴, 더 읽을 것"
+---
+
+import { CardGrid, Card, LinkCard } from '@astrojs/starlight/components';
+
+> 외울 것은 명령이 아니라 **순서**다 — 순서를 알면 명령은 `man`이 알려준다
+
+## 상황별 첫 명령 치트시트
+
+| 상황 | 첫 명령 | 다음 |
+|---|---|---|
+| 처음 보는 서버 | `hostnamectl` | `lscpu` · `free -h` · `lsblk` · `ip -br a` |
+| 서버가 느리다 | `vmstat 1 5` | `us/sy`→CPU · `wa`→디스크 · `si/so`→메모리 · `st`→호스트 |
+| 디스크가 찼다 | `df -h` → **`df -i`** | `du -xh --max-depth=1` · `lsof +L1` |
+| 프로세스가 사라졌다 | `journalctl -k \| grep -i oom` | `systemctl status` · 유닛에 `MemoryMax=` |
+| 서비스가 안 뜬다 | `journalctl -u <유닛> -b` | `systemctl cat` · `nginx -t`/`sshd -t` · `ss -tulpn` |
+| 포트를 누가 쓰나 | `sudo ss -tulpn \| grep :포트` | `lsof -i :포트` |
+| 네트워크가 안 된다 | `ip -br a` → `ip r` | 층별 진단 [8장](/server/08-connectivity/) |
+| DNS가 의심된다 | `getent hosts <이름>` | `resolvectl status` · `dig @서버` |
+| 프록시 뒤에서 안 된다 | `curl -v` (CONNECT 줄 확인) | 프로그램별 설정 [9장](/server/09-proxy/) |
+| TLS 오류가 난다 | `curl -vI --insecure` | 되면 **사내 CA 미설치** 확정 |
+| 접속이 안 된다 | `nc -vz 호스트 포트` | **refused**(서버) vs **timeout**(경로) |
+| 권한이 거부된다 | `id` → `namei -l 경로` | `journalctl -k \| grep DENIED` (AppArmor) |
+| 누가 들어왔나 | `last -F -a` | `grep Accepted /var/log/auth.log` |
+| 누가 뭘 했나 | `grep COMMAND /var/log/auth.log` | `/var/log/apt/history.log` · `find /etc -mtime -3` |
+| 뭐가 바뀌었나 | `sudo find /etc -mtime -3 -type f -ls` | `/var/log/apt/history.log` |
+| 재부팅이 필요한가 | `ls /var/run/reboot-required` | `cat` 해서 이유 확인 |
+
+## 새 서버를 받았을 때
+
+<CardGrid>
+<Card title="1. 파악한다 (읽기만)" icon="magnifier">
+`hostnamectl` — OS · 커널 · 가상화
+
+`lscpu` · `free -h` · `lsblk` · `df -hT`
+
+`ip -br a` · `ip r` · `resolvectl status`
+
+`sudo ss -tulpn` — 열려 있는 포트
+
+`systemctl --failed` · `systemctl list-unit-files --state=enabled`
+
+`last -F -a \| head` — 누가 쓰던 서버인가
+</Card>
+<Card title="2. 준비한다" icon="setting">
+진단 도구 설치 — **장애 나기 전에**
+
+```
+sudo apt install -y traceroute mtr-tiny \
+  dnsutils lsof net-tools tcpdump htop ncdu tmux
+```
+
+사내 프록시 · CA 설정 ([9장](/server/09-proxy/))
+
+저널 크기 상한 ([6장](/server/06-logs/))
+
+SSH 키 인증 · sudoers ([10장](/server/10-users/))
+
+시각 동기화 확인 — `timedatectl`
+</Card>
+<Card title="3. 기록한다" icon="document">
+스펙 스냅숏을 남긴다 —
+
+```
+{ hostnamectl; lscpu; free -h; lsblk; \
+  ip -br a; ss -tulpn; } > spec.txt
+```
+
+물리 서버면 **시리얼(서비스 태그)** 도
+
+바꾼 설정과 이유를 한 곳에 적는다 —
+6개월 뒤의 자신을 위한 것이다
+</Card>
+</CardGrid>
+
+## 정기 점검 루틴
+
+주에 한 번, 5분이면 끝난다.
+
+```bash
+uptime && systemctl --failed
+df -h | grep -v tmpfs ; df -i | awk '$5+0 > 80'
+journalctl -p err --since "7 days ago" --no-pager | tail -30
+apt list --upgradable 2>/dev/null | head -20
+ls /var/run/reboot-required 2>/dev/null && cat /var/run/reboot-required.pkgs
+apt-mark showhold                       # 고정해 둔 패키지가 방치되고 있지 않나
+sudo lastb -F | head -20                # 로그인 실패 폭주가 없나
+lastlog -b 90 | grep -v Never           # 90일 이상 안 쓰인 계정
+timedatectl | grep -i synchron
+```
+
+이걸 스크립트로 만들어 systemd 타이머에 걸고 결과를 메일/슬랙으로 보내면
+**점검을 잊지 않게 된다**([5장](/server/05-systemd/)).
+
+## 이 덱이 반복해서 말한 것
+
+**하나 — 읽기 명령을 먼저, 많이 친다.** 진단의 99%는 상태를 바꾸지 않고 끝난다.
+바꾸는 명령을 치기 전에 무엇이 바뀌는지, 어떻게 되돌리는지 말할 수 있어야 한다.
+
+**둘 — "안 된다"를 "어디까지 된다"로 바꾼다.** 네트워크는 링크→IP→라우팅→DNS→TCP→TLS→HTTP,
+서비스는 프로세스→포트→응답, 부팅은 펌웨어→GRUB→커널→systemd.
+층을 세우고 처음 실패하는 지점을 찾으면 원인은 이미 좁혀져 있다.
+
+**셋 — 기본 설정으로 무엇이 남는지 알아 둔다.** 로그인 이력·SSH 상세·sudo 명령·패키지
+변경은 남지만, **셸 명령 전체는 남지 않는다.** 감사는 사고 난 뒤에 만들 수 없다.
+
+**넷 — 리눅스에 "시스템 프록시"는 없다.** 프로그램마다 자기 방식으로 읽는다.
+"curl은 되는데 apt는 안 된다"는 고장이 아니라 **설계가 그렇다.**
+
+## 더 읽을 것
+
+- `man 7 hier` — 디렉터리 구조의 공식 설명. 5분이면 읽는다
+- `man systemd.unit` · `man systemd.service` · `man journalctl` — systemd는 man이 매우 좋다
+- [Ubuntu Server 공식 문서](https://documentation.ubuntu.com/server/) — 버전별 기본값의 근거
+- [Ubuntu 24.04 릴리스 노트](https://documentation.ubuntu.com/release-notes/24.04/) — 무엇이 바뀌었는지
+- `ip`·`ss`는 `man ip-address` · `man ss` — 서브커맨드마다 별도 man 페이지가 있다
+
+이 사이트의 다른 덱과의 관계 —
+컨테이너·쿠버네티스로 넘어가면 [CKA 덱](/cka/)이,
+서비스 앞단의 인증은 [Keycloak 덱](/keycloak/)이 이어받는다.
+
+## 덱 전체 요약
+
+- **0~1장** — 읽기/쓰기 명령을 가르고, `man`·`$?`·`2>&1`·`sudo -E`로 스스로 알아낸다
+- **2~4장** — `hostnamectl`·`df -i`·`lsof +L1`·`vmstat 1`이 서버 파악의 핵심
+- **5~6장** — `systemctl status` + `journalctl -u -b` + drop-in. journal은 grep이 아니라 필터
+- **7~9장** — `ip -br a`·`ss -tulpn`·`getent hosts`, 층별 진단, 프로그램별 프록시와 사내 CA
+- **10~11장** — `namei -l`로 권한을, `last`·`auth.log`로 이력을. bash_history는 근거가 못 된다
+- **12~13장** — `update` ≠ `upgrade`, `ss -tulpn`과 `ufw status`의 차이를 설명할 수 있을 것
+- **14장** — 증상마다 첫 명령을 정해 두고, **복구 전에 스냅숏**을 남긴다
+
+<LinkCard
+  title="다른 덱 둘러보기"
+  description="주제별 스터디 노트 목록으로 돌아가기."
+  href="/"
+/>

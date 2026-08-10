@@ -1,0 +1,256 @@
+---
+title: "11. 누가 접속했고 무엇을 했나"
+description: "last · lastb · w · loginctl · auth.log · journalctl로 접속 이력 추적, bash_history의 한계와 auditd"
+---
+
+import { Steps, Badge, LinkCard } from '@astrojs/starlight/components';
+import TermIntro from '../../../components/TermIntro.astro';
+
+> **감사는 사후에 만들 수 없다.** 기본 설정으로 무엇이 남고 무엇이 안 남는지를
+> 사고 나기 전에 알아 둬야 한다
+
+<TermIntro
+  terms={[
+    ['utmp / wtmp / btmp', '', '로그인 기록을 담는 바이너리 파일 셋. **utmp = 지금 접속 중**(`w`·`who`), **wtmp = 과거 로그인 이력**(`last`), **btmp = 실패한 로그인**(`lastb`). 텍스트가 아니라 전용 명령으로만 읽는다.'],
+    ['lastlog', '', '사용자별 **마지막 로그인 시각만** 기록하는 별도 파일. "이 계정 아직 쓰이나"를 판단할 때 쓴다.'],
+    ['auditd', 'Linux Audit daemon', '커널 감사 서브시스템의 사용자 공간 데몬. 파일 접근·시스템 콜·명령 실행을 **정책대로 기록**한다. **Ubuntu에 기본 설치돼 있지 않다** — 규제 대응이 필요하면 직접 깐다.'],
+    ['PAM', 'Pluggable Authentication Modules', '로그인·인증 절차를 모듈로 조립하는 리눅스의 인증 프레임워크. 세션 기록·접근 제한·2단계 인증이 여기 끼워진다. `/etc/pam.d/` 아래가 그 설정이다.'],
+    ['비대화형 세션', 'non-interactive session', 'SSH로 명령만 실행하고 나가는 접속(`ssh host "명령"`) 등. **셸 히스토리에 안 남고** 로그인 기록도 형태가 다르다 — 히스토리에만 의존하면 안 되는 이유다.'],
+  ]}
+/>
+
+## 알고 싶은 것 → 명령
+
+| 알고 싶은 것 | 명령 | 출처 |
+|---|---|---|
+| **지금** 누가 접속해 있나 | `w` · `who` · `loginctl` | utmp / logind |
+| 그 사람이 지금 뭘 하고 있나 | `w` 의 `WHAT` 열 · `ps -u 사용자 -f` | — |
+| **과거에** 누가 로그인했나 | `last -F -a` | wtmp |
+| 로그인 **실패** 이력 | `sudo lastb -F` · `auth.log` | btmp |
+| 계정별 마지막 로그인 | `lastlog` | lastlog |
+| 재부팅 이력 | `last reboot` | wtmp |
+| SSH 접속 상세(IP·키 지문·실패 이유) | `journalctl -u ssh` · `/var/log/auth.log` | journal / rsyslog |
+| **누가 sudo로 무슨 명령을 썼나** | `grep sudo /var/log/auth.log` · `journalctl _COMM=sudo` | auth.log |
+| 누가 패키지를 설치했나 | `/var/log/apt/history.log` | apt |
+| 셸에서 친 명령 | `~/.bash_history` (**신뢰도 낮음** — 아래) | 셸 |
+| 실행된 모든 명령 (제대로) | `auditd` (미리 설정해야 한다) | 커널 |
+
+## 지금 접속 중인 사람
+
+```bash
+w                    # 사용자 · 접속 원격지 · 로그인 시각 · 유휴 시간 · 실행 중인 명령
+who -a               # 더 단순한 목록
+loginctl list-sessions        # systemd가 보는 세션 (utmp보다 정확하다)
+loginctl session-status 42    # 그 세션의 프로세스 트리까지
+sudo ss -tp state established '( sport = :22 )'   # SSH 연결의 상대 IP
+pgrep -a -u deploy            # 이 사용자가 돌리는 프로세스
+```
+
+```
+$ w
+ 15:22:31 up 21 days,  load average: 0.31, 0.22, 0.18
+USER     TTY      FROM             LOGIN@   IDLE   WHAT
+sshim    pts/0    10.20.5.77       14:58    0.00s  w
+deploy   pts/1    10.20.5.91       13:02    1:42m  tail -f /var/log/app.log
+```
+
+`IDLE`이 길면 붙어만 있는 세션이다. 강제로 끊어야 하면
+`sudo loginctl terminate-session 42` (또는 그 세션의 셸 PID에 `kill`).
+
+## 과거 로그인 이력 — `last`
+
+```bash
+last                        # 최근부터
+last -F -a -n 30            # 전체 시각(-F) + 호스트를 끝 열에(-a), 30줄
+last deploy                 # 특정 사용자만
+last -s -7days -t today     # 기간 지정
+last -x                     # 런레벨 변경·셧다운까지 포함
+last reboot                 # 재부팅 이력만  ← 장애 조사의 단골
+sudo lastb -F -n 20         # 실패한 로그인 (btmp — root 권한 필요)
+lastlog                     # 계정별 마지막 로그인 (한 번도 없으면 "Never logged in")
+lastlog -b 90               # 90일 이상 로그인 없는 계정  ← 계정 정리에 쓴다
+```
+
+```
+$ last -F -a -n 5
+sshim  pts/0  Mon Aug 10 14:58:11 2026   still logged in                    10.20.5.77
+deploy pts/1  Mon Aug 10 13:02:03 2026 - Mon Aug 10 15:20:41 2026  (02:18)  10.20.5.91
+reboot system boot  Mon Jul 20 04:11:52 2026   still running                6.8.0-51-generic
+```
+
+:::caution[함정 셋 — `last`를 믿을 때 알아야 할 것]
+- **wtmp는 로테이션된다.** 기본은 월 단위라 `last`가 보여주는 것은 **최근 한 달 정도뿐**이다.
+  더 옛날은 `last -f /var/log/wtmp.1`처럼 로테이션 파일을 직접 지정한다
+- **wtmp/btmp는 root가 지울 수 있다.** 침해 대응에서는 이 파일들만으로 판단하지 않는다 —
+  원격 로그 수집(syslog 전송)이 있어야 진짜 증거가 된다
+- **utmp/wtmp는 사라지는 중이다.** systemd 256부터 utmp 지원이 기본 비활성이고,
+  Ubuntu도 25.10부터 `wtmpdb`(SQLite)로 옮겨 갔다.
+  **24.04에서는 지금까지처럼 동작하지만**, 앞으로 쓸 표준 도구는
+  `loginctl`과 `journalctl`이다 — 스크립트를 쓴다면 이쪽에 맞춰 둔다
+:::
+
+## SSH 접속의 상세 — auth.log와 journal
+
+`last`는 "언제 누가"까지만 알려준다. **어떤 키로 붙었는지, 왜 실패했는지**는 여기 있다.
+
+```bash
+sudo journalctl -u ssh --since "2026-08-01" | grep -E "Accepted|Failed|Invalid"
+sudo grep -E "Accepted|Failed password|Invalid user" /var/log/auth.log
+sudo zgrep "Accepted" /var/log/auth.log.*.gz        # 로테이션된 옛 로그까지
+```
+
+```
+Accepted publickey for deploy from 10.20.5.91 port 51422 ssh2: ED25519 SHA256:kJ8…
+Failed password for invalid user admin from 203.0.113.9 port 40122 ssh2
+Disconnected from authenticating user root 203.0.113.9 port 40122 [preauth]
+```
+
+**`SHA256:…` 지문으로 어느 키가 쓰였는지 특정할 수 있다** —
+공유 계정에서 "누가 들어왔나"를 가리는 유일한 단서인 경우가 많다.
+내 키의 지문은 `ssh-keygen -lf ~/.ssh/id_ed25519.pub`로 확인한다.
+
+집계해서 보면 공격 패턴이 드러난다.
+
+```bash
+sudo grep "Failed password" /var/log/auth.log \
+  | awk '{print $(NF-3)}' | sort | uniq -c | sort -rn | head    # 실패 IP 상위
+sudo grep "Accepted" /var/log/auth.log | awk '{print $9, $11}' | sort | uniq -c   # 성공 계정·IP
+```
+
+## 무슨 명령을 실행했나
+
+### sudo 로그 <Badge text="기본 제공" variant="tip" />
+
+**`sudo`로 실행한 명령은 기본으로 전부 기록된다.** 실무에서 가장 쓸모 있는 감사 흔적이다.
+
+```bash
+sudo grep sudo /var/log/auth.log | grep COMMAND
+sudo journalctl _COMM=sudo --since "7 days ago"
+```
+
+```
+sshim : TTY=pts/0 ; PWD=/etc/nginx ; USER=root ; COMMAND=/usr/bin/systemctl restart nginx
+```
+
+**어느 디렉터리에서(`PWD`) 무슨 명령을(`COMMAND`)** 실행했는지까지 남는다.
+`sudo -i`나 `sudo su -`로 **root 셸에 들어간 뒤의 명령은 기록되지 않는다** —
+그래서 sudoers에서 `NOPASSWD`로 개별 명령만 허용하는 편이 감사 관점에서 낫다([10장](/server/10-users/)).
+
+### 셸 히스토리 <Badge text="신뢰도 낮음" variant="caution" />
+
+```bash
+cat ~/.bash_history
+sudo cat /home/deploy/.bash_history
+sudo cat /root/.bash_history
+history                    # 현재 세션 (메모리 + 파일)
+```
+
+:::caution[함정 — 히스토리는 감사 수단이 아니다]
+`~/.bash_history`는 사용자가 마음대로 지울 수 있고, 구조적 한계도 많다 —
+
+- **세션이 정상 종료될 때 한 번에 기록된다.** 접속이 끊기거나 `kill`되면 통째로 사라진다
+- 기본적으로 **시각이 기록되지 않는다** (`HISTTIMEFORMAT`을 설정해야 남는다)
+- `unset HISTFILE` · `history -c` · 명령 앞에 **공백 한 칸**(`HISTCONTROL=ignorespace`)으로 회피된다
+- 여러 세션이 동시에 붙으면 **서로 덮어쓴다**
+- `ssh host "명령"` 같은 비대화형 실행, cron, 스크립트 안의 명령은 **아예 안 남는다**
+
+조사에는 참고 자료로 쓰되, **"히스토리에 없으니 안 했다"는 결론을 내면 안 된다.**
+:::
+
+최소한의 개선은 해 둘 만하다 — `/etc/profile.d/history.sh`
+
+```bash
+export HISTTIMEFORMAT="%F %T "     # 시각 기록
+export HISTSIZE=10000
+export HISTFILESIZE=20000
+shopt -s histappend                 # 덮어쓰지 않고 이어붙인다
+export PROMPT_COMMAND="history -a"  # 명령마다 즉시 파일에 기록
+```
+
+### 제대로 하려면 — auditd
+
+<Steps>
+
+1. 설치 (Ubuntu 기본에는 없다)
+
+   ```bash
+   sudo apt install -y auditd audispd-plugins
+   systemctl status auditd
+   ```
+
+2. 규칙을 건다 — `/etc/audit/rules.d/audit.rules`
+
+   ```
+   # 중요 파일 변경 감시
+   -w /etc/passwd -p wa -k identity
+   -w /etc/sudoers -p wa -k sudoers
+   -w /etc/ssh/sshd_config -p wa -k sshd
+   # 특정 사용자의 명령 실행 전부 (auid=로그인 사용자 — su로 바꿔도 추적된다)
+   -a always,exit -F arch=b64 -S execve -F auid=1001 -k user_cmd
+   ```
+
+   ```bash
+   sudo augenrules --load && sudo auditctl -l
+   ```
+
+3. 조회
+
+   ```bash
+   sudo ausearch -k sudoers -i          # -i 로 UID를 이름으로 풀어 준다
+   sudo ausearch -ua deploy --start today -i
+   sudo aureport --auth --summary
+   sudo aureport -l -i                  # 로그인 리포트
+   ```
+
+</Steps>
+
+:::caution[함정 — execve 전체 감시는 신중하게]
+모든 명령 실행(`-S execve`)을 조건 없이 기록하면 **로그가 폭증하고 성능도 떨어진다.**
+빌드 서버 같은 곳에서는 하루에 수 GB가 나온다. 범위를 좁힌다 —
+특정 사용자(`-F auid=`), 특정 디렉터리(`-F dir=`), 특정 파일 변경(`-w`)부터 시작하고
+`/etc/audit/auditd.conf`의 `max_log_file` · `num_logs`로 상한을 건다.
+:::
+
+대안으로 sudo 자체의 세션 녹화도 있다 — sudoers에
+`Defaults log_output` 을 주면 `sudoreplay`로 **화면 출력까지 재생**할 수 있다.
+
+## 조사 순서 — 무엇이 바뀌었나
+
+<Steps>
+
+1. **언제 누가 들어왔나** — `last -F -a | head -20`, `sudo lastb -F | head`
+2. **어떻게 인증했나** — `sudo grep Accepted /var/log/auth.log | tail -20` (IP·키 지문)
+3. **무슨 권한 명령을 썼나** — `sudo grep COMMAND /var/log/auth.log | tail -50`
+4. **패키지가 바뀌었나** — `/var/log/apt/history.log` · `grep -E "install|remove" /var/log/dpkg.log`
+5. **설정 파일이 바뀌었나** — `sudo find /etc -mtime -2 -type f -ls`
+6. **서비스가 재시작됐나** — `journalctl --since "2 days ago" | grep -i "Started\|Stopped"`
+7. **재부팅이 있었나** — `last reboot`, `uptime -s`
+
+</Steps>
+
+5번의 `find /etc -mtime -2`는 특히 유용하다 —
+**최근 이틀 안에 수정된 설정 파일을 전부 뽑아 준다.**
+
+:::tip[핵심]
+기본 설정으로 확실히 남는 것은 **로그인 이력(`last`) · SSH 상세(`auth.log`) ·
+sudo 명령(`auth.log`) · 패키지 변경(`apt/history.log`)** 넷이다.
+**셸 명령 전체는 남지 않는다** — 그게 필요하면 auditd를 미리 깔아야 한다.
+그리고 이 모든 것은 root가 지울 수 있으니, 중요한 서버는 **로그를 외부로 전송**해 둔다.
+:::
+
+## 11장 요약
+
+- 지금은 `w` · `loginctl`, 과거는 **`last -F -a`**, 실패는 `lastb`, 계정 정리는 `lastlog -b`
+- `last`가 보여주는 범위는 **로테이션 주기(대개 한 달)까지** — 옛날은 `-f wtmp.1`
+- utmp/wtmp는 **사라지는 중이다** — 새 스크립트는 `loginctl`/`journalctl` 기준으로
+- SSH의 **IP와 키 지문**은 `auth.log`의 `Accepted publickey` 줄에 있다
+- **sudo 명령은 기본으로 다 남는다** — 단 `sudo -i` 이후의 셸 명령은 안 남는다
+- `~/.bash_history`는 **감사 근거가 못 된다** (지워지고, 시각이 없고, 비대화형은 안 남는다)
+- 명령 단위 감사가 필요하면 **auditd를 미리** 깔고 범위를 좁혀 규칙을 건다
+- "어제 뭐가 바뀌었나"는 **`find /etc -mtime -2`** 와 `apt/history.log`가 빠르다
+
+<LinkCard
+  title="12. 패키지와 업데이트"
+  description="apt와 dpkg, 보안 업데이트 자동화, 서드파티 저장소 키, 재부팅이 필요한 시점."
+  href="/server/12-packages/"
+/>
