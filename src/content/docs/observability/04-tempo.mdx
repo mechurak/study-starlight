@@ -1,6 +1,6 @@
 ---
 title: "4. 추적 — Tempo와 OpenTelemetry"
-description: "한 요청이 어디서 느렸나 — 계측이라는 진입 장벽, 샘플링 전략, 상관 관계, 그리고 Tempo 3.0의 변화"
+description: "스팬의 생김새, 계측이라는 진입 장벽과 컨텍스트 전파, 샘플링 전략, TraceQL, 그리고 Tempo 3.0의 변화"
 ---
 
 import { Tabs, TabItem, LinkCard, Steps } from '@astrojs/starlight/components';
@@ -12,17 +12,18 @@ import TermIntro from '../../../components/TermIntro.astro';
   terms={[
     ['트레이스 · 스팬', 'Trace · Span', '요청 하나의 전체 여정이 트레이스, 그 안의 구간 하나가 스팬이다. `API 호출 3초` 아래 `DB 질의 2.8초`처럼 **트리로 쌓인다**.'],
     ['컨텍스트 전파', 'Context Propagation', '서비스 A가 B를 부를 때 **트레이스 ID를 HTTP 헤더에 실어 넘기는 것**. 이게 끊기면 트레이스가 조각난다. 표준 헤더는 `traceparent`(W3C).'],
+    ['리소스 속성 · 스팬 속성', 'Resource · Span Attributes', '**프로세스 전체에 붙는 꼬리표**(어느 서비스·어느 파드인가)와 **그 구간에만 붙는 꼬리표**(어떤 URL·어떤 SQL인가). TraceQL에서 둘을 다르게 쓴다.'],
     ['OTLP', 'OpenTelemetry Protocol', 'OpenTelemetry의 전송 프로토콜. 지금은 **트레이스·메트릭·로그 모두** 이걸로 보낸다 — 백엔드를 바꿔도 계측은 그대로다.'],
     ['샘플링', 'Sampling', '모든 요청을 저장하지 않고 **일부만 남기는 것**. head(시작할 때 결정)와 tail(끝나고 결과를 보고 결정) 두 방식이 있다.'],
-    ['TraceQL', '', 'Tempo의 트레이스 질의 언어. `{ duration > 2s && resource.service.name = "api" }` 같은 조건으로 **느린 트레이스만 골라낸다**.'],
+    ['TraceQL', '', 'Tempo의 트레이스 질의 언어. `{ duration > 2s && resource.service.name = "orders" }` 같은 조건으로 **느린 트레이스만 골라낸다**.'],
     ['서비스 그래프', 'Service Graph', '트레이스에서 자동 생성한 "누가 누구를 부르나" 지도. 문서에 없는 실제 호출 관계가 드러난다.'],
   ]}
 />
 
 ## 문제 — 로그로는 "어디서" 느린지 못 찾는다
 
-```
-[api]      POST /orders  →  3.2s
+```text
+[orders]   POST /orders  →  3.2s
 ```
 
 3.2초가 어디서 갔을까. 인증 확인? DB? 결제 서비스 호출? 그 결제 서비스 안의 또 다른 호출?
@@ -35,7 +36,54 @@ import TermIntro from '../../../components/TermIntro.astro';
 | 로그 | "그 시각에 이런 에러가" — **무슨 일이 있었는지**는 안다 |
 | **트레이스** | "3.2초 중 2.8초가 재고 서비스의 DB 질의" — **어디서 갔는지**를 안다 |
 
-## 진입 장벽이 다르다 — 앱을 고쳐야 한다
+## 스팬 하나는 어떻게 생겼나
+
+트레이스는 **스팬의 트리**이고, 스팬 하나는 이런 물건이다.
+
+```text
+span_id        : 00f067aa0ba902b7
+trace_id       : 4bf92f3577b34da6          ← 같은 요청의 스팬은 전부 이 값을 공유한다
+parent_span_id : 05e3ac9a4f6e3b90          ← 이 값이 트리를 만든다
+name           : "GET /stock"
+kind           : client                     ← server / client / producer / consumer / internal
+start / end    : 03:12:04.601 → 03:12:07.451  (duration 2.85s)
+status         : error
+
+resource:                                   ← 이 프로세스 전체에 붙는다
+  service.name   : inventory
+  k8s.namespace  : prod
+  k8s.pod.name   : inventory-6c8-w2n4d
+
+attributes:                                 ← 이 구간에만 붙는다
+  http.request.method : GET
+  http.route          : /stock/{sku}
+  db.system           : postgresql
+  db.statement        : "SELECT ... FOR UPDATE"
+
+events:
+  03:12:07.450  exception  { type: "TimeoutError", message: "..." }
+```
+
+**리소스와 속성의 구분이 이 장 전체에 걸린다.**
+
+| | 리소스 속성 | 스팬 속성 |
+|---|---|---|
+| 붙는 대상 | **프로세스 하나 전체** | **구간 하나** |
+| 예 | `service.name` · `k8s.pod.name` · `deployment.environment` | `http.route` · `db.statement` · `messaging.system` |
+| 어디서 정하나 | 배포 설정(환경변수·컬렉터) | 계측 코드·자동 계측 |
+| 질의할 때 | `resource.service.name` | `span.http.route` |
+
+:::tip[핵심 — 여기에는 라벨 제한이 없다]
+메트릭과 로그에서는 `user_id`나 `request_id`를 라벨에 넣으면 스택이 죽었다.
+**트레이스는 반대다** — 스팬 속성에는 그런 고유 값을 넣어도 된다.
+트레이스는 애초에 샘플링해서 일부만 저장하고, ID로 찾아가는 구조라 인덱스가
+카디널리티에 눌리지 않는다.
+
+**세 신호에 무엇을 넣을지 헷갈리면 이 기준이다** — 값의 가짓수가 무한한 것은
+**트레이스 속성이나 로그 본문**에, 유한한 것만 메트릭·로그의 라벨에.
+:::
+
+## 계측 — 앱을 고쳐야 한다
 
 메트릭과 로그는 앱이 가만히 있어도 어느 정도 모인다(노드 exporter, stdout).
 **추적은 다르다.** 요청이 서비스를 건널 때 트레이스 ID를 이어 주는 코드가 필요하다.
@@ -67,11 +115,16 @@ flowchart LR
 | **SDK로 수동** | 코드에서 스팬을 직접 연다 | 비즈니스 구간까지 볼 수 있다. 개발 공수 |
 | **사이드카·메시** | 서비스 메시가 프록시 레벨에서 | 서비스 간 호출은 잡히지만 **앱 안은 안 보인다** |
 
+**자동 계측으로 시작한다.** 대부분의 지연은 HTTP 호출과 DB 질의에서 나오고,
+그 둘은 자동 계측이 잡는다. 부족한 구간이 확인된 뒤에 SDK로 채운다.
+
 :::caution[함정 — 헤더 하나만 안 넘겨도 끊긴다]
 자동 계측을 넣었는데 트레이스가 조각조각 나뉜다면, 대개 **중간 어딘가에서
 `traceparent` 헤더가 사라진 것**이다. 흔한 범인은 자체 HTTP 클라이언트 래퍼,
-메시지 큐를 거치는 구간, 그리고 헤더를 화이트리스트로 걸러 내는 프록시다.
-게이트웨이·프록시가 그 헤더를 통과시키는지부터 확인한다.
+메시지 큐를 거치는 구간(헤더를 메시지 속성으로 옮겨 실어야 한다),
+그리고 헤더를 화이트리스트로 걸러 내는 프록시·게이트웨이다.
+
+증상으로는 **루트 스팬이 여러 개인 트레이스**나 **깊이가 1인 트레이스만 잔뜩** 보인다.
 :::
 
 :::tip[핵심 — 제일 싼 첫걸음]
@@ -93,7 +146,7 @@ Grafana의 derived field가 그 링크를 만들어 준다 ([5장](/observabilit
 ```yaml
 # OTel Collector / Alloy의 tail 샘플링 — 온프렘에서 이 조합이 실용적이다
 tail_sampling:
-  decision_wait: 10s
+  decision_wait: 10s        # 이 시간 안에 끝난 트레이스만 판단한다
   policies:
     - name: errors            # 에러는 전부 남긴다
       type: status_code
@@ -106,17 +159,26 @@ tail_sampling:
       probabilistic: { sampling_percentage: 1 }
 ```
 
+:::caution[함정 — tail 샘플링은 트레이스가 한 컬렉터에 모여야 한다]
+"결과를 보고 결정"하려면 **그 트레이스의 스팬이 전부 같은 컬렉터 인스턴스에 있어야** 한다.
+컬렉터를 여러 개로 늘리면서 그냥 라운드로빈으로 뿌리면, 스팬이 흩어져
+**판단이 트레이스 조각 단위로 이뤄진다** — 결과는 반쪽짜리 트레이스가 잔뜩 저장되는 것이다.
+
+앞단에 **trace ID 기반으로 라우팅하는 컬렉터 계층**을 두거나,
+규모가 작다면 tail 샘플링 컬렉터를 한 벌로 유지한다.
+:::
+
 :::caution[함정 — "그 요청"이 없다]
 사용자가 "3시 12분에 주문이 실패했어요"라고 하는데 샘플링에 안 걸려 트레이스가 없는 일이
 자주 생긴다. **에러와 느린 요청은 100%로 남기는 tail 정책**이 그래서 필요하고,
 그래도 없을 때를 대비해 **로그의 `trace_id`** 가 최후의 연결 고리가 된다.
 :::
 
-## Tempo — 트레이스 저장소
+## Tempo — 저장하고 되돌려 준다
 
 Tempo도 Loki처럼 **오브젝트 스토리지에 블록을 쓴다.** 그리고 특이한 성질이 하나 있다 —
 **트레이스 ID로 찾을 때는 인덱스가 필요 없다.** ID에서 위치를 계산할 수 있어서다.
-그래서 저장 비용이 아주 낮다.
+그래서 저장 비용이 아주 낮고, "로그에서 ID를 들고 와서 여는" 사용법이 특히 싸다.
 
 ```yaml
 # Tempo 저장소 설정 — 온프렘 덱 6장의 그 엔드포인트
@@ -152,16 +214,79 @@ Tempo 3.0은 **인입과 질의를 분리한 새 아키텍처**로 갈아엎었�
 | 서비스가 많고 지속적으로 들어온다 | 분리 구성 + tail 샘플링을 컬렉터에서 |
 | 메트릭 생성(서비스 그래프·스팬 메트릭)을 쓰겠다 | 3.0에서는 **Kafka가 인입 경로에 들어온다** ([Kafka 덱](/kafka/)) — 도입 비용을 먼저 따진다 |
 
-## 트레이스에서 얻는 부산물 — 서비스 그래프와 스팬 메트릭
+### 부산물 — 서비스 그래프와 스팬 메트릭
 
 Tempo는 트레이스를 보고 **메트릭을 만들어 낼 수 있다.**
 
 | 산출물 | 내용 | 쓸모 |
 |---|---|---|
 | **서비스 그래프** | 누가 누구를 부르는지의 지도 | **문서에 없는 실제 의존 관계**가 드러난다. 장애 전파 경로 파악 |
-| **스팬 메트릭** | 서비스·오퍼레이션별 요청 수·지연·에러율 | 앱이 메트릭을 안 내줘도 RED 지표를 얻는다 |
+| **스팬 메트릭** | 서비스·오퍼레이션별 요청 수·지연·에러율 | 앱이 메트릭을 안 내줘도 **RED 지표를 얻는다** ([2장](/observability/02-prometheus/)) |
 
-이 메트릭들은 Prometheus로 흘러가므로 [2장](/observability/02-prometheus/)의 알림 규칙에 그대로 쓸 수 있다.
+이 메트릭들은 Prometheus로 흘러가므로 2장의 알림 규칙에 그대로 쓸 수 있다.
+다만 **샘플링된 트레이스에서 나온 값**이라 절대 건수는 실제와 다르다 —
+비율과 추세로 읽고, 정확한 건수가 필요하면 앱의 counter를 쓴다.
+
+## TraceQL — 느린 것만 골라낸다
+
+트레이스 ID를 이미 알고 있으면 그냥 열면 된다. 문제는 **ID를 모를 때** —
+"어제 새벽에 느렸던 주문 요청"을 찾아야 하는 경우다. 그게 TraceQL이다.
+
+```text
+{ resource.service.name = "orders" && duration > 2s && status = error }
+  └── 조건에 맞는 스팬이 하나라도 있는 트레이스를 돌려준다
+```
+
+<Tabs>
+<TabItem label="기본 필터">
+
+```traceql
+{ resource.service.name = "orders" && duration > 2s }
+{ span.http.response.status_code >= 500 }
+{ status = error }
+{ resource.k8s.namespace = "prod" && span.db.system = "postgresql" && duration > 1s }
+```
+
+**접두사가 곧 앞 절의 구분**이다 — `resource.`는 프로세스 꼬리표,
+`span.`은 그 구간의 꼬리표. `duration`·`status`·`name`처럼 스팬 자체의 값은 접두사가 없다.
+
+</TabItem>
+<TabItem label="구조로 찾기">
+
+```traceql
+# orders를 거친 트레이스 중, 그 아래 어딘가에서 느린 DB 질의가 있던 것
+{ resource.service.name = "orders" } >> { span.db.system = "postgresql" && duration > 1s }
+
+# 바로 아래 자식만
+{ resource.service.name = "orders" } > { resource.service.name = "inventory" }
+```
+
+`>>`는 자손, `>`는 직계 자식이다. **"A를 거친 요청 중 B에서 터진 것"** 처럼
+서비스 경계를 넘는 조건을 걸 수 있는 게 TraceQL의 진짜 값이다 —
+메트릭으로는 이 질문을 만들 수조차 없다.
+
+</TabItem>
+<TabItem label="집계와 선택">
+
+```traceql
+# 조건에 맞는 스팬이 3개 이상인 트레이스 (N+1 질의 찾기)
+{ span.db.system = "postgresql" } | count() > 3
+
+# 결과 표에 이 필드를 같이 보여 준다
+{ resource.service.name = "orders" && duration > 2s } | select(span.http.route, span.db.statement)
+```
+
+`count() > 3`은 **N+1 질의를 잡는 데 특히 잘 듣는다** — 한 요청 안에서
+같은 종류의 DB 호출이 수십 번 일어나는 패턴이 그대로 걸린다.
+
+</TabItem>
+</Tabs>
+
+:::tip[핵심 — 조사 순서]
+**메트릭(p99가 튀었다) → TraceQL(그 시간대에 `duration > 2s`인 트레이스) →
+트레이스 한 개를 열어 어느 스팬이 시간을 먹었나 → 그 서비스의 로그.**
+이 네 걸음이 이 덱 전체가 만들려는 경로다.
+:::
 
 ## 세 신호를 잇기 — 이 장의 진짜 값
 
@@ -201,7 +326,7 @@ kubectl -n observability logs deploy/alloy | grep -i -m5 'trace\|otlp'
 # ② Tempo가 저장하고 있나
 kubectl -n observability port-forward svc/tempo 3200:3200
 curl -s http://localhost:3200/api/echo        # 살아 있나
-curl -s http://localhost:3200/metrics | grep -E 'tempo_distributor_spans_received_total|tempo_ingester'
+curl -s http://localhost:3200/metrics | grep -E 'tempo_distributor_spans_received_total'
 
 # ③ 오브젝트 스토리지에 블록이 쌓이나
 mc ls store/tempo-traces/ --recursive | tail
@@ -209,7 +334,11 @@ mc ls store/tempo-traces/ --recursive | tail
 # ④ 트레이스 ID로 직접 조회 (로그에서 하나 골라서)
 curl -s "http://localhost:3200/api/traces/<trace_id>" | jq '.batches | length'
 
-# ⑤ 앱이 헤더를 넘기나 — 서비스 경계에서 확인
+# ⑤ TraceQL로 조회 — ID를 모를 때
+curl -sG http://localhost:3200/api/search \
+  --data-urlencode 'q={ resource.service.name = "orders" && duration > 2s }' | jq '.traces | length'
+
+# ⑥ 앱이 헤더를 넘기나 — 서비스 경계에서 확인
 kubectl -n prod exec deploy/api -- \
   sh -c 'curl -s -D- http://downstream.prod.svc:8080/health -o /dev/null' | grep -i traceparent
 ```
@@ -217,23 +346,30 @@ kubectl -n prod exec deploy/api -- \
 | 증상 | 흔한 원인 | 확인 |
 |---|---|---|
 | 트레이스가 조각남 | `traceparent` 전파 끊김 | 프록시·클라이언트 래퍼·큐 구간 |
+| 루트 스팬이 여러 개 | 같은 원인 — 중간에서 새 트레이스가 시작됨 | 게이트웨이가 헤더를 지우는지 |
 | 트레이스가 아예 없음 | OTLP 엔드포인트 오설정 · 샘플링 0% | 컬렉터 로그, SDK 환경변수 |
-| "그 요청"이 안 남음 | head 샘플링만 씀 | tail 샘플링에 에러·지연 정책 추가 |
+| "그 요청"만 안 남음 | head 샘플링만 씀 | tail 샘플링에 에러·지연 정책 추가 |
+| 반쪽짜리 트레이스가 많음 | **tail 샘플링인데 스팬이 컬렉터에 흩어짐** | trace ID 기반 라우팅 계층 |
+| 서비스 이름이 `unknown_service` | `service.name` 리소스 속성 미설정 | `OTEL_SERVICE_NAME` 환경변수 |
 | 저장은 되는데 조회 실패 | S3 접근 · 블록 포맷 | Tempo 로그, [온프렘 덱 6장](/onprem/06-minio/) 함정 넷 |
 | 업그레이드 후 기동 실패 | **3.0 구조 변경** | `tempo-cli migrate config`, 제거된 컴포넌트 확인 |
 
 ## 4장 요약
 
 - 추적은 **"어디서 느렸나"** 에 답하고, 그 대가로 **앱 계측**이 필요하다 — 진입 장벽이 다른 둘과 다르다
+- 스팬은 **트리의 노드**다. `trace_id`가 묶고 `parent_span_id`가 계층을 만든다
+- **리소스 속성(프로세스)과 스팬 속성(구간)** 의 구분이 계측 설정과 TraceQL 양쪽에 걸린다
+- **트레이스 속성에는 고유 값을 넣어도 된다** — 카디널리티 제한은 메트릭·로그 라벨의 이야기다
 - 계측의 급소는 **컨텍스트 전파**다. `traceparent` 헤더 하나가 끊기면 트레이스가 조각난다
 - **가장 싼 첫걸음은 로그에 `trace_id`를 찍는 것**이다
-- 샘플링은 **tail로 — 에러·느린 요청은 100%, 나머지는 1%**. head만 쓰면 정작 필요한 요청이 없다
+- 샘플링은 **tail로 — 에러·느린 요청은 100%, 나머지는 1%**. 다만 tail은
+  **한 트레이스의 스팬이 같은 컬렉터에 모여야** 제대로 판단한다
 - Tempo는 블록을 오브젝트 스토리지에 두고, 트레이스 ID 조회에는 인덱스가 필요 없다
+- ID를 모를 때는 **TraceQL** — `duration > 2s`, `>>`로 서비스 경계 넘기, `count() > 3`으로 N+1 찾기
 - **Tempo 3.0은 구조가 바뀌었고 2.x로 되돌릴 수 없다** — 업그레이드는 계획된 작업으로
-- 트레이스에서 **서비스 그래프와 스팬 메트릭**이 부산물로 나온다
 
 <LinkCard
   title="5. Grafana — 하나의 창"
-  description="세 데이터소스를 한 화면에서 오가게 만들기, 대시보드를 코드로 관리하기, SSO와 HA."
+  description="세 데이터소스를 잇는 설정, Explore로 실제 조사하기, 대시보드 설계와 as code, SSO와 알림의 자리."
   href="/observability/05-grafana/"
 />

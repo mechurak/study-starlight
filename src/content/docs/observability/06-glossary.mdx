@@ -1,6 +1,6 @@
 ---
 title: "6. 용어 사전"
-description: "이 덱에 나온 약어와 개념을 신호별로 묶어 한 곳에"
+description: "이 덱에 나온 약어와 개념을 신호별로 묶어 한 곳에 — 질의 언어 셋의 핵심 문법 포함"
 ---
 
 import { LinkCard } from '@astrojs/starlight/components';
@@ -13,6 +13,7 @@ import TermIntro from '../../../components/TermIntro.astro';
   terms={[
     ['신호', '', '이 덱의 뼈대인 세 신호 — **메트릭 · 로그 · 트레이스**([1장](/observability/01-signals/)). 아래 표도 그 순서다.'],
     ['장 링크', '', '각 항목의 오른쪽 열은 **그 말이 실제로 쓰이는 장**이다. 뜻만 필요하면 여기서, 맥락이 필요하면 그 장으로 간다.'],
+    ['질의 언어 셋', 'PromQL · LogQL · TraceQL', '각 신호 절의 아래쪽에 **문법 요약**을 따로 뒀다. 셋의 모양이 닮은 것을 나란히 보면 외우기 쉽다.'],
   ]}
 />
 
@@ -26,7 +27,9 @@ import TermIntro from '../../../components/TermIntro.astro';
 | **카디널리티** | Cardinality | 라벨 조합의 가짓수. **스택을 죽이는 1번 원인** | [1](/observability/01-signals/) · [2](/observability/02-prometheus/) · [3](/observability/03-loki/) |
 | 리텐션 · 보존 | Retention | 데이터를 며칠 들고 있을지. 저장소 크기와 직결된다 | [1](/observability/01-signals/) |
 | 스크랩 | Scrape | 대상의 `/metrics`를 주기적으로 긁어 오는 것 | [1](/observability/01-signals/) · [2](/observability/02-prometheus/) |
-| RED · USE | — | 서비스는 요청·에러·지연 / 자원은 사용률·포화·오류로 본다 | [0](/observability/00-intro/) |
+| **RED** | Rate · Errors · Duration | **서비스**를 재는 세 지표. **알림은 여기에 건다** | [2](/observability/02-prometheus/) |
+| **USE** | Utilization · Saturation · Errors | **자원**을 재는 세 지표. 조사용이지 알림용이 아니다 | [2](/observability/02-prometheus/) |
+| 구조화 로그 | Structured Logging | JSON 등 기계가 파싱할 수 있는 로그. **라벨을 절제할 수 있게 하는 전제** | [3](/observability/03-loki/) |
 | LGTM 스택 | Loki · Grafana · Tempo · Mimir | Grafana Labs 관측 묶음. **이 덱은 Mimir 대신 Prometheus** | [0](/observability/00-intro/) |
 
 ## 수집 — 에이전트와 표준
@@ -38,23 +41,44 @@ import TermIntro from '../../../components/TermIntro.astro';
 | OTel | OpenTelemetry | 계측·수집의 벤더 중립 표준 (SDK · 프로토콜 · 컬렉터) | [0](/observability/00-intro/) · [4](/observability/04-tempo/) |
 | OTLP | OpenTelemetry Protocol | OTel의 전송 프로토콜. 트레이스·메트릭·로그 모두 이걸로 | [4](/observability/04-tempo/) |
 | relabel | 리라벨링 | 수집 단계에서 라벨을 만들거나 잘라 내는 규칙 | [2](/observability/02-prometheus/) · [3](/observability/03-loki/) |
+| discovery · source · write | — | Alloy 파이프라인의 단계 — **찾고 · 읽고 · 보낸다** | [3](/observability/03-loki/) |
 
 ## ① 메트릭 — Prometheus
 
 | 용어 | 풀 이름 | 뜻 | 장 |
 |---|---|---|---|
 | pull 모델 | — | 대상을 직접 긁는 방식. **`up == 0`이 곧 "죽었다"** | [2](/observability/02-prometheus/) |
+| **counter** | 카운터 | **늘기만 한다.** 재시작하면 0으로. `_total`로 끝난다 — **반드시 `rate()`로 본다** | [2](/observability/02-prometheus/) |
+| **gauge** | 게이지 | 오르내리는 현재값. 그대로 그린다 | [2](/observability/02-prometheus/) |
+| **histogram** | 히스토그램 | 관측값을 구간(`le`)별로 센 것. `_bucket`·`_sum`·`_count` 세 쌍 | [2](/observability/02-prometheus/) |
+| summary | 서머리 | 앱이 미리 계산한 분위수. **인스턴스끼리 합칠 수 없다** | [2](/observability/02-prometheus/) |
+| `le` | less or equal | 히스토그램 버킷의 경계 라벨. **집계할 때 반드시 남긴다** | [2](/observability/02-prometheus/) |
 | exporter | 익스포터 | 메트릭을 Prometheus 형식으로 내주는 프로그램 | [2](/observability/02-prometheus/) |
+| node-exporter · kube-state-metrics | — | 노드 상태 / 쿠버네티스 오브젝트 상태를 내주는 두 exporter | [2](/observability/02-prometheus/) |
 | ServiceMonitor · PodMonitor | — | "이걸 긁어라"를 선언하는 CRD | [2](/observability/02-prometheus/) |
 | PrometheusRule | — | 알림·기록 규칙을 선언하는 CRD | [2](/observability/02-prometheus/) |
+| 기록 규칙 | Recording Rule | 무거운 쿼리를 미리 계산해 새 메트릭으로 저장 | [2](/observability/02-prometheus/) |
 | kube-prometheus-stack | — | Operator + Prometheus + Alertmanager + Grafana 묶음 Helm 차트 | [2](/observability/02-prometheus/) |
-| PromQL | Prometheus Query Language | 메트릭 질의 언어. `rate()` · `histogram_quantile()`이 핵심 | [2](/observability/02-prometheus/) |
 | TSDB | Time Series Database | 시계열 저장소. Prometheus는 **로컬 디스크**에 쓴다 | [2](/observability/02-prometheus/) |
-| `predict_linear` | — | 추세로 미래를 외삽하는 함수. **"찰 것 같다"** 를 알려 준다 | [2](/observability/02-prometheus/) |
 | Alertmanager | — | 알림의 라우팅 · 묶음 · 억제 · 침묵 | [2](/observability/02-prometheus/) |
 | inhibit · silence | 억제 · 침묵 | 상위 알림이 있을 때 하위를 묻기 / 일시적으로 끄기 | [2](/observability/02-prometheus/) |
 | **Watchdog** | — | 항상 발화하는 알림. **알림 경로가 죽은 것을 알아채는 장치** | [2](/observability/02-prometheus/) |
 | Thanos · Mimir | — | 메트릭 장기 저장소. **필요해지기 전에 넣지 않는다** | [2](/observability/02-prometheus/) |
+
+### PromQL 문법 요약
+
+| 쓰는 것 | 무엇 |
+|---|---|
+| `이름{라벨="값"}` | 순간 벡터 — 지금 시점의 값들 |
+| `이름[5m]` | 범위 벡터 — 지난 5분치. **함수 안에서만 쓴다** |
+| `rate(x[5m])` · `increase(x[1h])` | counter의 **초당 속도** · **구간 증가량** |
+| `sum by (l) (...)` · `sum without (l) (...)` | 라벨을 남기고 / 지우고 합친다 |
+| `histogram_quantile(0.99, sum by (le, …) (rate(…_bucket[5m])))` | p99. **`le`를 남기는 것이 핵심** |
+| `predict_linear(x[6h], 24*3600) < 0` | 추세를 외삽 — **"찰 것 같다"** |
+| `absent(up{job="x"})` | 시계열이 **아예 없을 때** 참 |
+| `topk(5, …)` | 상위 5개 |
+
+**순서는 언제나 `rate` → `sum by` → `histogram_quantile`.**
 
 ## ② 로그 — Loki
 
@@ -62,24 +86,52 @@ import TermIntro from '../../../components/TermIntro.astro';
 |---|---|---|---|
 | 스트림 | Stream | **라벨 조합 하나 = 스트림 하나.** 로그는 스트림 단위로 뭉친다 | [3](/observability/03-loki/) |
 | chunk | 청크 | 스트림의 로그를 뭉쳐 압축한 덩어리. **오브젝트 스토리지로 간다** | [3](/observability/03-loki/) |
-| LogQL | Log Query Language | Loki 질의 언어. `{라벨} \|= "문자열" \| 파싱 \| 필터` | [3](/observability/03-loki/) |
+| LogQL | Log Query Language | Loki 질의 언어. 네 단계로 읽는다 — 아래 요약 | [3](/observability/03-loki/) |
+| 라인 필터 · 파서 | Line Filter · Parser | 본문 문자열로 거르기 / 필드를 꺼내기. **필터가 먼저여야 빠르다** | [3](/observability/03-loki/) |
 | compactor | — | chunk 정리와 **보존 기간 적용**을 맡는 컴포넌트 | [3](/observability/03-loki/) |
 | monolithic · SSD · microservices | — | Loki 배포 모드 셋. **monolithic → SSD 순으로 간다** | [3](/observability/03-loki/) |
 | 테넌트 | Tenant | `X-Scope-OrgID`로 가르는 격리 단위. 팀·규정별 분리에 | [3](/observability/03-loki/) |
 | ingester · querier | — | 인입을 받아 chunk로 만드는 쪽 / 질의를 처리하는 쪽 | [3](/observability/03-loki/) |
 | ruler | — | 로그로 알림 규칙을 평가하고 Alertmanager로 보내는 컴포넌트 | [3](/observability/03-loki/) · [5](/observability/05-grafana/) |
 
+### LogQL 문법 요약
+
+| 단계 | 쓰는 것 | 무엇 |
+|---|---|---|
+| ① 스트림 선택 | `{namespace="prod", app="api"}` | **필수.** 읽을 chunk의 범위 |
+| ② 라인 필터 | `\|=` `!=` `\|~` `!~` | 본문 문자열로 거른다. **파서보다 앞에** |
+| ③ 파서 | `\| json` `\| logfmt` `\| pattern` `\| regexp` | 필드를 꺼낸다 |
+| ④ 라벨 필터 | `\| status >= 500` | 꺼낸 필드로 다시 거른다 |
+| ④ 출력 | `\| line_format "{{.msg}}"` | 보이는 줄을 다시 조립 |
+| ④ 집계 | `sum by (app) (rate({…}[5m]))` | **로그를 세어 그래프로** |
+| ④ 숫자 집계 | `quantile_over_time(0.99, {…} \| json \| unwrap duration_ms [5m])` | 꺼낸 필드를 숫자로 |
+
 ## ③ 트레이스 — Tempo와 OpenTelemetry
 
 | 용어 | 풀 이름 | 뜻 | 장 |
 |---|---|---|---|
 | 트레이스 · 스팬 | Trace · Span | 요청 하나의 여정 / 그 안의 구간. **트리로 쌓인다** | [4](/observability/04-tempo/) |
+| `trace_id` · `parent_span_id` | — | 같은 요청을 묶는 값 / 트리 계층을 만드는 값 | [4](/observability/04-tempo/) |
+| **리소스 속성** | Resource Attributes | **프로세스 전체**에 붙는 꼬리표 (`service.name` · `k8s.pod.name`) | [4](/observability/04-tempo/) |
+| **스팬 속성** | Span Attributes | **그 구간에만** 붙는 꼬리표 (`http.route` · `db.statement`) | [4](/observability/04-tempo/) |
+| span kind | — | `server` · `client` · `producer` · `consumer` · `internal` | [4](/observability/04-tempo/) |
 | **컨텍스트 전파** | Context Propagation | 서비스 사이로 트레이스 ID를 넘기는 것 (`traceparent`) | [4](/observability/04-tempo/) |
 | 자동 계측 | Auto-instrumentation | 에이전트가 HTTP·DB 호출을 알아서 잡는 방식 | [4](/observability/04-tempo/) |
 | head · tail 샘플링 | — | 시작할 때 결정 / **끝나고 결과를 보고** 결정 | [4](/observability/04-tempo/) |
-| TraceQL | — | Tempo 질의 언어. `{ duration > 2s }` 로 느린 것만 고른다 | [4](/observability/04-tempo/) |
+| TraceQL | — | Tempo 질의 언어 — 아래 요약 | [4](/observability/04-tempo/) |
 | 서비스 그래프 | Service Graph | 트레이스에서 자동 생성한 "누가 누구를 부르나" 지도 | [4](/observability/04-tempo/) |
 | 스팬 메트릭 | Span Metrics | 트레이스에서 뽑아낸 요청 수·지연·에러율 | [4](/observability/04-tempo/) |
+
+### TraceQL 문법 요약
+
+| 쓰는 것 | 무엇 |
+|---|---|
+| `{ duration > 2s }` | 스팬 자체의 값 — `duration` · `status` · `name`은 접두사가 없다 |
+| `{ resource.service.name = "orders" }` | **프로세스** 꼬리표로 고르기 |
+| `{ span.http.route = "/orders" }` | **구간** 꼬리표로 고르기 |
+| `A >> B` · `A > B` | B가 A의 **자손** / **직계 자식**인 트레이스 |
+| `{ … } \| count() > 3` | 조건에 맞는 스팬이 3개 이상 — **N+1 질의 찾기** |
+| `\| select(span.db.statement)` | 결과 표에 이 필드를 같이 보여 준다 |
 
 ## ④ 조회와 연결 — Grafana
 
@@ -87,11 +139,12 @@ import TermIntro from '../../../components/TermIntro.astro';
 |---|---|---|---|
 | 데이터소스 | Data Source | Grafana가 붙는 저장소 하나. **`uid`로 서로를 참조한다** | [5](/observability/05-grafana/) |
 | 프로비저닝 | Provisioning | 대시보드·데이터소스를 파일·CRD로 미리 넣는 것 | [5](/observability/05-grafana/) |
+| **Explore** | 탐색 | 질의를 그때그때 던지는 화면. **분할 화면이 조사의 핵심 도구** | [5](/observability/05-grafana/) |
 | **derived field** | 파생 필드 | 로그에서 값을 뽑아 다른 데이터소스로 링크. `trace_id` → Tempo | [5](/observability/05-grafana/) |
 | **exemplar** | 표본 링크 | 메트릭 한 점에 매달린 대표 트레이스 ID. 그래프 → 트레이스 | [1](/observability/01-signals/) · [5](/observability/05-grafana/) |
 | trace to logs | — | 트레이스 화면에서 그 서비스·시각의 로그로 가는 설정 | [5](/observability/05-grafana/) |
+| **템플릿 변수** | Template Variable | `$service` 드롭다운. **대시보드 개수를 억누르는 장치** | [5](/observability/05-grafana/) |
 | Unified Alerting | 통합 알림 | Grafana 자체 알림. **Alertmanager와 역할이 겹친다** | [5](/observability/05-grafana/) |
-| organization | 조직 | Grafana 안의 격리 단위. 대개 폴더 권한으로 충분하다 | [5](/observability/05-grafana/) |
 
 ## 다른 덱으로 넘긴 말들
 

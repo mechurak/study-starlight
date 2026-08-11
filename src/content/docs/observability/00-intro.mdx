@@ -1,6 +1,6 @@
 ---
 title: "0. 시작하기 전에"
-description: "이 덱의 대상과 범위, 그리고 2026년 8월의 관측 지형 — 무엇이 끝났고 무엇으로 갈아타는가"
+description: "이 덱의 대상과 범위, 각 장을 읽는 방식, 그리고 2026년 8월의 관측 지형 — 무엇이 끝났고 무엇으로 갈아타는가"
 ---
 
 import { Card, CardGrid, LinkCard } from '@astrojs/starlight/components';
@@ -15,7 +15,7 @@ import TermIntro from '../../../components/TermIntro.astro';
     ['Grafana Alloy', '', 'Grafana Labs의 OpenTelemetry 컬렉터 배포판. 로그·메트릭·트레이스를 **한 에이전트로** 모은다. **Promtail은 2026-03에 EOL**이라 지금은 이쪽이 답이다.'],
     ['OTel', 'OpenTelemetry', '계측·수집의 벤더 중립 표준(CNCF). SDK · 프로토콜(OTLP) · 컬렉터로 이뤄진다. 지금은 트레이스뿐 아니라 로그·메트릭까지 여기로 모인다.'],
     ['카디널리티', 'Cardinality', '라벨 조합의 가짓수. **관측 스택을 죽이는 1번 원인**이다 — 사용자 ID처럼 값이 무한한 것을 라벨에 넣으면 시계열이 폭발한다.'],
-    ['RED · USE', '', '무엇을 재야 하는지의 두 관례. RED는 서비스를 **요청 수 · 에러 · 지연**으로, USE는 자원을 **사용률 · 포화 · 오류**로 본다. 대시보드 설계의 출발점이다.'],
+    ['질의 언어 셋', 'PromQL · LogQL · TraceQL', '메트릭 · 로그 · 트레이스를 각각 묻는 말. **셋이 서로 닮았다** — PromQL을 익히면 나머지 둘은 변형으로 읽힌다. 2 · 3 · 4장에서 하나씩 다룬다.'],
   ]}
 />
 
@@ -26,8 +26,8 @@ import TermIntro from '../../../components/TermIntro.astro';
 - 이미 Grafana가 떠 있지만 **대시보드만 있고 알림은 없는** 상태를 물려받은 사람
 - 관리형 관측 서비스(CloudWatch · Datadog)를 쓰다가 **직접 굴려야 하게 된** 사람
 
-전제하는 것: 쿠버네티스 기본기(Deployment · Service · PV/PVC · Helm),
-터미널, YAML. 전제하지 않는 것: PromQL · LogQL · OpenTelemetry 경험.
+전제하는 것: 쿠버네티스 기본기(Deployment · Service · PV/PVC · Helm), 터미널, YAML.
+**전제하지 않는 것: PromQL · LogQL · TraceQL · OpenTelemetry 경험** — 셋 다 이 덱 안에서 처음부터 쌓는다.
 
 ### 다루는 것과 다루지 않는 것
 
@@ -35,13 +35,13 @@ import TermIntro from '../../../components/TermIntro.astro';
 <Card title="다룬다" icon="approve-check">
 세 신호가 각각 무엇에 답하고 무엇에 답하지 못하는가.
 
-Prometheus — pull 모델, ServiceMonitor, 리텐션, **알림 설계**.
+Prometheus — 메트릭의 생김새, **PromQL**, ServiceMonitor, 리텐션, **알림 설계**.
 
-Loki — 라벨만 인덱싱하는 구조, Alloy 수집, LogQL, 보존.
+Loki — 라벨만 인덱싱하는 구조, Alloy 수집, **LogQL**, 보존.
 
-Tempo — 계측과 컨텍스트 전파, 샘플링, 3.0의 구조 변화.
+Tempo — 스팬의 생김새, 계측과 컨텍스트 전파, 샘플링, **TraceQL**, 3.0의 구조 변화.
 
-Grafana — 셋을 잇는 상관 관계 설정, 대시보드 as code, SSO.
+Grafana — 셋을 잇는 상관 관계 설정, 조사 흐름, 대시보드 설계, SSO.
 
 **안 될 때 어디를 보나** — 장마다 점검 절과 증상·원인 표.
 </Card>
@@ -66,6 +66,24 @@ SLO 정의와 에러 버짓 — 알림 설계 원칙까지만.
 이 덱은 [온프렘 덱](/onprem/)의 관측 부분이 커져서 독립한 것이다. 경계는 이렇다 —
 **"관측 스택을 인프라 노드에 두고 저장소를 클러스터 밖에 둔다"는 판단은 온프렘 덱 8장**,
 **"Loki를 어떻게 설정하고 안 될 때 어디를 보나"는 이 덱**이다.
+:::
+
+## 각 장을 읽는 방식
+
+도구를 배울 때 제일 흔한 실패는 **설정 파일부터 보는 것**이다. 값이 무슨 뜻인지 모른 채
+YAML을 복사하면, 안 될 때 어디를 봐야 할지 알 수 없다.
+그래서 2~5장은 전부 같은 순서로 간다.
+
+| 순서 | 무엇을 | 왜 이 순서인가 |
+|---|---|---|
+| ① **데이터가 어떻게 생겼나** | 메트릭 한 줄 · 로그 한 줄 · 스팬 하나의 실제 모양 | 저장되는 물건을 봐야 나머지가 다 읽힌다 |
+| ② **어떻게 묻나** | PromQL · LogQL · TraceQL | 질의를 알면 **무엇을 저장해야 하는지**가 거꾸로 보인다 |
+| ③ **어떻게 세우나** | Helm · CRD · 에이전트 설정 | 이제 각 값이 ①②의 무엇을 정하는지 안다 |
+| ④ **안 될 때 어디를 보나** | 명령어 + 증상·원인·확인 표 | 실제로 제일 자주 열리는 자리 |
+
+:::tip[핵심]
+급하면 **각 장의 ④(점검) 절만 봐도 된다.** 다만 그 표의 "원인" 열이 안 읽히면
+그 장의 ①②로 돌아가는 것이 결국 빠르다.
 :::
 
 ## 미리 잡아두면 좋은 멘탈 모델
@@ -138,8 +156,10 @@ SLO 정의와 에러 버짓 — 알림 설계 원칙까지만.
 | 지금 처지 | 먼저 볼 장 |
 |---|---|
 | 아무것도 없다. 뭐부터 세우나 | [1장](/observability/01-signals/) 끝의 "무엇부터 만드나" |
+| `rate()`가 뭔지 모른 채 남의 쿼리를 붙여 쓰고 있다 | [2장](/observability/02-prometheus/) 메트릭의 생김새 · PromQL 절 |
 | 그래프는 있는데 **알림이 없다** | [2장](/observability/02-prometheus/) 알림 설계 절 |
 | 로그가 안 들어온다 · `too many streams` | [3장](/observability/03-loki/) 라벨 설계와 점검 |
+| 로그 검색이 매번 타임아웃된다 | [3장](/observability/03-loki/) LogQL 절 (필터 순서가 원인인 경우가 많다) |
 | 로그에서 트레이스로 못 건너간다 | [5장](/observability/05-grafana/) 상관 관계 절 |
 | Tempo 업그레이드했더니 안 뜬다 | [4장](/observability/04-tempo/) Tempo 3.0 절 |
 | 디스크가 차고 있다 | [2장](/observability/02-prometheus/) 리텐션 · [3장](/observability/03-loki/) 보존 · [온프렘 덱 8장](/onprem/08-observability/) |
@@ -147,12 +167,14 @@ SLO 정의와 에러 버짓 — 알림 설계 원칙까지만.
 ## 0장 요약
 
 - 대상은 **쿠버네티스 위의 서비스를 관측해야 하는 사람**이다. 밑에 깔리는 인프라는 [온프렘 덱](/onprem/)
+- 질의 언어 셋(PromQL · LogQL · TraceQL)은 **전제하지 않는다** — 덱 안에서 쌓는다
+- 각 장은 **데이터 모양 → 질의 → 설정 → 점검** 순서로 간다. 설정부터 보면 안 될 때 막힌다
 - 멘탈 모델 셋: **역할 분담 / 이동 / 카디널리티**
 - 기준 시점은 2026년 8월. **Promtail EOL(2026-03)과 Tempo 3.0의 구조 변경**이
   이 시점 관측 지형의 가장 큰 변화다 — 옛 가이드를 그대로 따르면 안 된다
 
 <LinkCard
   title="1. 세 신호 — 무엇이 무엇에 답하나"
-  description="메트릭·로그·트레이스의 역할 분담, 스택 전체 그림, 수집기 통일, 그리고 무엇부터 만드나."
+  description="한 사건을 세 신호로 나란히 보고, 스택 전체 그림과 카디널리티, 그리고 무엇부터 만드나."
   href="/observability/01-signals/"
 />

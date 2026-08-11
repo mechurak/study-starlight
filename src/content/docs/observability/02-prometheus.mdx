@@ -1,6 +1,6 @@
 ---
 title: "2. 메트릭 — Prometheus와 알림"
-description: "pull 모델과 ServiceMonitor, 리텐션과 카디널리티, 그리고 온프렘에서 반드시 걸어야 하는 알림 목록"
+description: "메트릭의 생김새와 타입 넷, PromQL 다섯 형태, RED와 USE, ServiceMonitor와 리텐션, 그리고 반드시 걸어야 하는 알림 목록"
 ---
 
 import { Tabs, TabItem, LinkCard } from '@astrojs/starlight/components';
@@ -12,9 +12,10 @@ import TermIntro from '../../../components/TermIntro.astro';
   terms={[
     ['pull 모델', '', 'Prometheus가 대상에 **직접 접속해 긁어 오는(scrape)** 방식. 대상이 보내 주는(push) 방식과 반대다. "긁으러 갔는데 없더라"로 **죽은 것도 알 수 있다**는 게 큰 차이다.'],
     ['exporter', '익스포터', 'Prometheus가 읽을 수 있는 형식으로 메트릭을 내주는 작은 프로그램. `node-exporter`(노드 상태), `kube-state-metrics`(쿠버네티스 오브젝트 상태)가 대표적이다.'],
+    ['카운터 · 게이지 · 히스토그램', 'Counter · Gauge · Histogram', '메트릭의 세 가지 성격. **늘기만 하는 것 · 오르내리는 것 · 분포를 담는 것**이다. 성격을 모르고 질의하면 그래프가 조용히 거짓말을 한다.'],
+    ['PromQL', 'Prometheus Query Language', '메트릭 질의 언어. **`rate()`로 속도를 내고 `sum by()`로 묶는** 두 동작이 전체의 8할이다.'],
+    ['RED · USE', '', '무엇을 재야 하는지의 두 관례. RED는 서비스를 **요청 수 · 에러 · 지연**으로, USE는 자원을 **사용률 · 포화 · 오류**로 본다. 대시보드와 알림 설계의 출발점이다.'],
     ['ServiceMonitor · PodMonitor', '', '"이 Service·Pod를 긁어라"를 선언하는 CRD. Prometheus 설정 파일을 직접 고치지 않고 **쿠버네티스 리소스로** 대상을 추가한다.'],
-    ['PromQL', 'Prometheus Query Language', '메트릭 질의 언어. `rate()`(증가 속도) · `histogram_quantile()`(분위수) 두 함수만 익혀도 대부분을 쓴다.'],
-    ['TSDB', 'Time Series Database', '시계열 저장소. Prometheus는 로컬 디스크에 자체 TSDB를 쓴다 — **PVC 크기가 곧 보존 기간**이다.'],
     ['Alertmanager', '', '알림의 라우팅·묶음·중복 제거·억제(inhibit)·침묵(silence)을 담당하는 별도 컴포넌트. Prometheus는 "규칙이 참이다"까지만 하고 나머지는 여기가 한다.'],
   ]}
 />
@@ -36,7 +37,229 @@ Prometheus는 대상이 보내 주기를 기다리지 않고 **직접 긁으러 
 **대부분의 온프렘 알림은 결국 `up == 0`과 디스크·인증서 만료 세 가지에서 시작한다.**
 :::
 
-## 무엇으로 설치하나
+## 메트릭은 어떻게 생겼나
+
+Prometheus가 긁어 오는 것은 결국 **텍스트 몇 줄**이다.
+앱의 `/metrics` 주소를 그냥 `curl`하면 이게 나온다.
+
+```text
+# HELP http_requests_total 처리한 HTTP 요청 수
+# TYPE http_requests_total counter
+http_requests_total{method="POST",path="/orders",status="200"} 12044
+http_requests_total{method="POST",path="/orders",status="500"} 37
+
+# HELP process_resident_memory_bytes 프로세스가 쓰고 있는 메모리
+# TYPE process_resident_memory_bytes gauge
+process_resident_memory_bytes 4.1943e+08
+```
+
+한 줄의 구조는 **`이름{라벨=값, ...} 숫자`** 다. 여기서 두 가지가 따라 나온다.
+
+- **저장되는 건 숫자 하나뿐이다.** 에러 메시지도, 어느 사용자였는지도 여기 없다 —
+  그건 로그와 트레이스의 몫이다
+- **라벨 조합 하나가 시계열 하나다.** 위 예에서 `status`만 다른 두 줄은
+  **서로 다른 시계열 둘**이고, Prometheus는 각각에 대해 (시각, 값) 수열을 따로 쌓는다
+
+### 타입 넷 — 성격을 모르면 그래프가 거짓말을 한다
+
+같은 숫자라도 **어떻게 변하는 값인지**에 따라 읽는 법이 다르다. 이걸 타입이라 부른다.
+
+| 타입 | 성격 | 예 | 어떻게 읽나 |
+|---|---|---|---|
+| **counter** | **늘기만 한다.** 프로세스가 재시작하면 0으로 돌아간다 | `http_requests_total` · `..._errors_total` | **절대 그냥 보지 않는다.** `rate()`로 **속도**를 낸다 |
+| **gauge** | 오르내린다 | `..._memory_bytes` · `kube_pod_status_ready` | 그대로 본다. 추세는 `deriv()`·`predict_linear()` |
+| **histogram** | 관측값을 **구간별로 센다** | `http_request_duration_seconds` | `histogram_quantile()`로 p95·p99를 뽑는다 |
+| **summary** | 앱이 **미리 계산한 분위수** | 일부 라이브러리의 기본값 | 파드가 여럿이면 **합칠 수 없다.** 아래 함정 |
+
+이름 규칙이 타입을 알려 준다 — **`_total`로 끝나면 counter**, `_bytes`·`_seconds`로
+끝나는 현재값은 대개 gauge, `_bucket`·`_sum`·`_count` 세 쌍이 보이면 histogram이다.
+
+:::caution[함정 — counter를 그냥 그리면 계단만 보인다]
+`http_requests_total`을 그래프로 그리면 **끝없이 올라가는 선** 하나가 나온다.
+"지금 초당 몇 건인가"는 그 선의 **기울기**이지 값이 아니다.
+그래서 counter는 언제나 `rate()`나 `increase()`를 씌운다.
+
+그리고 이 함수들은 **재시작으로 값이 0으로 떨어진 것을 알아서 보정**한다 —
+직접 빼기(`a - a offset 5m`)로 구현하면 파드가 재시작할 때마다 커다란 음수가 튄다.
+:::
+
+### 히스토그램이 특별한 이유
+
+지연 시간은 평균이 거의 쓸모없다. 평균 200ms인데 **100명 중 1명이 5초**를 겪고 있으면
+그 1명이 문제다. 그래서 지연은 **분포**로 저장한다.
+
+```text
+# 히스토그램 하나는 실제로 이렇게 여러 줄로 나온다
+http_request_duration_seconds_bucket{le="0.1"}   9800    # 0.1초 이하가 9800건
+http_request_duration_seconds_bucket{le="0.5"}   9950
+http_request_duration_seconds_bucket{le="1"}     9990
+http_request_duration_seconds_bucket{le="+Inf"} 10000    # 전체
+http_request_duration_seconds_sum              1240.5    # 걸린 시간 합
+http_request_duration_seconds_count             10000    # 건수
+```
+
+`le`는 "less or equal", 즉 **누적 구간**이다. 이 구조 덕분에 파드가 열 개여도
+버킷끼리 그냥 더하면 전체 분포가 되고, **거기서 p99를 다시 계산할 수 있다.**
+
+:::caution[함정 — summary는 합쳐지지 않는다]
+summary는 앱이 자기 안에서 이미 p99를 계산해 숫자 하나로 내준다.
+파드 셋의 p99가 각각 1.0 · 1.2 · 5.0초일 때, **이 셋을 평균 내도 전체 p99가 아니다** —
+분포 정보가 이미 버려졌기 때문에 되살릴 방법이 없다.
+
+**여러 인스턴스로 도는 서비스의 지연은 histogram으로 낸다.** 라이브러리가 summary를
+기본값으로 주면 바꿔 둔다. (버킷을 미리 정하지 않아도 되는 **네이티브 히스토그램**이
+3.x 계열에서 자리를 잡아 가는 중이니, 새로 설계한다면 성숙도를 문서에서 확인하고 고른다.)
+:::
+
+### 라벨과 카디널리티
+
+라벨 조합 하나가 시계열 하나이므로, **라벨 설계가 곧 용량 설계다.**
+`method`(5종) × `path`(20종) × `status`(6종)이면 시계열 600개 — 괜찮다.
+여기에 `user_id`가 붙으면 사용자 수만큼 곱해진다.
+
+| 하면 안 되는 라벨 | 대신 |
+|---|---|
+| `user_id` · `request_id` · `trace_id` | 로그·트레이스에 넣는다 ([3장](/observability/03-loki/) · [4장](/observability/04-tempo/)) |
+| `pod_ip` · 파드 이름(단명 파드) | `deployment`·`service` 단위로 |
+| URL 전체 (`/orders/12345`) | 경로 템플릿 (`/orders/:id`) |
+
+이미 들어오는 라벨은 **긁는 단계에서 잘라 낸다.** 앱 배포를 기다릴 필요가 없다.
+
+```yaml
+# ServiceMonitor의 endpoints 아래
+metricRelabelings:
+  - action: labeldrop
+    regex: "id|uuid|request_id"
+```
+
+## PromQL — 다섯 형태면 대부분 쓴다
+
+PromQL은 문법이 넓지만, 실전에서 쓰는 모양은 사실상 다섯 개다.
+**이 다섯을 조합하는 것이 전부**이고, 남의 대시보드에 있는 긴 쿼리도 대개 이것의 겹침이다.
+
+<Tabs>
+<TabItem label="① 고르기">
+
+```promql
+up{job="node-exporter"}                       # 라벨로 고른다
+up{job=~"node.*"}                             # =~ 정규식, != 부정, !~ 정규식 부정
+node_filesystem_avail_bytes{fstype!~"tmpfs|overlay"}
+```
+
+이렇게 고른 결과가 **순간 벡터** — "지금 시점의 값들"이다.
+그래프에 그대로 그릴 수 있는 건 gauge뿐이라는 걸 기억한다.
+
+</TabItem>
+<TabItem label="② 속도 내기">
+
+```promql
+rate(http_requests_total[5m])                 # 초당 몇 건인가 (5분 창의 평균)
+increase(http_requests_total[1h])             # 1시간 동안 몇 건 늘었나
+```
+
+`[5m]`이 붙으면 **범위 벡터** — "지난 5분치 값들"이다.
+범위 벡터는 그래프에 못 그리고, 반드시 `rate` 같은 함수를 통과해야 한다.
+
+**창 크기는 스크랩 간격의 4배 이상**으로 준다. 스크랩이 30초인데 `[30s]`를 주면
+창 안에 점이 하나뿐이라 값이 비거나 요동친다. 30초 스크랩이면 `[2m]` 이상이 안전하다.
+
+</TabItem>
+<TabItem label="③ 묶기">
+
+```promql
+sum by (service) (rate(http_requests_total[5m]))          # 서비스별 합계
+sum without (pod, instance) (rate(...))                    # 이 라벨들만 지우고 합친다
+topk(5, sum by (namespace) (rate(...)))                    # 상위 5개만
+count by (node) (kube_pod_info)                            # 노드별 파드 수
+```
+
+`by`는 **남길 라벨**, `without`은 **지울 라벨**이다.
+파드처럼 계속 바뀌는 라벨은 `without`으로 지우는 편이 대시보드가 안 깨진다.
+
+</TabItem>
+<TabItem label="④ 비율 내기">
+
+```promql
+# 에러율 = 5xx 속도 / 전체 속도
+  sum by (service) (rate(http_requests_total{status=~"5.."}[5m]))
+/
+  sum by (service) (rate(http_requests_total[5m]))
+```
+
+**나눗셈은 양쪽 라벨 집합이 같아야 짝이 맞는다.** 결과가 비어 있으면
+십중팔구 한쪽에만 있는 라벨(`status` 같은) 때문이니, 양쪽 다 같은 `by`로 묶는다.
+
+</TabItem>
+<TabItem label="⑤ 분위수와 예측">
+
+```promql
+# p99 지연 — 안쪽부터 읽는다: rate → sum by(le) → quantile
+histogram_quantile(0.99,
+  sum by (le, service) (rate(http_request_duration_seconds_bucket[5m])))
+
+# 24시간 안에 디스크가 빌 것 같은가 (6시간 추세를 외삽)
+predict_linear(node_filesystem_avail_bytes{mountpoint="/"}[6h], 24*3600) < 0
+```
+
+`histogram_quantile`은 **`by`에 `le`를 반드시 남긴다** — 버킷 경계 라벨이 사라지면
+분포를 복원할 수 없어 결과가 빈다. 가장 흔한 실수다.
+
+`predict_linear`는 온프렘에서 특히 값을 한다. **"찼다"가 아니라 "찰 것 같다"** 를
+알려 주니 노드 증설 리드타임을 벌 수 있다.
+
+</TabItem>
+</Tabs>
+
+### 자주 하는 실수 다섯
+
+| 쓴 것 | 무슨 일이 벌어지나 | 이렇게 |
+|---|---|---|
+| `sum(http_requests_total)` | counter 원값의 합 — **계단만 올라간다** | `sum(rate(...[5m]))` |
+| `rate(sum(...))` | 합친 뒤 속도를 내서 **재시작 보정이 깨진다** | **`rate`가 먼저, `sum`이 나중** |
+| `avg(p99_latency)` | 분위수의 평균은 **아무 의미가 없다** | 히스토그램 버킷을 합친 뒤 `histogram_quantile` |
+| `histogram_quantile(0.99, sum by (service) (...))` | `le`가 없어 **결과가 빈다** | `sum by (le, service)` |
+| `up{job="x"} == 0` | 대상이 **아예 사라지면** 시계열도 없어 알림이 안 뜬다 | `absent(up{job="x"})`를 함께 건다 |
+
+:::tip[핵심 — 순서 하나만 외운다]
+**`rate` → `sum by` → (필요하면) `histogram_quantile`.**
+안쪽에서 바깥쪽으로 이 순서면 대시보드 쿼리의 대부분이 맞는다.
+:::
+
+## 무엇을 재나 — RED와 USE
+
+메트릭을 낼 수 있다고 아무거나 내면 시계열만 는다.
+**무엇을 재야 하는지에는 검증된 관례 둘이 있다** — 대상이 다르다.
+
+| | **RED** — 요청을 처리하는 것 | **USE** — 자원 |
+|---|---|---|
+| 대상 | API · 서비스 · 큐 컨슈머 | CPU · 메모리 · 디스크 · 네트워크 |
+| 무엇을 | **R**ate 요청 수 · **E**rrors 에러 · **D**uration 지연 | **U**tilization 사용률 · **S**aturation 포화 · **E**rrors 오류 |
+| 답하는 것 | **사용자가 지금 아픈가** | **왜 아픈가 (어디가 모자란가)** |
+| 알림을 건다면 | **여기에 건다** — 증상이다 | 조사용. 알림으로 걸면 시끄럽다 |
+
+```promql
+# RED — 서비스 하나에 이 셋이면 충분하다
+sum by (service) (rate(http_requests_total[5m]))                                  # Rate
+sum by (service) (rate(http_requests_total{status=~"5.."}[5m]))
+  / sum by (service) (rate(http_requests_total[5m]))                              # Errors
+histogram_quantile(0.99,
+  sum by (le, service) (rate(http_request_duration_seconds_bucket[5m])))           # Duration
+
+# USE — 자원 하나에 이 셋
+100 - (avg by (instance) (rate(node_cpu_seconds_total{mode="idle"}[5m])) * 100)   # Utilization
+node_load5 / count by (instance) (node_cpu_seconds_total{mode="idle"})             # Saturation
+rate(node_network_receive_errs_total[5m])                                          # Errors
+```
+
+:::tip[핵심 — 알림은 RED에, 대시보드는 둘 다]
+**"노드 CPU 90%"는 알림이 아니다.** CPU가 90%여도 사용자가 멀쩡하면 깨울 이유가 없고,
+CPU가 40%인데 DB 잠금으로 전부 실패하는 상황은 그 알림이 못 잡는다.
+
+**증상(RED)으로 깨우고, 원인(USE)은 깨어난 뒤에 본다.** 예외는 되돌릴 수 없는 것 —
+디스크가 100% 차면 그 뒤에 벌어지는 일을 못 막으니 이건 USE라도 알림 대상이다.
+:::
+
+## 세우기 — kube-prometheus-stack
 
 | 방식 | 성격 |
 |---|---|
@@ -44,7 +267,7 @@ Prometheus는 대상이 보내 주기를 기다리지 않고 **직접 긁으러 
 | Prometheus Operator 단독 | 위 묶음이 과할 때 |
 | 바이너리·단독 컨테이너 | 쿠버네티스 밖 대상을 긁을 때 |
 
-kube-prometheus-stack을 쓰면 **긁을 대상을 CRD로 추가**하게 된다 — 설정 파일을 손대지 않는다.
+이걸 쓰면 **긁을 대상과 알림 규칙을 CRD로 추가**하게 된다 — 설정 파일을 손대지 않는다.
 
 ```mermaid
 flowchart LR
@@ -64,6 +287,11 @@ flowchart LR
     class AM,N warn
     class SM,PR,P,T1,T2,T3 mute
 ```
+
+기본 묶음에 들어오는 exporter 둘이 사실상 클러스터 감시의 바닥을 깐다 —
+**`node-exporter`가 노드(CPU·메모리·디스크·네트워크)**, **`kube-state-metrics`가
+쿠버네티스 오브젝트 상태(파드 Ready인가, Deployment 몇 개 떴나)** 를 낸다.
+`kube_pod_status_ready` 같은 이름이 보이면 후자에서 온 것이다.
 
 <Tabs>
 <TabItem label="긁을 대상 추가">
@@ -118,8 +346,19 @@ spec:
             summary: "{{ $labels.instance }}:{{ $labels.mountpoint }} 24시간 내 디스크 소진 예상"
 ```
 
-`predict_linear`가 온프렘에서 특히 유용하다 — **"찼다"가 아니라 "찰 것 같다"** 를
-알려 주니 노드 증설 리드타임을 벌 수 있다.
+</TabItem>
+<TabItem label="기록 규칙">
+
+```yaml
+        - record: service:request_error_rate:ratio5m
+          expr: |
+            sum by (service) (rate(http_requests_total{status=~"5.."}[5m]))
+              / sum by (service) (rate(http_requests_total[5m]))
+```
+
+무거운 쿼리를 **미리 계산해 새 메트릭으로 저장**하는 것이 기록 규칙(recording rule)이다.
+대시보드 여러 개가 같은 계산을 반복하거나 알림 표현식이 길어지면 여기로 뺀다.
+이름은 `수준:메트릭:연산` 관례를 따르면 나중에 알아보기 쉽다.
 
 </TabItem>
 </Tabs>
@@ -138,7 +377,7 @@ kubectl -n observability port-forward svc/kube-prometheus-stack-prometheus 9090:
 ```
 :::
 
-## Prometheus 3.x에서 달라진 것
+### Prometheus 3.x에서 달라진 것
 
 **3.13이 LTS**다 (2026-07). 2.x 설정은 대체로 그대로 통하지만, 새로 얻은 게 있다.
 
@@ -151,7 +390,8 @@ kubectl -n observability port-forward svc/kube-prometheus-stack-prometheus 9090:
 
 ## 리텐션 — 언제 장기 저장이 필요한가
 
-Prometheus는 **로컬 디스크에만** 저장한다. 그래서 보존 기간은 PVC 크기와 직결된다.
+Prometheus는 시계열을 자체 저장 엔진(**TSDB**, Time Series Database)에 담는데,
+이게 **로컬 디스크에만** 있다. 그래서 보존 기간은 PVC 크기와 직결된다.
 
 ```yaml
 spec:
@@ -163,6 +403,9 @@ spec:
         storageClassName: standard
         resources: { requests: { storage: 200Gi } }
 ```
+
+`retentionSize`를 PVC의 80~90% 선으로 잡아 둔다. 기간만 주면
+시계열이 늘었을 때 **디스크가 먼저 차고, 그때 Prometheus가 죽는다.**
 
 | 필요 | 답 |
 |---|---|
@@ -183,7 +426,7 @@ spec:
 | 원칙 | 뜻 |
 |---|---|
 | **사람이 행동할 수 있는 것만** | 받고도 할 일이 없는 알림은 다음부터 무시된다 |
-| **증상으로 건다** | "노드 CPU 90%"보다 "요청 실패율 증가"가 낫다. 원인은 조사로 찾는다 |
+| **증상으로 건다** | "노드 CPU 90%"보다 "요청 실패율 증가"가 낫다 — 위 RED·USE 절 |
 | **`for`를 넉넉히** | 깜빡임은 사람을 깨울 이유가 없다 |
 | **runbook 링크를 단다** | 새벽 3시에 처음 보는 알림에서 제일 필요한 건 "그래서 뭘 하지"다 |
 
@@ -202,6 +445,7 @@ spec:
 | **CNPG 백업 실패 · 복제 지연** | 백업 나이, `pg_stat_replication` 지연 | [온프렘 덱 7장](/onprem/07-cnpg/). WAL이 쌓이면 DB가 멈춘다 |
 | 오브젝트 스토리지 용량 | 스토리지 exporter 기준 | 차면 **로그와 백업이 동시에** 멈춘다 |
 | 파드 재시작 반복 | `rate(kube_pod_container_status_restarts_total[15m]) > 0` | |
+| 서비스 에러율 | RED의 E — `> 0.05` (5m) | **사용자가 아픈 것을 직접 재는 유일한 줄** |
 | **관측 스택 자체** | Prometheus TSDB 용량, Loki 인입 실패 | 감시자가 조용히 죽는다 |
 | **Watchdog** | 항상 참인 규칙 | 아래 |
 
@@ -214,13 +458,15 @@ Alertmanager가 죽거나 메일 서버가 막히면 **알림이 안 오는데, 
 
 ### Alertmanager 라우팅
 
+Prometheus는 "규칙이 참이다"까지만 하고 **누구에게 어떻게 보낼지는 전부 여기**서 정한다.
+
 ```yaml
 route:
   receiver: default
   group_by: [alertname, namespace]
   group_wait: 30s          # 첫 알림 전 대기 — 관련된 것들이 같이 오게
-  group_interval: 5m
-  repeat_interval: 4h
+  group_interval: 5m       # 같은 묶음에 새 알림이 붙었을 때 다시 보내는 간격
+  repeat_interval: 4h      # 안 고쳐졌을 때 다시 깨우는 주기
   routes:
     - matchers: [ severity="critical" ]
       receiver: oncall-phone
@@ -236,30 +482,8 @@ inhibit_rules:
 ```
 
 `inhibit_rules`가 실전에서 특히 중요하다 — **노드 하나가 죽었을 때 알림 40개가 오면
-아무도 안 읽는다.**
-
-## 카디널리티 관리
-
-```text
-# 시계열이 많은 메트릭 상위 (Prometheus UI에서 실행)
-topk(10, count by (__name__)({__name__=~".+"}))
-
-# 특정 메트릭의 라벨별 가짓수
-count(count by (pod) (container_cpu_usage_seconds_total))
-```
-
-| 하면 안 되는 라벨 | 대신 |
-|---|---|
-| `user_id` · `request_id` · `trace_id` | 로그·트레이스에 넣는다 ([3장](/observability/03-loki/) · [4장](/observability/04-tempo/)) |
-| `pod_ip` · 파드 이름(단명 파드) | `deployment`·`service` 단위로 |
-| URL 전체 (`/orders/12345`) | 경로 템플릿 (`/orders/:id`) |
-
-```yaml
-# 이미 들어오는 라벨은 relabel로 잘라 낸다
-metricRelabelings:
-  - action: labeldrop
-    regex: "id|uuid|request_id"
-```
+아무도 안 읽는다.** 계획된 작업 중에는 `silence`로 잠시 끄되,
+**만료 시각을 반드시 넣는다** — 영구 침묵은 알림을 지운 것과 같다.
 
 ## 점검
 
@@ -271,7 +495,10 @@ kubectl -n observability port-forward svc/kube-prometheus-stack-prometheus 9090:
 # ② 규칙이 로드됐나 (PrometheusRule 라벨이 틀리면 조용히 무시된다)
 #   http://localhost:9090/rules
 
-# ③ Alertmanager까지 실제로 가나 — 테스트 알림을 직접 쏴 본다
+# ③ 지금 발화 중인 알림
+curl -s http://localhost:9090/api/v1/alerts | jq '.data.alerts[] | {name:.labels.alertname, state}'
+
+# ④ Alertmanager까지 실제로 가나 — 테스트 알림을 직접 쏴 본다
 kubectl -n observability port-forward svc/kube-prometheus-stack-alertmanager 9093:9093
 curl -XPOST http://localhost:9093/api/v2/alerts -H 'Content-Type: application/json' -d '[{
   "labels": {"alertname":"SmokeTest","severity":"critical"},
@@ -279,24 +506,40 @@ curl -XPOST http://localhost:9093/api/v2/alerts -H 'Content-Type: application/js
 }]'
 #   → 실제 채널(메신저·메일)에 도착하는지 확인
 
-# ④ TSDB 용량
+# ⑤ 무엇이 시계열을 많이 먹고 있나
 #   http://localhost:9090/tsdb-status  — 시계열 수와 라벨 카디널리티 상위
 ```
 
+| 증상 | 흔한 원인 | 확인 |
+|---|---|---|
+| 대상이 목록에 아예 없다 | `release` 라벨 · NS 셀렉터 불일치 | `kubectl get servicemonitor -o yaml`의 labels |
+| 대상이 DOWN이다 | 포트 이름 오타 · NetworkPolicy · `/metrics` 경로 | `/targets`의 Error 열, 파드에서 직접 `curl` |
+| 그래프가 계단처럼 올라간다 | **counter를 그냥 그렸다** | `rate(...[5m])`를 씌운다 |
+| `histogram_quantile` 결과가 빈다 | `by`에서 `le`가 빠졌다 | `sum by (le, ...)` |
+| 나눗셈 결과가 빈다 | 양쪽 라벨 집합이 다르다 | 양쪽을 같은 `by`로 묶는다 |
+| 알림이 안 뜬다 | 규칙 미로드 · 대상이 사라져 시계열 자체가 없음 | `/rules`, `absent()` 추가 |
+| 알림이 뜨는데 안 온다 | receiver 설정 · inhibit · silence | ④의 테스트 알림, Alertmanager UI |
+| 메모리가 계속 는다 | **카디널리티 폭발** | `/tsdb-status` 상위, `metricRelabelings`로 labeldrop |
+| 디스크가 찬다 | `retentionSize` 미설정 | PVC의 80~90% 선으로 넣는다 |
+
 ## 2장 요약
 
+- 메트릭 한 줄은 **`이름{라벨} 숫자`** 가 전부다. **라벨 조합 하나 = 시계열 하나**
+- 타입을 알아야 읽는 법이 정해진다 — **counter는 `rate()`, gauge는 그대로,
+  지연은 histogram**. summary는 파드가 여럿이면 합쳐지지 않는다
+- PromQL은 **고르기 · 속도 · 묶기 · 비율 · 분위수** 다섯이면 대부분 된다.
+  순서는 언제나 **`rate` → `sum by` → `histogram_quantile`**
+- 무엇을 잴지는 **RED(서비스)와 USE(자원)**. **알림은 RED에 걸고 USE는 조사용**이다
 - **pull 모델**이라 `up == 0` 하나로 "죽었다"를 안다 — 온프렘 알림의 출발점
 - **kube-prometheus-stack**으로 시작하고, 대상은 **ServiceMonitor**로 추가한다.
   안 긁히면 `release` 라벨 · 포트 **이름** · 네임스페이스 셀렉터 셋을 본다
-- Prometheus **3.13 LTS** — OTLP 수신과 UTF-8 라벨이 새로 생겼다
-- 보존은 **로컬 TSDB로 15~30일**이 기본. 장기 저장(Thanos·Mimir)은 필요해진 뒤에
+- 보존은 **로컬 TSDB로 15~30일**이 기본. `retention`과 `retentionSize`를 **둘 다** 준다
 - 알림은 **행동 가능한 것만, 증상으로, `for`를 넉넉히, runbook과 함께**.
-  온프렘 필수 목록에는 **디스크 소진 예측 · 인증서 만료 · CNPG 백업 실패**가 들어간다
+  필수 목록에 **디스크 소진 예측 · 인증서 만료 · CNPG 백업 실패**가 들어간다
 - **Watchdog을 외부로 라우팅**한다 — 알림이 안 오는 것을 알아채는 유일한 방법이다
-- 카디널리티가 스택을 죽인다. 라벨은 **미리 셀 수 있는 것만**
 
 <LinkCard
   title="3. 로그 — Loki"
-  description="인덱스가 라벨뿐인 로그 저장소. 라벨 설계가 전부인 이유와 Alloy로 수집하는 법."
+  description="인덱스가 라벨뿐인 로그 저장소. 라벨 설계가 전부인 이유, LogQL 네 단계, Alloy 수집."
   href="/observability/03-loki/"
 />
