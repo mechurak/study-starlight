@@ -519,6 +519,59 @@ export default defineConfig({
 							],
 						},
 						{
+							label: '강화학습',
+							link: '/rl/',
+							icon: 'setting',
+							items: [
+								'rl',
+								{
+									label: '시작',
+									items: ['rl/00-intro', 'rl/01-why'],
+								},
+								{
+									label: '문제를 세우기',
+									items: ['rl/02-mdp', 'rl/03-value'],
+								},
+								{
+									label: '알고리즘',
+									items: [
+										'rl/04-value-based',
+										'rl/05-policy-gradient',
+										'rl/06-ppo-sac',
+										'rl/07-offline-model',
+									],
+								},
+								{
+									label: '실전 공통',
+									items: [
+										'rl/08-reward',
+										'rl/09-training',
+										'rl/10-evaluation',
+									],
+								},
+								{
+									label: '시스템 트레이딩',
+									items: [
+										'rl/11-market',
+										'rl/12-trading-design',
+										'rl/13-trading-practice',
+									],
+								},
+								{
+									label: '피지컬 AI — 로봇',
+									items: [
+										'rl/14-robot',
+										'rl/15-robot-stack',
+										'rl/16-imitation-vla',
+									],
+								},
+								{
+									label: '마무리',
+									items: ['rl/17-career', 'rl/18-glossary', 'rl/19-wrapup'],
+								},
+							],
+						},
+						{
 							label: 'Starlight',
 							link: '/starlight/',
 							icon: 'star',
