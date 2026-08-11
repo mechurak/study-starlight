@@ -4,134 +4,122 @@ description: 주제별 기술 스터디 노트 — 검색하고, 찾아보고, �
 template: splash
 hero:
   title: Study Note
-  tagline: 주제(덱)별로 정리한 기술 학습 자료. 상단 검색으로 어디서든 바로 찾아갈 수 있다.
-  actions:
-    - text: CKA 시험 대비
-      link: /cka/
-      icon: right-arrow
-    - text: CKA 실습
-      link: /cka-udemy/
-      icon: right-arrow
-      variant: minimal
-    - text: 온프렘 쿠버네티스
-      link: /onprem/
-      icon: right-arrow
-      variant: minimal
-    - text: 관측
-      link: /observability/
-      icon: right-arrow
-      variant: minimal
-    - text: 웹 개발 일반
-      link: /web/
-      icon: right-arrow
-      variant: minimal
-    - text: 프론트엔드 실전 스택
-      link: /frontend/
-      icon: right-arrow
-      variant: minimal
-    - text: shadcn/ui
-      link: /shadcn/
-      icon: right-arrow
-      variant: minimal
-    - text: 서버 관리 일반
-      link: /server/
-      icon: right-arrow
-      variant: minimal
-    - text: Supabase
-      link: /supabase/
-      icon: right-arrow
-      variant: minimal
-    - text: Keycloak
-      link: /keycloak/
-      icon: right-arrow
-      variant: minimal
-    - text: Kafka
-      link: /kafka/
-      icon: right-arrow
-      variant: minimal
-    - text: Starlight
-      link: /starlight/
-      icon: right-arrow
-      variant: minimal
+  tagline: 주제(덱)별로 정리한 기술 학습 노트. 아래 카테고리에서 골라 들어가고, 상단 검색으로 어디서든 바로 찾아간다.
 ---
 
-import { Card, CardGrid } from '@astrojs/starlight/components';
+import DeckCatalog from '../../components/DeckCatalog.astro';
 
-<CardGrid stagger>
-	<Card title="CKA — Kubernetes 관리자 시험" icon="open-book">
-		커리큘럼 5개 도메인을 "무엇이 실제로 일어나는가"로 관통하는 정리.
-		개념 → 명령 → 함정 순서로 반복하고, 장 끝마다 요약을 둔다.
-
-		[시작하기 →](/cka/)
-	</Card>
-	<Card title="CKA 실습 — KodeKloud 랩 풀이 패턴" icon="pencil">
-		유데미 CKA 강의의 실습 44개를 cka 덱 장 순서로 재편성.
-		개념은 cka 덱이, "시키면 어떻게 하나"는 이 덱이 맡는다.
-
-		[시작하기 →](/cka-udemy/)
-	</Card>
-	<Card title="온프렘 쿠버네티스 — 빈칸을 채우는 운영" icon="server">
-		클라우드가 대신 해 주던 자리 — LB·인증서·SSO·S3·DB·관측·백업 — 을
-		MetalLB·Gateway API·Keycloak·MinIO·CloudNativePG·Argo CD로 한 판에 채운다.
-
-		[시작하기 →](/onprem/)
-	</Card>
-	<Card title="관측 — 알림에서 원인까지" icon="analytics">
-		메트릭·로그·트레이스가 각각 무엇에 답하고, Prometheus·Loki·Tempo·Grafana로
-		어떻게 세우고, **셋 사이를 두 번의 클릭으로** 오가게 만드는가.
-
-		[시작하기 →](/observability/)
-	</Card>
-	<Card title="웹 개발 일반 — 지도부터 그리는 웹" icon="rocket">
-		요청의 일생, 렌더링 전략, 기술 스택 지형도, 그리고 도구 사슬 —
-		pnpm은 왜 쓰고 Vite는 뭐 하는 물건인지를 통증 중심으로.
-
-		[시작하기 →](/web/)
-	</Card>
-	<Card title="프론트엔드 — Next.js · Tailwind · shadcn/ui" icon="laptop">
-		세 도구가 각각 무슨 문제를 푸는지, 컴포넌트가 어떻게 팀의 자산이 되는지,
-		디자인 시스템을 어떻게 토큰 층으로 얹는지.
-
-		[시작하기 →](/frontend/)
-	</Card>
-	<Card title="shadcn/ui — 테마로 관리하는 UI" icon="puzzle">
-		앱의 외모를 색·형태·글자·컴포넌트·아이콘 다섯 리소스로 쪼개 이름 붙이고,
-		그 이름 한 벌을 테마로 관리한다. 새 용어는 전부 풀어서 설명한다.
-
-		[시작하기 →](/shadcn/)
-	</Card>
-	<Card title="서버 관리 일반 — Ubuntu 24.04 실무" icon="linux">
-		네트워크가 안 될 때 어디까지 되는지, 이 서버가 무슨 물건인지,
-		누가 언제 들어와 무엇을 했는지 — 상황에서 출발하는 명령 정리.
-
-		[시작하기 →](/server/)
-	</Card>
-	<Card title="Supabase — Postgres 위의 백엔드 플랫폼" icon="seti:db">
-		Auth가 발급한 JWT를 RLS가 해석해 행 단위로 판정한다는 한 문장을 축으로,
-		아키텍처부터 Vercel과의 역할 배분·운영·비용까지.
-
-		[시작하기 →](/supabase/)
-	</Card>
-	<Card title="Keycloak — 사내 AD 인증의 SSO 허브" icon="seti:lock">
-		AD를 사용자 저장소로 빌려 쓰는 IdP — 토큰 세 종류, AD 연동의 급소,
-		쿠버네티스 API 서버 연동, 온프렘 배포와 운영까지 관리자 관점으로.
-
-		[시작하기 →](/keycloak/)
-	</Card>
-	<Card title="Kafka — 서비스 사이의 지워지지 않는 로그" icon="random">
-		서비스끼리 직접 부르던 결합을 시간 축에서 끊는 로그 — 파티션 · 전달 보장부터
-		Strimzi로 온프렘 쿠버네티스에서 굴리는 법까지 도입하는 사람 관점으로.
-
-		[시작하기 →](/kafka/)
-	</Card>
-	<Card title="Starlight — 이 사이트를 만든 도구" icon="star">
-		문서 도구 지형에서 왜 Starlight를 골랐는지, MDX와 컴포넌트는 어떻게 쓰는지,
-		빌드가 못 잡는 함정은 무엇으로 판정하는지 — 이 사이트 자체가 예제다.
-
-		[시작하기 →](/starlight/)
-	</Card>
-	<Card title="다음 덱" icon="add-document">
-		새 주제는 `src/content/docs/<덱이름>/`에 페이지를 추가하고
-		`astro.config.mjs`의 topics에 등록하면 이 목록에 나타난다.
-	</Card>
-</CardGrid>
+<DeckCatalog sections={[
+{
+title: '쿠버네티스',
+desc: '시험 대비부터 온프렘 구축·운영까지',
+tone: 'key',
+decks: [
+{
+href: '/cka/',
+icon: 'open-book',
+title: 'CKA — 관리자 시험',
+desc: '커리큘럼 5개 도메인을 개념 → 명령 → 함정 순서로 관통하는 시험 대비 정리.',
+chapters: 21,
+},
+{
+href: '/cka-udemy/',
+icon: 'pencil',
+title: 'CKA 실습',
+desc: 'KodeKloud 랩 44개를 cka 덱 장 순서로 재편성한 "시키면 어떻게 하나" 풀이 패턴.',
+chapters: 10,
+},
+{
+href: '/onprem/',
+icon: 'server',
+title: '온프렘 쿠버네티스',
+desc: '클라우드가 대신 해 주던 자리 — LB·인증서·SSO·스토리지·백업 — 를 직접 채우는 운영.',
+chapters: 15,
+},
+],
+},
+{
+title: '인프라 · 플랫폼',
+desc: '클러스터 위아래에서 돌아가는 것들 — 서버, 관측, 인증, 메시징',
+tone: 'zone',
+decks: [
+{
+href: '/server/',
+icon: 'linux',
+title: '서버 관리 일반',
+desc: 'Ubuntu 24.04 실무 — "이 서버는 무슨 물건인가"부터 상황에서 출발하는 명령 정리.',
+chapters: 17,
+},
+{
+href: '/observability/',
+icon: 'analytics',
+title: '관측',
+desc: '메트릭·로그·트레이스를 Prometheus·Loki·Tempo·Grafana로 세우고, 셋 사이를 잇는 법.',
+chapters: 8,
+},
+{
+href: '/keycloak/',
+icon: 'seti:lock',
+title: 'Keycloak',
+desc: '사내 AD를 사용자 저장소로 빌려 쓰는 SSO 허브 — 토큰, 연동, 배포까지 관리자 관점.',
+chapters: 13,
+},
+{
+href: '/kafka/',
+icon: 'random',
+title: 'Kafka',
+desc: '서비스 사이의 결합을 시간 축에서 끊는 로그 — 도입하는 사람 관점의 모델과 운영.',
+chapters: 14,
+},
+],
+},
+{
+title: '웹 개발',
+desc: '지도부터 그리고, 도구가 각각 무슨 문제를 푸는지로 들어간다',
+tone: 'warn',
+decks: [
+{
+href: '/web/',
+icon: 'rocket',
+title: '웹 개발 일반',
+desc: '요청의 일생, 렌더링 전략, 기술 지형도, 도구 사슬을 통증 중심으로.',
+chapters: 15,
+},
+{
+href: '/frontend/',
+icon: 'laptop',
+title: '프론트엔드 실전 스택',
+desc: 'Next.js · Tailwind · shadcn/ui — 세 도구가 각각 무슨 문제를 푸는가.',
+chapters: 22,
+},
+{
+href: '/shadcn/',
+icon: 'puzzle',
+title: 'shadcn/ui',
+desc: '앱의 외모를 다섯 리소스로 쪼개 이름 붙이고, 그 한 벌을 테마로 관리한다.',
+chapters: 14,
+},
+],
+},
+{
+title: '백엔드 · 도구',
+desc: '제품을 받치는 플랫폼과, 이 사이트를 만든 도구',
+tone: 'ok',
+decks: [
+{
+href: '/supabase/',
+icon: 'seti:db',
+title: 'Supabase',
+desc: 'Auth가 발급한 JWT를 RLS가 행 단위로 판정한다 — 그 한 문장을 축으로 한 백엔드 플랫폼.',
+chapters: 18,
+},
+{
+href: '/starlight/',
+icon: 'star',
+title: 'Starlight',
+desc: '왜 이 도구를 골랐고 어떻게 쓰는지 — 이 사이트 자체가 예제다.',
+chapters: 10,
+},
+],
+},
+]} />
