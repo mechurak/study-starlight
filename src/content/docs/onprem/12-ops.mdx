@@ -1,5 +1,5 @@
 ---
-title: "16. 운영 — 루틴 · 업그레이드 · 진단"
+title: "12. 운영 — 루틴 · 업그레이드 · 진단"
 description: "평상시에 무엇을 하고 터졌을 때 어느 층부터 가르나 — 운영 루틴, 업그레이드 순서, 용량, 진단 사다리"
 ---
 
@@ -13,7 +13,7 @@ import TermIntro from '../../../components/TermIntro.astro';
     ['버전 스큐', 'Version Skew', '컴포넌트 사이에 허용되는 **버전 차이의 범위**. 쿠버네티스는 kubelet이 API 서버보다 최대 3마이너 낮은 것까지 허용한다 — 이 범위를 벗어나면 동작을 보장하지 않는다.'],
     ['드레인', 'Drain', '노드에서 파드를 안전하게 비워 내는 것(`kubectl drain`). 업그레이드·점검 전에 한다.'],
     ['PDB', 'PodDisruptionBudget', '"이 앱은 동시에 몇 개까지만 내려도 된다"는 선언. 드레인이 이걸 존중하기 때문에 **PDB가 없으면 업그레이드가 서비스를 끊는다**.'],
-    ['runbook', '실행 절차서', '특정 알림·증상이 왔을 때 **무엇을 순서대로 확인하고 조치하는지** 적은 문서. 알림에 링크로 달아 둔다(9장).'],
+    ['runbook', '실행 절차서', '특정 알림·증상이 왔을 때 **무엇을 순서대로 확인하고 조치하는지** 적은 문서. 알림에 링크로 달아 둔다([관측 덱 2장](/observability/02-prometheus/)).'],
     ['온콜', 'On-call', '장애 시 호출을 받는 당번. 도구보다 **누가 어떤 순서로 무엇을 보는지**가 정해져 있느냐가 품질을 가른다.'],
     ['용량 계획', 'Capacity Planning', '언제 무엇이 부족해질지 미리 계산하는 일. **온프렘에는 오토스케일이 없으므로** 이게 운영 업무의 한 항목이 된다.'],
   ]}
@@ -28,7 +28,7 @@ import TermIntro from '../../../components/TermIntro.astro';
 | **매일** | 알림 확인(밤새 온 것), 백업 잡 결과, Argo CD `OutOfSync` 목록 |
 | **매주** | 디스크·PVC 사용률 추세, 인증서 만료 30일 이내 목록, 노드 상태, 재시작 반복 파드 |
 | **매월** | 컴포넌트 버전과 최신 릴리스 대조(CVE 확인), 대시보드·알림 정리, 용량 추세 리뷰 |
-| **분기** | **복구 리허설**([15장](/onprem/15-backup/)), 쿠버네티스·애드온 업그레이드, 접근 권한 감사, runbook 갱신 |
+| **분기** | **복구 리허설**([11장](/onprem/11-backup/)), 쿠버네티스·애드온 업그레이드, 접근 권한 감사, runbook 갱신 |
 | **연 1회** | 사내 CA·클러스터 인증서 만료 점검, DR 시나리오 전면 훈련, 용량 증설 예산 |
 
 ```bash
@@ -70,7 +70,7 @@ kubectl -n argocd get applications | grep -v 'Synced.*Healthy'
 
 <Steps>
 
-1. **백업**. etcd 스냅샷 + CNPG 백업을 작업 직전에 한 번 더 ([15장](/onprem/15-backup/))
+1. **백업**. etcd 스냅샷 + CNPG 백업을 작업 직전에 한 번 더 ([11장](/onprem/11-backup/))
 
 2. **스테이징 클러스터에서 먼저.** 없으면 최소한 **워커 노드 1대로** 먼저
 
@@ -129,7 +129,7 @@ mc ls store/ >/dev/null && echo "S3 OK"
 kubectl -n observability get pods
 #   Prometheus /targets 에서 DOWN 급증이 없는지
 
-# ⑤ 배포 (13장)
+# ⑤ 배포 (9장)
 kubectl -n argocd get applications | grep -v 'Synced.*Healthy'
 
 # ⑥ 스토리지 실동작 (2장)
@@ -152,12 +152,12 @@ kubectl get pvc smoke && kubectl delete pvc smoke
 | 노드 CPU·메모리 | `kubectl top nodes`, Prometheus 추세 | **요청(request) 합계가 용량의 70%** 를 넘으면 증설 검토 |
 | PVC 용량 | `kubelet_volume_stats_*` | 확장 가능한 SC로 만들어 뒀는가 ([2장](/onprem/02-foundation/)) |
 | 오브젝트 스토리지 | 스토리지 자체 지표 | 라이프사이클로 상한을 만든다 ([6장](/onprem/06-minio/)) |
-| Prometheus TSDB | `/tsdb-status` | 리텐션 vs 디스크 ([9장](/onprem/09-prometheus/)) |
+| Prometheus TSDB | `/tsdb-status` | 리텐션 vs 디스크 ([관측 덱 2장](/observability/02-prometheus/)) |
 | IP 풀 | `IPAddressPool` 잔여 | 서비스가 늘면 LB IP도 는다 ([3장](/onprem/03-gateway/)) |
 
 :::tip[핵심 — 예측 알림이 리드타임을 번다]
 "디스크가 찼다"는 알림은 이미 늦었다. `predict_linear`로 **"24시간 내 소진 예상"** 을 걸어 두면
-([9장](/onprem/09-prometheus/)) 하루를 벌고, 주간 추세 리뷰를 하면 몇 주를 번다.
+([관측 덱 2장](/observability/02-prometheus/)) 하루를 벌고, 주간 추세 리뷰를 하면 몇 주를 번다.
 온프렘에서 이 시간차가 곧 장애를 막는다.
 :::
 
@@ -220,13 +220,13 @@ flowchart LR
 | 증상 | 자주 있는 원인 | 첫 수 |
 |---|---|---|
 | 노드가 갑자기 여러 대 `NotReady` | 컨트롤 플레인·etcd 문제 | API 응답 시간, etcd 리더 유무 |
-| 파드가 `ImagePullBackOff` | 레지스트리 · 자격증명 · 사내 CA | 노드에서 직접 pull 시도 ([13장](/onprem/13-gitops/)) |
+| 파드가 `ImagePullBackOff` | 레지스트리 · 자격증명 · 사내 CA | 노드에서 직접 pull 시도 ([9장](/onprem/09-gitops/)) |
 | 파드가 `Pending` | 스토리지 · 리소스 부족 · taint | `describe pod` Events |
 | 전 서비스 HTTPS 오류 | **인증서 만료** | `kubectl get certificate -A` |
 | 로그가 안 쌓임 | 오브젝트 스토리지 풀 · Alloy 죽음 | `mc admin info`, Alloy 파드 |
 | DB 쓰기 실패 | **WAL 아카이브 실패로 디스크 참** | `pg_stat_archiver` ([7장](/onprem/07-cnpg/)) |
 | 새 배포가 반영 안 됨 | Argo CD `OutOfSync` · 이미지 태그 | `argocd app diff` |
-| 특정 앱만 느림 | 앱 자체 · 다운스트림 | 트레이스 ([11장](/onprem/11-tempo/)) |
+| 특정 앱만 느림 | 앱 자체 · 다운스트림 | 트레이스 ([관측 덱 4장](/observability/04-tempo/)) |
 
 :::caution[함정 — 관측 스택부터 확인한다]
 "메트릭이 없다"와 "장애가 없다"는 다른 말이다. 조사 시작할 때
@@ -244,7 +244,7 @@ flowchart LR
 | 권한 | 야간에 혼자서 롤백·재시작할 수 있는 권한이 있는가 |
 | 기록 | 사후 회고(postmortem)를 남기고, **runbook에 반영**한다 |
 
-## 16장 요약
+## 12장 요약
 
 - 루틴을 **일·주·월·분기**로 고정한다. 분기에는 **복구 리허설과 업그레이드**가 들어간다
 - 업그레이드는 **호환표를 채우는 것이 절반**이다. 순서는 백업 → CNI/CSI → 컨트롤 플레인 → 워커 → 애드온
@@ -254,7 +254,7 @@ flowchart LR
 - 진단은 **층 구조를 위에서 아래로**. 시작할 때 **관측 스택 자체가 살아 있는지** 먼저 본다
 
 <LinkCard
-  title="17. 용어 사전"
+  title="13. 용어 사전"
   description="이 덱에 나온 약어와 개념을 한 곳에 — 층별로 묶어서."
-  href="/onprem/17-glossary/"
+  href="/onprem/13-glossary/"
 />

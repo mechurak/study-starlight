@@ -1,5 +1,5 @@
 ---
-title: "12. Grafana — 하나의 창"
+title: "5. Grafana — 하나의 창"
 description: "세 데이터소스를 한 화면에서 오가게 만들기 — 상관 관계 설정, 대시보드 as code, SSO, 그리고 HA"
 ---
 
@@ -13,7 +13,7 @@ import TermIntro from '../../../components/TermIntro.astro';
     ['데이터소스', 'Data Source', 'Grafana가 붙는 저장소 하나. Prometheus · Loki · Tempo · PostgreSQL이 각각 하나씩이다. **uid**로 서로를 참조한다.'],
     ['프로비저닝', 'Provisioning', '데이터소스·대시보드를 **파일이나 CRD로 미리 넣어 두는 것**. UI에서 만든 것과 달리 파드가 사라져도 남고, Git으로 관리된다.'],
     ['derived field', '파생 필드', '로그 한 줄에서 정규식으로 값을 뽑아 **다른 데이터소스로 가는 링크**를 만드는 기능. `trace_id` → Tempo 링크가 대표적이다.'],
-    ['exemplar', '표본 링크', '메트릭의 한 점에 매달린 대표 트레이스 ID. 그래프에서 그 점을 눌러 트레이스로 간다(11장).'],
+    ['exemplar', '표본 링크', '메트릭의 한 점에 매달린 대표 트레이스 ID. 그래프에서 그 점을 눌러 트레이스로 간다(4장).'],
     ['Unified Alerting', '통합 알림', 'Grafana가 자체적으로 알림 규칙을 평가·발송하는 기능. Alertmanager와 **역할이 겹쳐서** 어느 쪽에 둘지 정해야 한다.'],
     ['organization', '조직', 'Grafana 안의 격리 단위. 대시보드·데이터소스가 조직 단위로 나뉜다. 대부분은 폴더 권한으로 충분하고 조직까지 쪼갤 일은 드물다.'],
   ]}
@@ -95,7 +95,7 @@ datasources:
 :::tip[핵심 — 이 설정 하나가 조사 시간을 절반으로 줄인다]
 대시보드를 100개 만드는 것보다 **derived field 한 줄**이 실전에서 더 자주 쓰인다.
 로그에서 `trace_id` 옆에 링크 버튼이 생기고, 누르면 그 요청의 전체 여정이 바로 열린다.
-[11장](/onprem/11-tempo/)에서 "가장 싼 첫걸음"이라고 한 게 여기서 값을 한다.
+[4장](/observability/04-tempo/)에서 "가장 싼 첫걸음"이라고 한 게 여기서 값을 한다.
 :::
 
 ## 배포 — Grafana 자신의 상태는 어디에 두나
@@ -105,14 +105,14 @@ Grafana는 대시보드·사용자·알림 규칙을 **자기 DB**에 저장한�
 | 저장소 | 결과 |
 |---|---|
 | SQLite (기본) | **replica를 2개로 못 늘린다.** 파드가 옮겨 다니면 PVC에 묶인다 |
-| **PostgreSQL** ([7장](/onprem/07-cnpg/)) | HA 가능. 백업이 CNPG 체계에 들어온다 |
+| **PostgreSQL** ([온프렘 덱 7장](/onprem/07-cnpg/)) | HA 가능. 백업이 CNPG 체계에 들어온다 |
 
 ```yaml
 # Helm values 발췌
 grafana.ini:
   database:
     type: postgres
-    host: platform-pg-rw.database.svc:5432      # CNPG의 쓰기 서비스 (7장)
+    host: platform-pg-rw.database.svc:5432      # CNPG의 쓰기 서비스 (온프렘 덱 7장)
     name: grafana
     user: grafana
     ssl_mode: require
@@ -125,7 +125,7 @@ persistence:
 Grafana가 CNPG를 쓰고, CNPG 장애를 Grafana로 보고, Grafana 로그인은 Keycloak을 거치고,
 Keycloak도 같은 CNPG를 쓴다면 — **DB 하나가 죽을 때 원인을 볼 창까지 같이 죽는다.**
 최소한 다음 둘은 확보해 둔다.
-- Grafana의 **로컬 관리자 계정**(깨진 유리, [5장](/onprem/05-identity/))
+- Grafana의 **로컬 관리자 계정**(깨진 유리, [온프렘 덱 5장](/onprem/05-identity/))
 - DB 없이도 볼 수 있는 경로 — Prometheus UI 직접 접근(포트포워딩)이면 충분하다
 :::
 
@@ -150,7 +150,7 @@ data:
     { "title": "Platform Overview", "panels": [ ... ] }
 ```
 
-가장 단순하다. Argo CD로 관리하면 대시보드가 **Git에서 리뷰를 거쳐** 들어온다 ([13장](/onprem/13-gitops/)).
+가장 단순하다. Argo CD로 관리하면 대시보드가 **Git에서 리뷰를 거쳐** 들어온다 ([온프렘 덱 9장](/onprem/09-gitops/)).
 
 </TabItem>
 <TabItem label="Grafana Operator">
@@ -183,7 +183,7 @@ spec:
 
 ## SSO — Keycloak 붙이기
 
-[5장](/onprem/05-identity/)의 패턴 ①이다. Grafana는 OIDC를 내장 지원하고,
+[온프렘 덱 5장](/onprem/05-identity/)의 패턴 ①이다. Grafana는 OIDC를 내장 지원하고,
 **그룹으로 역할까지 매핑**된다.
 
 ```ini
@@ -210,9 +210,9 @@ auto_assign_org_role = Viewer
 | 확인할 것 | 왜 |
 |---|---|
 | `groups` claim이 실제로 오는가 | 안 오면 전원이 Viewer가 된다 → [Keycloak 덱 7장](/keycloak/07-apps/) |
-| 사내 CA를 Grafana가 믿는가 | Keycloak이 사내 인증서면 토큰 교환이 실패한다 ([4장](/onprem/04-tls-dns/)) |
+| 사내 CA를 Grafana가 믿는가 | Keycloak이 사내 인증서면 토큰 교환이 실패한다 ([온프렘 덱 4장](/onprem/04-tls-dns/)) |
 | `root_url`이 실제 주소와 같은가 | 리다이렉트 URI 불일치의 단골 원인 |
-| 로컬 admin이 남아 있는가 | 깨진 유리 계정 ([5장](/onprem/05-identity/)) |
+| 로컬 admin이 남아 있는가 | 깨진 유리 계정 ([온프렘 덱 5장](/onprem/05-identity/)) |
 
 ## 알림을 어디에 두나 — Grafana vs Alertmanager
 
@@ -255,11 +255,11 @@ kubectl -n observability logs deploy/grafana | grep -i 'oauth\|role'
 | 데이터소스 Test 실패 | 서비스 주소 오타 · NetworkPolicy | 파드에서 직접 `curl` |
 | 로그에 트레이스 링크가 없음 | `matcherRegex`가 실제 로그 형식과 불일치 | 로그 한 줄을 보고 정규식 수정 |
 | exemplar가 안 보임 | 앱이 exemplar를 안 내보냄 · Prometheus 설정 미비 | `/metrics`에 `# {trace_id=...}` 주석이 있나 |
-| 전원이 Viewer | `groups` claim 미도착 | ID 토큰 디코드 ([5장](/onprem/05-identity/)) |
+| 전원이 Viewer | `groups` claim 미도착 | ID 토큰 디코드 ([온프렘 덱 5장](/onprem/05-identity/)) |
 | 대시보드가 사라짐 | UI에서 만들었고 파드가 재생성됨 | 프로비저닝으로 옮긴다 |
 | 알림이 두 번 옴 | Grafana와 Alertmanager 양쪽에 규칙 | 한쪽으로 통일 |
 
-## 12장 요약
+## 5장 요약
 
 - Grafana의 값은 대시보드가 아니라 **세 신호 사이의 이동을 없애는 것**이다
 - **derived field · exemplar · trace to logs** 셋을 먼저 설정한다. 대시보드보다 먼저다
@@ -270,7 +270,7 @@ kubectl -n observability logs deploy/grafana | grep -i 'oauth\|role'
 - **인프라 알림은 Alertmanager에.** Grafana가 죽어도 알림은 가야 한다
 
 <LinkCard
-  title="13. 배포 — Argo CD와 GitOps"
-  description="지금까지 얹은 열몇 개를 손으로 다시 세울 수 있나. App of Apps, 설치 순서, 그리고 부트스트랩의 닭과 달걀."
-  href="/onprem/13-gitops/"
+  title="6. 용어 사전"
+  description="세 신호와 네 도구에서 나온 말들을 신호별로 다시 모은다."
+  href="/observability/06-glossary/"
 />

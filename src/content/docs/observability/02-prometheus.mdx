@@ -1,5 +1,5 @@
 ---
-title: "9. 메트릭 — Prometheus와 알림"
+title: "2. 메트릭 — Prometheus와 알림"
 description: "pull 모델과 ServiceMonitor, 리텐션과 카디널리티, 그리고 온프렘에서 반드시 걸어야 하는 알림 목록"
 ---
 
@@ -144,7 +144,7 @@ kubectl -n observability port-forward svc/kube-prometheus-stack-prometheus 9090:
 
 | 항목 | 내용 | 온프렘에서 |
 |---|---|---|
-| **OTLP 수신** | OpenTelemetry 프로토콜로 들어오는 메트릭을 직접 받는다 | 앱이 OTel로 계측돼 있으면 exporter 없이 바로 ([11장](/onprem/11-tempo/)) |
+| **OTLP 수신** | OpenTelemetry 프로토콜로 들어오는 메트릭을 직접 받는다 | 앱이 OTel로 계측돼 있으면 exporter 없이 바로 ([4장](/observability/04-tempo/)) |
 | **UTF-8 라벨** | 라벨 이름·값에 UTF-8 허용 | OTel 속성 이름을 그대로 쓸 수 있다 |
 | 새 UI | 쿼리·타겟 화면 개편 | |
 | remote write 2.0 | 장기 저장소로 보낼 때 효율 개선 | 장기 저장을 붙일 때 |
@@ -167,7 +167,7 @@ spec:
 | 필요 | 답 |
 |---|---|
 | 15~30일이면 충분 | **로컬 TSDB 그대로.** 대부분 여기서 끝난다 |
-| 몇 달~몇 년 보존 | **Thanos** 또는 **Mimir** — 압축된 블록을 오브젝트 스토리지에 ([6장](/onprem/06-minio/)) |
+| 몇 달~몇 년 보존 | **Thanos** 또는 **Mimir** — 압축된 블록을 오브젝트 스토리지에 ([온프렘 덱 6장](/onprem/06-minio/)) |
 | 클러스터 여러 개를 한 화면에 | 마찬가지로 Thanos/Mimir. 또는 Grafana에서 데이터소스를 여러 개 |
 | HA (Prometheus 자체 이중화) | 같은 설정으로 **2벌을 돌리고** Alertmanager가 중복을 제거하게 한다 |
 
@@ -197,9 +197,9 @@ spec:
 | 노드 NotReady | `kube_node_status_condition{condition="Ready",status="true"} == 0` | |
 | **디스크 소진 예측** | `predict_linear(...[6h], 24h) < 0` | 온프렘은 증설에 시간이 걸린다 |
 | PVC 사용률 | `kubelet_volume_stats_available_bytes / ..._capacity_bytes < 0.1` | Prometheus·Loki 자신이 여기 걸린다 |
-| **인증서 만료 임박** | `certmanager_certificate_expiration_timestamp_seconds - time() < 14*86400` | [4장](/onprem/04-tls-dns/). 조용히 만료돼 전면 장애가 된다 |
+| **인증서 만료 임박** | `certmanager_certificate_expiration_timestamp_seconds - time() < 14*86400` | [온프렘 덱 4장](/onprem/04-tls-dns/). 조용히 만료돼 전면 장애가 된다 |
 | etcd 이상 | `etcd_server_has_leader == 0`, fsync 지연 | 클러스터 전체가 느려지는 원인 |
-| **CNPG 백업 실패 · 복제 지연** | 백업 나이, `pg_stat_replication` 지연 | [7장](/onprem/07-cnpg/). WAL이 쌓이면 DB가 멈춘다 |
+| **CNPG 백업 실패 · 복제 지연** | 백업 나이, `pg_stat_replication` 지연 | [온프렘 덱 7장](/onprem/07-cnpg/). WAL이 쌓이면 DB가 멈춘다 |
 | 오브젝트 스토리지 용량 | 스토리지 exporter 기준 | 차면 **로그와 백업이 동시에** 멈춘다 |
 | 파드 재시작 반복 | `rate(kube_pod_container_status_restarts_total[15m]) > 0` | |
 | **관측 스택 자체** | Prometheus TSDB 용량, Loki 인입 실패 | 감시자가 조용히 죽는다 |
@@ -250,7 +250,7 @@ count(count by (pod) (container_cpu_usage_seconds_total))
 
 | 하면 안 되는 라벨 | 대신 |
 |---|---|
-| `user_id` · `request_id` · `trace_id` | 로그·트레이스에 넣는다 ([10장](/onprem/10-loki/) · [11장](/onprem/11-tempo/)) |
+| `user_id` · `request_id` · `trace_id` | 로그·트레이스에 넣는다 ([3장](/observability/03-loki/) · [4장](/observability/04-tempo/)) |
 | `pod_ip` · 파드 이름(단명 파드) | `deployment`·`service` 단위로 |
 | URL 전체 (`/orders/12345`) | 경로 템플릿 (`/orders/:id`) |
 
@@ -283,7 +283,7 @@ curl -XPOST http://localhost:9093/api/v2/alerts -H 'Content-Type: application/js
 #   http://localhost:9090/tsdb-status  — 시계열 수와 라벨 카디널리티 상위
 ```
 
-## 9장 요약
+## 2장 요약
 
 - **pull 모델**이라 `up == 0` 하나로 "죽었다"를 안다 — 온프렘 알림의 출발점
 - **kube-prometheus-stack**으로 시작하고, 대상은 **ServiceMonitor**로 추가한다.
@@ -296,7 +296,7 @@ curl -XPOST http://localhost:9093/api/v2/alerts -H 'Content-Type: application/js
 - 카디널리티가 스택을 죽인다. 라벨은 **미리 셀 수 있는 것만**
 
 <LinkCard
-  title="10. 로그 — Loki"
+  title="3. 로그 — Loki"
   description="인덱스가 라벨뿐인 로그 저장소. 라벨 설계가 전부인 이유와 Alloy로 수집하는 법."
-  href="/onprem/10-loki/"
+  href="/observability/03-loki/"
 />

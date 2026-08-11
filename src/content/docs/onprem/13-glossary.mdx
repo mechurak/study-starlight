@@ -1,5 +1,5 @@
 ---
-title: "17. 용어 사전"
+title: "13. 용어 사전"
 description: "이 덱에 나온 약어와 개념을 층별로 묶어 한 곳에"
 ---
 
@@ -26,7 +26,7 @@ import TermIntro from '../../../components/TermIntro.astro';
 | 에어갭 | Air-gap | 인터넷과 물리적으로 끊긴 환경 | [0](/onprem/00-intro/) |
 | egress 프록시 | Egress Proxy | 내부→외부 트래픽을 대신 내보내는 사내 중계 | [4](/onprem/04-tls-dns/) |
 | SLO | Service Level Objective | 스스로 정한 서비스 목표치 | [1](/onprem/01-why/) |
-| 실패 도메인 | Failure Domain | 함께 죽는 범위. 백업을 여기에 같이 두면 안 된다 | [15](/onprem/15-backup/) |
+| 실패 도메인 | Failure Domain | 함께 죽는 범위. 백업을 여기에 같이 두면 안 된다 | [11](/onprem/11-backup/) |
 
 ## ① 바닥 — 클러스터 · 네트워크 · 스토리지
 
@@ -73,7 +73,7 @@ import TermIntro from '../../../components/TermIntro.astro';
 | 오퍼레이터 | Operator | 운영 절차를 컨트롤러 코드로 옮긴 것 | [7](/onprem/07-cnpg/) |
 | CNPG | CloudNativePG | 쿠버네티스용 PostgreSQL 오퍼레이터 | [7](/onprem/07-cnpg/) |
 | WAL | Write-Ahead Log | 데이터를 고치기 전에 먼저 남기는 변경 로그. 복제·복구의 기반 | [7](/onprem/07-cnpg/) |
-| PITR | Point-In-Time Recovery | 베이스 백업 + WAL로 임의 시점 복구 | [7](/onprem/07-cnpg/) · [15](/onprem/15-backup/) |
+| PITR | Point-In-Time Recovery | 베이스 백업 + WAL로 임의 시점 복구 | [7](/onprem/07-cnpg/) · [11](/onprem/11-backup/) |
 | 페일오버 · 스위치오버 | Failover · Switchover | 죽어서 넘어감 / 계획적으로 넘김 | [7](/onprem/07-cnpg/) |
 | 동기 · 비동기 복제 | Synchronous · Asynchronous | 커밋 때 레플리카를 기다리는지 | [7](/onprem/07-cnpg/) |
 
@@ -83,59 +83,51 @@ import TermIntro from '../../../components/TermIntro.astro';
 |---|---|---|---|
 | 관측 가능성 | Observability | 밖에서 나오는 신호로 안을 알아내는 성질 | [8](/onprem/08-observability/) |
 | 메트릭 · 로그 · 트레이스 | — | 얼마나 / 무슨 일이 / 어디서 느렸나 | [8](/onprem/08-observability/) |
-| 카디널리티 | Cardinality | 라벨 조합의 가짓수. **관측 스택을 죽이는 1번 원인** | [8](/onprem/08-observability/) · [9](/onprem/09-prometheus/) · [10](/onprem/10-loki/) |
-| pull 모델 | — | Prometheus가 대상을 직접 긁는 방식. `up == 0`이 곧 신호 | [9](/onprem/09-prometheus/) |
-| exporter | 익스포터 | 메트릭을 Prometheus 형식으로 내주는 프로그램 | [9](/onprem/09-prometheus/) |
-| ServiceMonitor · PodMonitor | — | "이걸 긁어라"를 선언하는 CRD | [9](/onprem/09-prometheus/) |
-| PromQL · LogQL · TraceQL | — | 메트릭 · 로그 · 트레이스 질의 언어 | [9](/onprem/09-prometheus/) · [10](/onprem/10-loki/) · [11](/onprem/11-tempo/) |
-| TSDB | Time Series Database | 시계열 저장소. Prometheus는 로컬 디스크에 쓴다 | [9](/onprem/09-prometheus/) |
-| Alertmanager | — | 알림의 라우팅 · 묶음 · 억제 · 침묵 | [9](/onprem/09-prometheus/) |
-| Watchdog | — | 항상 발화하는 알림. **알림 경로가 죽은 것을 알아채는 장치** | [9](/onprem/09-prometheus/) |
-| 스트림 · chunk | Stream · Chunk | Loki의 라벨 조합 단위 / 압축 저장 덩어리 | [10](/onprem/10-loki/) |
-| Grafana Alloy | — | 로그·메트릭·트레이스 통합 수집기. **Promtail은 EOL** | [8](/onprem/08-observability/) · [10](/onprem/10-loki/) |
-| 트레이스 · 스팬 | Trace · Span | 요청 하나의 여정 / 그 안의 구간 | [11](/onprem/11-tempo/) |
-| 컨텍스트 전파 | Context Propagation | 서비스 사이로 트레이스 ID를 넘기는 것 (`traceparent`) | [11](/onprem/11-tempo/) |
-| OTLP | OpenTelemetry Protocol | OpenTelemetry의 전송 프로토콜 | [11](/onprem/11-tempo/) |
-| head · tail 샘플링 | — | 시작할 때 결정 / 끝나고 결과를 보고 결정 | [11](/onprem/11-tempo/) |
-| exemplar | 표본 링크 | 메트릭 한 점에 매달린 대표 트레이스 ID | [11](/onprem/11-tempo/) · [12](/onprem/12-grafana/) |
-| derived field | 파생 필드 | 로그에서 값을 뽑아 다른 데이터소스로 링크 | [12](/onprem/12-grafana/) |
-| 프로비저닝 | Provisioning | 대시보드·데이터소스를 파일·CRD로 미리 넣는 것 | [12](/onprem/12-grafana/) |
+| 카디널리티 | Cardinality | 라벨 조합의 가짓수. **관측 스택을 죽이는 1번 원인** | [8](/onprem/08-observability/) |
+| Grafana Alloy | — | 로그·메트릭·트레이스 통합 수집기. **Promtail은 EOL** | [8](/onprem/08-observability/) |
+| dead man 스위치 | Dead Man's Switch | 정상일 때 주기적으로 울리는 신호. **알림 경로가 죽은 것을 알아채는 장치** | [8](/onprem/08-observability/) |
+| 실패 도메인 | Failure Domain | 함께 죽는 범위. **감시자를 여기에 같이 두면 안 된다** | [8](/onprem/08-observability/) · [11](/onprem/11-backup/) |
+
+`pull 모델` · `ServiceMonitor` · `PromQL` · `LogQL` · `TraceQL` · `TSDB` · `Alertmanager` ·
+`Watchdog` · `스트림` · `chunk` · `스팬` · `OTLP` · `exemplar` · `derived field` 처럼
+**도구 안쪽의 말들은 [관측 덱 용어 사전](/observability/06-glossary/)에** 있다.
 
 ## ⑤ 배포 · 시크릿 · 백업 · 운영
 
 | 용어 | 풀 이름 | 뜻 | 장 |
 |---|---|---|---|
-| GitOps | — | 원하는 상태를 Git에 두고 컨트롤러가 맞추는 방식 | [13](/onprem/13-gitops/) |
-| 드리프트 | Drift | Git과 클러스터 실제 상태의 어긋남 | [13](/onprem/13-gitops/) |
-| App of Apps | — | Application 하나가 다른 Application들을 배포하는 구조 | [13](/onprem/13-gitops/) |
-| sync wave | — | 설치 순서를 강제하는 순번 | [13](/onprem/13-gitops/) |
-| 부트스트랩 | Bootstrap | 빈 클러스터에 **자기 자신을 관리할 첫 조각**을 손으로 심는 일 | [13](/onprem/13-gitops/) |
-| SealedSecret | — | 공개키로 암호화해 Git에 올리는 봉투. 클러스터 안 컨트롤러만 푼다 | [14](/onprem/14-secrets/) |
-| sealing key | 마스터키 | SealedSecret을 푸는 개인키. **잃으면 Git의 모든 암호문이 안 풀린다** | [14](/onprem/14-secrets/) |
-| 스코프 | Scope | 암호문을 **어느 이름·NS에서 풀 수 있는지**. 기본은 strict — 옮기면 거부된다 | [14](/onprem/14-secrets/) |
-| SOPS · age | — | 파일 암호화 도구와 키 형식. **마스터키 백업을 지키는 "키의 키"** | [14](/onprem/14-secrets/) |
-| ESO | External Secrets Operator | 외부 금고의 값을 Secret으로 만들어 주는 오퍼레이터. Git엔 참조만 | [14](/onprem/14-secrets/) |
-| Reflector | — | Secret을 **네임스페이스 간 복제**. 암호화와는 무관하다 | [14](/onprem/14-secrets/) |
-| RPO · RTO | Recovery Point · Time Objective | 얼마나 최근까지 / 얼마나 빨리 되살리나 | [15](/onprem/15-backup/) |
-| etcd 스냅샷 | — | 클러스터 오브젝트 전체를 뜬 파일. 복구는 최후 수단 | [15](/onprem/15-backup/) |
-| Velero · Kopia | — | 리소스·PV 백업 도구 / 그 파일 백업 엔진 | [15](/onprem/15-backup/) |
-| 버전 스큐 | Version Skew | 컴포넌트 사이에 허용되는 버전 차이 | [16](/onprem/16-ops/) |
-| 드레인 | Drain | 노드에서 파드를 안전하게 비워 내는 것 | [16](/onprem/16-ops/) |
-| PDB | PodDisruptionBudget | 동시에 내려도 되는 파드 수의 선언. **없으면 드레인이 서비스를 끊는다** | [16](/onprem/16-ops/) |
-| runbook | 실행 절차서 | 알림·증상별 확인·조치 순서 | [16](/onprem/16-ops/) |
-| 용량 계획 | Capacity Planning | 언제 무엇이 부족해질지 미리 계산하는 일 | [16](/onprem/16-ops/) |
+| GitOps | — | 원하는 상태를 Git에 두고 컨트롤러가 맞추는 방식 | [9](/onprem/09-gitops/) |
+| 드리프트 | Drift | Git과 클러스터 실제 상태의 어긋남 | [9](/onprem/09-gitops/) |
+| App of Apps | — | Application 하나가 다른 Application들을 배포하는 구조 | [9](/onprem/09-gitops/) |
+| sync wave | — | 설치 순서를 강제하는 순번 | [9](/onprem/09-gitops/) |
+| 부트스트랩 | Bootstrap | 빈 클러스터에 **자기 자신을 관리할 첫 조각**을 손으로 심는 일 | [9](/onprem/09-gitops/) |
+| SealedSecret | — | 공개키로 암호화해 Git에 올리는 봉투. 클러스터 안 컨트롤러만 푼다 | [10](/onprem/10-secrets/) |
+| sealing key | 마스터키 | SealedSecret을 푸는 개인키. **잃으면 Git의 모든 암호문이 안 풀린다** | [10](/onprem/10-secrets/) |
+| 스코프 | Scope | 암호문을 **어느 이름·NS에서 풀 수 있는지**. 기본은 strict — 옮기면 거부된다 | [10](/onprem/10-secrets/) |
+| SOPS · age | — | 파일 암호화 도구와 키 형식. **마스터키 백업을 지키는 "키의 키"** | [10](/onprem/10-secrets/) |
+| ESO | External Secrets Operator | 외부 금고의 값을 Secret으로 만들어 주는 오퍼레이터. Git엔 참조만 | [10](/onprem/10-secrets/) |
+| Reflector | — | Secret을 **네임스페이스 간 복제**. 암호화와는 무관하다 | [10](/onprem/10-secrets/) |
+| RPO · RTO | Recovery Point · Time Objective | 얼마나 최근까지 / 얼마나 빨리 되살리나 | [11](/onprem/11-backup/) |
+| etcd 스냅샷 | — | 클러스터 오브젝트 전체를 뜬 파일. 복구는 최후 수단 | [11](/onprem/11-backup/) |
+| Velero · Kopia | — | 리소스·PV 백업 도구 / 그 파일 백업 엔진 | [11](/onprem/11-backup/) |
+| 버전 스큐 | Version Skew | 컴포넌트 사이에 허용되는 버전 차이 | [12](/onprem/12-ops/) |
+| 드레인 | Drain | 노드에서 파드를 안전하게 비워 내는 것 | [12](/onprem/12-ops/) |
+| PDB | PodDisruptionBudget | 동시에 내려도 되는 파드 수의 선언. **없으면 드레인이 서비스를 끊는다** | [12](/onprem/12-ops/) |
+| runbook | 실행 절차서 | 알림·증상별 확인·조치 순서 | [12](/onprem/12-ops/) |
+| 용량 계획 | Capacity Planning | 언제 무엇이 부족해질지 미리 계산하는 일 | [12](/onprem/12-ops/) |
 
 ## 다른 덱으로 넘긴 말들
 
 | 주제 | 어디에 |
 |---|---|
 | Pod · Deployment · Service · PV/PVC · RBAC · etcd 내부 | [CKA 덱](/cka/) |
+| PromQL · LogQL · TraceQL · 스트림 · chunk · 스팬 · exemplar · derived field | [관측 덱](/observability/06-glossary/) |
 | realm · client · mapper · 토큰 수명 · LDAP 페더레이션 | [Keycloak 덱](/keycloak/) |
 | systemd · 저널 · 네트워크 진단 · 사용자 관리 | [서버 관리 덱](/server/) |
 | 토픽 · 파티션 · 오프셋 · 컨슈머 그룹 | [Kafka 덱](/kafka/) |
 
 <LinkCard
-  title="18. 마무리"
+  title="14. 마무리"
   description="전체 지도, 장별 한 문장, 구축 순서 체크리스트, 그리고 사고 대응 카드."
-  href="/onprem/18-wrapup/"
+  href="/onprem/14-wrapup/"
 />

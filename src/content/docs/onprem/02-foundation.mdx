@@ -185,7 +185,7 @@ DB용은 **`Retain`으로 따로 만든다.** 실수로 `Cluster` 리소스를 �
 
 ## 노드 설계 — 무엇을 어디에 놓나
 
-용량 계획은 [16장](/onprem/16-ops/)에서 다루고, 여기서는 **배치**만 정한다.
+용량 계획은 [12장](/onprem/12-ops/)에서 다루고, 여기서는 **배치**만 정한다.
 
 | 역할 | 대수 | 두는 것 | 왜 |
 |---|---|---|---|
@@ -240,7 +240,7 @@ kubectl delete pvc smoke
 | PVC가 계속 `Pending` | 기본 SC 없음 · SC 이름 오타 · 프로비저너 파드 죽음 | `describe pvc`의 Events, CSI 컨트롤러 로그 |
 | 노드가 `NotReady` | CNI 파드 미기동 · kubelet 인증서 만료 | `kubectl -n kube-system get pods`, 노드에서 `journalctl -u kubelet` |
 | 파드가 다른 노드로 안 옮겨감 | local 볼륨에 묶임 | `kubectl get pv <name> -o yaml`의 `nodeAffinity` |
-| API 서버가 간헐적으로 느림 | etcd 디스크 지연 | etcd 메트릭 `etcd_disk_wal_fsync_duration_seconds` ([9장](/onprem/09-prometheus/)) |
+| API 서버가 간헐적으로 느림 | etcd 디스크 지연 | etcd 메트릭 `etcd_disk_wal_fsync_duration_seconds` ([관측 덱 2장](/observability/02-prometheus/)) |
 
 ## 2장 요약
 

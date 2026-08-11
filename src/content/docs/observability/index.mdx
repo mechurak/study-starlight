@@ -1,0 +1,72 @@
+---
+title: 개요
+description: 관측 — 장애가 났을 때 어디를 보나. 메트릭·로그·트레이스와 그 셋을 잇는 법
+---
+
+import { LinkCard, LinkButton } from '@astrojs/starlight/components';
+import DeckMap from '../../../components/DeckMap.astro';
+
+> 관측 스택의 목적은 대시보드가 아니다 — **"지금 뭐가 문제냐"에서 원인까지 가는 시간을 줄이는 것**이다
+
+새벽에 알림이 온다. "5xx가 늘었습니다." 여기서 원인까지 가는 데 5분이 걸리는 팀과
+50분이 걸리는 팀의 차이는 그래프의 개수가 아니라 **신호 사이를 얼마나 빨리 건너가느냐**다.
+
+이 덱은 그 길을 만드는 도구 넷 — **Prometheus · Loki · Tempo · Grafana** — 을
+**하나씩이 아니라 한 판으로** 다룬다. 각 도구의 매뉴얼이 아니라
+**무엇에 답하고, 어디에 저장되고, 옆 신호로 어떻게 건너가는가**가 축이다.
+
+쿠버네티스 기초는 [CKA 덱](/cka/) 수준을 전제한다. 오브젝트 스토리지·DB·SSO 같은
+**밑에 깔리는 것들**과 온프렘 고유의 제약은 [온프렘 덱](/onprem/)이 맡는다 —
+이 덱은 그 덱의 관측 부분이 커져서 독립한 것이다.
+
+**2026년 8월 기준**으로 쓰였다 — Prometheus 3.13 LTS · Grafana 13.1 · Loki 3.7 · Tempo 3.0.
+**이 시점에 Promtail이 EOL됐고 Tempo가 구조를 갈아엎었다**([0장](/observability/00-intro/)).
+
+<LinkButton href="/observability/00-intro/" icon="right-arrow">첫 장부터 읽기</LinkButton>
+
+## 구성
+
+<DeckMap
+  steps={[
+    { label: '0장', href: '/observability/00-intro/', title: '시작하기 전에', tone: 'key',
+      desc: '범위와 기준 시점 · 2026년의 관측 지형',
+      note: '무엇이 끝났고 무엇으로 갈아타는가' },
+    { label: '1장', href: '/observability/01-signals/', title: '세 신호', tone: 'zone',
+      desc: '메트릭 · 로그 · 트레이스의 역할 분담과 스택 전체 그림',
+      note: '무엇이 무엇에 답하고, 셋은 어떻게 이어지는가' },
+    { label: '2장', href: '/observability/02-prometheus/', title: '메트릭 — Prometheus', tone: 'warn',
+      desc: 'pull 모델 · ServiceMonitor · 리텐션 · 알림 설계',
+      note: '얼마나 · 언제부터 · 그리고 누가 사람을 깨우는가' },
+    { label: '3장', href: '/observability/03-loki/', title: '로그 — Loki', tone: 'ok',
+      desc: '라벨만 인덱싱하는 저장소 · Alloy 수집 · LogQL · 보존',
+      note: '그 시각에 정확히 무슨 일이 있었는가' },
+    { label: '4장', href: '/observability/04-tempo/', title: '추적 — Tempo', tone: 'bad',
+      desc: '계측과 컨텍스트 전파 · 샘플링 · Tempo 3.0의 변화',
+      note: '한 요청이 어디서 느렸는가' },
+    { label: '5장', href: '/observability/05-grafana/', title: '조회 — Grafana', tone: 'key',
+      desc: '상관 관계 설정 · 대시보드 as code · SSO · 알림의 자리',
+      note: '셋 사이를 두 번의 클릭으로 오갈 수 있는가' },
+    { label: '6~7장', href: '/observability/06-glossary/', title: '마무리', tone: 'mute',
+      desc: '용어 사전 · 도입 순서와 사고 대응 카드' },
+  ]}
+/>
+
+## 전체를 관통하는 두 문장
+
+**셋을 따로 두면 값을 못 한다.** 메트릭에서 시각을 확인하고, 로그 화면으로 가서 시각을
+다시 입력하고, 파드 이름을 찾아 넣는 수동 이동이 매번 생긴다. 이어 붙이는 장치는 셋뿐이다 —
+로그에 실린 `trace_id`, 메트릭에 매달린 **exemplar**, 트레이스에서 로그로 가는 링크.
+**대시보드를 100개 만드는 것보다 이 셋을 설정하는 것이 먼저**다
+([5장](/observability/05-grafana/)).
+
+**스택을 죽이는 건 데이터 양이 아니라 카디널리티다.** `user_id` · `request_id` · `pod_ip`처럼
+값이 무한한 것을 라벨에 넣으면 시계열이 수십만 개가 되고, Prometheus는 메모리로,
+Loki는 인덱스로 무너진다. 원칙 하나만 기억하면 된다 —
+**라벨은 "값의 종류가 유한하고 미리 셀 수 있는 것"만.** 나머지는 로그 본문이나 트레이스 속성에
+넣고 질의할 때 파싱한다. 이 이야기는 1 · 2 · 3장에서 각각 다른 얼굴로 다시 나온다.
+
+<LinkCard
+  title="0. 시작하기 전에"
+  description="이 덱의 대상과 범위, 그리고 2026년 8월의 관측 지형 — 무엇이 끝났고 무엇으로 갈아타는가."
+  href="/observability/00-intro/"
+/>

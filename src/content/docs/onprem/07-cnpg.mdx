@@ -106,7 +106,7 @@ spec:
     topologyKey: kubernetes.io/hostname
 
   monitoring:
-    enablePodMonitor: true              # Prometheus가 긁어 간다 (9장)
+    enablePodMonitor: true              # Prometheus가 긁어 간다 (8장)
 
   backup:
     barmanObjectStore:
@@ -129,7 +129,7 @@ spec:
 :::caution[함정 — WAL 아카이브가 막히면 디스크가 찬다]
 WAL은 아카이브에 성공해야 지워진다. S3 자격증명이 틀렸거나 버킷이 가득 차면
 **Postgres가 WAL을 계속 쌓아 두다가 볼륨을 채우고 멈춘다.** 백업 실패는
-"나중에 볼 일"이 아니라 **즉시 알림 대상**이다 ([9장](/onprem/09-prometheus/)).
+"나중에 볼 일"이 아니라 **즉시 알림 대상**이다 ([관측 덱 2장](/observability/02-prometheus/)).
 :::
 
 ## 복제를 어떻게 설정하나
@@ -223,7 +223,7 @@ spec:
 :::tip[핵심 — 복구는 리허설한 것만 된다]
 백업이 "성공"으로 찍히는 것과 **그 백업으로 실제 DB가 뜨는 것**은 다른 일이다.
 분기에 한 번은 위 복구 매니페스트로 **새 네임스페이스에 복구본을 띄우고
-행 수를 세어 본다.** 안 해 본 백업은 백업이 아니다 ([15장](/onprem/15-backup/)).
+행 수를 세어 본다.** 안 해 본 백업은 백업이 아니다 ([11장](/onprem/11-backup/)).
 :::
 
 ## 운영 — plugin이 대부분을 해 준다
@@ -265,7 +265,7 @@ CNPG는 앱만을 위한 게 아니다. **플랫폼 자신이 쓴다.**
 | 사용자 | 무엇을 넣나 | 없으면 |
 |---|---|---|
 | **Keycloak** | 사용자 · 세션 · client 설정 | SSO가 통째로 멈춘다 ([Keycloak 덱 8장](/keycloak/08-deploy/)) |
-| **Grafana** | 대시보드 · 사용자 · 알림 규칙 | SQLite면 **HA가 불가능**하다 ([12장](/onprem/12-grafana/)) |
+| **Grafana** | 대시보드 · 사용자 · 알림 규칙 | SQLite면 **HA가 불가능**하다 ([관측 덱 5장](/observability/05-grafana/)) |
 | 사내 앱 | 업무 데이터 | |
 
 :::caution[함정 — 순환 의존]

@@ -1,5 +1,5 @@
 ---
-title: "15. 백업과 복구"
+title: "11. 백업과 복구"
 description: "무엇을 잃을 수 있고 무엇부터 되살리나 — etcd 스냅샷, Velero, CNPG PITR, 그리고 복구 리허설"
 ---
 
@@ -25,12 +25,12 @@ import TermIntro from '../../../components/TermIntro.astro';
 
 | 잃을 수 있는 것 | 잃으면 | 무엇이 지키나 |
 |---|---|---|
-| **매니페스트·설정** | 무엇이 있었는지 모른다 | **Git** ([13장](/onprem/13-gitops/)) |
+| **매니페스트·설정** | 무엇이 있었는지 모른다 | **Git** ([9장](/onprem/09-gitops/)) |
 | **etcd** (오브젝트 전체) | 클러스터의 기억이 통째로 | etcd 스냅샷 |
 | **PV 데이터** | 앱이 쌓아 둔 파일 | Velero (+ CSI 스냅샷) |
 | **데이터베이스** | 업무 데이터 | CNPG 백업 + WAL ([7장](/onprem/07-cnpg/)) |
 | **오브젝트 스토리지** | 로그·트레이스·백업 자체 | 복제 또는 오프사이트 ([6장](/onprem/06-minio/)) |
-| **Sealed Secrets 마스터키** | **Git의 모든 비밀을 영영 못 푼다** | 별도 금고 ([14장](/onprem/14-secrets/)) |
+| **Sealed Secrets 마스터키** | **Git의 모든 비밀을 영영 못 푼다** | 별도 금고 ([10장](/onprem/10-secrets/)) |
 | **사내 CA 개인키** | 발급한 인증서 체계를 다시 세워야 | 별도 금고 ([4장](/onprem/04-tls-dns/)) |
 | **Keycloak realm 설정** | SSO를 처음부터 다시 | CNPG 백업 (DB가 원본) |
 
@@ -163,7 +163,7 @@ mc mirror --overwrite store/pg-backups dr/pg-backups
 | PostgreSQL | 베이스 1일 + WAL 연속 | **분 단위** | 새 Cluster로 PITR | 1~수 시간 (데이터 크기) |
 | PV 데이터 | 1일 | 24시간 | Velero restore | 시간 |
 | 오브젝트 스토리지 | 지속 복제 | 분~시간 | 복제본으로 전환 | 데이터 크기에 비례 |
-| 마스터키·CA 키 | **변경·갱신 시마다** | 0 | 금고에서 복원 ([14장](/onprem/14-secrets/)) | 분 |
+| 마스터키·CA 키 | **변경·갱신 시마다** | 0 | 금고에서 복원 ([10장](/onprem/10-secrets/)) | 분 |
 
 :::tip[핵심 — 클러스터 전체를 잃었을 때의 순서]
 숫자보다 중요한 건 **순서**다. 각 단계가 다음 단계의 전제다.
@@ -174,7 +174,7 @@ mc mirror --overwrite store/pg-backups dr/pg-backups
 
 2. **새 클러스터**를 세운다 (또는 DR 클러스터를 쓴다)
 
-3. **Sealed Secrets 마스터키**를 복원한다 — 없으면 Git의 비밀을 못 푼다 ([14장](/onprem/14-secrets/))
+3. **Sealed Secrets 마스터키**를 복원한다 — 없으면 Git의 비밀을 못 푼다 ([10장](/onprem/10-secrets/))
 
 4. **Argo CD**를 손으로 깔고 root Application을 적용한다 → 플랫폼이 스스로 펼쳐진다
 
@@ -260,7 +260,7 @@ mc ls dr/cluster-backups/etcd/ | tail -3      # 오프사이트에도 갔나
 | PITR이 원하는 시점 이전으로 안 간다 | WAL 보존 기간 |
 | 복구가 너무 오래 걸린다 | 파일 백업의 한계 — CSI 스냅샷 지원 확인 |
 
-## 15장 요약
+## 11장 요약
 
 - 백업 계획은 **선언(Git) + 상태(etcd · PV · DB · 오브젝트) + 열쇠(마스터키 · CA 키)** 로 나눈다
 - **GitOps는 절반만 백업한다** — "무엇이 깔려 있었나"는 복원돼도 데이터는 안 돌아온다
@@ -271,7 +271,7 @@ mc ls dr/cluster-backups/etcd/ | tail -3      # 오프사이트에도 갔나
   진짜 runbook은 리허설 중에 쓰인다
 
 <LinkCard
-  title="16. 운영 — 루틴 · 업그레이드 · 진단"
+  title="12. 운영 — 루틴 · 업그레이드 · 진단"
   description="평상시에 무엇을 하고, 터졌을 때 어느 층부터 가르나. 온프렘 운영의 반복 업무."
-  href="/onprem/16-ops/"
+  href="/onprem/12-ops/"
 />

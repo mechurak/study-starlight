@@ -1,5 +1,5 @@
 ---
-title: "11. 추적 — Tempo와 OpenTelemetry"
+title: "4. 추적 — Tempo와 OpenTelemetry"
 description: "한 요청이 어디서 느렸나 — 계측이라는 진입 장벽, 샘플링 전략, 상관 관계, 그리고 Tempo 3.0의 변화"
 ---
 
@@ -49,7 +49,7 @@ flowchart LR
     B -.->|"스팬"| COL
     C -.->|"스팬"| COL
     COL -->|"OTLP"| T["Tempo"]
-    T --> S3[("오브젝트 스토리지 — 6장")]
+    T --> S3[("오브젝트 스토리지 — 온프렘 6장")]
 
     classDef bad  fill:#fee2e2,stroke:#dc2626,color:#7f1d1d
     classDef ok   fill:#dcfce7,stroke:#16a34a,color:#14532d
@@ -77,8 +77,8 @@ flowchart LR
 :::tip[핵심 — 제일 싼 첫걸음]
 전면 도입 전에 **로그에 `trace_id`를 찍는 것**부터 한다. 계측을 넣으면 SDK가 현재
 trace ID를 알고 있으니 로그 포맷에 한 줄 넣으면 끝이고, 그것만으로도
-[10장](/onprem/10-loki/)의 로그에서 트레이스로 건너뛸 수 있다.
-Grafana의 derived field가 그 링크를 만들어 준다 ([12장](/onprem/12-grafana/)).
+[3장](/observability/03-loki/)의 로그에서 트레이스로 건너뛸 수 있다.
+Grafana의 derived field가 그 링크를 만들어 준다 ([5장](/observability/05-grafana/)).
 :::
 
 ## 샘플링 — 전부 저장할 수는 없다
@@ -119,7 +119,7 @@ Tempo도 Loki처럼 **오브젝트 스토리지에 블록을 쓴다.** 그리고
 그래서 저장 비용이 아주 낮다.
 
 ```yaml
-# Tempo 저장소 설정 — 6장의 그 엔드포인트
+# Tempo 저장소 설정 — 온프렘 덱 6장의 그 엔드포인트
 storage:
   trace:
     backend: s3
@@ -161,7 +161,7 @@ Tempo는 트레이스를 보고 **메트릭을 만들어 낼 수 있다.**
 | **서비스 그래프** | 누가 누구를 부르는지의 지도 | **문서에 없는 실제 의존 관계**가 드러난다. 장애 전파 경로 파악 |
 | **스팬 메트릭** | 서비스·오퍼레이션별 요청 수·지연·에러율 | 앱이 메트릭을 안 내줘도 RED 지표를 얻는다 |
 
-이 메트릭들은 Prometheus로 흘러가므로 [9장](/onprem/09-prometheus/)의 알림 규칙에 그대로 쓸 수 있다.
+이 메트릭들은 Prometheus로 흘러가므로 [2장](/observability/02-prometheus/)의 알림 규칙에 그대로 쓸 수 있다.
 
 ## 세 신호를 잇기 — 이 장의 진짜 값
 
@@ -188,7 +188,7 @@ flowchart LR
 3. **트레이스 → 로그**: 트레이스 화면에서 해당 서비스·시각의 로그로 이동한다.
    Tempo 데이터소스의 "trace to logs" 설정이 그것이다.
 
-4. 셋 다 [12장](/onprem/12-grafana/)에서 실제로 연결한다.
+4. 셋 다 [5장](/observability/05-grafana/)에서 실제로 연결한다.
 
 </Steps>
 
@@ -219,10 +219,10 @@ kubectl -n prod exec deploy/api -- \
 | 트레이스가 조각남 | `traceparent` 전파 끊김 | 프록시·클라이언트 래퍼·큐 구간 |
 | 트레이스가 아예 없음 | OTLP 엔드포인트 오설정 · 샘플링 0% | 컬렉터 로그, SDK 환경변수 |
 | "그 요청"이 안 남음 | head 샘플링만 씀 | tail 샘플링에 에러·지연 정책 추가 |
-| 저장은 되는데 조회 실패 | S3 접근 · 블록 포맷 | Tempo 로그, [6장](/onprem/06-minio/) 함정 넷 |
+| 저장은 되는데 조회 실패 | S3 접근 · 블록 포맷 | Tempo 로그, [온프렘 덱 6장](/onprem/06-minio/) 함정 넷 |
 | 업그레이드 후 기동 실패 | **3.0 구조 변경** | `tempo-cli migrate config`, 제거된 컴포넌트 확인 |
 
-## 11장 요약
+## 4장 요약
 
 - 추적은 **"어디서 느렸나"** 에 답하고, 그 대가로 **앱 계측**이 필요하다 — 진입 장벽이 다른 둘과 다르다
 - 계측의 급소는 **컨텍스트 전파**다. `traceparent` 헤더 하나가 끊기면 트레이스가 조각난다
@@ -233,7 +233,7 @@ kubectl -n prod exec deploy/api -- \
 - 트레이스에서 **서비스 그래프와 스팬 메트릭**이 부산물로 나온다
 
 <LinkCard
-  title="12. Grafana — 하나의 창"
+  title="5. Grafana — 하나의 창"
   description="세 데이터소스를 한 화면에서 오가게 만들기, 대시보드를 코드로 관리하기, SSO와 HA."
-  href="/onprem/12-grafana/"
+  href="/observability/05-grafana/"
 />

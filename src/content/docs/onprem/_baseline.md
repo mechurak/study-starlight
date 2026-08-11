@@ -13,6 +13,19 @@
 Loki · Tempo · Velero · CNPG 백업이 전부 S3를 쓰고, Keycloak · Grafana가 Postgres를 쓴다.
 위층 이야기를 쓸 때 **그 상태가 어느 바닥에 떨어지는지**를 반드시 밝힌다.
 
+## 관측 덱과의 경계
+
+옛 8~12장(관측)은 2026-08-11에 [observability 덱](/observability/)으로 독립했다.
+**8장 하나만 남았고 뒤 장이 앞으로 밀렸다** — 옛 13~18장이 지금 9~14장이다.
+
+- **이 덱 8장은 판단만 쓴다** — 어느 빈칸을 채우나, 상태가 어느 바닥에 떨어지나,
+  감시자를 어디에 배치하나, 용량을 어떻게 정하나.
+- **도구 넷(Prometheus · Loki · Tempo · Grafana)의 설치·설정·질의·운영은 쓰지 않는다.**
+  PromQL · LogQL · ServiceMonitor · derived field 같은 말이 이 덱에 자라기 시작하면
+  경계가 무너진 것이다 — 관측 덱으로 옮긴다.
+- 관측 도구의 **버전 번호도 이 덱에 두지 않는다.** 아래 표에서 뺐고, 원본은
+  `src/content/docs/observability/_baseline.md`에 있다.
+
 ## 기준 시점과 확인한 사실
 
 **2026년 8월** 기준이다. 아래는 2026-08-10에 공식 출처로 확인했다.
@@ -26,12 +39,8 @@ Loki · Tempo · Velero · CNPG 백업이 전부 S3를 쓰고, Keycloak · Grafa
 | Gateway API | **v1.5** (2026-02-27), v1.5.1 패치. 마이그레이션 도구 ingress2gateway 1.0 (2026-03-20) | kubernetes.io/blog `2026/04/21/gateway-api-v1-5`, `2026/03/20/ingress2gateway-1-0-release` |
 | MinIO | 커뮤니티판 **2026-02 저장소 아카이브**(2025-05 콘솔 관리기능 제거 → 2025-12 maintenance mode 순). 상용 AIStor로 이동 | min.io 블로그, `minio/minio` 저장소 상태 |
 | CloudNativePG | **1.30.0** (2026-06-29). 1.29.1에서 CVE-2026-44477(9.4) 수정 | cloudnative-pg.io/releases |
-| Prometheus | **3.13** LTS (2026-07-01), 최신 패치 3.13.2 | github.com/prometheus/prometheus/releases |
-| Grafana | **13.1** (2026-06-23), 13.0 GA는 2026-04-14 | grafana.com/blog `grafana-13-release` |
-| Loki | **3.7**. Helm 차트가 2026-03-16 `grafana-community/helm-charts`로 이전 | grafana.com/docs/loki/latest/release-notes |
-| Promtail | **2026-03-02 EOL** — Grafana Alloy로 이관 | grafana.com/docs/loki/latest/setup/migrate/migrate-to-alloy |
-| Tempo | **3.0** — 인입·질의 분리 아키텍처. ingester·compactor·v2 블록·scalable-single-binary 제거, **2.x로 다운그레이드 경로 없음** | grafana.com/blog `tempo-3-0-release` |
 | oauth2-proxy | **7.15.3** (2026-06-09) | github.com/oauth2-proxy/oauth2-proxy/releases |
+| 관측 도구 넷 | **여기 두지 않는다** — Prometheus · Grafana · Loki · Promtail · Tempo는 관측 덱 `_baseline.md` | `src/content/docs/observability/_baseline.md` |
 
 ## 서술 규칙
 
@@ -39,7 +48,8 @@ Loki · Tempo · Velero · CNPG 백업이 전부 S3를 쓰고, Keycloak · Grafa
 
 - **Keycloak 자체는 [keycloak 덱](/keycloak/)이 맡는다.** 이 덱의 5장은 "플랫폼 도구 열 개에
   로그인을 어떻게 한 곳으로 모으나"까지만 쓰고, realm·mapper·토큰 수명은 링크로 넘긴다.
-  같은 이유로 쿠버네티스 기초는 [cka 덱](/cka/), 리눅스 운영은 [server 덱](/server/)이 맡는다.
+  같은 이유로 관측 도구는 [observability 덱](/observability/), 쿠버네티스 기초는
+  [cka 덱](/cka/), 리눅스 운영은 [server 덱](/server/)이 맡는다.
 - **버전 번호는 위 표에 있는 것만 쓴다.** 표에 없는 도구는 버전을 적지 말고 성질만 쓴다 —
   확인 안 한 숫자를 적으면 이 덱의 신뢰가 통째로 깎인다.
 - 온프렘의 제약(인터넷 직접 연결 없음 · egress proxy · 사내 CA · 오토스케일 없음)은

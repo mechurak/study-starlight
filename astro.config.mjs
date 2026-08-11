@@ -158,29 +158,57 @@ export default defineConfig({
 								},
 								{
 									label: '관측',
-									items: [
-										'onprem/08-observability',
-										'onprem/09-prometheus',
-										'onprem/10-loki',
-										'onprem/11-tempo',
-										'onprem/12-grafana',
-									],
+									items: ['onprem/08-observability'],
 								},
 								{
 									label: '배포와 복구',
 									items: [
-										'onprem/13-gitops',
-										'onprem/14-secrets',
-										'onprem/15-backup',
+										'onprem/09-gitops',
+										'onprem/10-secrets',
+										'onprem/11-backup',
 									],
 								},
 								{
 									label: '운영',
-									items: ['onprem/16-ops'],
+									items: ['onprem/12-ops'],
 								},
 								{
 									label: '마무리',
-									items: ['onprem/17-glossary', 'onprem/18-wrapup'],
+									items: ['onprem/13-glossary', 'onprem/14-wrapup'],
+								},
+							],
+						},
+						{
+							label: '관측',
+							link: '/observability/',
+							icon: 'analytics',
+							items: [
+								'observability',
+								{
+									label: '시작',
+									items: [
+										'observability/00-intro',
+										'observability/01-signals',
+									],
+								},
+								{
+									label: '세 신호',
+									items: [
+										'observability/02-prometheus',
+										'observability/03-loki',
+										'observability/04-tempo',
+									],
+								},
+								{
+									label: '하나의 창',
+									items: ['observability/05-grafana'],
+								},
+								{
+									label: '마무리',
+									items: [
+										'observability/06-glossary',
+										'observability/07-wrapup',
+									],
 								},
 							],
 						},

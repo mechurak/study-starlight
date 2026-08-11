@@ -69,20 +69,24 @@ flowchart LR
 | S3 | 오브젝트 스토리지 | **MinIO 또는 대안** (RustFS · SeaweedFS · Ceph RGW) | [6장](/onprem/06-minio/) |
 | RDS · Aurora | 관계형 DB의 HA·백업 | **CloudNativePG** | [7장](/onprem/07-cnpg/) |
 | EBS · EFS CSI | 블록·파일 볼륨 | **벤더 CSI · Ceph(Rook) · Longhorn · NFS** | [2장](/onprem/02-foundation/) |
-| CloudWatch Metrics | 메트릭 수집·알림 | **Prometheus** + Alertmanager | [9장](/onprem/09-prometheus/) |
-| CloudWatch Logs | 로그 수집·검색 | **Loki** (+ Grafana Alloy) | [10장](/onprem/10-loki/) |
-| X-Ray | 분산 추적 | **Tempo** (+ OpenTelemetry) | [11장](/onprem/11-tempo/) |
-| CloudWatch 대시보드 | 조회·시각화 | **Grafana** | [12장](/onprem/12-grafana/) |
-| ECR | 컨테이너 이미지 저장 | **사내 레지스트리** (Harbor 등) | [13장](/onprem/13-gitops/) |
-| Secrets Manager · KMS | 비밀 저장·전달·회전 | **Sealed Secrets** 또는 ESO + 금고 | [14장](/onprem/14-secrets/) |
-| AWS Backup · 스냅샷 | 백업·복구 | **Velero** + etcd 스냅샷 + CNPG PITR | [15장](/onprem/15-backup/) |
-| 오토스케일링 그룹 | 노드 자동 증설 | **없다** — 용량은 사람이 미리 산다 | [16장](/onprem/16-ops/) |
-| 사업자의 SLA | 가용성 책임 | **내가 정한 SLO와 온콜** | [16장](/onprem/16-ops/) |
+| CloudWatch Metrics | 메트릭 수집·알림 | **Prometheus** + Alertmanager | [8장](/onprem/08-observability/) |
+| CloudWatch Logs | 로그 수집·검색 | **Loki** (+ Grafana Alloy) | [8장](/onprem/08-observability/) |
+| X-Ray | 분산 추적 | **Tempo** (+ OpenTelemetry) | [8장](/onprem/08-observability/) |
+| CloudWatch 대시보드 | 조회·시각화 | **Grafana** | [8장](/onprem/08-observability/) |
+| ECR | 컨테이너 이미지 저장 | **사내 레지스트리** (Harbor 등) | [9장](/onprem/09-gitops/) |
+| Secrets Manager · KMS | 비밀 저장·전달·회전 | **Sealed Secrets** 또는 ESO + 금고 | [10장](/onprem/10-secrets/) |
+| AWS Backup · 스냅샷 | 백업·복구 | **Velero** + etcd 스냅샷 + CNPG PITR | [11장](/onprem/11-backup/) |
+| 오토스케일링 그룹 | 노드 자동 증설 | **없다** — 용량은 사람이 미리 산다 | [12장](/onprem/12-ops/) |
+| 사업자의 SLA | 가용성 책임 | **내가 정한 SLO와 온콜** | [12장](/onprem/12-ops/) |
+
+관측 네 줄만 장이 하나로 몰려 있다. **[8장](/onprem/08-observability/)이 그 넷의 자리와
+배치 판단까지 맡고, 도구 넷의 설치·설정·질의는 [관측 덱](/observability/)이 이어받는다** —
+이 덱에서 유일하게 "온프렘이라서"가 아닌 이유로 분량이 컸던 부분이다.
 
 :::tip[핵심 원칙]
 빈칸을 채우는 순서는 **아래에서 위로**다. 스토리지가 없으면 DB를 못 올리고,
 DB가 없으면 Keycloak을 못 올리고, Keycloak이 없으면 Grafana에 SSO를 못 붙인다.
-[18장](/onprem/18-wrapup/)의 구축 체크리스트가 이 순서를 그대로 따른다.
+[14장](/onprem/14-wrapup/)의 구축 체크리스트가 이 순서를 그대로 따른다.
 :::
 
 ### 채우지 않아도 되는 자리도 있다
@@ -100,7 +104,7 @@ DB가 없으면 Keycloak을 못 올리고, Keycloak이 없으면 Grafana에 SSO�
 ## 채운 다음에 생기는 일 — 층 구조
 
 빈칸을 다 채우면 이런 모양이 된다. **아래층이 죽으면 위층이 같이 죽는다** —
-이 그림이 [16장](/onprem/16-ops/) 진단 사다리의 원본이다.
+이 그림이 [12장](/onprem/12-ops/) 진단 사다리의 원본이다.
 
 ```mermaid
 flowchart LR
@@ -164,7 +168,7 @@ Helm 차트 다운로드, 이미지 pull이 전부 여기서 막힌다.
 <Card title="② 용량이 유한하다" icon="warning">
 노드를 늘리는 데 몇 주가 걸린다. 오토스케일이 없으니
 **Loki의 보존 기간, Prometheus의 리텐션, PVC 크기를 미리 정해야** 한다.
-디스크가 차면 관측 스택이 먼저 죽는다 ([16장](/onprem/16-ops/)).
+디스크가 차면 관측 스택이 먼저 죽는다 ([12장](/onprem/12-ops/)).
 </Card>
 <Card title="③ 신뢰의 뿌리가 사내에 있다" icon="warning">
 공인 인증서를 못 쓰는 구간에서는 사내 CA를 쓴다. 그러면 그 CA를
@@ -174,7 +178,7 @@ Helm 차트 다운로드, 이미지 pull이 전부 여기서 막힌다.
 <Card title="④ 아무도 대신 안 깨워 준다" icon="warning">
 디스크 임계치, 인증서 만료, 복제 지연 — 클라우드가 콘솔에서 알려 주던 것을
 전부 직접 알림으로 만들어야 한다. **알림 설계가 곧 운영 품질**이다
-([9장](/onprem/09-prometheus/)).
+([관측 덱 2장](/observability/02-prometheus/)).
 </Card>
 </CardGrid>
 

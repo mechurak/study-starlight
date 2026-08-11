@@ -13,7 +13,7 @@ import TermIntro from '../../../components/TermIntro.astro';
     ['온프렘', 'On-premises', '클라우드 관리형 서비스가 아니라 **자체 인프라(사내 서버실·데이터센터)에서 직접 운영**하는 것. 남이 해 주던 일이 전부 내 일이 된다.'],
     ['플랫폼', 'Platform', '앱을 올리기만 하면 돌아가게 만드는 **공통 기반 한 벌**. 이 덱에서는 클러스터 + 입구 + 인증 + 스토리지 + DB + 관측 + 배포 파이프라인 전체를 가리킨다.'],
     ['오퍼레이터', 'Operator', '사람이 하던 운영 절차(설치·페일오버·백업)를 **컨트롤러 코드로 옮긴 것**. CRD로 원하는 상태를 선언하면 오퍼레이터가 그 상태를 유지한다. CloudNativePG가 대표적이다(7장).'],
-    ['LGTM 스택', 'Loki · Grafana · Tempo · Mimir', 'Grafana Labs의 관측 도구 묶음을 부르는 말. 이 덱은 Mimir 대신 Prometheus를 쓰는 조합을 기준으로 한다(8~12장).'],
+    ['LGTM 스택', 'Loki · Grafana · Tempo · Mimir', 'Grafana Labs의 관측 도구 묶음을 부르는 말. 이 덱은 Mimir 대신 Prometheus를 쓰는 조합을 기준으로 한다(8장 · [관측 덱](/observability/)).'],
     ['에어갭', 'Air-gap', '네트워크가 인터넷과 **물리적으로 끊겨 있는** 환경. 이미지·차트·CRL을 사람이 반입해야 한다. 온프렘의 극단이지만 드물지 않다.'],
     ['egress 프록시', 'Egress Proxy', '내부에서 외부로 나가는 트래픽을 대신 내보내는 사내 중계 서버. 온프렘 클러스터는 보통 인터넷에 직접 못 나가서 이걸 거친다(4장).'],
   ]}
@@ -45,7 +45,7 @@ Keycloak · oauth2-proxy — 도구 열 개의 로그인을 한 곳으로.
 
 MinIO(와 대안) · CloudNativePG — 상태를 맡는 바닥 둘.
 
-Prometheus · Loki · Tempo · Grafana — 관측 네 조각과 셋을 잇는 법.
+관측 스택을 **어디에 놓고 무엇을 미리 정하나** — 감시자의 배치와 유한한 용량.
 
 Argo CD · 시크릿 관리(봉인 · 스코프 · 회전) · Velero — 재현과 복구.
 
@@ -66,7 +66,7 @@ Kafka 운영 (→ [Kafka 덱](/kafka/)).
 
 하드웨어·스토리지 어플라이언스 벤더별 설정.
 
-애플리케이션 코드 계측의 언어별 상세 (11장은 개념과 경계까지).
+관측 도구 넷의 설치·설정·질의 (→ [관측 덱](/observability/)). 8장은 자리와 배치 판단까지.
 </Card>
 </CardGrid>
 
@@ -141,11 +141,8 @@ flowchart LR
 | HTTP 입구 | **ingress-nginx는 2026-03에 은퇴**했다 — 릴리스도 보안 패치도 없다. 후속으로 예고됐던 InGate도 무산 | "온프렘 인그레스는 ingress-nginx가 표준"이라는 글 전부 |
 | 그 대체 | **Gateway API v1.5**(2026-02) + 구현체(Envoy Gateway · NGINX Gateway Fabric · Traefik · Cilium) | Ingress 리소스와 annotation만 다루는 자료 |
 | 사내 S3 | MinIO **커뮤니티판은 2026-02 저장소 아카이브**(상용 AIStor로 이동). 신규는 대안 검토 | "MinIO 웹 콘솔에서 버킷·사용자 만들기" (2025-05에 관리 기능 제거됨) |
-| 로그 수집기 | **Grafana Alloy** | **Promtail은 2026-03-02 EOL** — 대부분의 Loki 튜토리얼이 아직 Promtail 기준 |
-| Loki Helm 차트 | 2026-03-16부터 `grafana-community/helm-charts` | `grafana/helm-charts` 저장소를 가리키는 설치 명령 |
-| 트레이스 | **Tempo 3.0** — 인입과 질의를 분리한 새 아키텍처. ingester · compactor · v2 블록 제거, **2.x로 되돌릴 수 없다** | ingester/compactor를 튜닝하는 2.x 기준 운영 글 |
 | Postgres | **CloudNativePG 1.30** (오퍼레이터가 사실상 기본값) | `StatefulSet`으로 Postgres를 직접 띄우는 예제 |
-| 메트릭 | **Prometheus 3.13 LTS** — OTLP 수신 · UTF-8 라벨 | 2.x 기준 설정 (대부분 그대로 통하지만 새 기능이 빠져 있다) |
+| 관측 스택 | **Promtail EOL**(2026-03-02, → Alloy) · **Tempo 3.0**(2.x로 못 되돌린다) · Loki 차트 이전 — [관측 덱 0장](/observability/00-intro/) | Promtail 기준 Loki 튜토리얼, ingester를 튜닝하는 Tempo 2.x 운영 글 |
 
 :::caution[함정]
 **"ingress-nginx를 설치한다"로 시작하는 온프렘 가이드는 지금 전부 낡았다.**
@@ -156,16 +153,16 @@ flowchart LR
 ## 읽는 순서
 
 앞에서 뒤로 읽으면 **실제 구축 순서**와 대체로 같다 — 바닥(2장) → 입구(3~5장) →
-상태 저장소(6~7장) → 관측(8~12장) → 배포·복구(13~14장). 다만 급하면:
+상태 저장소(6~7장) → 관측(8장) → 배포·복구(9~11장). 다만 급하면:
 
 | 지금 처지 | 먼저 볼 장 |
 |---|---|
 | 클러스터는 있는데 외부에서 못 들어온다 | [3장](/onprem/03-gateway/) → [4장](/onprem/04-tls-dns/) |
 | ingress-nginx를 쓰고 있어서 갈아타야 한다 | [3장](/onprem/03-gateway/)의 결정표 |
-| 로그·메트릭을 어디서 보는지부터 만들어야 한다 | [8장](/onprem/08-observability/) → [9장](/onprem/09-prometheus/) · [10장](/onprem/10-loki/) |
+| 로그·메트릭을 어디서 보는지부터 만들어야 한다 | [8장](/onprem/08-observability/) → [관측 덱 2장](/observability/02-prometheus/) · [관측 덱 3장](/observability/03-loki/) |
 | DB를 클러스터에 올려야 한다 | [7장](/onprem/07-cnpg/) (그 전에 [2장](/onprem/02-foundation/) 스토리지 절) |
-| 시크릿을 어떻게 넣고 관리할지 막혔다 | [14장](/onprem/14-secrets/) |
-| 이미 다 떠 있고 운영만 물려받았다 | [16장](/onprem/16-ops/) → [18장](/onprem/18-wrapup/) 체크리스트 |
+| 시크릿을 어떻게 넣고 관리할지 막혔다 | [10장](/onprem/10-secrets/) |
+| 이미 다 떠 있고 운영만 물려받았다 | [12장](/onprem/12-ops/) → [14장](/onprem/14-wrapup/) 체크리스트 |
 
 ## 0장 요약
 
