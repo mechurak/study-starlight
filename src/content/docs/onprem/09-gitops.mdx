@@ -46,7 +46,7 @@ flowchart LR
     ARGO["Argo CD"] -->|"주기적으로 읽는다"| GIT
     ARGO -->|"차이가 있으면 적용"| K8S["클러스터"]
     K8S -.->|"실제 상태 보고"| ARGO
-    ARGO -.->|"드리프트 알림"| OBS["Prometheus — 9장"]
+    ARGO -.->|"드리프트 알림"| OBS["Prometheus — 관측 덱 2장"]
 
     classDef key  fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
     classDef ok   fill:#dcfce7,stroke:#16a34a,color:#14532d

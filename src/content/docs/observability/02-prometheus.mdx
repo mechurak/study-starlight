@@ -67,7 +67,7 @@ process_resident_memory_bytes 4.1943e+08
 | 타입 | 성격 | 예 | 어떻게 읽나 |
 |---|---|---|---|
 | **counter** | **늘기만 한다.** 프로세스가 재시작하면 0으로 돌아간다 | `http_requests_total` · `..._errors_total` | **절대 그냥 보지 않는다.** `rate()`로 **속도**를 낸다 |
-| **gauge** | 오르내린다 | `..._memory_bytes` · `kube_pod_status_ready` | 그대로 본다. 추세는 `deriv()`·`predict_linear()` |
+| **gauge** | 오르내린다 | `..._memory_bytes` · `kube_pod_status_ready` | 그대로 본다. 추세는 `deriv()`(초당 변화율)·`predict_linear()`(추세를 연장한 예측값) |
 | **histogram** | 관측값을 **구간별로 센다** | `http_request_duration_seconds` | `histogram_quantile()`로 p95·p99를 뽑는다 |
 | **summary** | 앱이 **미리 계산한 분위수** | 일부 라이브러리의 기본값 | 파드가 여럿이면 **합칠 수 없다.** 아래 함정 |
 
@@ -131,6 +131,23 @@ metricRelabelings:
   - action: labeldrop
     regex: "id|uuid|request_id"
 ```
+
+### 옆 신호로 건너가기 — exemplar
+
+`trace_id`를 라벨에 넣지 못한다면, 메트릭에서 트레이스로는 어떻게 건너가나.
+그 자리를 맡는 것이 **exemplar**다 — 히스토그램 관측값에 **대표 trace ID 하나를
+매달아 두는 것.** 시계열의 라벨이 아니라 옆에 붙는 표본이라 **카디널리티를 늘리지 않으면서**,
+그래프에서 튄 지점의 "실제로 느렸던 요청 하나"로 바로 갈 수 있게 한다.
+
+```text
+# OpenMetrics 노출 형식 — 값 뒤의 # {...}가 exemplar다
+http_request_duration_seconds_bucket{le="1"} 9990 # {trace_id="4bf92f3577b3..."} 0.94
+```
+
+연결에는 세 조각이 필요하다 — ① 앱(OTel SDK)이 관측값에 trace ID를 매달고,
+② Prometheus가 exemplar 저장을 켜고(`--enable-feature=exemplar-storage`),
+③ Grafana 데이터소스가 그 ID를 Tempo로 잇는다. ③의 설정과
+"점이 안 보일 때 어디부터 보나"는 [5장](/observability/05-grafana/)에 있다.
 
 ## PromQL — 다섯 형태면 대부분 쓴다
 
@@ -247,7 +264,7 @@ histogram_quantile(0.99,
 
 # USE — 자원 하나에 이 셋
 100 - (avg by (instance) (rate(node_cpu_seconds_total{mode="idle"}[5m])) * 100)   # Utilization
-node_load5 / count by (instance) (node_cpu_seconds_total{mode="idle"})             # Saturation
+node_load5 / on(instance) count by (instance) (node_cpu_seconds_total{mode="idle"})  # Saturation
 rate(node_network_receive_errs_total[5m])                                          # Errors
 ```
 
@@ -530,6 +547,7 @@ curl -XPOST http://localhost:9093/api/v2/alerts -H 'Content-Type: application/js
 - PromQL은 **고르기 · 속도 · 묶기 · 비율 · 분위수** 다섯이면 대부분 된다.
   순서는 언제나 **`rate` → `sum by` → `histogram_quantile`**
 - 무엇을 잴지는 **RED(서비스)와 USE(자원)**. **알림은 RED에 걸고 USE는 조사용**이다
+- 트레이스로는 **exemplar로 건너간다** — `trace_id`는 라벨이 아니라 exemplar에 싣는다
 - **pull 모델**이라 `up == 0` 하나로 "죽었다"를 안다 — 온프렘 알림의 출발점
 - **kube-prometheus-stack**으로 시작하고, 대상은 **ServiceMonitor**로 추가한다.
   안 긁히면 `release` 라벨 · 포트 **이름** · 네임스페이스 셀렉터 셋을 본다

@@ -116,7 +116,7 @@ flowchart LR
 7. **관측** ([8장](/onprem/08-observability/) · [관측 덱](/observability/))
    - kube-prometheus-stack → **알림 열 개 + Watchdog 외부 라우팅**
    - Loki + Alloy (라벨은 최소로) → Grafana에 데이터소스 셋
-   - **derived field · exemplar · trace to logs** 연결
+   - 세 신호를 **잇는 연결 셋**을 대시보드보다 먼저 ([관측 덱 5장](/observability/05-grafana/))
    - Grafana DB를 CNPG로, SSO 연결
    - Tempo는 서비스 간 호출이 늘어난 뒤에
 
@@ -230,7 +230,7 @@ kubectl -n argocd get applications | grep -v 'Synced.*Healthy'
 | 관측 | [관측 덱](/observability/) | 8장이 자리만 잡아 준 도구 넷 전체 |
 | 인증 | [Keycloak 덱](/keycloak/) | 5장이 요약만 한 부분 전체 |
 | 리눅스 운영 | [서버 관리 덱](/server/) | 노드 안에서 벌어지는 일 |
-| 메시징 | [Kafka 덱](/kafka/) | Tempo 3.0의 인입 경로에도 등장한다 |
+| 메시징 | [Kafka 덱](/kafka/) | 새 Tempo의 인입 경로에도 등장한다 |
 | 정책·보안 | Pod Security Admission · Kyverno/OPA · 이미지 서명 | 이 덱이 다루지 않은 층 |
 | 멀티 클러스터 | Thanos/Mimir · 클러스터 API · DR 사이트 | 규모가 커진 다음 |
 | 서비스 메시 | Istio · Linkerd | 서비스 간 mTLS·트래픽 제어가 필요해지면 |

@@ -125,7 +125,7 @@ curl -sI https://grafana.example.internal/ | head -1
 kubectl cnpg status platform-pg -n database
 mc ls store/ >/dev/null && echo "S3 OK"
 
-# ④ 관측 (9·10·11장)
+# ④ 관측 (8장 · 관측 덱)
 kubectl -n observability get pods
 #   Prometheus /targets 에서 DOWN 급증이 없는지
 

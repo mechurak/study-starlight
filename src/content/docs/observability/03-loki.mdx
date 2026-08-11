@@ -132,61 +132,6 @@ chunk가 잘게 쪼개져 압축이 안 되고, 인덱스가 커지고, ingester
 **필요하면 본문에 넣고 나중에 파싱한다** — 아래 LogQL 절의 `| json` · `| logfmt`가 그 용도다.
 :::
 
-## 수집 — Grafana Alloy
-
-Alloy 설정은 **컴포넌트를 파이프로 잇는** 모양이다. 아래 넷이 한 줄기가 된다 —
-**대상을 찾고(discovery) → 라벨을 정하고(relabel) → 읽어서(source) → 보낸다(write).**
-
-```hcl
-// ① 쿠버네티스에서 파드를 찾는다
-discovery.kubernetes "pods" {
-  role = "pod"
-}
-
-// ② 라벨은 여기서 결정된다 — 이 목록이 곧 검색 축이다
-discovery.relabel "pods" {
-  targets = discovery.kubernetes.pods.targets
-
-  rule {
-    source_labels = ["__meta_kubernetes_namespace"]
-    target_label  = "namespace"
-  }
-  rule {
-    source_labels = ["__meta_kubernetes_pod_label_app_kubernetes_io_name"]
-    target_label  = "app"
-  }
-  rule {
-    source_labels = ["__meta_kubernetes_pod_container_name"]
-    target_label  = "container"
-  }
-  // pod 이름은 일부러 라벨로 안 만든다 (카디널리티)
-}
-
-// ③ 로그를 읽어서
-loki.source.kubernetes "pods" {
-  targets    = discovery.relabel.pods.output
-  forward_to = [loki.write.default.receiver]
-}
-
-// ④ Loki로 보낸다
-loki.write "default" {
-  endpoint {
-    url = "http://loki-gateway.observability.svc/loki/api/v1/push"
-    // 멀티테넌시를 쓰면: tenant_id = "platform"
-  }
-}
-```
-
-**Alloy는 자기 UI에 이 파이프라인을 그림으로 보여 준다**(`/graph`).
-로그가 안 들어올 때 제일 먼저 여는 화면이 거기다 — 어느 컴포넌트에서 대상 수가
-0이 됐는지 눈으로 보인다.
-
-:::caution[함정 — Promtail 기준 문서]
-검색으로 나오는 Loki 수집 설정은 대부분 **Promtail의 `scrape_configs`** 형식이다.
-Promtail은 2026-03-02에 EOL됐다. 기존 Promtail 설정이 있으면
-Loki 문서의 **Alloy 마이그레이션 도구**가 한 번에 변환해 준다 — 손으로 옮기지 않는다.
-:::
-
 ## LogQL — 네 단계로 읽는다
 
 LogQL 질의는 아무리 길어도 **왼쪽에서 오른쪽으로 이 네 단계**다.
@@ -293,6 +238,61 @@ sum by (app) (sum_over_time({namespace="prod"} | json | unwrap bytes [5m]))
 </TabItem>
 </Tabs>
 
+## 수집 — Grafana Alloy
+
+Alloy 설정은 **컴포넌트를 파이프로 잇는** 모양이다. 아래 넷이 한 줄기가 된다 —
+**대상을 찾고(discovery) → 라벨을 정하고(relabel) → 읽어서(source) → 보낸다(write).**
+
+```hcl
+// ① 쿠버네티스에서 파드를 찾는다
+discovery.kubernetes "pods" {
+  role = "pod"
+}
+
+// ② 라벨은 여기서 결정된다 — 이 목록이 곧 검색 축이다
+discovery.relabel "pods" {
+  targets = discovery.kubernetes.pods.targets
+
+  rule {
+    source_labels = ["__meta_kubernetes_namespace"]
+    target_label  = "namespace"
+  }
+  rule {
+    source_labels = ["__meta_kubernetes_pod_label_app_kubernetes_io_name"]
+    target_label  = "app"
+  }
+  rule {
+    source_labels = ["__meta_kubernetes_pod_container_name"]
+    target_label  = "container"
+  }
+  // pod 이름은 일부러 라벨로 안 만든다 (카디널리티)
+}
+
+// ③ 로그를 읽어서
+loki.source.kubernetes "pods" {
+  targets    = discovery.relabel.pods.output
+  forward_to = [loki.write.default.receiver]
+}
+
+// ④ Loki로 보낸다
+loki.write "default" {
+  endpoint {
+    url = "http://loki-gateway.observability.svc/loki/api/v1/push"
+    // 멀티테넌시를 쓰면: tenant_id = "platform"
+  }
+}
+```
+
+**Alloy는 자기 UI에 이 파이프라인을 그림으로 보여 준다**(`/graph`).
+로그가 안 들어올 때 제일 먼저 여는 화면이 거기다 — 어느 컴포넌트에서 대상 수가
+0이 됐는지 눈으로 보인다.
+
+:::caution[함정 — Promtail 기준 문서]
+검색으로 나오는 Loki 수집 설정은 대부분 **Promtail의 `scrape_configs`** 형식이다.
+Promtail은 2026-03-02에 EOL됐다. 기존 Promtail 설정이 있으면
+Loki 문서의 **Alloy 마이그레이션 도구**가 한 번에 변환해 준다 — 손으로 옮기지 않는다.
+:::
+
 ## 배포 모드와 보존
 
 | 모드 | 모양 | 언제 |
@@ -322,17 +322,19 @@ loki:
       accessKeyId: ${LOKI_ACCESS_KEY}
       secretAccessKey: ${LOKI_SECRET_KEY}
   limits_config:
-    retention_period: 720h         # 30일
-    ingestion_rate_mb: 20          # 테넌트별 인입 제한 — 폭주 앱이 전체를 못 죽이게
-    max_streams_per_user: 10000    # 카디널리티 방어선
-    max_query_length: 721h         # 실수로 1년치를 훑는 질의를 막는다
-compactor:
-  retention_enabled: true          # 이게 꺼져 있으면 보존 기간이 적용되지 않는다
+    retention_period: 720h                # 30일
+    ingestion_rate_mb: 20                 # 테넌트별 인입 제한 — 폭주 앱이 전체를 못 죽이게
+    max_global_streams_per_user: 10000    # 카디널리티 방어선 (테넌트별 전역 한도)
+    max_query_length: 721h                # 실수로 1년치를 훑는 질의를 막는다
+  compactor:
+    retention_enabled: true               # 이게 꺼져 있으면 보존 기간이 적용되지 않는다
 ```
 
 :::caution[함정 — 보존을 두 군데서 정하지 않는다]
-로그가 안 지워지는 원인 1번은 **`compactor.retention_enabled`가 꺼져 있는 것**이다.
+로그가 안 지워지는 원인 1번은 **`loki.compactor.retention_enabled`가 꺼져 있는 것**이다.
 `retention_period`만 적어 두고 안심하면 버킷이 조용히 계속 찬다.
+자리도 잘 틀린다 — Helm 차트 **최상위의 `compactor:`는 컴포넌트 배포 설정**(replicas 등)이라,
+거기에 `retention_enabled`를 적으면 조용히 무시된다. **`loki:` 밑에** 둬야 한다.
 
 반대로 **Loki의 보존과 버킷 라이프사이클을 둘 다 켜면** 라이프사이클이 먼저
 객체를 지워 Loki가 "있어야 할 chunk가 없다"고 실패한다.
@@ -385,7 +387,7 @@ kubectl -n observability port-forward ds/alloy 12345:12345
 |---|---|---|
 | 로그가 하나도 안 보임 | Alloy가 대상을 못 찾음 · 라벨 이름 불일치 | Alloy UI(`/graph`), `api/v1/labels` |
 | 특정 앱만 안 들어옴 | relabel 규칙이 그 앱 라벨과 안 맞음 | Alloy `/graph`에서 그 대상이 목록에 있나 |
-| `too many streams` | **카디널리티 폭발** | `max_streams_per_user`, 라벨에 `pod`·ID가 없는지 |
+| `too many streams` | **카디널리티 폭발** | `max_global_streams_per_user`, 라벨에 `pod`·ID가 없는지 |
 | 질의가 타임아웃 | 범위가 넓다 · **파서가 라인 필터보다 앞** | 시간 범위를 좁히고 `\|=`를 앞으로 |
 | 필드로 필터가 안 걸림 | 파서를 안 붙였다 · 로그가 비구조화 | `\| json`을 넣고, 앱 로그 형식부터 본다 |
 | 오래된 로그가 안 지워짐 | `retention_enabled: false` | compactor 설정 |

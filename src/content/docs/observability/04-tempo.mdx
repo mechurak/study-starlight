@@ -50,9 +50,9 @@ start / end    : 03:12:04.601 → 03:12:07.451  (duration 2.85s)
 status         : error
 
 resource:                                   ← 이 프로세스 전체에 붙는다
-  service.name   : inventory
-  k8s.namespace  : prod
-  k8s.pod.name   : inventory-6c8-w2n4d
+  service.name       : inventory
+  k8s.namespace.name : prod
+  k8s.pod.name       : inventory-6c8-w2n4d
 
 attributes:                                 ← 이 구간에만 붙는다
   http.request.method : GET
@@ -83,6 +83,67 @@ events:
 **트레이스 속성이나 로그 본문**에, 유한한 것만 메트릭·로그의 라벨에.
 :::
 
+## TraceQL — 느린 것만 골라낸다
+
+트레이스 ID를 이미 알고 있으면 그냥 열면 된다. 문제는 **ID를 모를 때** —
+"어제 새벽에 느렸던 주문 요청"을 찾아야 하는 경우다. 그게 TraceQL이다.
+
+```text
+{ resource.service.name = "orders" && duration > 2s && status = error }
+  └── 조건에 맞는 스팬이 하나라도 있는 트레이스를 돌려준다
+```
+
+<Tabs>
+<TabItem label="기본 필터">
+
+```traceql
+{ resource.service.name = "orders" && duration > 2s }
+{ span.http.response.status_code >= 500 }
+{ status = error }
+{ resource.k8s.namespace.name = "prod" && span.db.system = "postgresql" && duration > 1s }
+```
+
+**접두사가 곧 앞 절의 구분**이다 — `resource.`는 프로세스 꼬리표,
+`span.`은 그 구간의 꼬리표. `duration`·`status`·`name`처럼 스팬 자체의 값은 접두사가 없다.
+
+</TabItem>
+<TabItem label="구조로 찾기">
+
+```traceql
+# orders를 거친 트레이스 중, 그 아래 어딘가에서 느린 DB 질의가 있던 것
+{ resource.service.name = "orders" } >> { span.db.system = "postgresql" && duration > 1s }
+
+# 바로 아래 자식만
+{ resource.service.name = "orders" } > { resource.service.name = "inventory" }
+```
+
+`>>`는 자손, `>`는 직계 자식이다. **"A를 거친 요청 중 B에서 터진 것"** 처럼
+서비스 경계를 넘는 조건을 걸 수 있는 게 TraceQL의 진짜 값이다 —
+메트릭으로는 이 질문을 만들 수조차 없다.
+
+</TabItem>
+<TabItem label="집계와 선택">
+
+```traceql
+# 조건에 맞는 스팬이 3개 이상인 트레이스 (N+1 질의 찾기)
+{ span.db.system = "postgresql" } | count() > 3
+
+# 결과 표에 이 필드를 같이 보여 준다
+{ resource.service.name = "orders" && duration > 2s } | select(span.http.route, span.db.statement)
+```
+
+`count() > 3`은 **N+1 질의를 잡는 데 특히 잘 듣는다** — 한 요청 안에서
+같은 종류의 DB 호출이 수십 번 일어나는 패턴이 그대로 걸린다.
+
+</TabItem>
+</Tabs>
+
+:::tip[핵심 — 조사 순서]
+**메트릭(p99가 튀었다) → TraceQL(그 시간대에 `duration > 2s`인 트레이스) →
+트레이스 한 개를 열어 어느 스팬이 시간을 먹었나 → 그 서비스의 로그.**
+이 네 걸음이 이 덱 전체가 만들려는 경로다.
+:::
+
 ## 계측 — 앱을 고쳐야 한다
 
 메트릭과 로그는 앱이 가만히 있어도 어느 정도 모인다(노드 exporter, stdout).
@@ -97,7 +158,7 @@ flowchart LR
     B -.->|"스팬"| COL
     C -.->|"스팬"| COL
     COL -->|"OTLP"| T["Tempo"]
-    T --> S3[("오브젝트 스토리지 — 온프렘 6장")]
+    T --> S3[("오브젝트 스토리지 — 온프렘 덱 6장")]
 
     classDef bad  fill:#fee2e2,stroke:#dc2626,color:#7f1d1d
     classDef ok   fill:#dcfce7,stroke:#16a34a,color:#14532d
@@ -227,67 +288,6 @@ Tempo는 트레이스를 보고 **메트릭을 만들어 낼 수 있다.**
 다만 **샘플링된 트레이스에서 나온 값**이라 절대 건수는 실제와 다르다 —
 비율과 추세로 읽고, 정확한 건수가 필요하면 앱의 counter를 쓴다.
 
-## TraceQL — 느린 것만 골라낸다
-
-트레이스 ID를 이미 알고 있으면 그냥 열면 된다. 문제는 **ID를 모를 때** —
-"어제 새벽에 느렸던 주문 요청"을 찾아야 하는 경우다. 그게 TraceQL이다.
-
-```text
-{ resource.service.name = "orders" && duration > 2s && status = error }
-  └── 조건에 맞는 스팬이 하나라도 있는 트레이스를 돌려준다
-```
-
-<Tabs>
-<TabItem label="기본 필터">
-
-```traceql
-{ resource.service.name = "orders" && duration > 2s }
-{ span.http.response.status_code >= 500 }
-{ status = error }
-{ resource.k8s.namespace = "prod" && span.db.system = "postgresql" && duration > 1s }
-```
-
-**접두사가 곧 앞 절의 구분**이다 — `resource.`는 프로세스 꼬리표,
-`span.`은 그 구간의 꼬리표. `duration`·`status`·`name`처럼 스팬 자체의 값은 접두사가 없다.
-
-</TabItem>
-<TabItem label="구조로 찾기">
-
-```traceql
-# orders를 거친 트레이스 중, 그 아래 어딘가에서 느린 DB 질의가 있던 것
-{ resource.service.name = "orders" } >> { span.db.system = "postgresql" && duration > 1s }
-
-# 바로 아래 자식만
-{ resource.service.name = "orders" } > { resource.service.name = "inventory" }
-```
-
-`>>`는 자손, `>`는 직계 자식이다. **"A를 거친 요청 중 B에서 터진 것"** 처럼
-서비스 경계를 넘는 조건을 걸 수 있는 게 TraceQL의 진짜 값이다 —
-메트릭으로는 이 질문을 만들 수조차 없다.
-
-</TabItem>
-<TabItem label="집계와 선택">
-
-```traceql
-# 조건에 맞는 스팬이 3개 이상인 트레이스 (N+1 질의 찾기)
-{ span.db.system = "postgresql" } | count() > 3
-
-# 결과 표에 이 필드를 같이 보여 준다
-{ resource.service.name = "orders" && duration > 2s } | select(span.http.route, span.db.statement)
-```
-
-`count() > 3`은 **N+1 질의를 잡는 데 특히 잘 듣는다** — 한 요청 안에서
-같은 종류의 DB 호출이 수십 번 일어나는 패턴이 그대로 걸린다.
-
-</TabItem>
-</Tabs>
-
-:::tip[핵심 — 조사 순서]
-**메트릭(p99가 튀었다) → TraceQL(그 시간대에 `duration > 2s`인 트레이스) →
-트레이스 한 개를 열어 어느 스팬이 시간을 먹었나 → 그 서비스의 로그.**
-이 네 걸음이 이 덱 전체가 만들려는 경로다.
-:::
-
 ## 세 신호를 잇기 — 이 장의 진짜 값
 
 ```mermaid
@@ -338,9 +338,12 @@ curl -s "http://localhost:3200/api/traces/<trace_id>" | jq '.batches | length'
 curl -sG http://localhost:3200/api/search \
   --data-urlencode 'q={ resource.service.name = "orders" && duration > 2s }' | jq '.traces | length'
 
-# ⑥ 앱이 헤더를 넘기나 — 서비스 경계에서 확인
-kubectl -n prod exec deploy/api -- \
-  sh -c 'curl -s -D- http://downstream.prod.svc:8080/health -o /dev/null' | grep -i traceparent
+# ⑥ 전파가 이어지나 — 아는 trace_id를 심어 요청하고, 그 ID로 Tempo를 조회한다
+TID=4bf92f3577b34da6a3ce929d0e0e4736
+kubectl -n prod exec deploy/api -- curl -s -o /dev/null \
+  -H "traceparent: 00-${TID}-00f067aa0ba902b7-01" http://downstream.prod.svc:8080/health
+curl -s "http://localhost:3200/api/traces/${TID}" | jq '.batches | length'
+#   0이면 그 경계 어딘가에서 헤더가 끊기거나 downstream에 계측이 빠진 것이다
 ```
 
 | 증상 | 흔한 원인 | 확인 |
