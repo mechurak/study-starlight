@@ -1,6 +1,8 @@
 ---
 title: "10. 트러블슈팅"
 description: "어느 경계에서 끊겼나 — 진단의 축, 도구 상자, 증상별 처방전"
+aliases: [Keycloak 오류, invalid audience, unknown kid, issuer did not match, redirect_uri, kubectl Unauthorized, kubectl Forbidden]
+reviewedAt: 2026-08-12
 ---
 
 import { LinkCard } from '@astrojs/starlight/components';
@@ -44,7 +46,7 @@ flowchart TB
 | **discovery 문서 curl** | `curl https://…/realms/corp/.well-known/openid-configuration` — 열리나, `issuer`가 기대값인가. 연동 문제의 1번 확인 |
 | **Evaluate** | Clients → client → Client scopes → Evaluate — 그 사용자의 **실제 토큰 미리보기.** 매퍼 문제와 전달 문제를 가르는 칼 ([3장](/keycloak/03-structure/)) |
 | **로그인 이벤트** | 실패 이벤트에 원인 코드가 남는다 (`invalid_user_credentials`, `user_disabled` …). 켜 뒀다면 ([9장](/keycloak/09-ops/)) |
-| **jwt 디코드** | 받은 토큰을 base64 디코드해 `iss`·`aud`·`exp`·claim을 직접 본다 — 추측 대신 관찰 |
+| **jwt 디코드** | 받은 토큰 payload를 base64url 디코드해 `iss`·`aud`·`exp`·claim을 직접 본다. 디코드는 서명 검증이 아니므로 민감한 실제 토큰을 외부 웹사이트에 붙여 넣지 않는다 |
 | **로그 레벨 상향** | `KC_LOG_LEVEL=info,org.keycloak.storage.ldap:debug` 처럼 카테고리만 올린다 |
 
 ## 표 A — 로그인 진입·리다이렉트 구간
@@ -54,7 +56,7 @@ flowchart TB
 | `Invalid parameter: redirect_uri` | client의 Valid redirect URIs와 불일치 — **한 글자, 슬래시 하나도** | 앱이 보내는 값을 그대로 등록. 와일드카드는 경로 끝에만 |
 | 로그인 후 무한 리다이렉트 루프 | 앱·프록시의 쿠키가 안 잡힘 (https↔http 혼용, 쿠키 도메인, SameSite) | 전 구간 https 통일, 프록시 헤더 설정 ([8장](/keycloak/08-deploy/)) |
 | `iss` 불일치 / "issuer did not match" | `KC_HOSTNAME`과 실제 접속 주소가 다름, 안팎 주소 불일치 | hostname 고정 + 내외부 동일 도메인 ([8장](/keycloak/08-deploy/)) |
-| 404에 URL에 `/auth/`가 보임 | 낡은 문서의 경로를 복사 | `/auth` 접두사 제거 ([0장](/keycloak/00-intro/)) |
+| 404에 URL에 `/auth/`가 보임 | 옛 기본 경로를 복사했거나 서버의 `http-relative-path`와 불일치 | discovery URL을 열어 실제 base path 확인 ([0장](/keycloak/00-intro/)) |
 | 처음 뜨는 화면이 영어·이상한 realm | **master realm URL로 접속**했거나 realm 이름 오타 | URL의 `/realms/<이름>` 확인 |
 
 ## 표 B — 토큰 검증·전달 구간
@@ -66,7 +68,7 @@ flowchart TB
 | "unknown kid" / 서명 검증 실패 | 키 롤오버 직후 + 검증자의 JWKS 캐시·고정 | 검증자 JWKS 갱신. 파일로 박아 둔 연동 색출 ([9장](/keycloak/09-ops/)) |
 | claim이 앱에 안 옴 | 다섯 고리 중 어딘가 | **Evaluate로 이분 탐색** ([7장](/keycloak/07-apps/)) |
 | 400/502 — 요청 헤더가 너무 큼 | 그룹·롤 폭증으로 **토큰 비대화** → nginx 버퍼(기본 8k) 초과 | 그룹 필터링 ([4장](/keycloak/04-ad-federation/)), scope 축소. 임시로 `large_client_header_buffers` 증설 |
-| 간헐적으로 로그인 상태가 사라짐 | HA에서 캐시 클러스터링 실패 (JGroups 멤버 발견 안 됨) | Pod 로그에서 클러스터 뷰 확인 (`Received new cluster view`), headless Service 점검 ([8장](/keycloak/08-deploy/)) |
+| 간헐적으로 로그인·갱신 상태가 어긋남 | HA에서 cache invalidation·JGroups 클러스터링 실패 | Pod 로그의 cluster view, 노드 간 mTLS, `jdbc-ping`이 쓰는 공용 DB 연결 확인 ([8장](/keycloak/08-deploy/)) |
 
 ## 표 C — kubectl · API 서버 구간
 
@@ -75,7 +77,7 @@ kubectl 쪽 401은 **API 서버 로그**(`kube-apiserver` Pod)에 원인이 문�
 
 | API 서버 로그의 문구 | 뜻 | 해결 |
 |---|---|---|
-| `oidc: verify token: … expired` | 토큰 만료 — kubelogin 캐시가 낡음 | 보통 자동 갱신된다. 안 되면 캐시 삭제: `rm -rf ~/.kube/cache/oidc-login` |
+| `oidc: verify token: … expired` | 토큰 만료 — kubelogin refresh·캐시 문제 | 보통 자동 갱신된다. 안 되면 `kubectl oidc-login clean` 후 다시 로그인 |
 | `oidc: verify token: … audience` | `aud` ≠ 설정된 client ID | AuthenticationConfiguration의 `audiences`와 client ID 대조 ([6장](/keycloak/06-k8s-oidc/)) |
 | `oidc: fetch keys` / issuer 접속 실패 | API 서버에서 Keycloak 도달 불가 · CA 불신뢰 | 컨트롤플레인 노드에서 issuer curl, `certificateAuthority` 확인 ([6장](/keycloak/06-k8s-oidc/)) |
 | 인증은 되는데 `Forbidden` (403) | **인증은 성공, 인가 실패** — 401과 다른 문제다 | `kubectl auth can-i` + 그룹 prefix 확인. [CKA 덱 14장](/cka/14-rbac/)의 영역 |
@@ -92,6 +94,12 @@ prefix를 빼먹은 바인딩이 403의 단골 원인이다.
 **한 층 아래**가 원인일 수 있다 — Service의 EndpointSlice가 비었거나, DNS가 안 풀리거나,
 NetworkPolicy가 막고 있거나. 그 진단은 [CKA 덱 18장](/cka/18-troubleshooting/)의 영역이고,
 경계를 넘나드는 감각 자체가 온프렘 관리자의 몫이다.
+
+## 참고 자료
+
+- [Keycloak hostname debug](https://www.keycloak.org/server/hostname) — issuer·proxy·frontend URL 계산을 `/realms/<realm>/hostname-debug`로 확인하는 방법
+- [Kubernetes 1.35 인증 문서](https://v1-35.docs.kubernetes.io/docs/reference/access-authn-authz/authentication/) — OIDC 검증·CA·AuthenticationConfiguration 오류의 기준
+- [kubelogin troubleshooting](https://github.com/int128/kubelogin) — token cache 확인과 `kubectl oidc-login clean`
 
 ## 10장 요약
 

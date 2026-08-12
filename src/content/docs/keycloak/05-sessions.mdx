@@ -1,6 +1,8 @@
 ---
 title: "5. 세션과 토큰 수명"
 description: "SSO 세션 · 토큰 수명 · 로그아웃 전파 — 탈취 위험과 사용자 경험 사이의 다이얼"
+aliases: [SSO Session Idle, SSO Session Max, access token lifespan, refresh token rotation, offline token, logout, 토큰 회수]
+reviewedAt: 2026-08-12
 ---
 
 import { LinkCard } from '@astrojs/starlight/components';
@@ -55,10 +57,16 @@ flowchart TB
 | **클라이언트 세션** | 앱 하나와의 로그인 관계 | refresh token의 유효성이 여기 묶인다 |
 | **access token** | 발급 순간의 **스냅샷** | 만료가 아주 짧다 — 회수 불가능해도 피해가 분 단위 |
 
-**access token은 발급 후 회수할 수 없다** — 서명만 검증하지 Keycloak에 물어보지 않기
-때문이다 ([0장의 멘탈 모델](/keycloak/00-intro/)). 그래서 짧게 주고, 갱신 시점(refresh)마다
-세션이 살아 있는지·권한이 그대로인지 Keycloak이 다시 판단한다.
-**"회수"는 access token이 아니라 세션에 거는 것**이라는 감각이 운영의 축이다.
+서명만 로컬 검증하는 일반적인 Resource Server에서는 **발급된 JWT access token을 즉시
+회수할 수 없다**. Keycloak에 매 요청을 묻지 않기 때문이다 ([0장의 멘탈 모델](/keycloak/00-intro/)).
+세션 종료는 새 토큰 발급과 refresh를 막지만, 이미 발급된 token은 `exp`까지 통과할 수 있다.
+그래서 access token을 짧게 주고, 갱신 시점마다 세션과 현재 권한을 다시 판단한다.
+
+:::caution["세션 종료 = 모든 access token 즉시 무효"가 아니다]
+introspection을 매번 호출하거나 Keycloak adapter의 not-before push를 구현한 소비자는 더 빨리
+거부할 수 있다. 하지만 kube-apiserver 같은 일반 OIDC JWT 검증자는 그런 Keycloak 전용 정책을
+자동으로 알지 못한다. **범용적인 회수 보장은 짧은 `exp` + refresh 차단**까지다.
+:::
 
 ## 다이얼 목록 — Realm settings의 Sessions와 Tokens
 
@@ -96,7 +104,8 @@ UX 불만은 대부분 **SSO Session Idle/Max** 쪽 다이얼의 일이다.
 API를 호출하는 시나리오용이다.
 
 :::caution[함정]
-offline token은 **퇴사 처리의 사각지대**다. AD 비활성화·세션 종료로도 안 죽는다.
+offline token은 **퇴사 처리의 사각지대**다. 일반 SSO 로그아웃·SSO 세션 종료로는 안 죽고,
+AD 비활성화만으로 모든 소비자에서 즉시 막힌다고 가정해서도 안 된다.
 콘솔의 사용자 → **Consents/Offline sessions** 에서 별도로 회수해야 한다.
 offline_access scope를 **꼭 필요한 client에만** 열어 주는 것이 예방책이다.
 :::
@@ -139,8 +148,9 @@ sequenceDiagram
 | 작업 | 콘솔 위치 | 효과 |
 |---|---|---|
 | 특정 사용자 세션 종료 | Users → (사용자) → **Sessions → Sign out** | 그 사람의 SSO 세션·refresh 즉시 무효 |
-| realm 전체 세션 무효화 | Sessions → **Revocation → Set to now** (not-before 정책) | 그 시각 이전 발급 토큰·세션 전부 거부 |
-| client 시크릿 교체 | Clients → Credentials → Regenerate | 해당 앱의 토큰 교환 차단 |
+| realm 전체 로그아웃 | Sessions → **Sign out all active sessions** | SSO 세션 종료 + 등록된 client에 logout 전파 시도 |
+| 과거 토큰 revocation 기준 설정 | Sessions → **Revocation → Set to now** | Keycloak의 refresh·introspection과 정책을 전달받는 adapter에 적용. 일반 JWT 소비자는 자동 적용되지 않을 수 있음 |
+| client 시크릿 교체 | Clients → Credentials → Regenerate | 이후 token 교환의 옛 시크릿 사용을 차단. 이미 발급된 access token은 별도 |
 
 퇴사·계정 탈취 대응 절차에 **"AD 비활성화 + 세션 강제 종료 + offline token 회수"**
 세 줄을 함께 넣는다 — 하나만 하면 구멍이 남는다 ([4장의 함정 3](/keycloak/04-ad-federation/)).
@@ -156,11 +166,16 @@ Keycloak 26.0부터 **persistent user sessions가 기본**이다 — 세션이 D
 
 HA 구성에서 이 변화가 갖는 의미는 [8장](/keycloak/08-deploy/)에서 이어진다.
 
+## 참고 자료
+
+- [Keycloak Server Administration Guide — sessions, timeouts, offline access](https://www.keycloak.org/docs/latest/server_admin/) — 세션 수명·refresh rotation·offline token·revocation의 기준 동작
+- [Keycloak 26 세션 저장 방식](https://www.keycloak.org/2024/12/storing-sessions-in-kc26) — persistent user sessions가 기본이 된 배경과 지원 구성
+
 ## 5장 요약
 
 - 수명 설정은 전부 **탈취 위험 vs UX의 다이얼**이다 — 기본 전략은 "access token 짧게, 갱신은 세션으로"
 - 층이 셋: **SSO 세션(realm) → 클라이언트 세션(앱) → access token(스냅샷)**
-- access token은 회수 불가 — **회수는 세션에 건다.** 그래서 짧은 수명이 안전장치다
+- 로컬 검증 access token은 즉시 회수가 보장되지 않는다 — **세션을 끊어 refresh를 막고 짧은 수명으로 잔여 시간을 제한**한다
 - offline token은 로그아웃·재시작에도 살아남는다 — **퇴사 처리 시 별도 회수** 대상
 - 로그아웃 전파는 **RP-initiated + backchannel 등록**이 정석. 앱 자체 세션까지 세 층을 본다
 - 26부터 세션은 DB에 저장된다 — 재시작해도 로그인 유지, 대신 DB가 짊어진다

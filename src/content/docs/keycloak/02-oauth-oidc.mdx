@@ -1,6 +1,8 @@
 ---
 title: "2. OAuth 2.0과 OIDC"
 description: "위임에서 시작한 OAuth, 인증을 얹은 OIDC — 토큰 세 종류와 검증의 문법"
+aliases: [OAuth, OpenID Connect, JWT, ID token, access token, refresh token, PKCE, JWKS]
+reviewedAt: 2026-08-12
 ---
 
 import { Tabs, TabItem, LinkCard } from '@astrojs/starlight/components';
@@ -50,8 +52,10 @@ OAuth의 access token은 "이 자원에 접근해도 된다"는 **출입증**일
 
 ## 토큰 세 종류 — 신분증, 출입증, 재발급권
 
-로그인이 끝나면 Keycloak의 토큰 엔드포인트가 **하나의 JSON 응답으로 셋을 같이** 준다.
-"토큰"이 특정 하나가 아니라 세트이고, 앱이 목적에 맞는 것을 골라 쓴다.
+사용자가 `openid` scope로 Authorization Code Flow를 마치면 Keycloak의 토큰 엔드포인트는
+보통 **하나의 JSON 응답으로 셋을 같이** 준다. 다만 흐름과 client 설정에 따라 구성이 달라진다.
+예를 들어 Client Credentials는 기본적으로 access token만 준다. "토큰"을 한 종류로 뭉뚱그리지
+말고, 받은 응답에서 각 토큰의 소비자를 구분해야 한다.
 
 ```json
 {
@@ -98,14 +102,15 @@ sequenceDiagram
     AD-->>K: 인증 OK + 속성·그룹
     K->>U: 일회용 code 발급 → 앱으로 redirect
     U->>A: code 전달
-    A->>K: code + client secret → 토큰 교환
+    A->>K: code + client 인증(서버) + PKCE verifier → 토큰 교환
     K-->>A: ID + Access + Refresh token
     A->>A: 토큰 검증 후 자기 세션 시작
 ```
 
 - 비밀번호는 **브라우저 → Keycloak → AD** 경로로만 흐른다. 앱 구간에는 없다
-- code를 토큰으로 바꿀 때 client가 자기 시크릿을 함께 내밀어 **"코드를 주운 놈"과 구별**된다
-- 시크릿을 가질 수 없는 클라이언트(CLI·SPA)는 시크릿 대신 **PKCE**로 같은 효과를 낸다 —
+- 서버형 confidential client는 토큰 교환 때 client 인증(시크릿·private key 등)으로 자기 신원을 증명한다
+- **PKCE는 client 인증의 대체물이 아니라 code와 최초 요청을 묶는 장치**다. public client(CLI·SPA)에는
+  필수이고, confidential client에도 함께 쓰는 것이 현재의 안전한 기본값이다 —
   요청 시작 때 만든 비밀값의 해시를 맡겨 두고, 교환 때 원본을 제시한다
   (브라우저 쪽 원리는 [웹 덱 11장](/web/11-security/)에서도 다룬다)
 
@@ -120,7 +125,7 @@ sequenceDiagram
 
 ## JWT 해부 — 서명이 신뢰를 만든다
 
-JWT는 `헤더.내용.서명` 세 부분을 각각 base64로 적고 점으로 이은 문자열이다.
+JWT는 `헤더.내용.서명` 세 부분을 각각 **base64url**로 인코딩하고 점으로 이은 문자열이다.
 
 ```json
 // 헤더 — 어떤 키로 서명했나
@@ -130,7 +135,7 @@ JWT는 `헤더.내용.서명` 세 부분을 각각 base64로 적고 점으로 �
 {
   "iss": "https://keycloak.company.com/realms/corp",
   "sub": "f:3a9c...:jdoe",
-  "aud": "my-app",
+  "aud": "my-api",
   "azp": "my-app",
   "exp": 1785000000,
   "preferred_username": "jdoe",
@@ -141,7 +146,7 @@ JWT는 `헤더.내용.서명` 세 부분을 각각 base64로 적고 점으로 �
 ```
 
 `preferred_username`·`email`·`groups`는 AD에서 흘러온 값이고 ([1장의 사슬](/keycloak/01-why/)),
-`iss`·`sub`·`aud` 같은 것은 어느 토큰에나 있는 **표준 claim**이다.
+`iss`·`sub`·`aud` 같은 것은 토큰의 대상과 주체를 판단하는 **핵심 claim**이다.
 
 | claim | 풀이 | 뜻 | 검증하는 쪽이 확인할 것 |
 |---|---|---|---|
@@ -157,7 +162,7 @@ JWT는 `헤더.내용.서명` 세 부분을 각각 base64로 적고 점으로 �
 없으니 거절한다 — **토큰 오용을 막는 자물쇠**다. 쿠버네티스 연동에서도 이걸로 걸린다 ([6장](/keycloak/06-k8s-oidc/)).
 :::
 
-### 검증은 네 가지를 본다
+### 검증의 최소 축
 
 | 항목 | 어떻게 |
 |---|---|
@@ -166,7 +171,9 @@ JWT는 `헤더.내용.서명` 세 부분을 각각 base64로 적고 점으로 �
 | **대상** | `aud`에 내가 있는가 |
 | **만료** | `exp`가 지나지 않았는가 |
 
-이걸 직접 짜지 않는다 — 검증된 OIDC 라이브러리·미들웨어가 넷 다 해 준다.
+라이브러리는 허용한 서명 알고리즘과 `nbf`·`iat` 같은 시간 claim도 함께 검사한다.
+Authorization Code Flow의 ID token이라면 요청과 응답을 묶는 `nonce` 검증도 필요하다.
+이걸 직접 짜지 않는다 — 검증된 OIDC 라이브러리·미들웨어에 맡긴다.
 관리자에게 중요한 것은 **어느 쪽이 검증 주체인가**다: ID token은 앱이,
 access token은 API가, 쿠버네티스로 가는 토큰은 API 서버가 검증한다.
 
@@ -199,12 +206,17 @@ XML 기반 SSO 표준으로, 오래된 엔터프라이즈 제품이 아직 요�
 새로 붙이는 연동은 OIDC가 기본이고, 이 덱은 SAML 상세를 다루지 않는다
 ([0장의 범위](/keycloak/00-intro/)).
 
+## 참고 자료
+
+- [OpenID Connect Core 1.0](https://openid.net/specs/openid-connect-core-1_0.html) — ID token, Authorization Code Flow, 표준 claim의 원문
+- [Keycloak Server Administration Guide](https://www.keycloak.org/docs/latest/server_admin/) — token, client capability, audience와 protocol mapper의 현재 동작
+
 ## 2장 요약
 
 - OAuth는 **비밀번호 없는 위임**(인가)에서 출발했고, OIDC가 그 위에 **인증**을 얹었다
 - 토큰은 세트로 온다 — **ID(신분증) / Access(출입증) / Refresh(재발급권)**. 소비자가 각각 다르다
 - 표준 경로는 Authorization Code Flow. 비밀번호는 앱을 지나지 않고, 시크릿 없는 클라이언트는 **PKCE**
-- JWT 검증은 **서명(JWKS) · iss · aud · exp** 네 가지 — 검증 주체가 누구인지가 관리 포인트
+- JWT 검증의 최소 축은 **서명(JWKS) · iss · aud · exp** — 실제 구현은 시간 claim·알고리즘·ID token의 nonce까지 라이브러리에 맡긴다
 - 모든 연동 설정의 출발점은 **discovery 문서 URL 하나**다
 
 <LinkCard

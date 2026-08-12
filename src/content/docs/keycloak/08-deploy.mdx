@@ -1,6 +1,8 @@
 ---
 title: "8. 온프렘 k8s에 Keycloak 배포"
 description: "start-dev와 프로덕션의 거리 — Operator vs Helm, 필수 설정, DB, HA와 캐시"
+aliases: [Keycloak Operator, Keycloak CR, v2beta1, PostgreSQL, HA, Infinispan, JGroups, jdbc-ping, KC_HOSTNAME]
+reviewedAt: 2026-08-12
 ---
 
 import { Tabs, TabItem, LinkCard } from '@astrojs/starlight/components';
@@ -10,9 +12,9 @@ import TermIntro from '../../../components/docs/TermIntro.astro';
 
 <TermIntro
   terms={[
-    ['Operator', '', '특정 앱의 운영 지식을 코드로 담은 컨트롤러. CR(Custom Resource)에 "이런 Keycloak을 원한다"고 선언하면 StatefulSet·설정을 대신 만든다.'],
+    ['Operator', '', '특정 앱의 운영 지식을 코드로 담은 컨트롤러. CR(Custom Resource)에 "이런 Keycloak을 원한다"고 선언하면 Deployment·Service·설정을 대신 만든다.'],
     ['Infinispan', '', 'Keycloak에 내장된 분산 캐시. 여러 replica가 세션·무효화 정보를 **서로 공유**하는 통로다.'],
-    ['JGroups', '', 'Infinispan이 클러스터 멤버를 찾고 통신하는 하부 라이브러리. k8s에서는 headless Service의 DNS로 서로를 발견한다.'],
+    ['JGroups', '', 'Infinispan이 클러스터 멤버를 찾고 통신하는 하부 라이브러리. 26의 기본 `jdbc-ping` 스택은 DB 테이블로 멤버를 발견한다.'],
     ['hostname', '', 'Keycloak이 "내 공식 주소"로 아는 값. **토큰의 `iss`가 여기서 나온다** — 배포 설정이면서 동시에 프로토콜 설정이다.'],
   ]}
 />
@@ -20,8 +22,8 @@ import TermIntro from '../../../components/docs/TermIntro.astro';
 ## 문제 — dev 모드와 프로덕션의 거리
 
 문서·블로그의 Keycloak은 대부분 `start-dev`로 떠 있다. 파일 DB(H2)에, HTTP에,
-캐시는 로컬 — **데모 전용**이고, 프로덕션 모드(`start`)는 아래 표의 답을 요구하며
-답이 없으면 기동을 거부한다. 이 장은 그 답들을 하나씩 채운다.
+캐시는 로컬 — **데모 전용**이다. 프로덕션 모드(`start`)가 모든 항목을 기동 조건으로
+강제하는 것은 아니지만, 실제 운영 설계는 아래 네 질문에 답하지 않으면 완성되지 않는다.
 
 | 질문 | dev 모드 | 프로덕션에서 채울 답 |
 |---|---|---|
@@ -34,9 +36,9 @@ import TermIntro from '../../../components/docs/TermIntro.astro';
 
 | 수단 | 내용 | 판단 |
 |---|---|---|
-| **Keycloak Operator (공식)** | CR로 선언하면 StatefulSet·캐시 구성·업그레이드를 관리. realm import CR도 있다 | **기본 선택.** 운영 지식이 컨트롤러에 들어 있다 |
+| **Keycloak Operator (공식)** | CR로 선언하면 Deployment·캐시 구성·업그레이드를 관리. 새 realm용 일회성 import CR도 있다 | **기본 선택.** 운영 지식이 컨트롤러에 들어 있다 |
 | Helm 차트 | codecentric의 keycloakx 등 커뮤니티 차트 | 차트 커스터마이징에 익숙하면. 공식 차트는 없다 |
-| 직접 매니페스트 | StatefulSet + Service를 손으로 | 학습에는 좋다. 운영에서는 아래 설정을 전부 스스로 챙겨야 한다 |
+| 직접 매니페스트 | Deployment + Service를 손으로 | 학습에는 좋다. 운영에서는 아래 설정을 전부 스스로 챙겨야 한다 |
 
 :::caution[함정 — Bitnami 차트를 검색해서 그대로 쓰지 않는다]
 오랫동안 표준처럼 쓰이던 Bitnami Keycloak 차트는 2025년 8월 Broadcom의 카탈로그
@@ -48,7 +50,7 @@ import TermIntro from '../../../components/docs/TermIntro.astro';
 Operator 기준의 선언은 이런 뼈대다 —
 
 ```yaml
-apiVersion: k8s.keycloak.org/v2alpha1
+apiVersion: k8s.keycloak.org/v2beta1
 kind: Keycloak
 metadata:
   name: keycloak
@@ -120,7 +122,7 @@ flowchart LR
         K2["keycloak-1"]
         I --> K1
         I --> K2
-        K1 <-->|"Infinispan<br/>(JGroups · headless Svc)"| K2
+        K1 <-->|"Infinispan<br/>(JGroups · mTLS)"| K2
     end
     DB["PostgreSQL<br/>세션 · 설정의 원본"]
     K1 --> DB
@@ -136,12 +138,18 @@ flowchart LR
 
 | 부품 | 역할 | 설정 포인트 |
 |---|---|---|
-| **Infinispan 클러스터** | replica 간 캐시·무효화 공유 | `--cache-stack=kubernetes` — headless Service의 DNS로 멤버 발견. Operator가 구성해 준다 |
+| **Infinispan 클러스터** | replica 간 캐시·무효화 공유 | 26 기본 `jdbc-ping` — JGroups가 공용 DB로 멤버를 발견. Operator가 통신 mTLS도 구성 |
 | **persistent sessions (26 기본)** | 세션의 원본을 DB에 | replica가 죽거나 롤링돼도 **로그인 유지** ([5장](/keycloak/05-sessions/)) |
 | **sticky session** | 로그인 진행 중 상태를 같은 Pod로 | ingress affinity 쿠키. 필수는 아니지만 캐시 적중률·안정성에 유리 |
 
 멀티 클러스터(사이트 간) HA는 26.7 기준 아직 preview 기능이다 — 단일 클러스터
 HA와는 난이도가 다른 문제이니 필요해질 때 그 시점의 문서로 판단한다.
+
+:::caution[낡은 캐시 예시]
+`--cache-stack=kubernetes`와 `jgroups.dns.query=<headless-service>`를 쓰는 글이 많이 남아
+있지만, 26.7에서는 `kubernetes` 스택이 deprecated이고 기본은 `jdbc-ping`이다. 기존 환경을
+그대로 운영할 수는 있어도 신규 구성의 출발점으로 삼지 않는다.
+:::
 
 ## 이미지와 기동 최적화
 
@@ -154,6 +162,14 @@ JVM 앱이라는 것도 기억해 둔다 — 힙은 컨테이너 메모리의 �
 **requests/limits를 실제 사용량 기준으로** 주고, 기동 직후 CPU를 몰아 쓰는 특성상
 CPU limit을 너무 조이면 기동이 수 분으로 늘어진다.
 
+## 참고 자료
+
+- [Keycloak Operator 기본 배포](https://www.keycloak.org/operator/basic-deployment) — 26.7의 `v2beta1` CR, DB·hostname·TLS·proxy 필드
+- [Keycloak Operator 고급 설정](https://www.keycloak.org/operator/advanced-configuration) — Deployment, resource, truststore와 NetworkPolicy 동작
+- [Keycloak distributed cache](https://www.keycloak.org/server/caching) — 기본 `jdbc-ping`, deprecated `kubernetes` stack과 embedded cache 통신
+- [Keycloak hostname v2](https://www.keycloak.org/server/hostname) — issuer·frontend·backchannel URL이 hostname 설정에서 결정되는 방식
+- [Bitnami catalog 변경 공지](https://github.com/bitnami/containers/issues/83267) — 2025년 free catalog 축소와 `bitnamilegacy`의 업데이트 중단 범위
+
 ## 8장 요약
 
 - 프로덕션 모드는 네 가지 답을 요구한다 — **DB · hostname · TLS · HA**
@@ -161,7 +177,7 @@ CPU limit을 너무 조이면 기동이 수 분으로 늘어진다.
 - **지켜야 할 것은 DB다** — realm·client·세션의 원본. 외부 Postgres + 검증된 Operator로
 - **hostname은 `iss`의 원천** — 전용 도메인을 처음부터 고정하고, 안팎 주소를 일치시킨다
 - TLS는 ingress 종료 + `KC_HTTP_ENABLED` + `KC_PROXY_HEADERS=xforwarded`, 그리고 **우회 경로 차단**
-- HA는 **Infinispan(kubernetes 스택) + DB 세션 + sticky** 세 부품 — 26부터는 재시작에도 로그인이 유지된다
+- HA는 **Infinispan(`jdbc-ping`) + DB 세션 + sticky** 세 부품 — 26부터는 재시작에도 로그인이 유지된다
 - 관리 포트 9000(health·metrics)은 프로브 전용 — 외부 노출 금지
 
 <LinkCard

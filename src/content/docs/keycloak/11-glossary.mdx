@@ -1,6 +1,8 @@
 ---
 title: "11. 용어 사전"
 description: "이 덱에 나온 용어 전부 — 약어를 만나면 여기로"
+aliases: [Keycloak 용어, OAuth 용어, OIDC 용어, LDAP 용어, Keycloak glossary]
+reviewedAt: 2026-08-12
 ---
 
 import { LinkCard } from '@astrojs/starlight/components';
@@ -63,7 +65,7 @@ import { LinkCard } from '@astrojs/starlight/components';
 | SSO 세션 | — | realm 수준 로그인 세션 — 앱들이 이걸 타고 통과한다 | [5장](/keycloak/05-sessions/) |
 | offline token | — | 세션과 분리돼 오래 사는 refresh token — 퇴사 처리의 사각지대 | [5장](/keycloak/05-sessions/) |
 | backchannel logout | — | 서버 간 로그아웃 통지 — 브라우저를 거치지 않는다 | [5장](/keycloak/05-sessions/) |
-| not-before 정책 | — | "이 시각 이전 발급 토큰 전부 거부" — 회수의 마지막 카드 | [9장](/keycloak/09-ops/) |
+| not-before 정책 | — | 이 시각 이전 발급분에 대한 Keycloak revocation 기준 — 일반 JWT 소비자는 별도 지원 필요 | [9장](/keycloak/09-ops/) |
 | kcadm.sh | — | Keycloak 공식 관리 CLI — 콘솔 클릭을 코드로 | [4장](/keycloak/04-ad-federation/) |
 | realm export | — | realm 설정의 JSON 스냅샷 — 백업의 원본은 아니다 | [9장](/keycloak/09-ops/) |
 | realm-management 롤 | — | 관리 권한의 낱개 단위 (`manage-users` 등) — 위임의 도구 | [9장](/keycloak/09-ops/) |
@@ -73,7 +75,7 @@ import { LinkCard } from '@astrojs/starlight/components';
 | 용어 | 풀어 쓰면 | 뜻 | 자세히 |
 |---|---|---|---|
 | kubelogin | — | kubectl의 OIDC 로그인 플러그인 (`kubectl oidc-login`) | [6장](/keycloak/06-k8s-oidc/) |
-| AuthenticationConfiguration | — | kube-apiserver 인증을 파일로 선언 — 1.34 GA | [6장](/keycloak/06-k8s-oidc/) |
+| AuthenticationConfiguration | — | kube-apiserver 인증을 파일로 선언 — 1.34 stable | [6장](/keycloak/06-k8s-oidc/) |
 | claim mapping | — | 토큰 claim → 쿠버네티스 사용자명·그룹 변환 규칙 | [6장](/keycloak/06-k8s-oidc/) |
 | exec plugin | — | kubeconfig가 토큰 발급을 외부 명령에 위임하는 방식 | [6장](/keycloak/06-k8s-oidc/) |
 | CRL | Certificate Revocation List | 인증서 폐기 목록 — 쿠버네티스가 지원하지 않아 OIDC가 필요해진 이유 | [6장](/keycloak/06-k8s-oidc/) |
@@ -81,7 +83,7 @@ import { LinkCard } from '@astrojs/starlight/components';
 | auth_request | — | ingress-nginx가 백엔드 전송 전에 인증을 물어보는 서브요청 | [7장](/keycloak/07-apps/) |
 | X-Forwarded 헤더 | — | 프록시가 앱에 넘기는 확인된 사용자 정보 헤더 | [7장](/keycloak/07-apps/) |
 | Operator | — | 앱 운영 지식을 담은 컨트롤러 — CR로 선언하면 알아서 배포 | [8장](/keycloak/08-deploy/) |
-| Infinispan / JGroups | — | 내장 분산 캐시 / 그 멤버 발견·통신 계층 | [8장](/keycloak/08-deploy/) |
+| Infinispan / JGroups | — | 내장 분산 캐시 / 그 멤버 발견·통신 계층. 26 기본 발견 방식은 `jdbc-ping` | [8장](/keycloak/08-deploy/) |
 | hostname (KC_HOSTNAME) | — | Keycloak의 공식 주소 — 토큰 `iss`의 원천 | [8장](/keycloak/08-deploy/) |
 | persistent sessions | — | 세션을 DB에 저장 (26 기본) — 재시작에도 로그인 유지 | [5장](/keycloak/05-sessions/) · [8장](/keycloak/08-deploy/) |
 | 키 롤오버 | Key Rollover | 서명 키의 무중단 교체 — 겹침 구간이 핵심 | [9장](/keycloak/09-ops/) |

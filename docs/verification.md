@@ -25,6 +25,10 @@ pnpm check
 3. 모바일: 390px에서 문서 본문이 `scrollWidth > clientWidth`가 아닌지 확인한다.
    코드 블록 자체의 가로 스크롤은 정상이다.
 
+Playwright 같은 브라우저 자동화를 썼다면 검증 후 `git status --short`로 임시 로그·스냅샷이
+변경 목록에 남지 않았는지 확인한다. 이 저장소에서 `.playwright-cli/`는 검증 산출물이므로
+커밋하지 않고 `.gitignore`로 제외한다.
+
 `<Tabs>` 안 Mermaid는 비활성 패널이 `hidden`이므로 검사 전에 다음처럼 연다.
 
 ```js

@@ -1,6 +1,8 @@
 ---
 title: "12. 마무리"
 description: "전체 지도 한 장, 장별 핵심 문장, 구축·운영 체크리스트, 다음에 팔 것들"
+aliases: [Keycloak 체크리스트, Keycloak 요약, SSO 구축 순서, 인증 사고 대응]
+reviewedAt: 2026-08-12
 ---
 
 import { Steps, LinkCard } from '@astrojs/starlight/components';
@@ -50,7 +52,7 @@ flowchart LR
 | [2. OAuth · OIDC](/keycloak/02-oauth-oidc/) | 토큰은 세트다 — ID(신분증) · Access(출입증) · Refresh(재발급권), 소비자가 다 다르다 |
 | [3. 구조](/keycloak/03-structure/) | 콘솔에 보이는 것과 토큰에 실리는 것은 별개 — protocol mapper가 잇는다 |
 | [4. AD 연동](/keycloak/04-ad-federation/) | 비밀번호는 가져오지 않는다 — 검증을 AD에 위임할 뿐. 매핑은 세 관문을 통과해야 한다 |
-| [5. 세션·토큰](/keycloak/05-sessions/) | access token은 회수가 안 된다 — 그래서 짧게 주고, 회수는 세션에 건다 |
+| [5. 세션·토큰](/keycloak/05-sessions/) | 로컬 검증 token의 즉시 회수는 보장되지 않는다 — 세션으로 refresh를 막고 짧은 `exp`로 잔여 시간을 제한한다 |
 | [6. k8s OIDC](/keycloak/06-k8s-oidc/) | 인증서 kubeconfig는 회수 불가 — OIDC + 그룹 바인딩이면 AD 작업만으로 권한이 따라온다 |
 | [7. 앱 연동](/keycloak/07-apps/) | 첫 질문은 "앱이 OIDC를 아는가" — 모르면 oauth2-proxy, 이때 client는 프록시다 |
 | [8. 배포](/keycloak/08-deploy/) | 지켜야 할 것은 DB, 흔들리면 안 되는 것은 hostname(`iss`) |
@@ -62,7 +64,7 @@ flowchart LR
 <Steps>
 
 1. **기반** — 전용 도메인 확정(`KC_HOSTNAME`), 외부 Postgres(Operator), TLS 종료 지점과
-   `KC_PROXY_HEADERS`, NetworkPolicy로 우회 인입 차단 ([8장](/keycloak/08-deploy/))
+   `KC_PROXY_HEADERS`, NetworkPolicy로 우회 인입 차단. 26 신규 HA는 기본 `jdbc-ping` 사용 ([8장](/keycloak/08-deploy/))
 
 2. **realm** — master에는 아무것도 붙이지 않고 업무용 realm 생성.
    User events · Admin events **즉시 켜기** ([3장](/keycloak/03-structure/) · [9장](/keycloak/09-ops/))
@@ -86,7 +88,7 @@ flowchart LR
 |---|---|
 | 계정 탈취 의심 | AD 비활성화 → 세션 강제 종료 → offline token 회수 ([5장](/keycloak/05-sessions/)) |
 | client 시크릿 유출 | 시크릿 Regenerate → 배포 반영 ([9장](/keycloak/09-ops/)) |
-| 범위 불명의 유출 | not-before 정책으로 전체 무효화 — 전사 재로그인을 감수한다 ([9장](/keycloak/09-ops/)) |
+| 범위 불명의 유출 | 세션 전체 종료 + not-before 설정. 일반 JWT 소비자는 즉시 반영되지 않을 수 있어 token 수명·필요 시 서명 키 제거까지 판단 ([9장](/keycloak/09-ops/)) |
 | Keycloak 전면 장애 | break-glass kubeconfig로 클러스터 진입 → DB·Pod 순으로 진단 ([6장](/keycloak/06-k8s-oidc/) · [10장](/keycloak/10-troubleshooting/)) |
 
 ## 여기서 더 파려면

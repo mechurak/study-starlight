@@ -1,6 +1,8 @@
 ---
 title: "6. 쿠버네티스 API 서버와 OIDC"
 description: "kubectl을 SSO로 — 인증서 kubeconfig의 한계, AuthenticationConfiguration, kubelogin, RBAC 매핑"
+aliases: [Kubernetes OIDC, kube-apiserver OIDC, AuthenticationConfiguration, kubelogin, oidc-login, kubectl 401, RBAC groups]
+reviewedAt: 2026-08-12
 ---
 
 import { Steps, Tabs, TabItem, LinkCard } from '@astrojs/starlight/components';
@@ -29,9 +31,10 @@ CKA에서 배우는 사용자 발급 절차 — CSR 제출, 승인, 인증서 �
 | 그룹 변경이 재발급이다 | 그룹은 인증서 O 필드에 구워진다 — 팀 이동 = 인증서 재발급 |
 | MFA·감사가 없다 | 누가 언제 인증했는지 남지 않고, MFA를 끼울 자리도 없다 |
 
-OIDC 연동은 이 넷을 한 번에 바꾼다: kubectl이 **Keycloak에서 짧은 토큰**을 받아 오고,
-API 서버는 서명만 검증한다. 회수는 AD 비활성화·세션 종료로 중앙에서 되고,
-그룹은 로그인할 때마다 토큰에 **현재 상태로** 실려 온다.
+OIDC 연동은 이 넷을 바꾼다: kubectl이 **Keycloak에서 짧은 ID token**을 받아 오고,
+API 서버는 서명만 검증한다. AD 비활성화·세션 종료는 새 발급과 refresh를 중앙에서 막고,
+그룹 변경은 **다음 token 발급부터** 반영된다. 이미 캐시된 ID token은 만료 시각까지
+유효할 수 있으므로, 권한 회수 지연의 상한은 token 수명이다 ([5장](/keycloak/05-sessions/)).
 
 ## 전체 그림
 
@@ -52,15 +55,17 @@ sequenceDiagram
 ```
 
 API 서버는 Keycloak에 **물어보러 가지 않는다** — 공개키(JWKS)로 서명을 검증할 뿐이다.
-단 한 가지 예외가 기동·갱신 시 JWKS를 내려받는 것이고, 그래서 **API 서버에서
-Keycloak URL이 열려 있고 인증서가 신뢰돼야** 한다 (아래 함정).
+단 한 가지 예외가 기동·키 갱신 시 discovery/JWKS를 내려받는 것이고, 그래서 **API 서버에서
+Keycloak URL이 열려 있고 인증서가 신뢰돼야** 한다. 이미 캐시한 키로 기존 token을 검증하는
+동안은 잠시 버틸 수 있지만, 새 로그인·refresh와 새 `kid`의 검증은 막힌다 (아래 함정).
 
 ## Keycloak 쪽 준비 — client 하나와 매퍼 둘
 
 <Steps>
 
-1. **client 등록** — `kubernetes`, **public + PKCE** (kubectl은 시크릿을 숨길 곳이 없다).
-   Valid redirect URIs에 kubelogin의 콜백 `http://localhost:8000`, `http://localhost:18000` 추가
+1. **client 등록** — `kubernetes`, **Client authentication OFF(public)**, Standard Flow ON.
+   kubectl은 시크릿을 숨길 곳이 없으므로 PKCE method를 `S256`으로 강제하고,
+   Valid redirect URIs에는 실제 kubelogin 콜백(기본 `http://localhost:8000`)만 등록
 
 2. **groups 매퍼** — Group Membership protocol mapper, claim 이름 `groups`,
    **Full group path는 off** (경로 `/eng/dev-team`보다 평평한 이름이 RBAC 바인딩에 다루기 쉽다)
@@ -91,6 +96,7 @@ jwt:
 - issuer:
     url: https://keycloak.corp.com/realms/corp
     audiences: ["kubernetes"]
+    audienceMatchPolicy: MatchAny
     certificateAuthority: |
       -----BEGIN CERTIFICATE-----
       (사내 CA PEM)
@@ -150,7 +156,7 @@ users:
 - name: keycloak
   user:
     exec:
-      apiVersion: client.authentication.k8s.io/v1beta1
+      apiVersion: client.authentication.k8s.io/v1
       command: kubectl
       args:
       - oidc-login
@@ -165,8 +171,9 @@ users:
   Access Token Lifespan이 5분이어도 사용자는 못 느낀다 ([5장](/keycloak/05-sessions/))
 - 브라우저가 없는 서버에서는 `--grant-type=device-code`로 Device Authorization
   흐름([2장](/keycloak/02-oauth-oidc/))을 쓴다 — 코드를 자기 PC 브라우저에서 승인
-- 이 kubeconfig에는 **비밀이 없다** — 전 직원에게 같은 파일을 배포해도 된다.
-  신원은 각자의 로그인이 정한다
+- 이 kubeconfig 자체에는 **공유 client secret이 없다** — 전 직원에게 같은 템플릿을 배포할 수 있다.
+  다만 kubelogin이 로컬에 저장하는 ID/refresh token 캐시는 자격 증명이다. 가능하면 OS keyring을
+  쓰고, 공용 서버·백업·로그에 캐시 파일이 섞이지 않게 한다
 
 ## RBAC 매핑 — 여기부터는 아는 길
 
@@ -189,7 +196,8 @@ roleRef:
 ```
 
 이 한 벌로 **"AD 그룹 = 클러스터 권한"** 이 완성된다: AD에서 `Platform-Admin` 그룹에
-넣으면 클러스터 관리자가 되고, 빼면 다음 토큰부터 권한이 사라진다.
+넣으면 클러스터 관리자가 되고, 빼면 다음 토큰부터 권한이 사라진다. 이미 발급된 ID token은
+만료 전까지 옛 그룹 claim을 담고 있으므로 **token의 실제 `exp`도 확인**한다.
 개별 사용자 바인딩(`kind: User`)도 되지만, 운영은 그룹 바인딩으로 몰아야
 입퇴사·이동이 AD 작업만으로 끝난다.
 
@@ -201,9 +209,15 @@ roleRef:
 | **Keycloak 장애 = 로그인 장애** | Keycloak이 죽으면 새 토큰 발급이 안 된다 — 클러스터를 고치러 들어갈 수단도 같이 죽는다 | **break-glass**: 인증서 기반 admin kubeconfig를 금고에 따로 보관. OIDC와 인증서 인증은 공존한다 |
 | **issuer 불일치** | 토큰의 `iss`는 Keycloak의 hostname 설정에서 나온다. 설정과 실제 접속 도메인이 다르면 검증이 전부 실패 | `KC_HOSTNAME`을 고정하고 ([8장](/keycloak/08-deploy/)), discovery 문서의 `issuer` 값 확인 ([10장](/keycloak/10-troubleshooting/)) |
 
+## 참고 자료
+
+- [Kubernetes 1.35 인증 문서](https://v1-35.docs.kubernetes.io/docs/reference/access-authn-authz/authentication/) — 1.34에서 stable이 된 `AuthenticationConfiguration`, hot reload, CEL과 OIDC 요구사항
+- [kubelogin](https://github.com/int128/kubelogin) — exec plugin `v1`, token cache·keyring·`clean` 명령과 기본 콜백
+- [Keycloak Server Administration Guide](https://www.keycloak.org/docs/latest/server_admin/) — public client, PKCE, group mapper와 ID token 설정
+
 ## 6장 요약
 
-- 인증서 kubeconfig의 근본 한계는 **회수 불가**(CRL 없음) — OIDC는 짧은 토큰 + 중앙 회수로 푼다
+- 인증서 kubeconfig의 근본 한계는 **회수 불가**(CRL 없음) — OIDC는 짧은 token + 중앙의 새 발급·refresh 차단으로 회수 지연을 제한한다
 - API 서버는 Keycloak에 물어보지 않는다 — **JWKS 서명 검증**뿐. 대신 issuer 도달성·CA 신뢰가 전제
 - 설정은 **AuthenticationConfiguration 파일**(1.34 GA)이 현재 방식 — 재시작 없는 리로드, 복수 issuer, CEL
 - **prefix(`oidc:`)는 보안 장치다** — `system:` 이름 공간 위조를 막는다. username·groups 둘 다

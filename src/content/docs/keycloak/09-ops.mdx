@@ -1,6 +1,8 @@
 ---
 title: "9. 운영 — 백업 · 업그레이드 · 키 관리"
 description: "원본은 DB — 백업과 복구, 업그레이드 순서, 서명 키 롤오버, 권한 위임, 가시성"
+aliases: [Keycloak 백업, realm export, Keycloak 업그레이드, rolling update, key rollover, not-before, 이벤트 메트릭]
+reviewedAt: 2026-08-12
 ---
 
 import { Steps, LinkCard } from '@astrojs/starlight/components';
@@ -12,7 +14,7 @@ import TermIntro from '../../../components/docs/TermIntro.astro';
   terms={[
     ['realm export', '', 'realm 설정(client·매퍼·정책…)을 JSON으로 내보내는 기능. **구성의 스냅샷**이지 백업의 원본이 아니다.'],
     ['키 롤오버', 'Key Rollover', '토큰 서명 키를 **서비스 중단 없이** 새 키로 교체하는 절차. 옛 키를 검증용으로 남겨 두는 겹침 구간이 핵심이다.'],
-    ['not-before 정책', 'not-before policy', '"이 시각 이전에 발급된 토큰은 전부 거부하라"는 회수 장치. 탈취 대응의 마지막 카드다.'],
+    ['not-before 정책', 'not-before policy', '"이 시각 이전 발급분을 거부하라"는 Keycloak의 revocation 기준. refresh·introspection에는 적용되지만 로컬 JWT 소비자에는 별도 전달·지원이 필요하다.'],
   ]}
 />
 
@@ -34,7 +36,9 @@ import TermIntro from '../../../components/docs/TermIntro.astro';
 
 ## 업그레이드 — 롤백 수단은 DB 백업뿐
 
-Keycloak은 분기마다 마이너 버전이 나온다. 절차의 골격 —
+Keycloak은 26.x 안에서도 기능 릴리스와 수정 릴리스가 자주 나온다. 버전 번호를 막연히
+"패치"라고 부르기보다 **같은 `major.minor` 안의 patch인지, release stream이 바뀌는지**를
+구분한다. 절차의 골격 —
 
 <Steps>
 
@@ -46,8 +50,10 @@ Keycloak은 분기마다 마이너 버전이 나온다. 절차의 골격 —
 3. **스테이징에서 먼저** — 핵심 시나리오 세 개면 충분하다: 브라우저 로그인,
    kubectl 로그인, AD sync
 
-4. 적용 — 패치 버전은 26.2부터 **롤링 업데이트**가 지원된다 (Operator의 update 전략이
-   호환성을 확인). 마이너 업그레이드는 짧은 중단 창을 잡는 편이 안전하다
+4. 적용 — 같은 `major.minor` stream의 patch 업그레이드는 `update-compatibility check`가
+   허용하면 **무중단 롤링 업데이트**가 가능하다. `26.6 → 26.7`처럼 stream이 바뀌거나
+   기능·cache 설정이 호환되지 않으면 recreate와 중단 창을 전제로 한다. Operator의
+   `Auto` 전략도 이 호환성 결과를 사용한다
 
 5. 확인 — 버전, `/health/ready`, 로그인 이벤트 정상 유입
 
@@ -88,9 +94,15 @@ breaking change가 겹치고, 문제가 생겼을 때 어느 버전 탓인지 �
 | 상황 | 도구 |
 |---|---|
 | 사용자 계정 탈취 | AD 비활성화 + 세션 강제 종료 + offline token 회수 ([5장](/keycloak/05-sessions/)) |
-| client 시크릿 유출 | Clients → Credentials → **Regenerate** |
+| client 시크릿 유출 | Clients → Credentials → **Regenerate**. 새 token 교환은 막지만 기존 access token은 `exp`까지 남을 수 있음 |
 | 서명 키 유출 | 즉시 키 롤오버 (겹침 없이 — 이때는 토큰 즉사가 목적이다) |
-| 범위를 모를 때 | **not-before 정책** — Sessions → Revocation → Set to now: 그 시각 이전 토큰 전부 거부 |
+| 범위를 모를 때 | **not-before 정책** — Keycloak의 refresh·introspection과 정책 push를 받는 adapter에 적용. 일반 JWT 소비자까지 즉시 막는 만능 스위치는 아님 |
+
+:::caution[not-before의 경계]
+not-before를 `Push`하려면 client의 Admin URL과 이를 이해하는 adapter가 필요하다. kube-apiserver나
+일반 OIDC 라이브러리가 서명·`iss`·`aud`·`exp`만 로컬 검증하면 Keycloak의 realm not-before를
+자동으로 알 수 없다. 그런 소비자에는 **짧은 token 수명과 키 제거**가 실제 강제 수단이다.
+:::
 
 ## 관리 권한 위임 — master는 금고에
 
@@ -114,13 +126,17 @@ master 계정 공유 없이 돌아간다 — **권한도 앱과 같은 원리로
 |---|---|---|
 | **로그인 이벤트** | Realm settings → **User events** (기본 꺼짐!) | 누가 언제 로그인·실패했나. 보존 기간 설정 |
 | **관리 이벤트** | Realm settings → **Admin events** | 누가 설정을 바꿨나 — 감사의 핵심 |
-| 메트릭 | `KC_METRICS_ENABLED` → 관리 포트 9000 `/metrics` | Prometheus 포맷 — 로그인 성공/실패율, 응답 시간, JVM |
+| 메트릭 | `KC_METRICS_ENABLED` → 관리 포트 9000 `/metrics` | JVM·DB·cache 등. 로그인 성공/실패 카운터는 `KC_EVENT_METRICS_USER_ENABLED=true`도 필요 |
 | 로그 | `KC_LOG_LEVEL` (예: `info,org.keycloak.events:debug`) | 트러블슈팅 시 카테고리별 상향 ([10장](/keycloak/10-troubleshooting/)) |
 
 :::caution[함정]
 이벤트 로깅이 **기본으로 꺼져 있다.** 사고가 난 뒤에 켜면 과거는 없다 —
 구축 첫 주에 User events·Admin events를 켜고 보존 기간을 정하는 것까지가 설치다.
 :::
+
+event metrics를 켤 때 `clientId`·IdP 같은 label을 무작정 추가하면 시계열 cardinality가
+커진다. 기본 realm 단위로 시작하고, 실제 대시보드가 요구할 때만
+`KC_EVENT_METRICS_USER_TAGS`를 좁혀 추가한다.
 
 ## 운영 루틴 요약
 
@@ -131,12 +147,19 @@ master 계정 공유 없이 돌아간다 — **권한도 앱과 같은 원리로
 | 분기 | 버전 업그레이드, **백업 복원 연습**, client 목록 정리 (안 쓰는 client·시크릿 폐기) |
 | 연간 | 서명 키 롤오버, bind 계정 비밀번호 교체, 권한 위임 목록 재검토 |
 
+## 참고 자료
+
+- [Keycloak rolling update 호환성](https://www.keycloak.org/server/update-compatibility) — patch stream과 recreate가 필요한 변경을 판정하는 기준
+- [Keycloak Operator rolling updates](https://www.keycloak.org/operator/rolling-updates) — Operator update strategy와 중단 회피 절차
+- [Keycloak event metrics](https://www.keycloak.org/observability/event-metrics) — 사용자 이벤트 메트릭 활성화와 label cardinality 주의
+- [Keycloak Server Administration Guide](https://www.keycloak.org/docs/latest/server_admin/) — export·session revocation·key provider·관리 권한의 기준 동작
+
 ## 9장 요약
 
 - 백업의 원본은 **DB**다 — export는 구성 스냅샷일 뿐이고, 복원 연습까지가 백업이다
 - 업그레이드는 **DB 백업 → 릴리스 노트 → 스테이징 → 적용** — 롤백 수단은 백업 복원뿐, 작게 자주 따라간다
 - 키 교체는 **겹침 구간을 둔 롤오버** — 새 키 우선순위 ↑, 옛 키는 검증용으로 잔류, 만료 후 제거
-- 회수 도구 네 층: 세션 종료 · 시크릿 재생성 · 키 롤오버 · **not-before 정책**
+- 회수 도구 네 층: 세션 종료 · 시크릿 재생성 · 키 롤오버 · **not-before 정책** — 소비자별 즉시 반영 범위가 다르다
 - 관리 권한은 **realm-management 롤로 낱개 위임** — master 계정은 금고에
 - **이벤트 로깅은 기본 꺼짐** — 켜는 것까지가 설치다. 메트릭은 관리 포트 9000
 

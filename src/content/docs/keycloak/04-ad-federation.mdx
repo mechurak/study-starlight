@@ -1,6 +1,8 @@
 ---
 title: "4. AD 연동 — User Federation"
 description: "AD를 사용자 저장소로 빌려 쓰기 — LDAP 프로바이더 설정, 매퍼, 동기화, kcadm 자동화"
+aliases: [Active Directory, LDAP, LDAPS, User Federation, objectGUID, memberOf, MSAD mapper]
+reviewedAt: 2026-08-12
 ---
 
 import { Steps, Tabs, TabItem, LinkCard } from '@astrojs/starlight/components';
@@ -15,7 +17,7 @@ import TermIntro from '../../../components/docs/TermIntro.astro';
     ['sAMAccountName', 'Security Account Manager Account Name', '윈도우의 짧은 로그인 ID (`jdoe`). 도메인 안에서 유일하다.'],
     ['UPN', 'User Principal Name', '이메일 모양의 로그인 ID (`jdoe@corp.com`). sAMAccountName과 둘 중 하나를 로그인 ID로 고른다.'],
     ['objectGUID', '', 'AD 객체의 **변하지 않는** 고유 ID. 이름·부서가 바뀌어도 같은 사람임을 추적하는 열쇠.'],
-    ['LDAPS', 'LDAP over TLS', '암호화된 LDAP (포트 636). 평문 389는 bind 비밀번호가 그대로 네트워크에 노출된다.'],
+    ['LDAPS', 'LDAP over TLS', 'TLS로 보호한 LDAP(보통 636). 389를 쓰더라도 StartTLS를 반드시 켜야 하며, 보호 없는 단순 LDAP bind는 자격 증명을 노출한다.'],
   ]}
 />
 
@@ -88,9 +90,9 @@ CN=John Doe, OU=Users, OU=Seoul, DC=corp, DC=com
 | **UUID LDAP attribute** | 불변 고유 ID | `objectGUID` |
 | **User object classes** | 사용자로 볼 객체 | `person, organizationalPerson, user` |
 
-:::caution[함정 1 — 평문 LDAP 금지]
-운영은 **`ldaps://`(636)** 이어야 한다. 평문 `ldap://`(389)은 bind 비밀번호가
-네트워크에 그대로 흐른다. AD 인증서가 사내 CA 서명이면 그 CA를 Keycloak의
+:::caution[함정 1 — TLS 없는 LDAP 금지]
+운영은 **`ldaps://`(보통 636)** 또는 StartTLS로 보호해야 한다. TLS 없는
+`ldap://` bind는 자격 증명을 네트워크에 노출한다. AD 인증서가 사내 CA 서명이면 그 CA를 Keycloak의
 truststore에 넣어야 연결된다 — "Test connection은 되는데 authentication이 실패"의
 단골 원인이 인증서 불신뢰다.
 :::
@@ -136,7 +138,7 @@ AD에서 지운 사용자가 Keycloak DB에 **남아 있을 수 있다** (설정
 | Mapper | 종류 | 하는 일 |
 |---|---|---|
 | `username`·`email`·`first name`·`last name` | user-attribute-ldap-mapper | AD 속성 → Keycloak 사용자 필드 |
-| `MSAD account controls` | msad-user-account-control-mapper | AD의 계정 **비활성·잠금·비밀번호 만료** 상태를 반영 (AD 전용) |
+| `MSAD account controls` | msad-user-account-control-mapper | AD의 계정 **비활성·비밀번호 만료** 상태를 Keycloak 모델에 반영 (AD 전용) |
 | `groups` | group-ldap-mapper | AD 그룹 → Keycloak 그룹 |
 | `roles` | role-ldap-mapper | AD 그룹을 그룹 대신 **롤**로 가져오고 싶을 때 (선택) |
 
@@ -154,10 +156,11 @@ AD에서 지운 사용자가 Keycloak DB에 **남아 있을 수 있다** (설정
 | **Group Name LDAP Attribute** | 그룹 이름으로 쓸 속성 | `cn` |
 | **Membership LDAP Attribute** | 멤버십을 담은 속성 | `member` |
 | **Mode** | 그룹의 주인 | 보통 `READ_ONLY` |
-| **User Groups Retrieve Strategy** | 멤버십 조회 방법 | AD는 `LOAD_GROUPS_BY_MEMBER_ATTRIBUTE` (`memberOf` 활용)가 흔하고 빠르다 |
+| **User Groups Retrieve Strategy** | 멤버십 조회 방법 | AD의 사용자 `memberOf`를 읽으려면 `GET_GROUPS_FROM_USER_MEMBEROF_ATTRIBUTE`; 그룹의 `member`를 역조회하려면 `LOAD_GROUPS_BY_MEMBER_ATTRIBUTE` |
 
-중첩 그룹(그룹 안의 그룹)까지 펼치려면 `…_RECURSIVELY` 전략이 따로 있다 —
-켜기 전에 그룹 수가 얼마나 불어나는지 확인한다.
+중첩 그룹(그룹 안의 그룹)까지 펼쳐야 하면 `LOAD_GROUPS_BY_MEMBER_ATTRIBUTE_RECURSIVELY`를
+검토한다. 전략 이름의 `member`와 AD 사용자 속성 `memberOf`를 혼동하지 말고, 실제 AD의
+그룹 구조·인덱스·규모로 성능을 측정한 뒤 고른다.
 
 :::caution[함정 4 — 그룹 매퍼만으로는 토큰에 안 나온다]
 LDAP 그룹 매퍼는 **경계 ①**이다. Keycloak 콘솔에 그룹이 들어와도, 토큰에 실으려면
@@ -181,9 +184,11 @@ Principal Name) 등록과 keytab 발급이 선행돼야 하는, 별도 협의가
 
 ## 콘솔 클릭을 코드로 — kcadm.sh 자동화
 
-콘솔은 명령형이라 재현이 안 된다. 재현 가능한 관리 수단은 셋 —
-**kcadm.sh**(공식 CLI), **Terraform**(keycloak 프로바이더, 완전 선언형),
-**Operator의 realm import CR**([8장](/keycloak/08-deploy/)). 온프렘 k8s에서 흔한 절충은
+콘솔은 명령형이라 재현이 안 된다. 재현 가능한 관리 수단은 **kcadm.sh**(공식 CLI),
+**Terraform**(keycloak 프로바이더), 그리고 26.7 Operator의 client CR
+(`KeycloakOIDCClient` 등)이다. Operator의 `KeycloakRealmImport`는 **새 realm을 한 번
+생성하는 import**일 뿐, 기존 realm을 업데이트하거나 콘솔 변경을 역동기화하는 선언형
+관리자는 아니다 ([8장](/keycloak/08-deploy/)). 온프렘 k8s에서 흔한 절충은
 kcadm 스크립트를 ConfigMap에 담아 Job으로 실행하는 방식이다.
 
 ```bash
@@ -229,6 +234,11 @@ create" 헬퍼 함수로 감싼다 — 사내 구성 스크립트에 함수가 �
 - bind 비밀번호는 시크릿으로 관리하고 교체 주기를 정한다
 - LDAPS 인증서의 **만료일 추적**을 운영 루틴에 넣는다 ([9장](/keycloak/09-ops/)) —
   만료되면 그날부터 전사 로그인이 멈춘다
+
+## 참고 자료
+
+- [Keycloak Server Administration Guide — LDAP/AD](https://www.keycloak.org/docs/latest/server_admin/) — import·sync·LDAP mapper와 MSAD account mapper의 현재 동작
+- [Keycloak Operator realm import](https://www.keycloak.org/operator/realm-import) — Realm Import CR이 새 realm 생성만 지원하는 범위
 
 ## 4장 요약
 
