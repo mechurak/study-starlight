@@ -1,6 +1,8 @@
 ---
 title: "14. 로봇이라는 환경 — 연속 제어와 sim-to-real"
 description: "왜 로봇에서는 강화학습이 실제로 굴러가는가, 보행 과제의 MDP, sim-to-real 격차의 원인과 처방(도메인 랜덤화·액추에이터 모델·지연), 그리고 교사-학생 학습"
+reviewedAt: 2026-08-12
+status: stable
 ---
 
 import { Tabs, TabItem, LinkCard, Badge } from '@astrojs/starlight/components';
@@ -25,8 +27,8 @@ import TermIntro from '../../../components/docs/TermIntro.astro';
 
 | 조건 | 로봇 |
 |---|---|
-| 시뮬레이터 | **만들 수 있다** — 물리 법칙은 시간이 지나도 안 변한다 |
-| 샘플 | GPU에서 **수천 개 병렬**. 사실상 공짜 |
+| 시뮬레이터 | **관련 동역학을 근사할 수 있다** — 물리 법칙은 비교적 안정적이다 |
+| 샘플 | GPU에서 **수천 개 병렬**. 실물보다 싸고 빠르지만 계산비는 든다 |
 | 보상 | 넘어졌는지, 명령 속도를 따라갔는지 — **계산 가능** |
 | 신호 대 잡음비 | 높다. 좋은 행동은 즉시 티가 난다 |
 | 적대성 | 없다. 지형은 로봇에 맞서지 않는다 |
@@ -38,7 +40,7 @@ import TermIntro from '../../../components/docs/TermIntro.astro';
 ## 보행 과제의 MDP
 
 가장 성숙한 과제인 사족·이족 보행을 예로 다섯 칸을 채운다.
-**이 형태가 업계 표준에 가깝다.**
+아래는 공개 보행 환경에서 흔히 볼 수 있는 구성이다.
 
 | 칸 | 내용 |
 |---|---|
@@ -191,8 +193,8 @@ flowchart LR
 
 | 과제 | RL의 위치 | 왜 |
 |---|---|---|
-| **보행 (사족·이족)** | <Badge text="주류" variant="success" /> 시뮬 학습 → 실물 배포가 표준 | 보상이 명확, 시뮬이 잘 맞는다 |
-| 전신 균형·회복 | <Badge text="주류" variant="success" /> | 마찬가지 |
+| **보행 (사족·이족)** | <Badge text="성숙" variant="success" /> 시뮬 학습 → 실물 배포 사례가 많다 | 보상이 명확, 시뮬이 비교적 잘 맞는다 |
+| 전신 균형·회복 | <Badge text="활발" variant="success" /> | 마찬가지 |
 | 주행·내비게이션 | <Badge text="부분" variant="note" /> 지역 계획에 쓴다 | 전역 계획은 기존 알고리즘이 잘한다 |
 | **조작 (물건 다루기)** | <Badge text="모방학습이 주류" variant="caution" /> | 아래 |
 | 손재주 (인핸드) | <Badge text="연구" variant="note" /> RL 성과가 있으나 좁다 | 접촉이 지독하게 어렵다 |
@@ -218,6 +220,12 @@ flowchart LR
 **정책을 신뢰해서 안전을 맡기지 않는다.** 안전은 정책 밖의 층에서 강제한다 —
 트레이딩에서 한도를 정책 밖에 두는 것과 같은 원칙이다.
 
+## 참고 자료
+
+- [Learning agile and dynamic motor skills for legged robots](https://infoscience.epfl.ch/entities/publication/5fbf7257-aefd-4203-be0e-a22e15942d7e) — 액추에이터 모델과 도메인 랜덤화를 이용한 보행 sim-to-real
+- [Rapid Locomotion via Reinforcement Learning](https://arxiv.org/abs/2205.02824) — 특권 정보, 적응 모듈, 거친 지형 보행 사례
+- [Isaac Lab: Reinforcement Learning](https://isaac-sim.github.io/IsaacLab/main/source/overview/reinforcement-learning/index.html) — 대규모 병렬 로봇 RL 공식 개요
+
 ## 14장 요약
 
 - 로봇에서 RL이 되는 이유는 **시뮬레이터를 만들 수 있고, 보상이 계산 가능하기** 때문이다
@@ -227,7 +235,7 @@ flowchart LR
 - **도메인 랜덤화**는 실물을 "무작위 범위 안의 한 점"으로 만든다. 너무 넓히면 소극적인 정책이 나온다
 - **액추에이터 모델**은 시뮬을 실물에 맞추는 방향의 대표 처방이고, 보행에서 특히 값을 한다
 - 실물에서 못 재는 정보는 **교사-학생 증류**나 **비대칭 액터-크리틱**으로 다룬다
-- **보행은 주류, 조작은 모방학습이 주류**다 — 보상·접촉·지각 셋 때문이다
+- 보행 RL은 성숙한 공개 사례가 많고, 조작은 모방학습·VLA가 활발하다 — 보상·접촉·지각 차이 때문이다
 - 안전은 정책 안이 아니라 **정책 밖의 층**에서 강제한다
 
 <LinkCard

@@ -1,6 +1,8 @@
 ---
 title: "15. 로봇 학습 스택 — 대규모 병렬 시뮬레이션"
 description: "MuJoCo와 Isaac Lab, GPU에서 수천 개 로봇을 동시에 굴리는 구조, 자산에서 학습·배포까지의 파이프라인, 도구 선택과 하드웨어 감각"
+reviewedAt: 2026-08-12
+status: stable
 ---
 
 import { Tabs, TabItem, FileTree, LinkCard, Badge, Steps } from '@astrojs/starlight/components';
@@ -49,7 +51,7 @@ flowchart LR
 
 **환경·관측·보상 계산까지 전부 GPU 텐서로 두면** 복사가 사라진다.
 그러면 PPO의 "샘플을 펑펑 쓰는" 성질이 단점이 아니라 장점이 된다 —
-[6장](/rl/06-ppo-sac/)에서 "샘플이 공짜면 PPO"라고 한 그 조건이 여기서 만들어진다.
+[6장](/rl/06-ppo-sac/)에서 말한 **대량 병렬 수집이 쉬운 조건**이 여기서 만들어진다.
 
 :::tip[핵심 — 알고리즘보다 처리량이 먼저다]
 같은 PPO라도 환경 64개와 4096개는 **다른 결과를 낸다.** 배치가 커져 어드밴티지 추정이
@@ -61,7 +63,7 @@ flowchart LR
 
 | 도구 | 성격 | 고를 때 |
 |---|---|---|
-| **MuJoCo 3.11** | 정확한 접촉, 가볍고 빠르다. 연구 표준 | 알고리즘 연구, 벤치마크, 학습용 |
+| **MuJoCo 3.11** | 범용 강체·접촉 시뮬레이션, 가볍고 빠르다 | 알고리즘 연구, 벤치마크, 학습용 |
 | **MuJoCo의 GPU 경로(MJX)** | 같은 모델을 GPU에서 대량 병렬로 | MuJoCo 자산을 그대로 대규모 학습에 |
 | **Isaac Sim 6.0 + Isaac Lab 3.0** | GPU 네이티브 + 사실적 렌더링 + 로봇 자산 생태계 | **실물 배포를 노리는 보행·조작**, 카메라가 필요한 과제 |
 | 게임 엔진 기반 | 렌더링이 강점 | 지각 중심 과제 |
@@ -110,7 +112,7 @@ Isaac Lab은 알고리즘을 직접 갖지 않고 **외부 학습 라이브러�
 4. **대규모로 학습한다.**
 
    환경을 수천 개(2048~8192) 띄우고 PPO를 돌린다.
-   보행이면 **GPU 한 장에서 수십 분에서 몇 시간**이 흔한 감각이다.
+   보행 학습 시간은 로봇·환경 수·GPU·목표 성능에 따라 **수십 분에서 여러 시간 이상**까지 달라진다.
 
 5. **시뮬 안에서 평가한다.**
 
@@ -177,9 +179,9 @@ Isaac Lab은 알고리즘을 직접 갖지 않고 **외부 학습 라이브러�
 
 | 항목 | 감각 |
 |---|---|
-| 학습 GPU | 최신 세대 한 장으로 보행 과제는 충분. 조작·픽셀 입력은 메모리가 크게 필요 |
+| 학습 GPU | 단순 보행 예제는 단일 GPU에서도 가능. 조작·픽셀 입력은 메모리와 시간이 크게 늘어난다 |
 | VRAM | 병렬 환경 수와 렌더링 여부에 좌우된다. 렌더가 붙으면 급증 |
-| 시뮬 없는 실물 학습 | 사실상 안 한다. 실물은 **평가와 미세조정**의 자리 |
+| 시뮬 없는 실물 학습 | 연구 사례는 있지만 수집 비용·안전 때문에 **평가와 미세조정**에 집중하는 경우가 많다 |
 | 로봇 실물 | 저가 팔(수십만 원대)부터 사족·이족 플랫폼(수천만 원대)까지 폭이 넓다 |
 | 클라우드 | GPU 인스턴스로 학습, 로컬에서 배포하는 조합이 흔하다 |
 
@@ -205,6 +207,14 @@ Isaac Lab은 알고리즘을 직접 갖지 않고 **외부 학습 라이브러�
 **3번까지가 "시뮬을 돌려 봤다", 5~6번이 "실물을 안다"** 다.
 후자가 이 분야에서 훨씬 희소하다.
 
+## 참고 자료
+
+- [MuJoCo Documentation](https://mujoco.readthedocs.io/) — 모델링·시뮬레이션·MJX 공식 문서
+- [MuJoCo Releases](https://github.com/google-deepmind/mujoco/releases) — 현재 버전과 변경 사항
+- [Isaac Lab Reinforcement Learning Guide](https://isaac-sim.github.io/IsaacLab/main/source/overview/reinforcement-learning/index.html) — 지원 학습 라이브러리와 병렬 환경 구조
+- [Isaac Lab Releases](https://github.com/isaac-sim/IsaacLab/releases) — Isaac Sim 호환성을 포함한 릴리스 정보
+- [LeRobot Documentation](https://huggingface.co/docs/lerobot/index) — 데이터셋·정책·실기 제어 스택
+
 ## 15장 요약
 
 - 로봇 RL의 판을 바꾼 것은 **환경을 GPU 안에 넣어 CPU 왕복을 없앤 것**이다
@@ -218,7 +228,7 @@ Isaac Lab은 알고리즘을 직접 갖지 않고 **외부 학습 라이브러�
 - 실물을 만져 본 경험이 희소하고, **채용에서 실제 변별점**이 된다
 
 <LinkCard
-  title="16. 모방학습과 VLA — 지금 로봇 현장의 주류"
+  title="16. 모방학습과 VLA — 로봇 조작의 큰 흐름"
   description="왜 조작에서는 사람의 시연을 따라하는가, 행동 복제의 한계와 확산 정책, 그리고 VLA 시대에 강화학습이 맡는 자리."
   href="/rl/16-imitation-vla/"
 />

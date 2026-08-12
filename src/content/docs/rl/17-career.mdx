@@ -1,6 +1,8 @@
 ---
 title: "17. 이 일을 하려면 — 스택·직무·학습 경로"
-description: "강화학습 관련 직무가 실제로 어떻게 나뉘는가, 각 자리가 요구하는 스택, LLM 후처리라는 가장 큰 채용 시장, 6개월 학습 경로, 그리고 좋은 포트폴리오"
+description: "강화학습 관련 직무가 어떻게 나뉘는가, 각 자리가 요구하는 스택, 6개월 학습 경로, 그리고 좋은 포트폴리오"
+reviewedAt: 2026-08-12
+status: review
 ---
 
 import { Tabs, TabItem, Card, CardGrid, LinkCard, Badge, Steps } from '@astrojs/starlight/components';
@@ -10,7 +12,7 @@ import TermIntro from '../../../components/docs/TermIntro.astro';
 
 <TermIntro
   terms={[
-    ['RLHF', 'Reinforcement Learning from Human Feedback', '사람의 선호를 보상으로 바꿔 LLM을 다듬는 후처리. **강화학습 채용이 가장 많은 자리**다.'],
+    ['RLHF', 'Reinforcement Learning from Human Feedback', '사람의 선호를 보상으로 바꿔 LLM을 다듬는 후처리. 강화학습 지식이 쓰이는 한 응용 분야다.'],
     ['검증 가능한 보상', 'RLVR · Verifiable Rewards', '수학 정답·테스트 통과처럼 **기계가 채점할 수 있는** 보상으로 학습하는 방식.'],
     ['시뮬레이션 엔지니어', 'Simulation Engineer', '학습용 환경·시뮬레이터를 만드는 사람. 로봇과 금융 양쪽에서 **가장 수요가 꾸준한 자리** 중 하나다.'],
     ['MLOps', '엠엘옵스', '모델 학습·배포·모니터링의 운영. RL에서는 **재현성과 실험 관리**가 특히 중요하다.'],
@@ -22,19 +24,22 @@ import TermIntro from '../../../components/docs/TermIntro.astro';
 
 "강화학습 엔지니어"라는 단일 직무는 사실상 없다. 실제로는 이렇게 나뉜다.
 
-| 직무 | 하는 일 | 핵심 요구 | 자리 수 |
+| 직무 | 하는 일 | 핵심 요구 | 시장 맥락 |
 |---|---|---|---|
-| **LLM 후처리 (RLHF · RLVR)** | 선호·검증 보상으로 대형 모델 미세조정 | 분산 학습, 대규모 인프라, PyTorch 깊이 | <Badge text="가장 많다" variant="success" /> |
-| **로봇 학습 엔지니어** | 시뮬 환경·보상·대규모 학습·sim-to-real | Isaac Lab/MuJoCo, 제어 기초, 실물 경험 | <Badge text="증가 중" variant="success" /> |
-| **로봇 소프트웨어·배포** | 온보드 추론, ROS 2, 안전 층, 실시간성 | C++, 실시간 시스템, 하드웨어 감각 | <Badge text="꾸준" variant="note" /> |
-| **시뮬레이션 엔지니어** | 물리·시장 시뮬레이터 자체를 만든다 | 수치해석 또는 미시구조, 성능 최적화 | <Badge text="희소하고 귀하다" variant="success" /> |
-| **퀀트 (실행·마켓메이킹)** | 체결·호가 전략, RL은 그중 한 도구 | 시계열 검증, 미시구조, 저지연 | <Badge text="좁고 경쟁적" variant="caution" /> |
-| **RL 응용 (추천·광고·제어)** | 밴딧·오프라인 RL로 제품 지표 개선 | 인과추론, A/B, 오프라인 평가 | <Badge text="꾸준" variant="note" /> |
-| **연구자** | 새 알고리즘·이론 | 논문 실적, 수학 깊이 | <Badge text="매우 좁다" variant="caution" /> |
+| **LLM 후처리 (RLHF · RLVR)** | 선호·검증 보상으로 대형 모델 미세조정 | 분산 학습, 대규모 인프라, PyTorch 깊이 | 공고에서 RL보다 post-training·alignment로 불리기도 함 |
+| **로봇 학습 엔지니어** | 시뮬 환경·보상·대규모 학습·sim-to-real | Isaac Lab/MuJoCo, 제어 기초, 실물 경험 | 로봇 형태와 제품 단계에 따라 요구가 크게 다름 |
+| **로봇 소프트웨어·배포** | 온보드 추론, ROS 2, 안전 층, 실시간성 | C++, 실시간 시스템, 하드웨어 감각 | 학습보다 시스템·배포 비중이 클 수 있음 |
+| **시뮬레이션 엔지니어** | 물리·시장 시뮬레이터 자체를 만든다 | 수치해석 또는 미시구조, 성능 최적화 | 도메인 전문성이 강한 역할 |
+| **퀀트 (실행·마켓메이킹)** | 체결·호가 전략, RL은 그중 한 도구 | 시계열 검증, 미시구조, 저지연 | 역할 수는 제한적이고 경쟁적 |
+| **RL 응용 (추천·광고·제어)** | 밴딧·오프라인 RL로 제품 지표 개선 | 인과추론, A/B, 오프라인 평가 | 밴딧·의사결정 과학 이름으로도 채용 |
+| **연구자** | 새 알고리즘·이론 | 논문 실적, 수학 깊이 | 연구 실적 요구가 높은 편 |
+
+채용 규모와 명칭은 지역·시점·회사 분류에 따라 빠르게 바뀐다. 위 표는 **순위가 아니라
+역할 구분**이며, 실제 지원 시점에는 공고 표본을 다시 확인한다.
 
 :::tip[핵심 — 두 개의 오해]
-**오해 1 — "강화학습 = 연구직"**. 실제 채용의 대부분은 응용·인프라·시뮬레이션 쪽이고,
-거기서 요구하는 것은 논문이 아니라 **돌아가게 만드는 능력**이다.
+**오해 1 — "강화학습 = 연구직"**. 응용·인프라·시뮬레이션 역할도 있으며,
+그 자리에서는 논문 외에 **돌아가게 만드는 능력**이 중요하다.
 
 **오해 2 — "알고리즘을 잘 알면 된다"**. PPO를 구현할 줄 아는 사람은 흔하다.
 변별력은 **환경을 잘 만드는 능력, 검증을 제대로 하는 능력, 도메인 지식**에서 나온다.
@@ -70,7 +75,7 @@ import TermIntro from '../../../components/docs/TermIntro.astro';
 <Card title="환경을 만드는 능력" icon="puzzle">
 
 이 덱이 반복한 그것 — MDP 설계, 보상 설계, 종료 조건, 정규화, 시뮬레이터.
-**대부분의 팀이 실제로 시간을 쓰는 곳**이고 그래서 면접에서 가장 잘 드러난다.
+환경 설계는 많은 응용 프로젝트에서 큰 비중을 차지하고, 포트폴리오에서도 역량이 잘 드러난다.
 
 </Card>
 
@@ -195,20 +200,21 @@ import TermIntro from '../../../components/docs/TermIntro.astro';
 | 평가 | "이 결과를 어떻게 믿을 수 있는가" — [10장](/rl/10-evaluation/) |
 | 도메인 | 로봇 — sim-to-real 처방 / 트레이딩 — 누출 사례 |
 
-**절반이 "판정"과 "디버깅"** 이다. 알고리즘 유도를 물어보는 자리는 연구직에 가깝다.
+응용 면접에서는 "판정"과 "디버깅" 질문이 중요하다. 알고리즘 유도 비중은 역할마다 다르고,
+이론 유도를 깊게 묻는 자리는 연구 성격이 강한 편이다.
 
-## 계속 볼 자료
+## 참고 자료와 다음 단계
 
 | 자료 | 성격 |
 |---|---|
-| Sutton & Barto, *Reinforcement Learning: An Introduction* | 표준 교재. **온라인 공개**. 앞의 여섯 장이 이 덱의 2~5장에 대응 |
-| OpenAI **Spinning Up in Deep RL** | 구현 중심 입문. 알고리즘별 설명과 코드 |
-| **CleanRL** | 단일 파일 구현. **읽기 위한 코드** |
-| Stable-Baselines3 문서 | 실무 기본값과 하이퍼파라미터 감각 |
-| **Gymnasium 문서** | 환경 API의 원본 |
-| Isaac Lab · MuJoCo 문서 | 로봇 방향의 필수 |
-| LeRobot 저장소 | 실물 조작·VLA의 실용 진입로 |
-| `rliable` 등 평가 도구 | IQM·신뢰구간 보고 ([10장](/rl/10-evaluation/)) |
+| [Sutton & Barto, *Reinforcement Learning: An Introduction*](http://incompleteideas.net/book/the-book-2nd.html) | 표준 교재. 앞의 여섯 장이 이 덱의 2~5장에 대응 |
+| [OpenAI Spinning Up in Deep RL](https://spinningup.openai.com/) | 구현 중심 입문. 알고리즘별 설명과 코드 |
+| [CleanRL](https://docs.cleanrl.dev/) | 단일 파일 구현. **읽기 위한 코드** |
+| [Stable-Baselines3 문서](https://stable-baselines3.readthedocs.io/) | 구현·평가·하이퍼파라미터 출발점 |
+| [Gymnasium 문서](https://gymnasium.farama.org/) | 환경 API의 원본 |
+| [Isaac Lab 문서](https://isaac-sim.github.io/IsaacLab/) · [MuJoCo 문서](https://mujoco.readthedocs.io/) | 로봇 방향의 공식 자료 |
+| [LeRobot 문서](https://huggingface.co/docs/lerobot/index) | 실물 조작·VLA의 실용 진입로 |
+| [rliable](https://github.com/google-research/rliable) | 여러 과제의 IQM·성능 프로파일·개선 확률 보고 ([10장](/rl/10-evaluation/)) |
 
 **논문은 최신을 좇기보다** 각 갈래의 원본(DQN · PPO · SAC · CQL/IQL · Diffusion Policy)을
 한 번씩 읽고, 그다음은 **자기 도메인의 것만** 따라가는 편이 지속 가능하다.
@@ -216,14 +222,14 @@ import TermIntro from '../../../components/docs/TermIntro.astro';
 ## 17장 요약
 
 - "강화학습 엔지니어"라는 단일 직무는 없다. **도메인 × 층**으로 자리가 정해진다
-- 채용이 가장 많은 곳은 **LLM 후처리**이고, 그다음이 로봇 학습·시뮬레이션·응용이다
+- 직무는 LLM 후처리·로봇 학습·시뮬레이션·퀀트·제품 의사결정 등으로 갈리며 **규모 순위는 시점과 지역에 따라 달라진다**
 - 공통 기반은 **필요한 만큼의 수학 · 깊은 PyTorch · 실험을 재현하는 엔지니어링 · 환경 설계**
 - 변별력은 알고리즘이 아니라 **환경을 만드는 능력, 검증하는 능력, 도메인 지식**에서 나온다
 - 로봇이면 **제어 기초 · ROS 2 · 시뮬레이터 · 실물 경험**, 트레이딩이면 **시계열 검증 · 미시구조 · 데이터**
 - **도메인을 하나 고른다.** 겹치는 능력(환경 설계·평가 설계)은 어느 쪽으로 가든 남는다
 - 6개월 경로 — **기초 구현 → 현대 알고리즘 비교 → 환경 직접 제작 → 도메인 선택 → 심화 → 정리**
 - 포트폴리오는 **수익률 자랑이 아니라 재현 가능성과 정직한 한계**로 평가받는다
-- 면접의 절반은 **"이 문제에 RL을 쓸 이유가 있는가"와 "안 될 때 무엇부터 보는가"** 다
+- 응용 면접에서는 **"이 문제에 RL을 쓸 이유가 있는가"와 "안 될 때 무엇부터 보는가"** 를 준비한다
 
 <LinkCard
   title="18. 용어 사전"
