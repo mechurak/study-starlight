@@ -1,6 +1,8 @@
 ---
 title: "8. Storage"
 description: "파일도 결국 테이블이다 — 버킷, 경로 설계가 곧 권한 설계, 이미지 변환, 서명 업로드"
+reviewedAt: 2026-08-12
+status: stable
 ---
 
 import { Tabs, TabItem, FileTree, LinkCard } from '@astrojs/starlight/components';
@@ -49,8 +51,8 @@ values ('documents', 'documents', false, 10485760, array['application/pdf','imag
 | RLS | 쓰기에만 적용 | 읽기·쓰기 모두 적용 |
 
 :::caution[함정]
-**public 버킷의 URL은 추측 불가능해야 한다.** `avatars/user-1.png` 같은 경로는
-사실상 순번을 세어가며 전부 긁을 수 있다는 뜻이다. 파일명에 UUID를 섞자.
+**public 버킷에는 비밀 데이터를 두지 않는다.** 공개 URL의 경로를 아는 사람은 RLS 검사 없이 파일을 읽는다.
+UUID 파일명은 우연한 발견을 줄일 뿐 접근 제어가 아니다. 기밀성이 필요하면 private 버킷을 쓴다.
 :::
 
 ## 업로드와 다운로드
@@ -198,7 +200,9 @@ Next.js `next/image`와 함께 쓸 때는 **어느 쪽에서 리사이즈할지 
 import * as tus from 'tus-js-client'
 
 const upload = new tus.Upload(file, {
-  endpoint: `${SUPABASE_URL}/storage/v1/upload/resumable`,
+  // 대용량 업로드는 API 게이트웨이 대신 Storage 직결 호스트를 권장한다
+  endpoint: `https://${PROJECT_REF}.storage.supabase.co/storage/v1/upload/resumable`,
+  retryDelays: [0, 3000, 5000, 10000, 20000],
   headers: {
     authorization: `Bearer ${session.access_token}`,
     'x-upsert': 'true',
@@ -314,6 +318,12 @@ Vercel 함수의 요청 본문 크기 제한과 실행 시간 제한을 피할 �
 - public 버킷은 공개 자산에만, 나머지는 private + 짧은 서명 URL
 - 큰 파일은 **TUS(재개 가능)** 또는 S3 멀티파트
 - 서명 업로드 URL을 쓰면 **파일이 앱 서버를 통과하지 않는다**
+
+## 참고 자료
+
+- [Storage 버킷 접근 모델](https://supabase.com/docs/guides/storage/buckets/fundamentals) — public/private 버킷과 RLS 적용 범위
+- [재개 가능 업로드](https://supabase.com/docs/guides/storage/uploads/resumable-uploads) — TUS, 6MB 청크, Storage 직결 호스트
+- [Storage CDN](https://supabase.com/docs/guides/storage/cdn/fundamentals) — public/private 캐시 동작 차이
 
 <LinkCard
   title="9. Realtime"

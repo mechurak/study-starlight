@@ -1,11 +1,13 @@
 ---
 title: "13. Next.js 실전 통합"
-description: "App Router + @supabase/ssr — 클라이언트 4종, 미들웨어 세션 갱신, 캐싱 함정"
+description: "Next.js 16 App Router + @supabase/ssr — 클라이언트 4종, Proxy 세션 갱신, 캐싱 함정"
+reviewedAt: 2026-08-12
+status: stable
 ---
 
 import { Tabs, TabItem, FileTree, LinkCard } from '@astrojs/starlight/components';
 
-> 미들웨어는 방어선이 아니라 UX다. 진짜 방어선은 RLS다
+> Proxy는 방어선이 아니라 UX다. 진짜 방어선은 RLS다
 
 ## 왜 @supabase/ssr인가
 
@@ -15,7 +17,7 @@ import { Tabs, TabItem, FileTree, LinkCard } from '@astrojs/starlight/components
 `@supabase/ssr`이 하는 일은 이것을 쿠키로 옮기는 것이다.
 
 - 세션을 **쿠키**에 저장한다 → 요청과 함께 서버로 전달된다
-- 서버(미들웨어, Server Component, Route Handler)에서 세션을 읽을 수 있다
+- 서버(Proxy, Server Component, Route Handler)에서 세션을 읽을 수 있다
 - 토큰 갱신 결과를 쿠키에 다시 써 준다
 
 ```bash
@@ -46,7 +48,7 @@ SUPABASE_SECRET_KEY=sb_secret_xxxxx
 flowchart LR
     B["브라우저<br/>client.ts"] --> S["Supabase"]
     SC["서버 컴포넌트 · 액션<br/>server.ts"] --> S
-    MW["미들웨어<br/>middleware.ts"] --> S
+    MW["Proxy<br/>proxy.ts"] --> S
     AD["관리자<br/>admin.ts — server-only"] --> S
 
     classDef ok   fill:#dcfce7,stroke:#16a34a,color:#14532d
@@ -100,7 +102,7 @@ export async function createClient() {
             list.forEach(({ name, value, options }) => cookieStore.set(name, value, options))
           } catch {
             // Server Component에서는 쿠키를 쓸 수 없다.
-            // 갱신은 미들웨어가 담당하므로 무시해도 안전하다.
+            // 갱신은 Proxy가 담당하므로 무시해도 안전하다.
           }
         },
       },
@@ -144,12 +146,15 @@ export const supabaseAdmin = createClient<Database>(
 사람의 주의력에 의존하지 않고 **도구가 막아준다** — secret key 사고를 막는 가장 확실한 장치다.
 :::
 
-## 미들웨어
+## Proxy
+
+Next.js 16부터 `middleware.ts`는 `proxy.ts`로 이름이 바뀌었다.
+기능은 같지만, 전체 권한 검사를 맡는 계층이 아니라 요청 앞의 네트워크 경계라는 뜻을 분명히 한 이름이다.
 
 ### 세션 갱신
 
 ```ts
-// lib/supabase/middleware.ts
+// lib/supabase/proxy.ts
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
@@ -178,13 +183,13 @@ export async function updateSession(request: NextRequest) {
 ### 라우트 보호
 
 ```ts
-// middleware.ts (프로젝트 루트)
+// proxy.ts (프로젝트 루트)
 import { type NextRequest, NextResponse } from 'next/server'
-import { updateSession } from '@/lib/supabase/middleware'
+import { updateSession } from '@/lib/supabase/proxy'
 
 const PROTECTED = ['/dashboard', '/settings', '/api/private']
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   const { response, claims } = await updateSession(request)
   const { pathname } = request.nextUrl
 
@@ -192,7 +197,9 @@ export async function middleware(request: NextRequest) {
     const url = request.nextUrl.clone()
     url.pathname = '/login'
     url.searchParams.set('next', pathname)
-    return NextResponse.redirect(url)
+    const redirectResponse = NextResponse.redirect(url)
+    response.cookies.getAll().forEach(cookie => redirectResponse.cookies.set(cookie))
+    return redirectResponse
   }
   return response
 }
@@ -204,14 +211,15 @@ export const config = {
 
 ### 주의사항
 
-1. **반드시 `response` 객체를 그대로 반환한다.**
-   새 `NextResponse`를 만들어 반환하면 갱신된 쿠키가 유실되고, **사용자가 무작위로 로그아웃된다**
+1. 일반 경로에서는 **`response` 객체를 그대로 반환한다.**
+   리다이렉트처럼 새 `NextResponse`가 필요하면 위 예제처럼 갱신된 쿠키를 복사한다.
+   빼먹으면 **사용자가 무작위로 로그아웃된다**
 2. **`getClaims()` 호출과 `return` 사이에 로직을 최소화한다.**
    그 사이에 리다이렉트하면 쿠키가 안 실릴 수 있다
 3. **`getSession()`을 권한 판단에 쓰지 않는다.** 쿠키는 위조 가능하다
-4. **미들웨어는 방어선이 아니라 UX다.**
-   진짜 방어선은 **RLS**다 — 미들웨어를 우회해도 데이터는 안전해야 한다
-5. **matcher를 좁게 잡는다.** 정적 자산까지 미들웨어를 태우면 응답 지연과 함수 비용이 늘어난다
+4. **Proxy는 방어선이 아니라 UX다.**
+   진짜 방어선은 **RLS**다 — Proxy를 우회해도 데이터는 안전해야 한다
+5. **matcher를 좁게 잡는다.** 정적 자산까지 Proxy를 태우면 응답 지연과 함수 비용이 늘어난다
 
 ## 서버에서 조회하고 변경하기
 
@@ -242,27 +250,37 @@ export default async function PostsPage() {
 모듈 최상단에서 만들면 요청 간 쿠키가 섞인다.
 :::
 
-### 라우트 보호 패턴
+### 서버 측 가드 패턴
 
 ```tsx
-// app/dashboard/layout.tsx
+// lib/dal.ts
+import 'server-only'
+import { cache } from 'react'
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 
-export default async function DashboardLayout({
-  children,
-}: { children: React.ReactNode }) {
+export const requireUser = cache(async () => {
   const supabase = await createClient()
   const { data, error } = await supabase.auth.getClaims()
 
   if (error || !data?.claims) redirect('/login')
+  return data.claims
+})
+```
 
-  return <section>{children}</section>
+```tsx
+// app/dashboard/page.tsx
+import { requireUser } from '@/lib/dal'
+
+export default async function DashboardPage() {
+  const user = await requireUser()
+  return <h1>{user.email}의 대시보드</h1>
 }
 ```
 
-**레이아웃에서 한 번 검사**하면 하위 페이지 전체가 보호된다.
-미들웨어와 중복되지만, 미들웨어를 우회하는 경로가 있을 수 있으므로 둘 다 두는 게 안전하다.
+가드는 실제 데이터 접근점 가까이에서 호출한다. 레이아웃은 클라이언트 탐색 때마다 다시 렌더되지 않을 수 있고,
+Server Action·Route Handler는 별도 진입점이므로 **레이아웃 검사 하나로 하위 경로 전체가 보호되지는 않는다.**
+`cache()`는 한 번의 서버 렌더 안에서 중복 검증만 합친다. Proxy의 리다이렉트와 겹쳐도 역할이 다르다.
 
 ### Server Action
 
@@ -309,13 +327,17 @@ export async function createPost(formData: FormData) {
 }
 ```
 
-**Server Action은 공개 엔드포인트다.** 누구나 호출할 수 있다고 가정하고 검증한다.
-다만 RLS가 걸려 있으면 **권한 검사를 한 번 더 안 해도 데이터는 안전하다** — 이게 Supabase의 이점이다.
+**Server Action은 공개 엔드포인트다.** 누구나 호출할 수 있다고 가정하고 입력과 호출자를 검증한다.
+RLS는 검사를 생략할 이유가 아니라, 애플리케이션 검사가 빠졌거나 다른 경로가 생겼을 때도
+허용되지 않은 행 변경을 막는 **최종 방어선**이다.
 
 로그아웃은 **POST로** 처리한다. GET이면 링크 프리페치나 크롤러가 로그아웃시킬 수 있다.
 
 ```tsx
 // app/logout/route.ts
+import { NextResponse } from 'next/server'
+import { createClient } from '@/lib/supabase/server'
+
 export async function POST(request: Request) {
   const supabase = await createClient()
   await supabase.auth.signOut()
@@ -415,21 +437,17 @@ export function LiveComments({ postId, initial }: Props) {
 인증이 걸린 페이지에서 가장 위험한 실수는 **사용자별 데이터가 캐시되는 것**이다.
 
 ```tsx
-// 방법 1: 라우트 전체를 동적으로
-export const dynamic = 'force-dynamic'
-
-// 방법 2: 특정 조회만 캐시 제외
-import { unstable_noStore as noStore } from 'next/cache'
 export default async function Page() {
-  noStore()
-  // ...
+  const supabase = await createClient() // 내부에서 cookies()를 읽는다
+  const { data } = await supabase.from('profiles').select().single()
+  return <Profile data={data} />
 }
 ```
 
-- `cookies()`를 읽으면 Next.js가 자동으로 동적 렌더링으로 전환한다
-  → `createClient()`를 쓰는 Server Component는 대체로 자동으로 동적이 된다
-- 하지만 **명시하는 편이 안전하다.** 리팩터링 중 조용히 정적으로 바뀔 수 있다
-- 공개 데이터(로그인 불필요)는 오히려 적극적으로 캐시하자
+- `cookies()`는 Dynamic API다. 페이지나 레이아웃에서 읽으면 해당 라우트는 동적 렌더링으로 전환된다
+- 사용자별 조회를 `'use cache'` 함수나 공유 CDN 캐시에 넣지 않는다. 캐시해야 한다면 사용자 ID 등
+  **권한 경계를 캐시 키에 포함**하고, 응답의 `Set-Cookie`가 공유 캐시되지 않는지 확인한다
+- 공개 데이터(로그인 불필요)는 `'use cache'`, `cacheLife`, 태그 무효화를 사용해 적극적으로 캐시한다
 
 ## 타입과 디렉터리 구조
 
@@ -455,7 +473,7 @@ export type Profile = Tables<'profiles'>
   - (auth)/login/ page.tsx, actions.ts
   - auth/callback/route.ts OAuth code → session 교환
   - (app)/dashboard/
-    - layout.tsx **인증 가드**
+    - page.tsx `requireUser()`로 **데이터 접근점에서 인증 가드**
     - posts/page.tsx
   - api/stripe/webhook/route.ts 또는 Edge Function
   - logout/route.ts
@@ -463,18 +481,18 @@ export type Profile = Tables<'profiles'>
   - supabase/
     - client.ts 브라우저
     - server.ts 서버 (RLS 적용)
-    - middleware.ts 세션 갱신
+    - proxy.ts 세션 갱신
     - admin.ts **secret key — server-only**
   - database.types.ts 자동 생성
   - types.ts
-- middleware.ts
+- proxy.ts
 - supabase/ 마이그레이션, 함수, config
 
 </FileTree>
 
 ## 함정 모음
 
-1. **미들웨어에서 `response`를 반환하지 않음** → 무작위 로그아웃
+1. **Proxy에서 `response`를 반환하지 않음** → 무작위 로그아웃
 2. **`getSession()`으로 권한 판단** → 위조 가능. `getClaims()`를 쓴다
 3. **쿠키 핸들러를 `get`/`set`으로 구현** → 청크 쿠키가 깨진다
 4. **서버 클라이언트를 모듈 최상단에서 생성** → 요청 간 세션 혼선
@@ -488,11 +506,18 @@ export type Profile = Tables<'profiles'>
 ## 13장 요약
 
 - `@supabase/ssr`이 세션을 **쿠키**로 옮겨 서버에서도 읽게 해준다
-- 클라이언트는 4종: **브라우저 / 서버 / 미들웨어 / 관리자(server-only)**
+- 클라이언트는 4종: **브라우저 / 서버 / Proxy / 관리자(server-only)**
 - 쿠키는 반드시 **`getAll` / `setAll`**, 서버 클라이언트는 **요청마다 생성**
-- 미들웨어는 **세션 갱신 + UX 리다이렉트.** 진짜 방어선은 RLS
+- Proxy는 **세션 갱신 + UX 리다이렉트.** 진짜 방어선은 RLS
 - 초기 데이터는 Server Component, 실시간 갱신은 클라이언트 구독
 - 인증 페이지의 **캐싱을 항상 의심**한다
+
+## 참고 자료
+
+- [Supabase Next.js SSR 구성](https://supabase.com/docs/guides/auth/server-side/creating-a-client?queryGroups=framework&framework=nextjs) — 두 클라이언트와 `proxy.ts` 세션 갱신
+- [Supabase SSR 고급 가이드](https://supabase.com/docs/guides/auth/server-side/advanced-guide) — 요청별 클라이언트와 CDN 캐시 주의
+- [Next.js Proxy](https://nextjs.org/docs/app/getting-started/proxy) — Next.js 16 이름 변경과 권장 용도
+- [Next.js 인증 가이드](https://nextjs.org/docs/app/guides/authentication) — DAL, Server Action·Route Handler의 독립 권한 검사
 
 <LinkCard
   title="14. 운영"

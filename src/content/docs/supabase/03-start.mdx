@@ -1,6 +1,8 @@
 ---
 title: "3. 시작하기"
 description: "대시보드에서 5분, 그리고 제대로 된 로컬 개발 환경 — 마이그레이션과 타입 생성까지"
+reviewedAt: 2026-08-13
+status: stable
 ---
 
 import { Steps, Tabs, TabItem, FileTree, LinkCard } from '@astrojs/starlight/components';
@@ -319,23 +321,81 @@ insert into public.posts (author_id, title, body, published) values
 
 ## 원격 연결과 타입 생성
 
+`login`, `link`, `db push`는 비슷해 보여도 서로 다른 자격 증명을 쓴다.
+
+| 자격 증명 | 용도 | 보관 위치 |
+|---|---|---|
+| Personal Access Token | CLI가 프로젝트 목록·설정 같은 Management API를 호출 | `supabase login`이 OS 자격 증명 저장소에 보관하거나 `SUPABASE_ACCESS_TOKEN`으로 주입 |
+| 프로젝트 ref | 로컬 `supabase/` 디렉터리가 어느 호스팅 프로젝트를 가리키는지 식별 | `supabase link` 후 `supabase/.temp/`에 기록, Git에는 커밋하지 않음 |
+| DB 비밀번호 | CLI가 비밀번호 기반 원격 Postgres 연결을 사용할 때 인증 | 링크할 때 자격 증명 저장소에 보관하거나 `SUPABASE_DB_PASSWORD`로 주입 |
+
 ```bash
-# 1) 로그인
+# 1) Management API 로그인 — DB 비밀번호와 다른 자격 증명이다
 supabase login
 
 # 2) 로컬 디렉터리를 원격 프로젝트에 연결 (project-ref는 대시보드 URL에 있다)
 supabase link --project-ref abcdefghijklmno
 
-# 3) 로컬 마이그레이션을 원격에 적용
-supabase db push
+# 3) 적용 전 이력과 실행 대상을 확인
+supabase migration list --linked
+supabase db push --linked --dry-run
+
+# 4) 로컬 마이그레이션을 원격에 적용
+supabase db push --linked
 
 # 반대 방향: 원격에서 이미 손댄 스키마를 로컬로 끌어온다
-supabase db pull
+supabase db pull --linked
 ```
 
+- 현재 CLI에서 `link`의 DB 비밀번호는 선택 사항이다. 비밀번호 없이 연결되는 인증 경로를 쓸 수 있고,
+  입력했다면 네이티브 자격 증명 저장소에 보관되어 이후 `db push` 명령에 매번 적지 않아도 된다
+- 저장된 자격 증명을 쓸 수 없거나 CI에서 실행한다면 `SUPABASE_DB_PASSWORD`를 프로세스 환경에 주입한다
 - `db push`는 **아직 적용되지 않은 마이그레이션만** 순서대로 실행한다
+- 기본 `db push`는 `seed.sql`을 실행하지 않는다. 정말 필요한 환경에서만 `--include-seed`를 명시한다
 - 원격에서 대시보드로 직접 바꿔 놓은 게 있으면 충돌한다 → `db pull`로 먼저 흡수
 - 실무에서는 `db push`를 사람이 직접 치지 않고 **CI에서 실행**한다 ([14장](/supabase/14-ops/))
+
+### DB 비밀번호와 `.env`
+
+결론부터 말하면 **`.env`에 저장할 수는 있지만 `db push`가 그 파일을 일반 셸 환경처럼
+무조건 읽는다고 가정하면 안 된다.** Supabase CLI에서 `.env`가 쓰이는 방식은 세 가지가 서로 다르다.
+
+| 파일·옵션 | 자동 인식 범위 |
+|---|---|
+| 프로젝트 루트 `.env` | `config.toml`에서 `env(NAME)`으로 참조한 값을 CLI가 찾는다 |
+| 프로젝트 루트 `.env.local` | Next.js는 읽지만 Supabase CLI 설정용 자동 로더의 문서화된 파일은 아님 |
+| `supabase/functions/.env` 또는 `functions serve --env-file` | 로컬 Edge Function 런타임에 주입한다 |
+| `secrets set --env-file` | 호스팅 Edge Function 시크릿을 업로드한다 |
+
+`SUPABASE_DB_PASSWORD`는 **CLI 프로세스의 환경변수**다. 다음 중 하나를 사용한다.
+
+```bash
+# 한 번만 쓸 때 — 값은 셸 히스토리에 남기지 않도록 프롬프트에서 입력해 export하는 편이 낫다
+export SUPABASE_DB_PASSWORD='프로젝트-DB-비밀번호'
+supabase db push --linked --dry-run
+supabase db push --linked
+unset SUPABASE_DB_PASSWORD
+```
+
+파일로 관리하려면 앱의 공개 키가 든 `.env.local`과 분리한 `.env.supabase`를 만들고,
+dotenv 로더를 **명시적으로** 사용한다.
+
+```dotenv title=".env.supabase"
+SUPABASE_DB_PASSWORD="프로젝트-DB-비밀번호"
+```
+
+```bash
+# .env.supabase는 반드시 .gitignore에 포함한다
+npx @dotenvx/dotenvx run -f .env.supabase -- supabase db push --linked --dry-run
+npx @dotenvx/dotenvx run -f .env.supabase -- supabase db push --linked
+```
+
+:::caution[함정]
+`supabase secrets set --env-file .env.supabase`는 해결책이 아니다. 그 명령은 파일의 값을
+**Edge Function 실행 환경으로 업로드**한다. DB 비밀번호를 원격 함수 시크릿으로 복제하지 말자.
+`--password` 플래그도 가능하지만 명령 인자와 셸 기록에 값이 노출될 수 있어 대화형 입력,
+자격 증명 저장소, 환경변수 순으로 선호한다.
+:::
 
 ### 타입 생성 — 여기서 개발 경험이 갈린다
 
@@ -382,7 +442,7 @@ major_version = 17
 
 [auth]
 site_url = "http://127.0.0.1:3000"
-additional_redirect_urls = ["https://localhost:3000"]
+additional_redirect_urls = ["http://127.0.0.1:3000/auth/callback"]
 jwt_expiry = 3600
 enable_signup = true
 
@@ -396,6 +456,16 @@ secret = "env(GITHUB_SECRET)"
 ```
 
 `max_rows`는 기억해 둘 만하다. 클라이언트가 무한정 데이터를 긁어가는 것을 막는 안전장치다.
+
+`db push`와 `config push`도 구분한다.
+
+- `supabase db push` — `supabase/migrations/`의 **DB 스키마 변경**을 적용
+- `supabase config push` — `config.toml`의 지원되는 **프로젝트 설정**을 연결된 프로젝트에 적용
+
+로컬 `site_url = "http://127.0.0.1:3000"`이 들어 있는 파일을 프로덕션에 그대로
+`config push`하면 호스팅 Auth의 Site URL까지 localhost로 바뀔 수 있다. 첫 배포에서는
+호스팅 Auth URL과 OAuth 제공자를 대시보드에서 명시적으로 설정하고, 설정을 코드로 배포하려면
+환경별 값을 분리한 뒤 변경 내용을 검토한다.
 
 ## 3장 요약
 
@@ -419,6 +489,15 @@ flowchart LR
 - **`db reset`이 통과해야 커밋한다**
 - 타입 생성은 스크립트로 자동화해 둔다
 - 리전과 DB 비밀번호는 프로젝트 생성 시점의 되돌리기 어려운 결정이다
+
+## 참고 자료
+
+- [Supabase 로컬 개발](https://supabase.com/docs/guides/local-development) — CLI, Docker 로컬 스택, 마이그레이션 흐름
+- [데이터베이스 마이그레이션](https://supabase.com/docs/guides/deployment/database-migrations) — `login` → `link` → `db push`, seed와 이력 관리
+- [Supabase CLI 명령 레퍼런스](https://supabase.com/docs/reference/cli/supabase-link) — `link`, `db push`, `config push`와 DB 비밀번호 환경변수
+- [로컬 설정과 시크릿](https://supabase.com/docs/guides/local-development/managing-config) — 루트 `.env`와 `config.toml`의 `env(...)` 연결
+- [Supabase CLI 설정](https://supabase.com/docs/guides/local-development/cli/config) — `config.toml` 전체 옵션
+- [TypeScript 타입 생성](https://supabase.com/docs/guides/api/rest/generating-types) — 로컬·원격 스키마 기반 타입 생성
 
 <LinkCard
   title="4. Postgres 최소 지식"

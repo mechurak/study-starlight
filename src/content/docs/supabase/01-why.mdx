@@ -1,6 +1,8 @@
 ---
 title: "1. 왜 Supabase인가"
 description: "선택의 근거 — BaaS의 대가인 종속성, Firebase와의 결정적 차이, 쓰면 안 되는 경우"
+reviewedAt: 2026-08-12
+status: stable
 ---
 
 import { Tabs, TabItem, Card, CardGrid, LinkCard } from '@astrojs/starlight/components';
@@ -267,6 +269,9 @@ RLS는 **강력하지만 정확히 쓴 만큼만** 지켜준다. 흔한 사고 �
 - 실제 비용은 플랜 요금보다 **컴퓨트 애드온과 대역폭**에서 갈린다 ([15장](/supabase/15-perf-cost/))
 - 초과분은 종량제로 붙는다 — 대역폭, MAU 초과분 등
 
+가격과 포함량은 자주 바뀐다. 도입 견적을 낼 때는 이 표를 고정값으로 쓰지 말고
+공식 가격 페이지에서 **플랜 요금 + 프로젝트별 컴퓨트 + 초과 사용량**을 함께 다시 계산한다.
+
 ## 1장 요약
 
 - Supabase는 **Postgres 플랫폼**이다. BaaS는 포장이고, 알맹이는 관계형 DB다
@@ -274,6 +279,11 @@ RLS는 **강력하지만 정확히 쓴 만큼만** 지켜준다. 흔한 사고 �
 - 최대 강점: **배운 게 남고, 도구 생태계가 열려 있고, 나갈 길이 있다**
 - 최대 약점: 극단적 쓰기 부하, 복잡한 동적 권한, 멀티 리전 쓰기
 - "백엔드가 사라진다"가 아니라 **"CRUD 백엔드가 사라진다"**
+
+## 참고 자료
+
+- [Supabase 가격](https://supabase.com/pricing) — 플랜별 포함량, 백업, 컴퓨트 크레딧
+- [Supabase 과금 구조](https://supabase.com/docs/guides/platform/billing-on-supabase) — 조직 단위 구독과 사용량 과금
 
 <LinkCard
   title="2. 아키텍처 뜯어보기"

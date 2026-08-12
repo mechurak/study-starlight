@@ -1,6 +1,8 @@
 ---
 title: "11. 확장으로 넓히기"
 description: "Postgres를 쓴다는 것의 진짜 배당금 — pgvector, pg_cron, pg_net, pgmq, wrappers, vault"
+reviewedAt: 2026-08-12
+status: stable
 ---
 
 import { LinkCard } from '@astrojs/starlight/components';
@@ -302,6 +304,12 @@ flowchart LR
 - `wrappers`(외부 시스템을 테이블처럼) · `vault`(DB 내부용 시크릿)
 - 확장 설치는 **마이그레이션에 기록**해서 환경 간 재현성을 지킨다
 - 다만 DB가 병목이 되지 않게 **밖으로 뺄 계획**도 세워둔다
+
+## 참고 자료
+
+- [Supabase Postgres 확장](https://supabase.com/docs/guides/database/extensions) — 지원 확장과 설치 방식
+- [pgvector](https://supabase.com/docs/guides/ai/vector-columns) — vector 타입과 임베딩 저장
+- [Cron](https://supabase.com/docs/guides/cron) · [Queues](https://supabase.com/docs/guides/queues) — `pg_cron`과 `pgmq`의 관리형 기능
 
 <LinkCard
   title="12. Vercel과의 역할 배분"

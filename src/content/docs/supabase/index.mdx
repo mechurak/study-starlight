@@ -1,6 +1,8 @@
 ---
 title: 개요
 description: Supabase 스터디 노트 — Postgres 위에 올라탄 백엔드 플랫폼을 무엇부터 어떤 순서로 볼 것인가
+reviewedAt: 2026-08-12
+status: stable
 ---
 
 import { Card, CardGrid, LinkCard, LinkButton } from '@astrojs/starlight/components';
@@ -81,9 +83,10 @@ AI/벡터는 "이런 게 있다" 수준까지만.
 </CardGrid>
 
 :::caution[함정]
-검색으로 찾은 글이 `anon key` · `service_role key`(JWT 형태) · `Kong` 게이트웨이 ·
+검색으로 찾은 글이 `anon key` · `service_role key`(JWT 형태) ·
 `@supabase/auth-helpers-nextjs` · `getSession()`으로 서버 권한 판단을 쓰고 있다면
-**한 세대 이전 자료**다. 동작은 하지만 새로 배울 것은 그쪽이 아니다 —
+**한 세대 이전 자료**일 가능성이 높다. `Kong`은 로컬 CLI·셀프호스팅 버전에 따라 여전히 보일 수 있으므로
+배포 형태를 먼저 확인한다 —
 [0장의 대조표](/supabase/00-intro/#2026년-8월-기준--바뀐-것들)를 먼저 볼 것.
 :::
 

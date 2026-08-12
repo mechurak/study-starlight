@@ -1,6 +1,8 @@
 ---
 title: "9. Realtime"
 description: "실시간은 하나가 아니라 셋이다 — Broadcast · Presence · Postgres Changes와 확장성의 갈림길"
+reviewedAt: 2026-08-12
+status: stable
 ---
 
 import { Tabs, TabItem, LinkCard } from '@astrojs/starlight/components';
@@ -154,7 +156,8 @@ supabase
 
 - 필터 연산자: `eq` `neq` `lt` `lte` `gt` `gte` `in` `like` `ilike` `match` `is` 등
 - `not.` 접두사로 부정, 쉼표로 AND 결합 — `'amount=gt.100,status=eq.open'`
-- **DELETE 이벤트는 필터할 수 없다** (Postgres가 삭제된 행의 값을 제공하지 않는다)
+- **DELETE 이벤트는 필터할 수 없다.** `replica identity full`로 이전 값을 더 받을 수는 있지만,
+  Realtime이 DELETE를 구독 필터와 RLS로 안전하게 판정할 수 없기 때문이다
 
 ### RLS는 그대로 적용된다
 
@@ -339,6 +342,12 @@ channel.subscribe(async status => {
 - 민감한 채널은 **`private: true`** + `realtime.messages` 정책
 - 구독은 **유실 가능**하다 — 재연결 시 보충 조회를 항상 넣는다
 - 채널 정리(`removeChannel`)를 잊지 않는다
+
+## 참고 자료
+
+- [Postgres Changes](https://supabase.com/docs/guides/realtime/postgres-changes) — 필터·컬럼 선택·DELETE 제약과 확장성
+- [데이터베이스 변경 구독](https://supabase.com/docs/guides/realtime/subscribing-to-database-changes) — Broadcast 권장 패턴과 `realtime.broadcast_changes()`
+- [Realtime Authorization](https://supabase.com/docs/guides/realtime/authorization) — private 채널과 `realtime.messages` 정책
 
 <LinkCard
   title="10. Edge Functions"

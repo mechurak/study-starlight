@@ -1,6 +1,8 @@
 ---
 title: "10. Edge Functions"
 description: "서버 코드가 필요한 순간 — Deno 런타임, 시크릿, JWT 검증, Database Webhooks"
+reviewedAt: 2026-08-12
+status: stable
 ---
 
 import { Tabs, TabItem, FileTree, LinkCard } from '@astrojs/starlight/components';
@@ -41,17 +43,21 @@ supabase functions new hello-world
 
 ```ts
 // supabase/functions/hello-world/index.ts
-import { withSupabase } from 'jsr:@supabase/functions-js'
+import { withSupabase } from 'npm:@supabase/server'
 
 export default {
-  fetch: withSupabase({ auth: ['publishable', 'secret'] }, async (req, ctx) => {
+  fetch: withSupabase({ auth: 'user' }, async (req, ctx) => {
     const { name } = await req.json()
-    return Response.json({ message: `안녕하세요 ${name}님!` })
+    return Response.json({
+      message: `안녕하세요 ${name}님!`,
+      userId: ctx.userClaims?.id,
+    })
   }),
 }
 ```
 
-`withSupabase`는 API 키 검증과 Supabase 클라이언트 생성을 대신 해준다.
+`withSupabase`는 자격 증명 검증과 Supabase 클라이언트 생성을 대신 해준다.
+`auth: 'user'`는 유효한 사용자 JWT만 받고, `ctx.supabase`에는 그 사용자의 RLS가 적용된다.
 기존 예제에서 흔히 보이는 `Deno.serve(async (req) => {...})` 형태도 여전히 동작한다.
 
 ### 로컬 실행과 배포
@@ -62,7 +68,8 @@ supabase functions serve hello-world
 
 # 호출해 보기
 curl -i --location --request POST 'http://127.0.0.1:54321/functions/v1/hello-world' \
-  --header 'Authorization: Bearer <로컬 anon key>' \
+  --header 'apikey: <로컬 anon key>' \
+  --header 'Authorization: Bearer <로그인 사용자의 access token>' \
   --header 'Content-Type: application/json' \
   --data '{"name":"앨리스"}'
 
@@ -131,21 +138,19 @@ const apiKey = Deno.env.get('OPENAI_API_KEY')
 
 ## 함수 안에서 DB 접근
 
-두 가지 방식이 있고, **기본은 A**다.
+`withSupabase`가 만들어 준 두 클라이언트를 구분한다. **기본은 A**다.
 
 <Tabs>
 <TabItem label="A. 호출자 권한 — RLS 적용 (기본)">
 
 ```ts
-import { createClient } from 'jsr:@supabase/supabase-js@2'
-
-const supabase = createClient(
-  Deno.env.get('SUPABASE_URL')!,
-  Deno.env.get('SUPABASE_PUBLISHABLE_KEY')!,
-  { global: { headers: { Authorization: req.headers.get('Authorization')! } } },
-)
-const { data: { user } } = await supabase.auth.getUser()
-// 이 클라이언트의 쿼리에는 RLS가 적용된다
+export default {
+  fetch: withSupabase({ auth: 'user' }, async (_req, ctx) => {
+    const { data, error } = await ctx.supabase.from('documents').select()
+    // ctx.supabase에는 호출자의 JWT가 전달되어 RLS가 적용된다
+    return Response.json({ data, error })
+  }),
+}
 ```
 
 호출자의 JWT를 그대로 넘겨 **DB가 판정하게 한다.**
@@ -155,15 +160,17 @@ const { data: { user } } = await supabase.auth.getUser()
 <TabItem label="B. 관리자 권한 — RLS 우회">
 
 ```ts
-const admin = createClient(
-  Deno.env.get('SUPABASE_URL')!,
-  Deno.env.get('SUPABASE_SECRET_KEY')!,
-  { auth: { persistSession: false } },
-)
-await admin.from('audit_logs').insert({ action: 'export', user_id: user.id })
+export default {
+  fetch: withSupabase({ auth: 'secret' }, async (_req, ctx) => {
+    await ctx.supabaseAdmin.from('audit_logs').insert({ action: 'nightly-export' })
+    return Response.json({ ok: true })
+  }),
+}
 ```
 
 감사 로그 기록, 관리자 일괄 처리처럼 **정말 우회해야 하는 작업**에만 쓴다.
+secret key는 JWT가 아니므로 이 모드는 해당 함수의 `verify_jwt = false`와 함께 쓰고,
+`withSupabase`가 `apikey` 헤더의 secret key를 검증하게 한다.
 
 </TabItem>
 </Tabs>
@@ -175,8 +182,9 @@ B를 쓸 때는 **함수 안에서 직접 권한을 검증한 뒤에만** 쓴다
 
 ## JWT 검증과 인가
 
-기본적으로 게이트웨이가 `Authorization` 헤더의 JWT를 검증한다.
-웹훅처럼 **외부에서 JWT 없이 호출**해야 하는 함수는 이 검증을 꺼야 한다.
+플랫폼의 `verify_jwt`는 함수 코드가 실행되기 전에 `Authorization` 헤더의 **사용자 JWT**를 검증한다.
+사용자 전용 함수(`auth: 'user'`)에는 켜 두고, secret/publishable API 키나 외부 웹훅처럼
+**사용자 JWT 없이 호출**하는 함수는 끈 뒤 `withSupabase` 또는 제공자 서명으로 검증한다.
 
 ```toml
 # supabase/config.toml
@@ -295,7 +303,8 @@ flowchart LR
 ## 제약과 함정
 
 1. **콜드 스타트** — 오래 호출이 없으면 첫 요청이 느리다. 무거운 import를 줄인다
-2. **실행 시간 제한** — 장시간 작업에는 부적합. 큐에 넣고 백그라운드로 넘긴다
+2. **자원 제한** — 메모리 256MB, 요청당 CPU 시간 2초, 응답 대기 150초가 상한이다.
+   워커의 wall-clock 상한은 Free 150초, 유료 400초다. 장시간·CPU 집약 작업은 외부 워커로 넘긴다
 3. **JWT 검증을 끄고 자체 검증을 잊음** — 가장 흔한 보안 사고
 4. **secret key를 무비판적으로 사용** — 함수 URL은 공개되어 있다는 전제로 설계한다
 5. **CORS preflight 미처리** — 브라우저에서만 실패한다
@@ -311,6 +320,13 @@ flowchart LR
 - `verify_jwt = false`로 열었다면 **반드시 자체 검증**을 넣는다
 - 웹훅 연동 시 함수는 **멱등하게** 만든다
 - Vercel Route Handler와 역할이 겹친다 → [12장](/supabase/12-vercel/)에서 정리
+
+## 참고 자료
+
+- [Edge Function 인증](https://supabase.com/docs/guides/functions/auth) — `@supabase/server`, `withSupabase`, auth mode별 클라이언트
+- [Authorization 헤더](https://supabase.com/docs/guides/functions/auth-headers) — 사용자 JWT와 API 키 헤더, `verify_jwt`의 경계
+- [Edge Function 한도](https://supabase.com/docs/guides/functions/limits) — 메모리, CPU, wall-clock, 번들 크기
+- [환경 변수](https://supabase.com/docs/guides/functions/secrets) — 복수 키 JSON 맵과 기본 주입 변수
 
 <LinkCard
   title="11. 확장으로 넓히기"

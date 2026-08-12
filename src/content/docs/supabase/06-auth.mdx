@@ -1,6 +1,8 @@
 ---
 title: "6. Auth"
 description: "로그인과 신원, 그리고 JWT — 로그인 방식, 메타데이터와 역할, 서버에서 신원 확인하기"
+reviewedAt: 2026-08-13
+status: stable
 ---
 
 import { Tabs, TabItem, Steps, Card, CardGrid, LinkCard } from '@astrojs/starlight/components';
@@ -99,9 +101,10 @@ sequenceDiagram
 
 - **access token** — 짧게 산다(기본 1시간). 모든 API 요청에 실린다.
   서버가 서명만 검증하면 되므로 빠르다
-- **refresh token** — 길게 산다. 새 access token을 받는 데만 쓴다. **사용하면 새 것으로 교체**된다
+- **refresh token** — 길게 산다. 새 access token을 받는 데만 쓴다. **사용하면 새 것으로 교체**된다.
+  다만 SSR의 동시 갱신을 견디도록 기본 10초 재사용 구간 등 제한적인 예외가 있다
 - 클라이언트 SDK가 이 갱신을 자동으로 한다 (`autoRefreshToken`)
-- **서버 환경에서는 자동 갱신이 안 되므로 미들웨어에서 명시적으로 처리**한다 ([13장](/supabase/13-nextjs/))
+- **서버 환경에서는 자동 갱신이 안 되므로 Next.js Proxy에서 명시적으로 처리**한다 ([13장](/supabase/13-nextjs/))
 
 ### 세션 생명주기
 
@@ -122,7 +125,7 @@ subscription.unsubscribe()
 ```
 
 :::caution[함정]
-서버 코드(미들웨어, Server Component)에서 `getSession()`이 돌려주는 `user` 객체를
+서버 코드(Proxy, Server Component)에서 `getSession()`이 돌려주는 `user` 객체를
 **권한 판단에 쓰면 안 된다.** 쿠키는 위조될 수 있다.
 서버에서는 `getClaims()`(서명 검증) 또는 `getUser()`(Auth 서버 확인)를 쓴다.
 :::
@@ -176,9 +179,9 @@ const { data, error } = await supabase.auth.signInWithPassword({
   password: 'super-secret-password',
 })
 
-// 로그아웃 — 기본은 현재 기기만
+// 로그아웃 — 기본 global은 모든 기기의 세션을 종료한다
 await supabase.auth.signOut()
-await supabase.auth.signOut({ scope: 'global' })   // 모든 기기
+await supabase.auth.signOut({ scope: 'local' })    // 현재 세션만
 ```
 
 로그인 실패 시 `error.message`는 의도적으로 모호하다(`Invalid login credentials`).
@@ -233,32 +236,66 @@ await supabase.auth.updateUser({ password: '새-비밀번호' })
 
 ## 소셜 로그인과 PKCE
 
+OAuth 설정에는 이름이 비슷한 리디렉션 주소가 두 개 있다. 이 둘을 바꿔 적는 것이 가장 흔한 실패 원인이다.
+
+| 등록하는 곳 | 주소 | 의미 |
+|---|---|---|
+| Google Cloud의 Authorized redirect URI | `https://<ref>.supabase.co/auth/v1/callback` | Google이 인증 결과를 **Supabase Auth로** 돌려보냄 |
+| Supabase Auth의 Redirect URLs | `https://example.com/auth/callback` | Supabase가 인증 코드를 **우리 앱으로** 돌려보냄 |
+
+흐름은 `앱 → Google → Supabase Auth → 앱의 /auth/callback → 최종 페이지`다.
+
 ### 설정 절차
 
 <Steps>
 
-1. **제공자 쪽에서 앱 등록** (예: GitHub Developer Settings)
+1. **Google Cloud에서 웹 OAuth 클라이언트 등록**
 
-   - Authorization callback URL: `https://<ref>.supabase.co/auth/v1/callback`
+   - Authorized JavaScript origins: `https://example.com`, 로컬 OAuth도 시험하면 `http://127.0.0.1:3000`
+   - Authorized redirect URI: `https://<ref>.supabase.co/auth/v1/callback`
+   - 로컬 Supabase Auth도 시험하면 `http://127.0.0.1:54321/auth/v1/callback`도 추가
    - Client ID / Client Secret 발급
 
 2. **Supabase 대시보드 → Authentication → Sign In / Providers**
 
-   제공자를 켜고 Client ID / Secret을 입력한다
+   Google을 켜고 Client ID / Secret을 입력한다. Google 동의 화면이 테스트 상태라면
+   등록된 테스트 사용자만 로그인할 수 있으므로 공개 전 Audience 상태도 확인한다.
 
 3. **Redirect URLs 등록** (Authentication → URL Configuration)
 
    ```text
-   https://example.com/**
+   Site URL: https://example.com
+
+   Redirect URLs:
+   https://example.com/auth/callback
    https://*-myteam.vercel.app/**       ← 프리뷰 배포용
    http://localhost:3000/**
    ```
+
+4. **로컬 OAuth가 필요하면 `config.toml`도 별도로 설정**
+
+   ```toml
+   [auth]
+   site_url = "http://127.0.0.1:3000"
+   additional_redirect_urls = ["http://127.0.0.1:3000/auth/callback"]
+
+   [auth.external.google]
+   enabled = true
+   client_id = "env(GOOGLE_CLIENT_ID)"
+   secret = "env(SUPABASE_AUTH_EXTERNAL_GOOGLE_SECRET)"
+   skip_nonce_check = false
+   ```
+
+   프로젝트 루트 `.env`에 두 값을 두고 `supabase stop && supabase start`로 로컬 Auth를 재시작한다.
 
 </Steps>
 
 :::caution[함정]
 **Vercel 프리뷰 URL은 배포마다 바뀐다.** 와일드카드를 등록하지 않으면
 프리뷰에서 소셜 로그인이 리다이렉트 거부로 깨진다 — [12장](/supabase/12-vercel/)에서 다시 다룬다.
+프로덕션은 와일드카드보다 정확한 `/auth/callback` URL을 등록한다.
+또한 로컬 `config.toml`은 로컬 스택 설정이다. `db push`만으로 호스팅 Auth 설정이나
+Google Client Secret이 배포되지는 않는다.
 :::
 
 ### 코드와 콜백
@@ -266,10 +303,9 @@ await supabase.auth.updateUser({ password: '새-비밀번호' })
 ```ts
 // 1) 로그인 시작 — 제공자 페이지로 리다이렉트된다
 await supabase.auth.signInWithOAuth({
-  provider: 'github',
+  provider: 'google',
   options: {
-    redirectTo: `${location.origin}/auth/callback`,
-    scopes: 'read:user user:email',
+    redirectTo: `${location.origin}/auth/callback?next=%2Fme`,
   },
 })
 ```
@@ -279,7 +315,10 @@ await supabase.auth.signInWithOAuth({
 export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url)
   const code = searchParams.get('code')
-  const next = searchParams.get('next') ?? '/'
+  const requestedNext = searchParams.get('next')
+  const next = requestedNext?.startsWith('/') && !requestedNext.startsWith('//')
+    ? requestedNext
+    : '/'
 
   if (code) {
     const supabase = await createClient()
@@ -312,8 +351,12 @@ sequenceDiagram
 ```
 
 - **토큰이 URL 프래그먼트에 노출되지 않는다** — implicit 플로우보다 안전하다
-- 세션이 **httpOnly 쿠키**에 저장되어 서버에서도 읽을 수 있다
+- 세션이 **쿠키**에 저장되어 서버에서도 읽을 수 있다
 - `@supabase/ssr`을 쓰면 이게 기본 동작이다
+
+`@supabase/ssr`의 기본 세션 쿠키는 브라우저 SDK도 토큰을 읽고 갱신해야 하므로
+**`HttpOnly`가 아니다.** 모든 데이터 변경의 최종 권한 검사를 RLS와 서버에서 수행해야 하는 이유다.
+브라우저 JavaScript가 전혀 세션을 다루지 않는 전통적인 서버 전용 앱만 별도 `HttpOnly` 저장 전략을 고려한다.
 
 ## 그 밖의 로그인 방식
 
@@ -525,7 +568,7 @@ const { data } = await supabase.auth.getClaims()
 
 - 브라우저에서는 `getSession()`으로 "로그인했는지" 정도 판단해도 큰 문제가 없다
   (어차피 진짜 방어선은 서버와 RLS다)
-- **서버·미들웨어에서는 `getClaims()`.** 쿠키는 위조될 수 있다
+- **서버·Proxy에서는 `getClaims()`.** 쿠키는 위조될 수 있다
 - 사용자가 정지(ban)됐는지 같은 **최신 상태**가 필요하면 `getUser()`
 
 ### Admin API
@@ -557,13 +600,15 @@ Next.js라면 `server-only` 패키지를 import해서 실수를 **컴파일 타�
 ## 흔한 함정
 
 1. **Redirect URL 미등록** — 소셜 로그인 후 엉뚱한 곳으로 간다. 프리뷰 URL 와일드카드를 잊기 쉽다
-2. **기본 SMTP로 프로덕션 운영** — 속도 제한에 걸려 가입 메일이 안 간다
-3. **`user_metadata`를 권한 판단에 사용** — 사용자가 직접 고칠 수 있다
-4. **서버에서 `getSession()`의 user를 신뢰** — 위조 가능하다
-5. **`profiles` 행이 없는 사용자** — 트리거를 안 걸었거나 실패했을 때. 트리거 실패는 가입 실패로 이어진다
-6. **secret key 노출** — `NEXT_PUBLIC_` 접두사 실수, 클라이언트 컴포넌트에서 import
-7. **JWT 만료 시간을 길게 설정** — 로그아웃과 정지가 즉시 반영되지 않는다
-8. **이메일 확인 없이 운영** — 스팸 가입과 타인 이메일 도용의 통로
+2. **두 callback을 뒤바꿈** — Google에는 Supabase Auth 주소, Supabase에는 앱 주소를 등록한다
+3. **`next`를 그대로 redirect** — `//evil.example`까지 허용하면 오픈 리디렉션이 된다
+4. **기본 SMTP로 프로덕션 운영** — 속도 제한에 걸려 가입 메일이 안 간다
+5. **`user_metadata`를 권한 판단에 사용** — 사용자가 직접 고칠 수 있다
+6. **서버에서 `getSession()`의 user를 신뢰** — 위조 가능하다
+7. **`profiles` 행이 없는 사용자** — 트리거를 안 걸었거나 실패했을 때. 트리거 실패는 가입 실패로 이어진다
+8. **secret key 노출** — `NEXT_PUBLIC_` 접두사 실수, 클라이언트 컴포넌트에서 import
+9. **JWT 만료 시간을 길게 설정** — 로그아웃과 정지가 즉시 반영되지 않는다
+10. **이메일 확인 없이 운영** — 스팸 가입과 타인 이메일 도용의 통로
 
 ## 6장 요약
 
@@ -573,6 +618,15 @@ Next.js라면 `server-only` 패키지를 import해서 실수를 **컴파일 타�
 - 서버에서 신원 확인은 **`getClaims()`**, `getSession()`은 신뢰하지 않는다
 - 역할 기반 권한은 **Custom Access Token Hook**으로 JWT에 심는 게 가장 빠르다
 - 프로덕션 필수 체크: 커스텀 SMTP, Redirect URL 목록, 비밀번호 정책, MFA 검토
+
+## 참고 자료
+
+- [사용자 세션](https://supabase.com/docs/guides/auth/sessions) — access/refresh token, 재사용 구간, `HttpOnly` 쿠키의 제약
+- [로그아웃 범위](https://supabase.com/docs/guides/auth/signout) — `global`(기본), `local`, `others`
+- [SSR 고급 가이드](https://supabase.com/docs/guides/auth/server-side/advanced-guide) — PKCE와 쿠키 기반 세션 갱신
+- [Google 로그인](https://supabase.com/docs/guides/auth/social-login/auth-google) — Google Cloud, 호스팅·로컬 provider, PKCE 콜백 설정
+- [Redirect URL 설정](https://supabase.com/docs/guides/auth/redirect-urls) — Site URL, 정확한 프로덕션 주소, Vercel 프리뷰 와일드카드
+- [JWT 서명 키](https://supabase.com/docs/guides/auth/signing-keys) — 비대칭키와 JWKS 검증
 
 <LinkCard
   title="7. RLS — Row Level Security"

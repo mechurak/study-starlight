@@ -1,6 +1,8 @@
 ---
 title: "2. 아키텍처 뜯어보기"
 description: "무엇이 어떻게 조립되어 있는가 — 부품별 역할, 스키마 지도, API 키와 Postgres 역할의 연결"
+reviewedAt: 2026-08-12
+status: stable
 ---
 
 import { Tabs, TabItem, LinkCard } from '@astrojs/starlight/components';
@@ -74,7 +76,7 @@ sequenceDiagram
 
 ### Envoy — API 게이트웨이
 
-프로젝트의 모든 HTTP 트래픽이 들어오는 단일 진입점.
+호스팅된 Supabase 프로젝트의 HTTP 트래픽이 들어오는 단일 진입점.
 경로 기반 라우팅, `apikey` 헤더 검증, 속도 제한, CORS를 담당한다.
 
 | 경로 | 목적지 |
@@ -87,8 +89,9 @@ sequenceDiagram
 | `/graphql/v1` | pg_graphql |
 
 :::caution[함정]
-과거 문서와 블로그에는 **Kong**으로 나온다. 같은 역할의 게이트웨이가 Envoy로 교체된 것이다.
-동작 이해에는 차이가 없지만, 검색으로 찾은 설정 파일이 안 맞을 수 있다.
+과거 문서와 블로그에는 **Kong**으로 나온다. 호스팅 플랫폼은 같은 역할의 게이트웨이를
+Envoy로 교체했다. 로컬 CLI와 셀프호스팅은 설치 버전과 전환 시점에 따라 Kong이 보일 수 있으므로,
+설정 파일을 고칠 때는 **어느 배포 형태의 문서인지** 먼저 확인한다.
 :::
 
 ### PostgREST — 테이블을 REST로
@@ -257,7 +260,7 @@ flowchart LR
     class ANON,AUTH,SR mute
 ```
 
-- **publishable key는 브라우저에 노출해도 된다.** 그 자체로는 아무 권한이 없다
+- **publishable key는 브라우저에 노출해도 된다.** 로그인 전에는 `anon` 역할의 GRANT와 RLS 정책 범위만 허용한다
 - **secret key는 절대 클라이언트에 두지 않는다.** RLS를 통째로 우회한다
 - 예전 이름인 `anon key` / `service_role key`(JWT 형태)는 **폐기 예정**이다.
   신규 프로젝트는 새 키를 쓴다
@@ -293,6 +296,12 @@ flowchart LR
 - `publishable key`(공개 가능) / `secret key`(서버 전용) **두 개만 구분하면 된다**
 - 서버리스에서 직접 연결을 쓸 거면 **Supavisor transaction 모드(`6543`)** 를 기억한다
 - 대시보드 클릭 변경은 마이그레이션으로 남지 않는다 — 처음부터 CLI 흐름을 익힌다
+
+## 참고 자료
+
+- [Supabase 아키텍처](https://supabase.com/docs/guides/getting-started/architecture) — 프로젝트를 구성하는 서비스와 요청 흐름
+- [데이터베이스 연결 방식](https://supabase.com/docs/guides/database/connecting-to-postgres) — Direct, Supavisor session/transaction, Dedicated Pooler 비교
+- [API 키 이해하기](https://supabase.com/docs/guides/getting-started/api-keys) — 키 종류와 Postgres 역할의 관계
 
 <LinkCard
   title="3. 시작하기"

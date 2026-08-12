@@ -1,6 +1,8 @@
 ---
 title: "12. Vercel과의 역할 배분"
 description: "무엇을 어디에 둘 것인가 — Vercel은 실행, Supabase는 상태. 리전, 캐싱, 프리뷰, 비용"
+reviewedAt: 2026-08-13
+status: stable
 ---
 
 import { Tabs, TabItem, Card, CardGrid, LinkCard } from '@astrojs/starlight/components';
@@ -44,7 +46,7 @@ ISR(Incremental Static Regeneration)은 정적 페이지를 주기마다 다시 
 
 **프리뷰 배포** — PR마다 고유 URL. 코드 리뷰의 절반이 여기서 끝난다.
 
-**이미지 최적화 · 미들웨어 · 관측성 · 빌드 파이프라인.**
+**이미지 최적화 · Proxy · 관측성 · 빌드 파이프라인.**
 </Card>
 <Card title="Supabase" icon="seti:db">
 **영속 데이터** — 관계형, 트랜잭션, 제약, 인덱스가 있는 진짜 데이터베이스.
@@ -89,7 +91,7 @@ flowchart TB
     subgraph V["Vercel"]
       direction TB
       CDN["Edge Network / CDN"]
-      MW["Middleware<br/>세션 갱신 · 라우트 보호"]
+      MW["Proxy<br/>세션 갱신 · 낙관적 라우트 보호"]
       RSC["Server Components (RSC)<br/>서버에서 데이터 조회"]
       RH["Route Handlers<br/>Server Actions"]
       CC["Client Components"]
@@ -167,7 +169,7 @@ Supabase Edge Function은 **"이유가 있을 때"** 선택한다.
 | 배포 단위 | **프론트엔드와 함께** | 독립 |
 | 코드 위치 | 같은 레포, 같은 타입 | `supabase/functions/` |
 | 타입 공유 | ○ (같은 프로젝트) | 별도 관리 필요 |
-| DB 근접성 | 리전 설정에 따름 | **DB와 가까움** |
+| DB 근접성 | 리전 설정에 따름 | 기본은 사용자 근접, **DB 작업이면 리전 지정 필요** |
 | 프리뷰 배포 | **PR마다 자동** | 브랜치 연동 필요 |
 | DB 웹훅 대상 | 가능하지만 우회적 | **자연스러움** |
 | Node 패키지 | **전부 사용 가능** | 제한적 |
@@ -254,6 +256,8 @@ flowchart LR
 
 **Edge 런타임은 사용자에게는 가깝지만 DB에서는 멀 수 있다.**
 DB를 많이 읽는 라우트는 Node 런타임 + DB 리전이 낫다.
+Supabase Edge Function도 기본은 사용자와 가까운 리전에서 실행되므로,
+DB 왕복이 많은 함수는 호출할 때 Database 리전을 명시한다.
 
 ### 캐싱 역할 분담
 
@@ -335,6 +339,70 @@ const redirectBase = process.env.NODE_ENV === 'development'
 
 **해결 3:** 프리뷰에도 고정 도메인을 할당한다 (브랜치별 별칭 도메인).
 
+### 실전 적용: `timeline` issue #8 첫 배포
+
+[`mechurak/timeline`의 issue #8](https://github.com/mechurak/timeline/issues/8)은
+로컬 Supabase와 Next.js 앱을 Supabase Cloud·Vercel·Google OAuth로 옮기는 사례다.
+2026-08-13 기준 코드를 함께 보면 배포 전에 필요한 애플리케이션 작업은 이미 상당 부분 준비되어 있다.
+
+| 코드에 준비된 것 | 배포 환경에서 남은 것 |
+|---|---|
+| `loginWithGoogle`과 PKCE `/auth/callback` | Google Cloud OAuth 클라이언트와 Supabase Google provider 등록 |
+| `safeNextPath`로 오픈 리디렉션 차단 | Site URL과 프로덕션·프리뷰 Redirect URLs 등록 |
+| 7개 DB 마이그레이션과 비공개 `item-images` 버킷 생성 SQL | 연결된 프로젝트에 마이그레이션 적용·검증 |
+| 요청별 Supabase 서버 클라이언트와 Next.js Proxy | Vercel에 URL·publishable key·사이트 URL 주입 |
+| 로컬 전용 seed 계정과 fixture | 운영자 계정 승격과 초기 공개 콘텐츠 생성 |
+
+진행 순서는 다음처럼 잡는다.
+
+1. **Supabase 프로젝트를 서울 리전에 만든다.** DB 비밀번호는 비밀번호 관리자에 보관한다.
+2. **프로젝트를 연결하고 스키마만 먼저 올린다.**
+
+   ```bash
+   supabase login
+   supabase link --project-ref <project-ref>
+   supabase migration list --linked
+   npx @dotenvx/dotenvx run -f .env.supabase -- supabase db push --linked --dry-run
+   npx @dotenvx/dotenvx run -f .env.supabase -- supabase db push --linked
+   supabase migration list --linked
+   ```
+
+   `.env.supabase`에는 `SUPABASE_DB_PASSWORD`만 두고 Git에서 제외한다.
+   `--include-seed`는 사용하지 않는다. 이 프로젝트의 `seed.sql`에는 로컬 테스트 계정이 있기 때문이다.
+   Storage 버킷 생성 SQL은 마이그레이션에 들어 있으므로 일반 `db push`에 포함된다.
+
+3. **원격 상태를 확인한다.** Dashboard의 Table Editor·SQL Editor·Storage에서
+   마이그레이션 이력, 앱 테이블과 RPC, 비공개 `item-images` 버킷을 확인한다.
+   원격이 빈 데이터로 시작하는 것은 정상이다.
+4. **호스팅 Auth를 설정한다.** Site URL은 최종 서비스 주소, Redirect URLs는
+   프로덕션 `/auth/callback`과 Vercel 프리뷰 패턴으로 둔다. Google Cloud에는
+   `https://<project-ref>.supabase.co/auth/v1/callback`을 등록하고 같은 Client ID·Secret을
+   Supabase의 Google provider에 입력한다. 자세한 구분은 [6장](/supabase/06-auth/#소셜-로그인과-pkce)에 있다.
+5. **Vercel 환경을 연결한다.** 이 저장소의 현재 변수 이름에 맞춰 다음을 설정한다.
+
+   ```text
+   NEXT_PUBLIC_SUPABASE_URL=https://<project-ref>.supabase.co
+   NEXT_PUBLIC_SUPABASE_ANON_KEY=<publishable 또는 레거시 anon key>
+   NEXT_PUBLIC_SITE_URL=https://<production-domain>  # Production에만
+   ```
+
+   `NEXT_PUBLIC_SUPABASE_ANON_KEY`라는 변수 이름을 쓰더라도 값은 공개 전제의 publishable/anon 키다.
+   secret/service-role 키와 DB 비밀번호는 **Vercel 앱 런타임에** 넣지 않는다. Vercel 함수 리전은
+   Supabase와 같은 서울 `icn1`로 맞춘다.
+6. **첫 로그인을 운영 절차로 연결한다.** Google로 본인 계정을 먼저 생성해야
+   `auth.users` 트리거가 `profiles` 행을 만든다. 그다음 SQL Editor에서 해당 프로필만
+   운영자로 승격하고, 앱에서 초기 공개 콘텐츠를 만든다.
+7. **시크릿 창에서 전체 흐름을 시험한다.** Google 가입 → `/me`, 이미지 업로드,
+   공개·링크 공유, 신고와 관리자 처리, OG 카드, `robots.txt`와 `sitemap.xml`까지 확인한다.
+
+:::caution[이 사례에서 바로 고칠 로컬 설정]
+현재 `timeline/supabase/config.toml`의 `site_url`은 `http://127.0.0.1:3000`인데
+`additional_redirect_urls`는 `https://127.0.0.1:3000`으로 프로토콜이 다르다.
+로컬 Google OAuth를 시험하려면 이를 `http://127.0.0.1:3000/auth/callback` 또는 의도한
+로컬 와일드카드로 맞추고 Supabase 로컬 스택을 재시작한다. 이 로컬 URL을 호스팅 프로젝트에
+`config push`하지는 않는다.
+:::
+
 ## 비용 관점의 판단
 
 | Vercel의 비용 동인 | Supabase의 비용 동인 |
@@ -402,7 +470,7 @@ Supabase는 Vercel 전용이 아니다.
 7. **파일을 Vercel 함수로 중계** — 크기 제한과 이중 과금
 8. **`next/image`와 Storage 변환을 동시에** — 양쪽에 과금
 9. **사용자별 데이터를 ISR 캐시에 저장** — 데이터 유출
-10. **직접 연결 포트를 `5432`로 두고 서버리스 배포** — 커넥션 고갈
+10. **Direct host(`db.<ref>.supabase.co:5432`)로 서버리스 배포** — 커넥션 고갈
 
 ## 12장 요약
 
@@ -413,8 +481,16 @@ Supabase는 Vercel 전용이 아니다.
 - 파일과 실시간은 **브라우저 ↔ Supabase 직접 연결**이 정답이다
 - 프리뷰 환경은 **별도 브랜치**로 분리하고, Redirect URL 와일드카드를 잊지 않는다
 
+## 참고 자료
+
+- [Edge Function 리전 호출](https://supabase.com/docs/guides/functions/regional-invocation) — 사용자 근접 기본값과 Database 리전 지정
+- [Supabase Branching](https://supabase.com/docs/guides/deployment/branching) — Preview/Persistent Branch와 데이터·키 격리
+- [Supabase Redirect URLs](https://supabase.com/docs/guides/auth/redirect-urls) — Vercel 프리뷰 와일드카드와 정확한 프로덕션 콜백
+- [Vercel Functions 리전](https://vercel.com/docs/functions/configuring-functions/region) — 함수와 데이터 소스의 리전 배치
+- [`timeline` 배포 issue #8](https://github.com/mechurak/timeline/issues/8) — Supabase Cloud, Vercel, Google OAuth 첫 배포 체크리스트
+
 <LinkCard
   title="13. Next.js 실전 통합"
-  description="App Router + @supabase/ssr — 클라이언트 4종, 미들웨어, 캐싱 함정."
+  description="Next.js 16 App Router + @supabase/ssr — 클라이언트 4종, Proxy, 캐싱 함정."
   href="/supabase/13-nextjs/"
 />

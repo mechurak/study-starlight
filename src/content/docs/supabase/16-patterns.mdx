@@ -1,6 +1,8 @@
 ---
 title: "16. 실전 패턴과 안티패턴"
 description: "배운 것을 조합하기 — 멀티테넌트 SaaS, 실시간 채팅, 결제, 문서 앱, RAG, 그리고 안티패턴 총정리"
+reviewedAt: 2026-08-12
+status: stable
 ---
 
 import { Steps, Tabs, TabItem, LinkCard } from '@astrojs/starlight/components';
@@ -65,6 +67,13 @@ as $$
   select role from public.org_members
   where user_id = auth.uid() and org_id = target_org;
 $$;
+
+-- 정책을 평가하는 역할만 스키마와 함수에 접근시킨다
+revoke all on function private.my_orgs() from public;
+revoke all on function private.my_role(uuid) from public;
+grant usage on schema private to authenticated;
+grant execute on function private.my_orgs() to authenticated;
+grant execute on function private.my_role(uuid) to authenticated;
 ```
 
 ### 정책 적용
@@ -194,36 +203,80 @@ sequenceDiagram
 결제 시작은 사용자 세션과 프론트 흐름에 붙어 있다.
 웹훅은 프론트 배포와 무관하게 항상 살아 있어야 하고, 목적이 DB 반영이다.
 
+처리 완료 표식과 구독 상태 변경은 **같은 DB 트랜잭션**에 있어야 한다.
+표식을 먼저 커밋하고 실제 처리가 실패하면 재시도가 중복으로 오인되어 영원히 건너뛰기 때문이다.
+
+```sql
+create table private.processed_webhook_events (
+  id           text primary key,
+  event_type   text not null,
+  processed_at timestamptz not null default now()
+);
+
+create or replace function public.apply_stripe_event(
+  event_id text,
+  event_type text,
+  event_payload jsonb
+)
+returns boolean
+language plpgsql
+security definer set search_path = ''
+as $$
+begin
+  insert into private.processed_webhook_events (id, event_type)
+  values (event_id, event_type)
+  on conflict (id) do nothing;
+
+  if not found then
+    return false; -- 이미 처리됨
+  end if;
+
+  -- 여기서 subscriptions 등 도메인 테이블을 갱신한다.
+  -- 예외가 나면 위 insert도 함께 롤백되어 Stripe 재시도가 다시 처리할 수 있다.
+  return true;
+end;
+$$;
+
+revoke all on function public.apply_stripe_event(text, text, jsonb) from public;
+grant execute on function public.apply_stripe_event(text, text, jsonb) to service_role;
+```
+
 ```ts
 // supabase/functions/stripe-webhook/index.ts  (verify_jwt = false)
-Deno.serve(async (req) => {
-  const sig = req.headers.get('stripe-signature')
-  const raw = await req.text()
+import { withSupabase } from 'npm:@supabase/server'
+import Stripe from 'npm:stripe@17'
 
-  let event
-  try {
-    event = await stripe.webhooks.constructEventAsync(
-      raw, sig!, Deno.env.get('STRIPE_WEBHOOK_SECRET')!,
-    )
-  } catch {
-    return new Response('Invalid signature', { status: 400 })
-  }
+const stripe = new Stripe(Deno.env.get('STRIPE_SECRET_KEY')!)
 
-  // 멱등성: 이미 처리한 이벤트면 조용히 200
-  const { error: dup } = await admin
-    .from('processed_webhook_events')
-    .insert({ id: event.id, type: event.type })
-  if (dup?.code === '23505') return new Response('ok (duplicate)', { status: 200 })
+export default {
+  fetch: withSupabase({ auth: 'none' }, async (req, ctx) => {
+    const sig = req.headers.get('stripe-signature')
+    const raw = await req.text()
 
-  // ... 실제 처리 ...
-  return new Response('ok', { status: 200 })
-})
+    let event
+    try {
+      event = await stripe.webhooks.constructEventAsync(
+        raw, sig!, Deno.env.get('STRIPE_WEBHOOK_SECRET')!,
+      )
+    } catch {
+      return new Response('Invalid signature', { status: 400 })
+    }
+
+    const { error } = await ctx.supabaseAdmin.rpc('apply_stripe_event', {
+      event_id: event.id,
+      event_type: event.type,
+      event_payload: event,
+    })
+    if (error) return new Response('retry', { status: 500 })
+    return new Response('ok', { status: 200 })
+  }),
+}
 ```
 
 :::tip[핵심]
-**유니크 제약 위반(`23505`)을 멱등성 장치로 쓰는 패턴.**
-애플리케이션이 "이미 처리했나?"를 조회하고 판단할 필요 없이 **DB가 중복을 막아준다.**
-동시에 두 번 도착해도 안전하다.
+**이벤트 ID의 유니크 제약 + 도메인 변경을 한 RPC 트랜잭션에 묶는 패턴.**
+애플리케이션이 "이미 처리했나?"를 따로 조회할 필요 없이 DB가 동시 중복을 막고,
+실패하면 표식까지 롤백되어 다음 재시도가 다시 실행된다.
 :::
 
 ## 파일 기반 문서 앱
@@ -395,7 +448,7 @@ alter publication supabase_realtime add table public.notifications;
 5. **`security definer` 함수에 `search_path` 미설정** — 스키마 하이재킹
 6. **뷰로 RLS 우회** — `security_invoker = on` 누락
 7. **`verify_jwt = false` 함수에 자체 검증 없음** — 공개 엔드포인트다
-8. **소유자 컬럼을 클라이언트가 지정** — `default auth.uid()`를 쓴다
+8. **소유자 컬럼 위조** — `default auth.uid()`는 편의일 뿐이다. `with check`로 강제한다
 9. **`update` 정책의 `with check`가 느슨함** — 소유권 이전(작성자 변경)이 가능해진다
 
 </TabItem>
@@ -409,7 +462,7 @@ alter publication supabase_realtime add table public.notifications;
 6. **대시보드에서 프로덕션 스키마 직접 수정** — 환경이 갈라진다
 7. **여러 supabase-js 호출로 원자성 기대** — RPC로 묶는다
 8. **Prisma 직접 연결에 RLS 기대** — 적용되지 않는다
-9. **서버리스에서 direct connection(`5432`)** — 커넥션 고갈
+9. **서버리스에서 Direct host(`db.<ref>.supabase.co:5432`) 연결** — 커넥션 고갈
 10. **함수 리전과 DB 리전 불일치** — 모든 쿼리에 지연 세금
 11. **Realtime 채널 정리 누락** — 구독 누적
 12. **사용자별 데이터를 페이지 캐시에** — 데이터 유출
@@ -431,6 +484,12 @@ alter publication supabase_realtime add table public.notifications;
 - Storage 정책과 DB 정책이 **같은 헬퍼를 공유**하면 규칙이 어긋나지 않는다
 - RAG에서 **RLS가 그대로 걸리는 것**이 Supabase의 큰 이점이다
 - 안티패턴 목록은 **코드 리뷰 체크리스트**로 쓴다
+
+## 참고 자료
+
+- [RLS용 `security definer` 함수](https://supabase.com/docs/guides/database/postgres/row-level-security#use-security-definer-functions) — 비공개 스키마와 권한 최소화
+- [Edge Function 웹훅 인증](https://supabase.com/docs/guides/functions/auth#external-webhooks) — `auth: 'none'`과 제공자 서명 검증
+- [Stripe 웹훅 처리 권장 사항](https://docs.stripe.com/webhooks#handle-duplicate-events) — 중복 이벤트와 비동기 재시도
 
 <LinkCard
   title="17. 정리"

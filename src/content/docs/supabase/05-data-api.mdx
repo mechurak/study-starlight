@@ -1,6 +1,8 @@
 ---
 title: "5. Data API와 supabase-js"
 description: "테이블을 코드에서 다루는 법 — 되는 것과 안 되는 것의 경계, 관계 조회, 그리고 RPC로 내려가는 지점"
+reviewedAt: 2026-08-12
+status: stable
 ---
 
 import { Tabs, TabItem, LinkCard } from '@astrojs/starlight/components';
@@ -301,7 +303,8 @@ await supabase.from('posts').insert([
 - `author_id` 같은 소유자 컬럼은 클라이언트가 보내게 두지 않는다
 
 ```sql
--- 클라이언트가 author_id를 위조할 수 없게 기본값을 건다
+-- 기본값은 정상 클라이언트가 author_id를 생략하게 해준다.
+-- 위조 방지는 insert/update 정책의 with check가 담당한다.
 alter table posts alter column author_id set default auth.uid();
 ```
 
@@ -466,7 +469,7 @@ CI에서 "타입 파일이 최신인지" 검사하는 스텝을 넣으면 좋다
 - Data API = PostgREST에 보내는 **HTTP**. SQL 전부가 되는 건 아니다
 - 경계를 넘으면 **뷰 또는 RPC**로 내려간다
 - `.single()` vs `.maybeSingle()`, `!inner`의 의미, `.select()` 없는 insert의 반환값
-- RLS에 막힌 쓰기는 **에러가 아니라 빈 결과**다
+- `using` 때문에 수정 대상 행이 보이지 않으면 **빈 결과**, `with check` 위반은 **42501 에러**다
 
 **안티패턴**
 
@@ -475,6 +478,12 @@ CI에서 "타입 파일이 최신인지" 검사하는 스텝을 넣으면 좋다
 - 매 페이지마다 `count: 'exact'`
 - `.or()` 문자열로 복잡한 조건 조립 — RPC로 옮길 신호
 - 소유자 컬럼(`author_id`)을 클라이언트가 보내게 두기
+
+## 참고 자료
+
+- [supabase-js 데이터 조회](https://supabase.com/docs/reference/javascript/select) — 필터, 관계 조회, 반환 타입
+- [PostgREST API](https://postgrest.org/en/stable/references/api.html) — Data API가 사용하는 필터·임베딩 문법
+- [Supabase 데이터베이스 함수](https://supabase.com/docs/guides/database/functions) — Data API의 경계를 RPC로 넘는 방법
 
 <LinkCard
   title="6. Auth"

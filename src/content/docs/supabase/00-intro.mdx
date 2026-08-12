@@ -1,6 +1,8 @@
 ---
 title: "0. 시작하기 전에"
 description: "이 문서를 어떻게 읽을 것인가 — 대상, 범위, 미리 잡아두면 좋은 멘탈 모델과 실습 환경"
+reviewedAt: 2026-08-12
+status: stable
 ---
 
 import { Card, CardGrid, Steps, LinkCard } from '@astrojs/starlight/components';
@@ -91,8 +93,8 @@ flowchart LR
 | 항목 | 지금 | 옛 정보 (자료에 많이 남아 있음) |
 |---|---|---|
 | API 키 | **`sb_publishable_...` / `sb_secret_...`** | `anon key` / `service_role key` (JWT 형태, 폐기 예정) |
-| API 게이트웨이 | **Envoy** | Kong |
-| Next.js 통합 | **`@supabase/ssr`** | `@supabase/auth-helpers-nextjs` |
+| API 게이트웨이 | **호스팅 플랫폼은 Envoy** | Kong (로컬·셀프호스팅은 버전에 따라 보일 수 있음) |
+| Next.js 통합 | **`@supabase/ssr` + Next.js 16 `proxy.ts`** | `@supabase/auth-helpers-nextjs` + `middleware.ts` |
 | 서버에서 신원 확인 | **`getClaims()`** (서명 로컬 검증) | `getSession()`의 user를 신뢰 |
 | JWT 서명 | **비대칭키(ECC/RSA) + JWKS** | 프로젝트당 대칭키(HS256) 하나 |
 | 커넥션 풀러 | **Supavisor** (transaction 모드 `6543`) | PgBouncer 단독 |
@@ -166,8 +168,14 @@ CLI를 **팀원마다 다른 버전으로 전역 설치**하면 마이그레이�
 - 대상은 **웹 개발은 아는데 Supabase가 처음인 사람**이다
 - 멘탈 모델 셋: **관리형 Postgres / 권한은 DB가 판단 / 상태는 Supabase·실행은 Vercel**
 - 관통하는 흐름: **JWT 발급 → 세션 변수 주입 → RLS 판정**
-- `anon key`·`Kong`·`auth-helpers`가 보이는 자료는 **한 세대 이전**이다
+- `anon key`·`Kong`·`auth-helpers`가 보이면 **호스팅 플랫폼의 최신 경로인지 먼저 확인**한다
 - Docker + CLI + Free 플랜이면 실습 환경은 충분하다
+
+## 참고 자료
+
+- [Supabase API 키](https://supabase.com/docs/guides/getting-started/api-keys) — publishable/secret 키와 레거시 키의 차이
+- [Next.js SSR 클라이언트 구성](https://supabase.com/docs/guides/auth/server-side/creating-a-client?queryGroups=framework&framework=nextjs) — `@supabase/ssr`, `getClaims()`, `proxy.ts`
+- [Envoy API Gateway](https://supabase.com/docs/guides/self-hosting/self-hosted-envoy) — 호스팅 플랫폼과 셀프호스팅 게이트웨이 구조
 
 <LinkCard
   title="1. 왜 Supabase인가"
