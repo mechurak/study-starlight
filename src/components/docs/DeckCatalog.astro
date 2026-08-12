@@ -12,19 +12,27 @@
     desc   카테고리 한 줄 설명
     tone   mermaid classDef · DeckMap과 같은 여섯 팔레트 — 카테고리 식별색
     decks  덱 카드 목록
+      slug      덱 slug — 수정일을 계산할 콘텐츠 경로
       href      덱 index 링크 ('/cka/')
       icon      Starlight 아이콘 이름 — src/data/decks.mjs의 topic과 같은 값
       title     덱 이름
       desc      한 줄 소개 (평문 — 서식 처리 없음)
       chapters  장 수 — 카드 오른쪽 위 분량 표시
 
+  각 덱의 최종 수정일은 Starlight가 페이지 수정일에 쓰는 Git 이력에서 가져온다.
+  파일 시스템 mtime은 배포 체크아웃 시각으로 바뀌므로 사용하지 않는다. 덱의 index와
+  등록된 장 중 하나라도 커밋되면 가장 최신 날짜가 자동으로 카드에 반영된다.
+
   덱을 추가하면 src/data/decks.mjs 한 곳만 고친다.
 */
 import { Icon } from '@astrojs/starlight/components';
+import { getCollection } from 'astro:content';
+import { getNewestCommitDate } from 'virtual:starlight/git-info';
 
 type Tone = 'key' | 'ok' | 'warn' | 'bad' | 'mute' | 'zone';
 
 interface Deck {
+  slug: string;
   href: string;
   icon: string;
   title: string;
@@ -44,10 +52,40 @@ interface Props {
 }
 
 const { sections } = Astro.props;
+const docs = await getCollection('docs');
+
+const sectionsWithDates = sections.map((section) => ({
+  ...section,
+  decks: section.decks.map((deck) => {
+    const dates = docs
+      .filter((entry) => entry.id === deck.slug || entry.id.startsWith(`${deck.slug}/`))
+      .flatMap((entry) => {
+        try {
+          return [getNewestCommitDate(entry.filePath)];
+        } catch {
+          // 새 파일처럼 아직 Git 이력이 없는 문서는 날짜 계산에서 제외한다.
+          return [];
+        }
+      });
+
+    return {
+      ...deck,
+      updatedAt: dates.length > 0 ? new Date(Math.max(...dates.map((date) => date.getTime()))) : undefined,
+    };
+  }),
+}));
+
+const formatDate = (date: Date) =>
+  date.toLocaleDateString('ko-KR', {
+    year: 'numeric',
+    month: 'numeric',
+    day: 'numeric',
+    timeZone: 'Asia/Seoul',
+  });
 ---
 
 <div class="catalog">
-  {sections.map((section) => (
+  {sectionsWithDates.map((section) => (
     <section class="catalog__section" data-tone={section.tone}>
       <header class="catalog__head">
         <h2 class="catalog__title">{section.title}</h2>
@@ -65,6 +103,11 @@ const { sections } = Astro.props;
                 <span class="deck__meta">{deck.chapters}장</span>
               </span>
               <span class="deck__blurb">{deck.desc}</span>
+              {deck.updatedAt && (
+                <span class="deck__updated">
+                  마지막 수정 <time datetime={deck.updatedAt.toISOString()}>{formatDate(deck.updatedAt)}</time>
+                </span>
+              )}
             </span>
           </a>
         ))}
@@ -186,6 +229,12 @@ const { sections } = Astro.props;
     font-size: 0.85rem;
     line-height: 1.55;
     color: var(--sl-color-gray-2);
+  }
+  .deck__updated {
+    margin-top: 0.05rem;
+    font-size: 0.72rem;
+    line-height: 1.4;
+    color: var(--sl-color-gray-3);
   }
 
   @media (max-width: 30rem) {

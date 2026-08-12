@@ -13,6 +13,7 @@
 | mermaid 펜스 렌더 | `astro-mermaid` 통합 (**starlight보다 먼저**) | `astro.config.mjs` |
 | 검색 결과에 덱 이름 표시 | `MarkdownContent` 컴포넌트 override | `src/components/layout/MarkdownContent.astro` |
 | 덱 index 별칭 검색 | manifest의 `aliases`를 본문 앞에 표시 | `src/data/decks.mjs` · `MarkdownContent.astro` |
+| 랜딩 덱 최종 수정일 | Starlight의 Git 이력 API로 덱 문서의 최신 커밋일 계산 | `src/components/docs/DeckCatalog.astro` |
 | 본문 폰트 Pretendard | `customCss` (dynamic subset) | `astro.config.mjs` |
 | 본문 폭 45→55rem | `--sl-content-width` | `src/styles/custom.css` |
 | mermaid 가로 스크롤 | `.mermaid` overflow | `src/styles/custom.css` |
@@ -64,6 +65,22 @@ Pagefind JS API(`debouncedSearch` → `result.data()` → meta로 그룹핑)로 
 과하다고 판단해 라벨 표시까지만 남겼다. 다시 필요하면 git 히스토리가 아니라
 이 접근법 요약을 출발점으로 삼으면 된다 — 모달 셸(버튼·Ctrl+K·dialog)은 기본
 `Search.astro`에서 복사하고, 결과 영역만 자체 렌더러로 바꾸는 구조였다.
+
+## 랜딩 덱 최종 수정일
+
+`DeckCatalog.astro`는 Starlight가 페이지의 마지막 업데이트를 구할 때 쓰는
+`virtual:starlight/git-info`의 `getNewestCommitDate()`를 재사용한다. 각 덱의 index와 장 문서 중
+가장 최근 커밋일을 카드의 **마지막 수정**으로 표시한다. 파일 시스템 mtime은 배포 체크아웃 때
+바뀌므로 사용하지 않는다.
+
+기댄 내부 동작 (0.41.x 기준으로 확인):
+
+- dev에서는 파일별 `git log`, build에서는 Starlight가 빌드 시작 시 한 번 수집해 인라인한 Git
+  이력을 사용한다
+- 아직 커밋되지 않아 이력이 없는 새 문서는 계산에서 제외하고, 덱 전체에 이력이 없으면 날짜를
+  표시하지 않는다
+- Starlight 업그레이드 시 `virtual:starlight/git-info`와 `getNewestCommitDate(filePath)`가 유지되는지
+  확인한다
 
 ## 로케일
 

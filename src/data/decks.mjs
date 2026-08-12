@@ -341,6 +341,7 @@ export const deckCatalogSections = categories.map((category) => ({
 	decks: deckDefinitions
 		.filter((deck) => deck.category === category.id)
 		.map((deck) => ({
+			slug: deck.slug,
 			href: `/${deck.slug}/`,
 			icon: deck.icon,
 			title: deck.title,
