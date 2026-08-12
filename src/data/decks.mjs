@@ -278,7 +278,10 @@ export const deckDefinitions = [
 		groups: [
 			['시작', ['supabase/00-intro', 'supabase/01-why']],
 			['기반 — Postgres와 개발 환경', ['supabase/02-architecture', 'supabase/03-start', 'supabase/04-postgres']],
-			['핵심 — 데이터와 권한', ['supabase/05-data-api', 'supabase/06-auth', 'supabase/07-rls']],
+			[
+				'핵심 — 데이터와 권한',
+				['supabase/05-data-api', 'supabase/06-auth', 'supabase/06-auth-reference', 'supabase/07-rls'],
+			],
 			[
 				'주변 제품',
 				['supabase/08-storage', 'supabase/09-realtime', 'supabase/10-edge-functions', 'supabase/11-extensions'],
