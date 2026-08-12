@@ -1,6 +1,7 @@
 ---
 title: "8. 품질 도구 — 타입 · 린트 · 포맷 · 테스트"
 description: "사람이 안 봐도 잡히게 만드는 네 겹의 그물 — 각 도구의 역할 분담"
+reviewedAt: 2026-08-12
 ---
 
 import { Card, CardGrid, LinkCard } from '@astrojs/starlight/components';
@@ -24,7 +25,7 @@ import TermIntro from '../../../components/docs/TermIntro.astro';
 | 겹 | 잡는 것 | 도구 (2026 기준) | 언제 도나 |
 |---|---|---|---|
 | **타입 검사** | 형태가 안 맞는 코드 | tsc (`--noEmit`) | 에디터 상시 + CI |
-| **린트** | 버그 냄새 나는 패턴 | ESLint 9, Biome, oxlint | 에디터 상시 + CI |
+| **린트** | 버그 냄새 나는 패턴 | ESLint 10, Biome, oxlint | 에디터 상시 + CI |
 | **포맷** | 겉모양 불일치 | Prettier, Biome | 저장할 때 |
 | **테스트** | 동작이 틀린 코드 | Vitest, Playwright | 수시 + CI |
 
@@ -60,8 +61,7 @@ CI에 `tsc --noEmit`이 없으면 타입 에러가 있는 코드도 빌드가 �
 
 - **ESLint + Prettier** — 기존 표준 조합. 규칙 생태계가 가장 넓고,
   React 훅 규칙 같은 프레임워크 특화 규칙은 여전히 여기가 최강이다.
-  ESLint 9부터 설정 형식이 `eslint.config.js`(flat config)로 바뀌었다 —
-  `.eslintrc`가 나오는 자료는 구세대다
+  ESLint 9부터 `eslint.config.js`(flat config)가 기본이 됐고, 10에서는 `.eslintrc` 지원이 제거됐다
 - **Biome** — Rust로 만든 **린터 + 포매터 통합** 도구. 설정 파일 하나, 속도는 수십 배.
   v2부터 타입 정보를 쓰는 규칙까지 자체 지원하기 시작해 격차를 좁히는 중이다.
   새 프로젝트에서 채택이 빠르게 늘고 있다
@@ -103,7 +103,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - run: pnpm install --frozen-lockfile   # 잠금 파일과 다르면 실패 (5장)
-      - run: pnpm tsc --noEmit                # 타입
+      - run: pnpm exec tsc --noEmit           # 타입
       - run: pnpm lint                        # 린트 (+포맷 검사)
       - run: pnpm test                        # 테스트
       - run: pnpm build                       # 빌드 자체도 검사다
@@ -133,6 +133,11 @@ jobs:
 - 린트·포맷은 ESLint+Prettier(생태계)와 Biome(속도·통합)의 2강 구도
 - Vitest는 Vite의 설정을 공유한다 — 도구 사슬이 수렴하면 테스트도 편해진다
 - CI에 안 올라간 검사는 없는 검사다 — 그리고 **빌드도 검사다**
+
+## 참고 자료
+
+- [ESLint 10 발표](https://eslint.org/blog/2026/02/eslint-v10.0.0-released/) — flat config 전용화와 지원 Node 범위
+- [Biome 2.0 발표](https://biomejs.dev/blog/biome-v2/) — 타입 정보를 쓰는 lint 규칙과 통합 도구 범위
 
 <LinkCard
   title="9. 모노레포"

@@ -1,6 +1,7 @@
 ---
 title: "5. 형태 리소스"
 description: "--radius 하나가 앱 전체의 인상을 결정한다 — 둥글기 · 간격 · 테두리 · 그림자"
+reviewedAt: 2026-08-12
 ---
 
 import { LinkCard, Tabs, TabItem } from '@astrojs/starlight/components';
@@ -29,10 +30,13 @@ shadcn/ui가 `globals.css`에 넣어 주는 것 중 색 다음으로 중요한 �
 }
 
 @theme inline {
-  --radius-sm: calc(var(--radius) - 4px);
-  --radius-md: calc(var(--radius) - 2px);
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
   --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) + 4px);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-2xl: calc(var(--radius) * 1.8);
+  --radius-3xl: calc(var(--radius) * 2.2);
+  --radius-4xl: calc(var(--radius) * 2.6);
 }
 ```
 
@@ -99,7 +103,8 @@ Tailwind 4는 간격도 기준값 하나에서 파생시킨다.
 }
 ```
 
-`p-1` = 4px, `p-2` = 8px, `p-4` = 16px … **모든 간격이 4의 배수**가 된다.
+`p-1` = 4px, `p-2` = 8px, `p-4` = 16px처럼 번호가 기준값에서 계산된다.
+`p-0.5` 같은 반 단계와 `p-px` 같은 예외도 있지만, **한 스케일을 공유한다**는 점이 핵심이다.
 
 <ScaleViz kind="spacing" />
 
@@ -166,8 +171,8 @@ Tailwind 4는 간격도 기준값 하나에서 파생시킨다.
 **순서를 지키는 게 규칙의 전부**다. 모달이 카드보다 그림자가 약하면 층위가 뒤집혀 보인다.
 
 :::caution[함정 — 다크 모드의 그림자]
-어두운 배경에서는 **검은 그림자가 보이지 않는다.**
-다크 모드에서 고도를 표현하려면 그림자 대신 **배경을 살짝 밝게** 하는 쪽이 효과적이다.
+어두운 배경에서는 **검은 그림자만으로 고도를 구분하기 어렵다.**
+다크 모드에서는 그림자와 함께 **표면 배경을 살짝 밝게** 하는 쪽이 효과적이다.
 
 ```css
 :root { --card: oklch(1 0 0);      }   /* 라이트: 배경과 같고 그림자로 띄운다 */
@@ -202,7 +207,12 @@ flowchart LR
 - 밀도 조절은 `--spacing` 하나로 — 클래스는 그대로 두고 화면 밀도만 바꾼다
 - **`--ring`은 접근성 요소**다. `outline: none`으로 지우지 않는다
 - 그림자는 **고도 정보**다. 순서(카드 < 드롭다운 < 모달)만 지키면 된다
-- **다크 모드에서는 그림자가 안 보인다.** 배경 밝기 차이로 고도를 표현한다
+- **다크 모드에서는 검은 그림자만으로 부족하다.** 표면의 밝기 차이도 함께 쓴다
+
+## 참고 자료
+
+- [shadcn/ui Radius Scale](https://ui.shadcn.com/docs/theming#radius-scale) — 최신 기본 반경 배율과 파생 단계
+- [Tailwind CSS Theme Variables](https://tailwindcss.com/docs/theme) — `--spacing`과 유틸리티 스케일의 연결
 
 <LinkCard
   title="6. 글자 리소스"

@@ -1,13 +1,15 @@
 ---
 title: "1. shadcn/ui란 무엇인가"
 description: "설치하지 않는 컴포넌트 — 왜 이런 이상한 방식이 나왔는가"
+reviewedAt: 2026-08-12
 ---
 
 import { Card, CardGrid, LinkCard, Tabs, TabItem } from '@astrojs/starlight/components';
 import TermIntro from '../../../components/docs/TermIntro.astro';
 import BtnMatrix from '../../../components/demos/BtnMatrix.astro';
 
-> `npm install shadcn-ui` 같은 건 없다. **설치할 패키지가 없다.**
+> UI 컴포넌트를 통째로 제공하는 **런타임 패키지를 설치하는 방식이 아니다.**
+> CLI는 실행하지만, 컴포넌트 소스는 내 레포에 들어온다.
 
 <TermIntro
   terms={[
@@ -33,7 +35,7 @@ import { Button } from 'some-ui-library'
 
 디자이너가 "버튼 모서리를 좀 더 각지게, 그림자는 빼 주세요"라고 한다. 그런데 —
 
-- 그 스타일은 `node_modules` 안에 있다. **고칠 수 없다**
+- 그 스타일은 `node_modules` 안에 있다. 직접 고치면 재설치 때 사라지므로 **공식 확장 API 안에서만** 바꾸는 게 안전하다
 - 라이브러리가 열어 준 `theme` 설정으로 되는 범위까지만 가능하다
 - 안 되면 `!important`로 덮어쓰기 시작한다
 - 다음 버전으로 올리면 내부 클래스 이름이 바뀌어 **덮어쓴 것들이 깨진다**
@@ -52,7 +54,7 @@ pnpm dlx shadcn@latest add button
 
 - 이 파일은 **내 코드**다. git에 커밋된다
 - 모서리를 각지게? **파일을 열어서 고친다.** 끝
-- 라이브러리 업데이트로 깨질 일이 없다 — 업데이트 자체가 없으니까
+- 새 버전이 내 파일을 자동 교체하지 않는다 — **업스트림 변경을 언제 합칠지 내가 정한다**
 
 </TabItem>
 </Tabs>
@@ -118,15 +120,17 @@ flowchart TB
 
 :::caution[함정 — 오래된 자료]
 프리미티브의 기본값이 **2026년 7월에 Radix UI → Base UI로 바뀌었다.**
-인터넷 자료 대부분은 아직 Radix 기준이다. 실무에서 만나는 차이는 사실상 하나 —
+인터넷 자료 대부분은 아직 Radix 기준이다. 가장 눈에 띄는 문법 차이는 합성 프롭이다 —
 
 ```tsx
 <Tooltip.Trigger asChild><button>도움말</button></Tooltip.Trigger>   {/* Radix */}
 <Tooltip.Trigger render={<button>도움말</button>} />                  {/* Base UI */}
 ```
 
-**"내 태그를 대신 써 달라"는 뜻은 같다.** Radix가 필요하면 `init -b radix`로 고를 수 있고,
-Radix가 폐기된 것도 아니다. 이 덱은 기본값인 Base UI를 전제한다.
+**"내 태그를 대신 써 달라"는 큰 목적은 같다.** 다만 이름만 다른 것은 아니다.
+이벤트·상태 속성·합성 방식에 동작 차이가 있어 기존 앱을 옮길 때는 컴포넌트별 확인이 필요하다.
+Radix가 필요하면 `init -b radix`로 고를 수 있고, Radix가 폐기된 것도 아니다.
+이 덱은 새 프로젝트의 기본값인 Base UI를 전제한다.
 :::
 
 ## 얻는 것과 지는 책임
@@ -136,7 +140,7 @@ Radix가 폐기된 것도 아니다. 이 덱은 기본값인 Base UI를 전제�
 디자인 변경에 **제약이 없다**.
 컴포넌트 코드를 읽고 이해할 수 있다.
 안 쓰는 코드는 지워도 된다.
-라이브러리 업그레이드로 깨지지 않는다.
+새 버전이 로컬 UI 코드를 자동 교체하지 않는다.
 팀 컴포넌트로 자연스럽게 확장된다.
 </Card>
 <Card title="지는 책임" icon="warning">
@@ -158,16 +162,21 @@ Radix가 폐기된 것도 아니다. 이 덱은 기본값인 Base UI를 전제�
 - **Tailwind를 쓰지 않는다** — 이점의 절반이 사라진다
 - **프론트엔드를 계속 볼 사람이 없다** — 소유권은 곧 유지보수 인력이다
 
-반대로 **디자인이 계속 진화하는 제품**이라면 이 모델이 압도적으로 유리하다.
+반대로 **디자인이 계속 진화하고 UI 코드를 관리할 팀이 있는 제품**이라면 이 모델의 장점이 크다.
 
 ## 1장 요약
 
-- shadcn/ui는 **라이브러리가 아니라 코드 배송 시스템**이다. 설치할 패키지가 없다
+- shadcn/ui는 **코드 배송 시스템**이다. UI 전체를 런타임 패키지로 받지 않고 소스를 가져온다
 - 컴포넌트 소스가 **내 레포**(`components/ui/`)에 들어오고, 그때부터 내 코드다
 - 복붙과 다른 점: **레지스트리 · 의존성 해결 · 토큰 주입 · 경로 조정**, 그리고 `--diff`
 - **키보드·포커스·화면낭독기 대응은 프리미티브**(기본값 Base UI)가 계속 맡는다
 - 자유를 얻는 대신 **버그 수정이 자동으로 오지 않는 책임**을 진다
 - 그 책임을 감당하는 구조가 **테마**다
+
+## 참고 자료
+
+- [shadcn/ui 소개](https://ui.shadcn.com/docs) — “open code” 배포 모델과 컴포넌트 소유권
+- [Base UI 기본값 전환](https://ui.shadcn.com/docs/changelog/2026-07-base-ui-default) — Base UI·Radix 선택과 마이그레이션 주의점
 
 <LinkCard
   title="2. 테마 = 리소스 목록"

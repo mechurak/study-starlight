@@ -1,6 +1,7 @@
 ---
 title: "5. 패키지 매니저 — 왜 pnpm인가"
 description: "package.json · 잠금 파일 · node_modules의 구조적 문제, 그리고 pnpm의 해법"
+reviewedAt: 2026-08-12
 ---
 
 import { Tabs, TabItem, FileTree, LinkCard } from '@astrojs/starlight/components';
@@ -34,7 +35,7 @@ JS 프로젝트의 모든 것이 이 파일에서 시작한다.
     "react": "^19.2.0"
   },
   "devDependencies": {
-    "typescript": "^5.9.0",
+    "typescript": "^6.0.0",
     "vite": "^8.0.0"
   }
 }
@@ -75,12 +76,12 @@ npm은 설치를 빠르게 하려고 의존성의 의존성까지 전부 `node_m
 (호이스팅). 부작용 — **내가 설치한 적 없는 패키지도 import가 된다.**
 
 ```js
-// package.json에는 express만 적었는데…
-import _ from 'lodash';   // express가 내부에서 쓰는 lodash가 어쩌다 import 됨
+// package.json에는 some-package만 적었는데…
+import helper from 'transitive-helper'; // 하위 의존성이 우연히 최상위에 보여 import됨
 ```
 
-이게 "유령 의존성(phantom dependency)"이다. 지금은 돌지만, express가 내부 구현을 바꿔
-lodash를 버리는 순간 **내 코드가 영문 모를 이유로 깨진다.** 명세에 없는 우연에 기댄 코드다.
+이게 "유령 의존성(phantom dependency)"이다. 지금은 돌지만, 상위 패키지가 내부 의존성을 바꾸는 순간
+**내 코드가 영문 모를 이유로 깨진다.** 명세에 없는 우연에 기댄 코드다.
 
 ## pnpm의 해법 — 저장은 한 번, 연결은 링크로
 
@@ -88,7 +89,7 @@ pnpm(performant npm)은 두 문제를 구조로 푼다.
 
 ```mermaid
 flowchart LR
-    S["전역 저장소 (~/.pnpm-store)<br/>모든 패키지의 실체가 딱 한 벌"]
+    S["내용 주소 기반 저장소<br/>같은 패키지 파일은 한 번 저장"]
     subgraph P1["프로젝트 A의 node_modules"]
         A1["react → 링크"]
     end
@@ -114,9 +115,9 @@ flowchart LR
 
 ### 보너스 — 공급망 방어
 
-pnpm은 최근 몇 년의 npm 공급망 공격(패키지 탈취 → 설치 스크립트로 악성코드 실행)을 반영해
-**의존성의 설치 스크립트를 기본으로 차단**한다. 빌드가 꼭 필요한 패키지(sharp, esbuild 등)만
-허용 목록에 올린다 — 이 레포의 `pnpm-workspace.yaml`에 있는 `allowBuilds`가 정확히 그 목록이다.
+pnpm 10부터 공급망 공격의 주요 경로인 **의존성의 설치 스크립트를 기본으로 차단**한다.
+pnpm 11은 검토하지 않은 빌드를 기본 오류로 처리하고, 꼭 필요한 패키지만 `allowBuilds`에 명시한다.
+이 레포의 `pnpm-workspace.yaml`에 있는 설정이 정확히 그 목록이다.
 
 ## 도구별 비교
 
@@ -125,7 +126,7 @@ pnpm은 최근 몇 년의 npm 공급망 공격(패키지 탈취 → 설치 스�
 
 | | npm | yarn | **pnpm** | bun install |
 |---|---|---|---|---|
-| 위상 | Node 동봉 기본 | npm의 첫 대항마 | **신규 프로젝트 표준** | 최속 |
+| 위상 | Node 동봉 기본 | 오래된 대안·워크스페이스 강점 | **이 덱의 권장값** | 런타임과 통합 |
 | 디스크 | 프로젝트마다 복사 | 복사 (v4는 개선) | **전역 한 벌 + 링크** | 전역 캐시 |
 | 유령 의존성 | 허용됨 | 기본 허용 | **구조적으로 차단** | 허용됨 |
 | 모노레포 | 지원 | 지원 | **가장 성숙** (9장) | 지원 |
@@ -161,7 +162,7 @@ pnpm은 최근 몇 년의 npm 공급망 공격(패키지 탈취 → 설치 스�
 - my-app/
   - package.json 처음 볼 파일 — scripts와 의존성
   - **pnpm-lock.yaml** 이 파일이 있으면 pnpm 프로젝트라는 뜻
-  - pnpm-workspace.yaml 있으면 모노레포 (9장)
+  - pnpm-workspace.yaml `packages`가 있으면 모노레포. 설정만 담을 수도 있음 (9장)
   - node_modules/ 커밋 금지 — 언제든 지우고 다시 만들 수 있어야 한다
   - src/
 
@@ -177,6 +178,11 @@ pnpm은 최근 몇 년의 npm 공급망 공격(패키지 탈취 → 설치 스�
 - pnpm의 해법 — **전역 저장소 + 링크**로 낭비를, **엄격한 배치**로 유령을 잡는다
 - 설치 스크립트 기본 차단 — 공급망 공격 시대의 방어선
 - 잠금 파일이 도구의 표식이다 — 레포의 기존 선택을 따르고, 섞지 않는다
+
+## 참고 자료
+
+- [pnpm 공급망 방어](https://pnpm.io/supply-chain-security) — 설치 스크립트 차단과 pnpm 11의 기본 보호
+- [pnpm `allowBuilds`](https://pnpm.io/settings/build#allowbuilds) — 허용·차단 형식과 기본 동작
 
 <LinkCard
   title="6. 번들러 — 왜 묶어야 하는가"

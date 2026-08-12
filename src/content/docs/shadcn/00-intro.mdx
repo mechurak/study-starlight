@@ -1,6 +1,7 @@
 ---
 title: "0. 시작하기 전에"
 description: "이 덱이 전제하는 것, 기본 용어 다섯 개, 그리고 일부러 빼놓은 것들"
+reviewedAt: 2026-08-12
 ---
 
 import { Card, CardGrid, LinkCard } from '@astrojs/starlight/components';
@@ -100,9 +101,14 @@ Tailwind 4는 설정을 CSS 파일에 쓰고, shadcn 기본 기반은 `asChild` 
 | 도구 | 버전 | 왜 중요한가 |
 |---|---|---|
 | Tailwind CSS | **4.x** | 설정이 JS 파일에서 **CSS 파일**로 옮겨 갔다. 3.x 자료와 문법이 다르다 |
-| shadcn CLI | **3.x** | `registries` 필드, `view`·`docs` 명령이 이때 들어왔다 |
+| shadcn CLI | **4.x** | preset·template과 `--dry-run`·`--diff`·`--view`가 한 흐름으로 정리됐다 |
 | Next.js | 16 | 이 덱은 Next.js에 크게 의존하지 않는다. Vite 등에서도 대부분 그대로다 |
 | 기반 라이브러리 | **Base UI** | 2026년 7월부터 기본값. 예전 기본값은 Radix UI였다 |
+
+## 참고 자료
+
+- [shadcn CLI v4 발표](https://ui.shadcn.com/docs/changelog/2026-03-cli-v4) — 이 덱에서 쓰는 CLI 명령과 preset·template 기준
+- [Base UI 기본값 전환](https://ui.shadcn.com/docs/changelog/2026-07-base-ui-default) — 새 프로젝트의 기본 기반과 Radix 지원 상태
 
 ## 0장 요약
 

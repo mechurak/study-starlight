@@ -1,6 +1,7 @@
 ---
 title: "9. 테마 두 벌 — 다크 모드"
 description: "같은 이름, 다른 값 — 그리고 첫 화면이 하얗게 번쩍이는 문제"
+reviewedAt: 2026-08-12
 ---
 
 import { LinkCard, Steps, Tabs, TabItem } from '@astrojs/starlight/components';
@@ -143,14 +144,15 @@ flowchart LR
     class A,C,D mute
 ```
 
-원인은 명확하다 — **서버는 사용자의 취향을 모른다.**
-사용자 선택은 브라우저의 `localStorage`에 있고, 서버는 그걸 읽을 수 없다.
+이 구성에서 원인은 명확하다 — **선택이 `localStorage`에만 있어 서버가 읽을 수 없다.**
+쿠키로 저장해 서버가 클래스를 렌더하거나 `prefers-color-scheme`만 쓰는 설계도 가능하지만,
+`next-themes` 기본 흐름은 브라우저가 첫 페인트 전에 클래스를 붙이는 방식이다.
 
 **해결은 `next-themes`가 이미 해 준다.** `<head>`에 아주 작은 스크립트를 넣어
 **React가 로드되기 전에** `localStorage`를 읽고 클래스를 붙인다.
 
 :::caution[함정]
-직접 `useState` + `useEffect`로 다크 모드를 만들면 **반드시 이 번쩍임이 생긴다.**
+`localStorage`를 `useState` + `useEffect`에서만 읽어 다크 모드를 만들면 **이 번쩍임이 생긴다.**
 `useEffect`는 첫 렌더 **이후에** 실행되기 때문이다.
 
 "간단한 기능인데 직접 만들지"가 잘 안 통하는 대표 사례다. `next-themes`를 쓴다.
@@ -233,9 +235,13 @@ shadcn 기본값이 이미 이렇게 돼 있다. **함부로 `#000`으로 바꾸
 - 컴포넌트에 **`dark:` 변형이 늘고 있다면 토큰을 안 쓰고 있다는 신호**
 - `next-themes` + `attribute="class"` + `suppressHydrationWarning`이 표준 조합
 - `disableTransitionOnChange`를 켠다 — 없으면 전환이 어지럽다
-- **직접 만들면 화면이 번쩍인다.** 서버가 취향을 모르고, `useEffect`는 첫 렌더 이후라서
+- `localStorage`를 **`useEffect`에서만 읽으면 화면이 번쩍인다.** 첫 페인트보다 늦기 때문이다
 - 다크에서 따로 챙길 것 넷 — **그림자 대신 밝기 차 · 순수 검정 금지 · 로고 교체 · 채도 낮추기**
 - 다크 버그의 대부분은 결국 **토큰을 안 쓴 자리**다
+
+## 참고 자료
+
+- [shadcn/ui Next.js 다크 모드](https://ui.shadcn.com/docs/dark-mode/next) — `next-themes`·`attribute="class"`·hydration 설정의 공식 조합
 
 <LinkCard
   title="10. 내 테마 만들기"

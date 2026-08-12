@@ -1,6 +1,7 @@
 ---
 title: "4. 런타임 — JavaScript가 도는 곳"
 description: "Node.js는 무엇이고 Bun·Deno·엣지 런타임은 왜 나왔는가 — 그리고 TypeScript와 모듈 이야기"
+reviewedAt: 2026-08-12
 ---
 
 import { Tabs, TabItem, LinkCard } from '@astrojs/starlight/components';
@@ -52,8 +53,8 @@ flowchart TB
   Node의 이벤트 루프는 기다리는 동안 다른 요청을 처리한다
 
 물론 서버를 꼭 JS로 짤 필요는 없다(3장의 백엔드 층 — Spring·Go·Django도 건재하다).
-다만 **도구 사슬은 예외가 없다** — 어느 스택이든 프론트가 있으면 Node 계열 런타임 위에서
-빌드 도구가 돈다. 서버는 안 써도 도구로는 반드시 만난다.
+다만 현대 프론트엔드의 도구 사슬은 대개 **Node 호환 런타임** 위에서 돈다.
+서버를 다른 언어로 짜도 Node·Bun·Deno 중 하나를 빌드 도구 실행 환경으로 만날 가능성이 높다.
 
 ## 런타임 지형 — Node와 도전자들
 
@@ -62,7 +63,7 @@ flowchart TB
 
 여전히 기본값이고, 도전자들 덕에 좋아지는 중이다.
 
-- **짝수 버전이 LTS**다. 2026년 8월 기준 활성 LTS는 **24** (26이 10월 LTS 예정)
+- 2026년 8월 기준 활성 LTS는 **24**, 26은 Current다. 프로덕션은 LTS 상태를 확인해 고른다
 - 최근 몇 년 사이 내장이 두꺼워졌다 — **TypeScript 직접 실행**(타입만 벗겨서),
   내장 테스트 러너, `fetch` 내장
 - 고민 없으면 이것. 자료·호환성·배포처 전부 최대
@@ -74,8 +75,7 @@ flowchart TB
 
 - Zig로 작성, 시작 속도와 `bun install`이 체감 나게 빠르다
 - Node API 호환을 목표로 해서 기존 프로젝트도 대체로 돈다
-- 2025년 말 **Anthropic이 인수**했고, Claude Code CLI가 Bun으로 돈다 —
-  "실험작" 단계는 확실히 지났다
+- Node 호환 범위가 넓어졌지만 모든 패키지가 똑같이 동작한다고 가정하지 말고 테스트한다
 
 </TabItem>
 <TabItem label="Deno — 보안과 표준">
@@ -140,7 +140,7 @@ const express = require('express');
 import express from 'express';
 ```
 
-- 새 코드는 **무조건 ESM**이다. `package.json`에 `"type": "module"`을 두는 게 요즘 기본
+- 새 코드는 **ESM을 기본 선택**으로 본다. 다만 기존 Node 생태계와 일부 도구에는 CJS가 남아 있다
 - 최근 Node는 `require()`로 ESM을 불러오는 것까지 지원해서 경계의 고통이 많이 줄었다
 - 이 공존이 번들러가 필요한 이유 중 하나이기도 하다 — 6장에서 다시 만난다
 
@@ -155,9 +155,14 @@ import express from 'express';
 
 - 런타임 = **엔진 + API.** 같은 JS라도 런타임이 다르면 쓸 수 있는 것이 다르다
 - 기본값은 **Node LTS(현재 24)**. Bun은 속도·올인원, Deno는 보안·표준, 엣지는 초저지연
-- 서버를 JS로 안 짜도 **도구 사슬로는 반드시 Node 계열을 만난다**
+- 서버를 JS로 안 짜도 프론트 도구 사슬에서 **Node 호환 런타임을 만날 가능성이 높다**
 - TypeScript는 기본값 — **검사(tsc)와 제거(빌드 도구)는 분업**이다
 - 모듈은 ESM이 표준. CJS는 유산이며, 관련 에러는 코드가 아니라 **판정**의 문제다
+
+## 참고 자료
+
+- [Node.js 릴리스 현황](https://nodejs.org/en/about/previous-releases) — Node 24 LTS·26 Current와 프로덕션 권고
+- [Node.js TypeScript 실행](https://nodejs.org/api/typescript.html) — 내장 type stripping의 범위와 제약
 
 <LinkCard
   title="5. 패키지 매니저 — 왜 pnpm인가"

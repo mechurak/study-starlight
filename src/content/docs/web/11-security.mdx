@@ -1,6 +1,7 @@
 ---
 title: "11. 브라우저 보안 — 출처 · CORS · PKCE"
 description: "브라우저는 왜 내 요청을 막는가 — 같은 출처 정책에서 소셜 로그인의 PKCE까지"
+reviewedAt: 2026-08-12
 ---
 
 import { Tabs, TabItem, LinkCard } from '@astrojs/starlight/components';
@@ -13,7 +14,8 @@ import TermIntro from '../../../components/docs/TermIntro.astro';
     ['출처', 'Origin', '`프로토콜 + 도메인 + 포트`의 묶음 (`https://myapp.com:443`). 브라우저 보안의 기본 단위 — 셋 중 하나만 달라도 "다른 출처"다.'],
     ['SOP', 'Same-Origin Policy', '"다른 출처의 응답은 스크립트가 읽을 수 없다"는 브라우저의 기본 규칙. 웹 보안 전체가 이 위에 서 있다.'],
     ['CORS', 'Cross-Origin Resource Sharing', 'SOP를 서버의 허락 하에 푸는 표준. 서버가 응답 헤더로 "이 출처는 읽어도 됨"을 선언한다.'],
-    ['OAuth', 'Open Authorization', '비밀번호를 넘기지 않고 권한만 위임하는 표준. "Google로 로그인"이 이것이다.'],
+    ['OAuth 2.0', '', '사용자 대신 API에 접근할 권한을 위임하는 프레임워크. 그 자체는 로그인 규격이 아니다.'],
+    ['OIDC', 'OpenID Connect', 'OAuth 2.0 위에 신원 확인을 얹은 인증 규격. "Google로 로그인"에서 로그인 부분을 담당한다.'],
     ['PKCE', 'Proof Key for Code Exchange', 'OAuth 흐름에서 인가 코드를 가로채여도 쓸모없게 만드는 장치. "픽시"라고 읽는다.'],
   ]}
 />
@@ -23,17 +25,14 @@ import TermIntro from '../../../components/docs/TermIntro.astro';
 curl이나 서버 코드로는 아무 API나 호출해도 CORS 에러 같은 건 없다. 브라우저만 막는다.
 이유는 브라우저의 특수한 사정 하나 때문이다 —
 
-**브라우저는 남의 코드를 내 자격으로 실행하는 공간이다.**
-아무 사이트나 여는 순간 그 사이트의 JS가 내 브라우저에서 돌고, 내 브라우저에는
-은행·회사 메일의 로그인 쿠키가 들어 있다. 아무 규칙이 없다면 —
+**브라우저는 서로 모르는 출처의 코드를 한 사용자 세션 안에서 실행하는 공간이다.**
+어떤 페이지든 폼·이미지·스크립트 같은 교차 출처 요청을 만들 수 있고, 쿠키의 `SameSite` 조건이나
+`fetch`의 `credentials` 설정에 따라 자격 증명이 붙을 수도 있다. 요청을 전부 금지하면 웹이 동작하지
+않으므로, 같은 출처 정책(SOP)은 핵심적으로 **다른 출처의 응답 내용을 스크립트가 읽지 못하게** 막는다.
 
-```js
-// evil.com의 스크립트가, evil.com에 접속한 내 브라우저 안에서
-const res = await fetch('https://mybank.com/api/accounts');
-// 쿠키가 자동으로 딸려 가고, 내 계좌 목록이 evil.com 손에 들어간다
-```
-
-이걸 막는 게 같은 출처 정책(SOP)이다 — **다른 출처로 보낸 요청의 응답은 스크립트가 읽을 수 없다.**
+참고로 교차 출처 `fetch`의 기본값은 자격 증명을 보내지 않는 `credentials: 'same-origin'`이다.
+쿠키도 `SameSite=Lax`·`Strict`라면 교차 사이트 요청에 제한된다. SOP 하나가 모든 공격을 막는다는
+뜻은 아니며, 쓰기 요청은 CSRF 방어가 별도로 필요하다.
 브라우저 밖(서버 간 통신)에는 "남의 코드 + 내 쿠키"라는 조합이 없으니 이 규칙도 없다.
 
 :::tip[핵심]
@@ -69,15 +68,16 @@ sequenceDiagram
 
 | 증상 | 실체 | 처방 |
 |---|---|---|
-| 콘솔에 CORS 에러 | **프론트 코드 잘못이 아니다** — 서버가 내 출처를 허용 안 함 | API 서버의 CORS 설정에 프론트 출처 추가 |
+| 콘솔에 CORS 에러 | 브라우저 요청 조건과 서버 허용 정책이 불일치 | 요청 URL·메서드·헤더·credentials와 서버 CORS 설정을 함께 확인 |
 | 로컬에서만 남 | `localhost:5173`은 배포 도메인과 다른 출처다 | dev 서버 프록시 (Vite의 `server.proxy`) — 브라우저 입장에선 같은 출처가 된다 |
 | 남의 공개 API에서 남 | 그 API가 브라우저 직접 호출을 허용 안 한 것 | 내 서버(Route Handler)를 경유 — 서버 간에는 CORS가 없다 (+ API 키도 숨겨진다) |
 | OPTIONS 요청이 404 | 서버가 프리플라이트를 처리 안 함 | 프레임워크의 CORS 미들웨어를 쓴다 — 손으로 만들지 않는다 |
 
 :::caution[함정]
-검색하면 나오는 "CORS 끄는 브라우저 확장", `Access-Control-Allow-Origin: *` 전체 허용은
-처방이 아니라 **보안 장치 해체**다. 특히 쿠키 인증을 쓰는 API의 전체 허용은
-위의 evil.com 시나리오를 다시 여는 것과 같다. 허용 출처는 명시적으로 나열한다.
+검색하면 나오는 "CORS 끄는 브라우저 확장"은 실제 사용자의 브라우저에는 적용되지 않는 개발용 우회다.
+`Access-Control-Allow-Origin: *`는 **자격 증명 없는 공개 리소스**에는 유효하지만,
+쿠키 같은 자격 증명이 포함된 CORS 요청에는 브라우저가 허용하지 않는다.
+인증 API는 명시적 출처와 `Access-Control-Allow-Credentials`를 함께 설계한다.
 :::
 
 한 가지 흔한 오해 — CORS는 **읽기를 막는 장치지, 쓰기를 막는 장치가 아니다.**
@@ -86,10 +86,11 @@ sequenceDiagram
 Forgery)이고, 쿠키의 `SameSite` 속성(요즘은 기본 `Lax`)과 CSRF 토큰이 그 방어선이다.
 서버 검증(10장)과 마찬가지로 — 프레임워크·인증 라이브러리가 주는 방어를 끄지 않는 게 첫째 규칙이다.
 
-## OAuth — 비밀번호 대신 권한 위임
+## OAuth와 OIDC — 권한 위임과 로그인을 구분한다
 
-"Google로 로그인"의 목표는 하나다 — **내 서비스가 사용자의 Google 비밀번호를
-만지지 않고**, "이 사람이 이 Google 계정의 주인"이라는 확인만 받는 것.
+OAuth 2.0은 원래 **권한 위임** 규격이고, 로그인은 그 위의 OpenID Connect(OIDC)가 담당한다.
+"Google로 로그인"의 목표는 내 서비스가 사용자의 Google 비밀번호를 만지지 않고,
+Google이 인증한 사용자 신원을 검증 가능한 ID Token으로 받는 것이다.
 
 흐름의 뼈대(인가 코드 방식)는 이렇다 —
 
@@ -104,7 +105,7 @@ sequenceDiagram
     U->>G: ② Google에서 로그인 + "myapp에 허용?" 동의
     G->>A: ③ 인가 코드를 들려서 내 앱으로 돌려보냄<br/>(redirect: myapp.com/callback?code=abc123)
     A->>G: ④ 코드를 토큰으로 교환
-    G-->>A: ⑤ 액세스 토큰 (이후 이 토큰으로 사용자 확인)
+    G-->>A: ⑤ ID Token (+ 필요하면 액세스 토큰)
 ```
 
 비밀번호는 ②에서 Google 화면에만 입력된다 — 내 앱은 구경도 못 한다.
@@ -139,8 +140,8 @@ sequenceDiagram
 
 - **Supabase Auth, Auth.js, Clerk** 등의 로그인 흐름 설정에 `flowType: 'pkce'` 같은
   옵션이 있고, 요즘은 이게 기본값이다
-- OAuth 최신 권고는 **모든 클라이언트에 PKCE**다 — 비밀을 지킬 수 있는 서버 앱도
-  겹으로 쓰는 것이 표준이 됐다
+- OAuth 최신 보안 권고는 public client에 PKCE를 요구하고, 비밀을 지킬 수 있는 서버 앱에도
+  PKCE 사용을 권고한다
 - CLI 도구의 `gh auth login` 같은 브라우저 열리는 로그인도 같은 장치다
 
 설정 문서에서 "PKCE"를 보면 — "**인가 코드 가로채기 방어가 켜져 있구나**"로 읽으면 된다.
@@ -149,20 +150,27 @@ sequenceDiagram
 </Tabs>
 
 :::tip[핵심]
-CORS와 PKCE는 뿌리가 같다 — **브라우저는 공개된 공간**이라는 사실이다.
-남의 코드가 도니까 응답 읽기를 막고(SOP/CORS), 비밀을 못 숨기니까
+CORS와 PKCE는 모두 **브라우저 클라이언트의 경계를 정확히 다뤄야 한다**는 데서 나온다.
+출처가 다른 스크립트의 응답 읽기를 통제하고(SOP/CORS), public client가 비밀을 못 숨기므로
 비밀 없이도 안전한 교환 방식을 쓴다(PKCE). 이 감각 하나면 웹 보안 장치 대부분의
 "왜"가 풀린다.
 :::
 
 ## 11장 요약
 
-- 브라우저의 특수 사정 — **남의 코드가 내 자격(쿠키)으로 도는 공간**이라 규칙이 필요하다
+- 브라우저의 특수 사정 — 여러 출처의 코드와 사용자 세션이 한 공간에 있어 경계 규칙이 필요하다
 - SOP: 다른 출처의 응답은 못 읽는다. CORS: **응답하는 서버가** 헤더로 허락을 선언한다
-- CORS 에러는 프론트 코드 잘못이 아니다 — 서버 설정이거나, 프록시/서버 경유가 처방이다
-- 전체 허용(`*`)과 "CORS 끄기"는 처방이 아니라 보안 해체다
-- OAuth는 비밀번호 대신 **권한 위임** — 인가 코드가 리다이렉트로 돌아오는 구조
+- CORS 에러는 요청 조건과 서버 정책의 불일치다 — 양쪽 설정을 함께 확인한다
+- `*`는 자격 증명 없는 공개 리소스용이다. 인증 API는 명시적 출처를 쓴다
+- OAuth는 **권한 위임**, OIDC는 **로그인** — 인가 코드 흐름 위에서 함께 쓰인다
 - PKCE는 그 코드를 주워도 쓸모없게 만드는 일회용 자물쇠 — SPA·모바일의 표준이자 요즘 기본값
+
+## 참고 자료
+
+- [MDN CORS 가이드](https://developer.mozilla.org/en-US/docs/Web/HTTP/Guides/CORS) — 교차 출처 자격 증명·프리플라이트·wildcard 조건
+- [MDN Fetch의 credentials](https://developer.mozilla.org/en-US/docs/Web/API/Fetch_API/Using_Fetch#including_credentials) — 기본값과 `SameSite` 제한
+- [OpenID Connect Core](https://openid.net/specs/openid-connect-core-1_0.html) — OAuth 2.0 위의 인증 계층과 ID Token
+- [OAuth 2.0 Security BCP (RFC 9700)](https://www.rfc-editor.org/rfc/rfc9700.html) — public/confidential client의 PKCE 최신 권고
 
 <LinkCard
   title="12. 배포 — 코드가 서비스가 되기까지"

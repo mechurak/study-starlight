@@ -1,6 +1,7 @@
 ---
 title: "4. 색 리소스"
 description: "배경과 글자를 짝으로 — 20개 이름으로 앱 전체의 색을 관리한다"
+reviewedAt: 2026-08-12
 ---
 
 import { Steps, LinkCard, Tabs, TabItem } from '@astrojs/starlight/components';
@@ -14,7 +15,7 @@ import ColorScale from '../../../components/demos/ColorScale.astro';
   terms={[
     ['foreground', '', '"배경 위에 올라가는 것" — 주로 글자색. shadcn/ui는 배경색 토큰마다 짝이 되는 `-foreground` 를 둔다.'],
     ['대비', 'Contrast Ratio', '배경과 글자의 밝기 차이. 낮으면 안 읽힌다. 접근성 기준(WCAG)은 본문 4.5:1 이상을 요구한다.'],
-    ['oklch', 'Oklab Lightness Chroma Hue', '색을 밝기·선명도·색상 세 숫자로 적는 최신 CSS 색 표기법. 밝기를 사람 눈에 맞게 다루므로 **밝기만 바꿔도 색이 안 변한다**.'],
+    ['oklch', 'Oklab Lightness Chroma Hue', '색을 지각 밝기·채도·색상 세 숫자로 적는 CSS 색 표기법. 밝기 단계를 hex·HSL보다 예측 가능하게 조절하기 쉽다.'],
     ['WCAG', 'Web Content Accessibility Guidelines', '웹 접근성 국제 표준. 색 대비 기준의 출처.'],
     ['baseColor', '', 'shadcn init 때 고르는 중립색(회색) 계열. 화면의 90%를 차지한다.'],
   ]}
@@ -123,7 +124,8 @@ shadcn/ui의 색 토큰에는 규칙이 하나 있다. **배경색을 정하면 
 
 **왜 굳이?** HSL이나 hex는 밝기 숫자가 사람 눈과 안 맞는다.
 같은 밝기 값 50%인데 노랑은 눈부시고 파랑은 어둡게 보인다.
-`oklch`는 밝기를 눈에 맞춰 정의해서, **밝기만 바꿔도 색감이 유지**된다.
+`oklch`는 지각 밝기를 별도 축으로 다뤄, **밝기 단계를 비교적 일관되게 조절하기 쉽다.**
+다만 아주 선명한 색은 화면의 색역을 벗어날 수 있으므로 결과 색과 대비를 실제로 확인해야 한다.
 
 ```css
 /* 같은 파랑, 밝기만 다른 5단계 — oklch면 이게 자연스럽다 */
@@ -134,24 +136,24 @@ shadcn/ui의 색 토큰에는 규칙이 하나 있다. **배경색을 정하면 
 
 :::caution[함정]
 **hex를 써도 동작은 한다.** `--primary: #18181b;` 도 아무 문제 없다.
-다만 다크 모드 값을 만들 때 `oklch` 쪽이 훨씬 쉽다 — 밝기 숫자 하나만 뒤집으면 되기 때문이다.
+다만 다크 모드 값을 만들 때 `oklch` 쪽이 훨씬 쉽다 — 밝기와 채도를 서로 독립적으로 조절하기 좋기 때문이다.
 새로 만드는 프로젝트라면 `oklch`를 권한다.
 :::
 
 ## `baseColor` — 중립색 고르기
 
 화면 대부분은 브랜드 색이 아니라 **회색**이다. 텍스트, 테두리, 배경, 비활성 상태 전부.
-`init` 때 고르는 `baseColor`가 그 회색 계열을 정한다.
+`init` 때 고르는 `baseColor`가 그 중립색 계열을 정한다.
 
 <ColorScale name="zinc — 완전 중립 · 가장 무난하다" colors={['#fafafa','#f4f4f5','#e4e4e7','#d4d4d8','#a1a1aa','#71717a','#52525b','#3f3f46','#27272a','#18181b','#09090b']} />
-<ColorScale name="slate — 푸른 기가 섞임 · 차분하고 테크틱" colors={['#f8fafc','#f1f5f9','#e2e8f0','#cbd5e1','#94a3b8','#64748b','#475569','#334155','#1e293b','#0f172a','#020617']} />
 <ColorScale name="stone — 따뜻한 기가 섞임 · 부드러움" colors={['#fafaf9','#f5f5f4','#e7e5e4','#d6d3d1','#a8a29e','#78716c','#57534e','#44403c','#292524','#1c1917','#0c0a09']} />
 <ColorScale name="neutral — 순수 무채색" colors={['#fafafa','#f5f5f5','#e5e5e5','#d4d4d4','#a3a3a3','#737373','#525252','#404040','#262626','#171717','#0a0a0a']} />
 
-고르는 기준은 간단하다 — **브랜드 색이 따뜻하면 `stone`, 차가우면 `slate`, 애매하면 `zinc`.**
-`zinc`가 기본값이고 대부분의 경우 맞는 선택이다.
+현재 CLI의 선택지는 `neutral` · `stone` · `zinc` · `mauve` · `olive` · `mist` · `taupe`다.
+위 셋은 차이를 이해하기 위한 대표 예고, 나머지는 `shadcn/create`에서 실제 화면으로 비교하는 편이 빠르다.
+고르는 기준은 간단하다 — 따뜻하면 `stone`, 완전 무채색이면 `neutral`, 애매하면 `zinc`부터 본다.
 
-**나중에 못 바꾼다**는 점만 기억하자.
+초기화 뒤 `components.json`의 값만 바꿔서는 기존 토큰이 교체되지 않는다는 점을 기억하자.
 
 ## 연결하지 않으면 클래스가 안 생긴다
 
@@ -258,8 +260,13 @@ flowchart LR
 - 실무의 90%는 다섯 짝 — **`background` · `card` · `primary` · `muted` · `border`/`input`/`ring`**
 - `muted`(덜 중요한 것) / `secondary`(보조 액션) / `accent`(호버·선택)는 **의도가 다르다**
 - `oklch`는 **밝기를 눈에 맞게** 다뤄서 다크 값 만들기가 쉽다. hex를 써도 되긴 한다
-- `baseColor`는 화면의 90%를 결정한다. **`zinc`가 무난하고, 나중에 못 바꾼다**
+- `baseColor`는 화면 대부분의 중립색 인상을 정한다. 초기화 뒤에는 **필드만 바꿔도 기존 코드가 따라 바뀌지 않는다**
 - **값 정의 + `@theme inline` 연결**이 한 세트다. `inline`을 빠뜨리면 다크 모드가 조용히 죽는다
+
+## 참고 자료
+
+- [shadcn/ui 테마 문서](https://ui.shadcn.com/docs/theming) — 기본 토큰, base color 목록, 새 토큰 연결 방식
+- [WCAG 2.2 대비 기준](https://www.w3.org/WAI/WCAG22/Understanding/contrast-minimum.html) — 일반 텍스트 4.5:1 기준
 
 <LinkCard
   title="5. 형태 리소스"

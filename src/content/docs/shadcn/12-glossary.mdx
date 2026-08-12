@@ -11,12 +11,12 @@ import { LinkCard } from '@astrojs/starlight/components';
 
 | 이름 | 풀 이름 | 무엇인가 |
 |---|---|---|
-| **shadcn/ui** | — | 컴포넌트 소스를 내 레포에 복사해 주는 CLI 도구. 설치할 패키지가 없다 ([1장](/shadcn/01-what-is-shadcn/)) |
+| **shadcn/ui** | — | CLI로 컴포넌트 소스를 내 레포에 가져오는 코드 배포 방식. UI 전체를 런타임 패키지로 설치하지 않는다 ([1장](/shadcn/01-what-is-shadcn/)) |
 | **Tailwind CSS** | — | 클래스 이름 하나 = 스타일 한 줄인 CSS 프레임워크. `p-4` = `padding: 1rem` |
 | **Base UI** | — | shadcn/ui의 기본 프리미티브. 겉모습 없이 동작·접근성만 담당한다 (2026년 7월부터 기본값) |
 | **Radix UI** | — | 예전 기본 프리미티브. 계속 지원된다. `init -b radix`로 선택 |
 | **React Aria** | — | Adobe가 만든 또 다른 프리미티브 선택지 |
-| **lucide** | — | shadcn/ui의 기본 아이콘 세트. 선 스타일 1500여 개 ([8장](/shadcn/08-icon-font/)) |
+| **lucide** | — | shadcn/ui의 기본 아이콘 세트. 계속 추가되는 선 스타일 아이콘 모음 ([8장](/shadcn/08-icon-font/)) |
 | **cva** | class-variance-authority | variant 이름 → Tailwind 클래스 문자열을 만드는 라이브러리 ([7장](/shadcn/07-component/)) |
 | **clsx** | — | 조건에 따라 클래스를 켜고 끄는 라이브러리. `cn`의 절반 |
 | **tailwind-merge** | — | 충돌하는 Tailwind 클래스에서 뒤엣것만 남긴다. `cn`의 나머지 절반 |
@@ -81,7 +81,7 @@ import { LinkCard } from '@astrojs/starlight/components';
 | **레지스트리** | Registry | 컴포넌트·테마를 JSON으로 담아 둔 배포처 ([11장](/shadcn/11-registry/)) |
 | **업스트림** | Upstream | 내가 복사해 온 원본. 여기서는 shadcn/ui 공식 레지스트리 |
 | **드리프트** | Drift | 같은 컴포넌트가 앱마다 갈라져 결국 다른 물건이 되는 현상 |
-| **`--diff`** | — | 내 파일과 업스트림 최신본의 차이를 보여주는 옵션. **소유권 모델의 유일한 안전장치** |
+| **`--diff`** | — | 내 파일과 레지스트리의 현재 항목 차이를 보여주는 옵션. 업스트림 변경을 검토하는 핵심 도구 |
 | **`registryDependencies`** | — | 함께 받아야 할 다른 레지스트리 항목 |
 | **`dependencies`** | — | 함께 설치할 npm 패키지 |
 | **모노레포** | Monorepo | 앱 여러 개를 한 저장소에서 관리하는 구조 |

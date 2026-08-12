@@ -1,6 +1,7 @@
 ---
 title: "8. 아이콘 · 폰트 리소스"
 description: "세트를 하나로 통일하고, 폰트는 언제 어떻게 내려받게 할 것인가"
+reviewedAt: 2026-08-12
 ---
 
 import { LinkCard, Tabs, TabItem, Steps } from '@astrojs/starlight/components';
@@ -11,7 +12,7 @@ import TermIntro from '../../../components/docs/TermIntro.astro';
 
 <TermIntro
   terms={[
-    ['lucide', '', 'shadcn/ui의 기본 아이콘 세트. 1500개가 넘는 선(line) 스타일 아이콘 모음. 오픈소스.'],
+    ['lucide', '', 'shadcn/ui의 기본 아이콘 세트. 계속 추가되는 선(line) 스타일 오픈소스 아이콘 모음.'],
     ['SVG', 'Scalable Vector Graphics', '수학적으로 그려지는 이미지 형식. 아무리 확대해도 안 깨지고, CSS로 색을 바꿀 수 있다.'],
     ['`currentColor`', '', 'CSS 키워드. "지금 이 요소의 글자색"을 뜻한다. SVG 아이콘이 주변 글자색을 자동으로 따라오게 만드는 장치.'],
     ['FOIT / FOUT', 'Flash of Invisible / Unstyled Text', '웹폰트를 내려받는 동안 글자가 **안 보이거나**(FOIT) **다른 폰트로 보였다가 바뀌는**(FOUT) 현상.'],
@@ -92,11 +93,12 @@ import { Search, Loader2 } from 'lucide-react'
 `components.json`에 등록하면 CLI가 그 세트로 컴포넌트를 받아 온다.
 
 ```json
-{ "iconLibrary": "radix" }
+{ "iconLibrary": "tabler" }
 ```
 
-이미 받은 파일까지 바꾸려면 `shadcn migrate icons` 명령이 있다.
-**세트 교체는 한 번 하고 끝나는 일**이라 이 이상은 필요해질 때 문서를 보면 된다.
+새 프로젝트라면 `shadcn/create`나 preset에서 고르는 편이 안전하다.
+이미 받은 컴포넌트는 import와 아이콘 이름이 남아 있으므로, 설정 필드만 바꾸지 말고
+CLI의 현재 migration/preset 흐름으로 diff를 확인한다.
 
 ## 폰트 리소스
 
@@ -120,8 +122,8 @@ flowchart LR
     class A,B,C,D mute
 ```
 
-**둘 중 하나는 반드시 일어난다.** 고를 수 있을 뿐이다.
-그리고 대부분의 경우 **FOUT 쪽이 낫다** — 글자가 안 보이는 것보다 낫기 때문이다.
+첫 방문처럼 폰트가 캐시에 없을 때 브라우저는 대기 중 글자를 숨기거나 폴백으로 보여 준다.
+대부분의 본문에서는 **폴백을 먼저 보여 주는 쪽이 낫다** — 글자가 안 보이는 것보다 낫기 때문이다.
 
 ```css
 @font-face {
@@ -170,11 +172,11 @@ export default function RootLayout({ children }) {
 - **한글 폰트는 구글 폰트에 있는 것만** 가능하다 (Noto Sans KR 등)
 
 </TabItem>
-<TabItem label="③ 셀프호스팅 + 동적 서브셋 — 한글의 현실적 해답">
+<TabItem label="③ 동적 서브셋 — 한글의 실용적 선택지">
 
 ```css
 /* Pretendard가 공식 제공하는 CSS를 불러온다 */
-@import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/variable/pretendardvariable-dynamic-subset.css');
+@import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css');
 
 @theme inline {
   --font-sans: 'Pretendard Variable', system-ui, sans-serif;
@@ -184,14 +186,15 @@ export default function RootLayout({ children }) {
 - 폰트를 **수백 개 조각으로 쪼개** 두고, 페이지에 실제 쓰인 글자의 조각만 내려받는다
 - 수 MB짜리 한글 폰트가 **페이지당 수십 KB**로 줄어든다
 - 가변 폰트라 **굵기 전부가 파일 하나**에 들어 있다 ([6장](/shadcn/06-typography/#굵기))
+- 위 예시는 외부 CDN 방식이다. 보안 정책·개인정보·가용성이 중요하면 같은 파일을 직접 호스팅한다
 
 </TabItem>
 </Tabs>
 
 :::tip[핵심]
-**한글 웹폰트를 쓸 거면 동적 서브셋이 사실상 유일한 답이다.**
-전체 파일은 굵기당 수 MB라 모바일에서 감당이 안 되고,
-정적 서브셋(자주 쓰는 2350자만)은 이름·전문용어에서 글자가 깨진다.
+**한글 웹폰트에서는 동적 서브셋이 강력한 선택지다.**
+전체 글리프를 여러 굵기로 모두 내려받는 비용을 피하면서, 페이지에 쓰인 글자만 요청할 수 있다.
+다만 시스템 폰트, 필요한 문자만 만든 정적 서브셋, 프레임워크의 로컬 폰트 최적화도 요구에 따라 맞는 답이다.
 :::
 
 ### 토큰에 연결한다
@@ -235,10 +238,14 @@ export default function RootLayout({ children }) {
 - **아이콘 세트는 하나로 통일**한다. 섞으면 선 굵기와 여백이 안 맞아 어색해진다
 - lucide 아이콘은 `currentColor`라 **글자색을 자동으로 따라온다** — 색 클래스를 붙이지 않는다
 - 크기는 **`size-4`(16px)가 기본**, 버튼 안에서는 `shrink-0`을 같이 준다
-- 웹폰트는 **FOIT(안 보임)와 FOUT(덜컹) 중 하나가 반드시** 일어난다. `font-display: swap`으로 FOUT를 고른다
-- 방법 셋 — **시스템 폰트**(가장 빠름) · **`next/font`**(Next.js 기본) · **동적 서브셋**(한글의 답)
-- 한글 웹폰트는 **동적 서브셋이 사실상 유일한 실용적 방법**이다
+- 웹폰트가 아직 없을 때는 **FOIT(안 보임) 또는 폴백 표시** 정책이 필요하다. `font-display: swap`은 폴백을 먼저 보인다
+- 방법 셋 — **시스템 폰트**(가장 빠름) · **`next/font`**(Next.js 기본) · **동적 서브셋**(한글의 강력한 선택지)
 - 어느 방법이든 마지막은 **`--font-sans` 토큰에 연결 + `<body>`에 한 번 적용**
+
+## 참고 자료
+
+- [Pretendard 웹폰트 문서](https://github.com/orioncactus/pretendard/blob/main/packages/pretendard/docs/README.md) — 공식 CDN·동적 서브셋·가변 폰트 경로
+- [Next.js Font 최적화](https://nextjs.org/docs/app/getting-started/fonts) — `next/font`의 셀프호스팅과 폴백 처리
 
 <LinkCard
   title="9. 테마 두 벌 — 다크 모드"

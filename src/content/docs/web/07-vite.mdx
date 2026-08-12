@@ -1,6 +1,7 @@
 ---
 title: "7. Vite — 개발 서버와 빌드의 분리"
 description: "dev에선 안 묶는다는 발상 하나로 표준이 된 도구 — 그리고 Vite 8의 Rolldown"
+reviewedAt: 2026-08-12
 ---
 
 import { Tabs, TabItem, LinkCard } from '@astrojs/starlight/components';
@@ -48,10 +49,10 @@ Vite(프랑스어로 "빠르다", "비트"라 읽는다)는 순서를 뒤집었�
 서버를 먼저 띄우고, 브라우저의 네이티브 ESM이 `import`를 따라 파일을 요청하면
 **그 파일만 그때 변환해서** 준다.
 
-- **시작이 즉시다** — 프로젝트가 얼마나 크든 서버는 바로 뜬다. 할 일을 미뤘으니까
+- **시작이 빠르다** — 전체 앱 번들을 먼저 만들지 않고 요청된 모듈을 중심으로 처리한다
 - **HMR이 빠르다** — 파일 하나를 고치면 그 모듈만 갈아 끼운다. 전체 재번들이 없다
-- **의존성만 예외** — `node_modules`의 패키지는 파일 수가 많고 CJS(4장)가 섞여 있어,
-  처음 한 번만 esbuild로 사전 번들해 캐시한다. 첫 실행이 잠깐 걸리는 이유다
+- **의존성은 예외적으로 최적화한다** — `node_modules`의 패키지는 파일 수가 많고 CJS(4장)가 섞여 있어,
+  Rolldown 기반 파이프라인이 사전 처리해 캐시한다. 첫 실행이 잠깐 걸릴 수 있는 이유다
 
 그리고 배포용 빌드(`vite build`)는 6장의 결론대로 **제대로 묶는다** —
 트리셰이킹·미니파이·코드 스플리팅 전부. dev와 build가 서로 다른 전략을 쓰는 게 Vite의 정체다.
@@ -70,10 +71,11 @@ Vite 8(2026년 3월)이 이걸 정리했다. Rust로 만든 번들러 **Rolldown
 모두 담당하는 단일 엔진이 됐다 —
 
 - 빌드 속도가 프로젝트에 따라 수 배~수십 배 빨라졌다
-- dev/build 불일치의 근원이 사라졌다
+- dev/build 불일치의 큰 원인 하나였던 **서로 다른 번들러**가 사라졌다
 - 모듈 단위 캐시, 유연한 청크 분할 같은 기능이 단일 엔진 위에서 가능해졌다
 
-기존 설정과 플러그인은 대부분 그대로 돈다 — 사용자 입장에선 "같은 Vite인데 빨라졌다"에 가깝다.
+기존 설정과 플러그인은 호환 계층 덕분에 대부분 그대로 돈다. 다만 dev는 여전히 요청 기반,
+build는 번들 기반이라 환경 변수·청크·플러그인 훅 차이까지 전부 사라진 것은 아니다.
 
 ## 왜 다들 Vite 위에 있는가
 
@@ -129,7 +131,7 @@ pnpm build && ls dist/assets
 ```
 
 파일명의 해시(`D3xK9f2a`)는 내용이 바뀌면 같이 바뀐다 —
-CDN이 영원히 캐시해도 배포하면 새 파일명이라 안전한, 캐싱의 관용 수법이다.
+HTML은 짧게 캐시하고 해시 자산에는 긴 immutable 캐시를 주는 배포 전략이 가능해진다.
 
 </TabItem>
 </Tabs>
@@ -145,9 +147,14 @@ dev에서만 확인하고 배포하지 않는다. dev와 build는 전략이 다�
 
 - Vite의 정체 — **dev 서버(안 묶고 즉석 변환) + build 명령**(묶고 다이어트)의 묶음
 - 발상의 핵심: 브라우저의 네이티브 ESM에 모듈 해석을 맡기고, 요청된 파일만 그때 변환한다
-- Vite 8부터 **Rolldown**(Rust)이 dev/build 단일 엔진 — 더 빠르고, dev/build 불일치가 사라졌다
+- Vite 8부터 **Rolldown**(Rust)이 단일 번들러 — 더 빠르고, dev/build 불일치의 원인 하나가 줄었다
 - Astro·SvelteKit·Vitest가 전부 Vite 위에 있다 — 공통 기반의 표준화. 예외는 Next.js(Turbopack)
 - 배포 전 `pnpm preview`로 build 결과물을 확인하는 습관을 들인다
+
+## 참고 자료
+
+- [Vite 8 발표](https://vite.dev/blog/announcing-vite8) — Rolldown 통합, 성능 범위, 호환 계층과 남은 실험 기능
+- [Vite 8 마이그레이션 가이드](https://vite.dev/guide/migration.html) — esbuild·Rollup에서 Rolldown·Oxc로 바뀐 범위
 
 <LinkCard
   title="8. 품질 도구 — 타입 · 린트 · 포맷 · 테스트"
