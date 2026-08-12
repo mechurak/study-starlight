@@ -11,8 +11,17 @@ import { Steps, Card, CardGrid, Tabs, TabItem, Badge } from '@astrojs/starlight/
 
 2장에서 봤듯 **클러스터의 모든 변경은 kube-apiserver를 거쳐 etcd에 적는 것**으로 시작한다.
 컨트롤러도, kubelet도, `kubectl`도 예외가 없다 — 그래서 API 서버 한 곳만 지키면 클러스터 전체가 지켜진다.
-그 문지기가 **인증 → 인가 → admission** 세 관문이고, 이 장은 그 관문의 이야기다.
+그 문지기가 **인증 → 인가 → admission(요청 내용 검사)** 세 관문이고, 이 장은 그 관문의 이야기다.
 "선언(spec)을 적으면 컨트롤러가 실제를 거기에 맞춰 간다"는 축에서, 여기는 **누가 그 선언을 적을 수 있는가**를 정하는 자리다.
+
+인가에서 가장 많이 쓰는 방식이 **RBAC(Role-Based Access Control, 역할 기반 접근 제어)** 다.
+역할에 권한을 정의하고 사용자·그룹·ServiceAccount를 그 역할에 묶는다.
+
+:::tip[첫 회독은 네 덩어리만]
+처음에는 **세 관문 → 사람과 Pod의 신원 → RBAC 네 리소스 → `auth can-i` 검산** 순서로 읽는다.
+CSR로 인증서를 직접 만드는 절차, 집계 ClusterRole, AdmissionConfiguration·webhook은 두 번째
+회독에서 명령을 따라 해도 된다.
+:::
 
 ```mermaid
 flowchart LR
@@ -326,7 +335,7 @@ CI/CD 등 클러스터 밖에서 쓸 토큰이 이 경우다.
 ## RBAC의 네 리소스
 
 인가를 "이 사람에게 이 권한"으로 하나씩 붙이면, 사람이 늘 때마다 권한 목록을 통째로 복사해야 하고
-정책이 바뀌면 전부를 찾아 고쳐야 한다. RBAC(Role-Based Access Control, 역할 기반 접근 제어)은
+정책이 바뀌면 전부를 찾아 고쳐야 한다. RBAC은
 **역할에 권한을 정의해 두고, 주체를 그 역할에 묶는** 방식이다.
 권한 정의는 한 곳에 모이고, 사람이 늘어나는 일은 **묶기 하나를 더하는 일**이 된다.
 

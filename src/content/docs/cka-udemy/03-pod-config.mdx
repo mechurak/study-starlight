@@ -8,6 +8,13 @@ import { LinkCard } from '@astrojs/starlight/components';
 > 짝이 되는 개념 장: [cka 4. Pod](/cka/04-pods/) · [cka 6. 설정과 리소스](/cka/06-config/)
 
 이 장 실습의 공통 뼈대는 하나다 — **Pod 스펙 대부분은 실행 중에 못 고친다.**
+
+:::tip[실습 전 확인]
+`command`는 이미지의 ENTRYPOINT, `args`는 CMD를 덮는다. ConfigMap은 일반 설정,
+Secret은 민감한 값을 담지만 **base64일 뿐 암호화는 아니다**. 환경변수로 받은 값은 Secret이
+바뀌어도 실행 중인 프로세스에 자동 반영되지 않는다.
+:::
+
 그래서 모든 문제가 같은 3단계로 풀린다:
 
 ```bash

@@ -10,6 +10,12 @@ import { Steps, LinkCard } from '@astrojs/starlight/components';
 cka 15장이 "시험의 승부처"라 부르는 영역의 실습판이다. 다섯 벌 모두
 **절차형** — 순서를 외우는 게 아니라 각 단계가 왜 있는지 알면 순서는 따라온다.
 
+:::tip[실습 전 확인]
+명령을 치기 전에 **어느 노드에서 실행하는지** 표시한다. `kubeadm upgrade plan/apply`와
+etcd 스냅샷은 컨트롤 플레인 노드, `drain`은 클러스터를 조작할 수 있는 터미널에서 실행한다.
+백업 문제는 파일 생성으로 끝나지 않고 **문제가 지정한 경로에 결과가 있는지**까지 확인한다.
+:::
+
 ## kubeadm 설치 — Practice Test: Deploy a Cluster using Kubeadm
 
 원본 풀이: [05-Practice-Test-Deploy-Kubernetes-Cluster-using-Kubeadm.md](https://github.com/kodekloudhub/certified-kubernetes-administrator-course/blob/master/docs/11-Install-Kubernetes-the-kubeadm-way/05-Practice-Test-Deploy-Kubernetes-Cluster-using-Kubeadm.md)

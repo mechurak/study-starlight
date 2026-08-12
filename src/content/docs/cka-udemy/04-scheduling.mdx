@@ -10,6 +10,12 @@ import { LinkCard } from '@astrojs/starlight/components';
 실습이 일곱 벌로 가장 많은 장이다. 축은 두 방향이다 —
 **affinity는 Pod이 노드를 고르고, taint는 노드가 Pod을 밀어낸다.**
 
+:::tip[실습 전 확인]
+스케줄러는 먼저 **놓을 수 없는 노드를 제외**하고, 남은 후보 중 하나를 고른다.
+`nodeName`은 스케줄러를 건너뛰고, affinity·selector는 Pod 쪽 조건이며,
+taint는 노드 쪽 거부 조건이다. toleration은 거부를 견딜 뿐 그 노드를 선택하지는 않는다.
+:::
+
 ## 수동 배치 — Practice Test: Manual Scheduling
 
 원본 풀이: [03-Practice-Test-Manual-Scheduling.md](https://github.com/kodekloudhub/certified-kubernetes-administrator-course/blob/master/docs/03-Scheduling/03-Practice-Test-Manual-Scheduling.md)

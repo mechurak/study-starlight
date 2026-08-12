@@ -9,12 +9,25 @@ import { Steps, Card, CardGrid, Tabs, TabItem, FileTree, Badge } from '@astrojs/
 
 ## 이 장이 시험의 승부처다
 
-- **커리큘럼의 25%가** 이 영역이다 (Cluster Architecture, Installation and Configuration)
+- 이 장이 속한 **Cluster Architecture, Installation and Configuration 도메인 전체가 25%**다.
+  14~17장이 이 비중을 나눠 맡고, 이 장 하나가 25%라는 뜻은 아니다
 - 그리고 **평소에 할 일이 없는 작업**들이다 — EKS/GKE를 쓰면 아예 못 만진다
 - 문제 하나가 **10~15분**을 먹는다. 손에 안 붙어 있으면 시간에 진다
 
 **반복 말고는 방법이 없다.** killercoda에서
 **업그레이드와 etcd 백업·복구를 각각 10회 이상** 돌리는 것을 권한다.
+
+:::tip[읽는 장과 연습하는 장을 분리한다]
+한 번에 이 긴 장을 전부 외우려 하지 않는다.
+
+| 구분 | 범위 |
+|---|---|
+| 첫 회독에서 이해 | 클러스터 생성 흐름 · 업그레이드 순서 · etcd가 복구되는 위치 |
+| 반복해서 손에 붙일 것 | `kubeadm upgrade` · `etcdctl snapshot save/restore` |
+| 장애 때 찾아볼 참조 | 파일 지도 · 인증서 명령 · HA 토폴로지 · 노드 추가/제거 |
+
+첫 회독은 각 h2의 그림과 요약만 읽고, 명령 블록은 killercoda를 켠 두 번째 회독에서 실행한다.
+:::
 
 :::tip[시험]
 이 장의 명령들은 **공식 문서에 그대로 있다.**
@@ -32,6 +45,7 @@ import { Steps, Card, CardGrid, Tabs, TabItem, FileTree, Badge } from '@astrojs/
 이 일을 손으로 하면 인증서 수십 장을 직접 서명하고 컴포넌트마다 kubeconfig를 써야 한다.
 설치의 주인공인 **kubeadm** — 공식 클러스터 부트스트랩 도구 — 이 그 과정을 대신해 준다.
 인증서·kubeconfig·컨트롤 플레인 스태틱 Pod을 순서대로 만들어 준다.
+아래 흐름의 CNI(Container Network Interface)는 Pod 네트워크를 붙이는 플러그인 규격이다.
 
 ### 클러스터가 만들어지는 전체 흐름
 

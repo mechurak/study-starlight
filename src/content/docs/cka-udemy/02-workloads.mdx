@@ -10,6 +10,12 @@ import { LinkCard } from '@astrojs/starlight/components';
 이 장의 실습은 **"깨진 정의 파일을 고쳐서 만들어라"** 유형이 절반이다.
 에러 메시지를 읽고 어느 줄을 고칠지 바로 짚는 것이 연습 목표다.
 
+:::tip[실습 전 확인]
+ReplicaSet은 **Pod 개수**, Deployment는 그 ReplicaSet의 **버전과 롤아웃**까지 관리한다.
+둘 다 `selector`와 Pod 템플릿의 라벨이 맞아야 한다. "Pod을 고친다"보다 **컨트롤러의
+템플릿을 고쳐 새 Pod을 만든다**가 기본 동작이다.
+:::
+
 ## ReplicaSet — Practice Test: ReplicaSets
 
 원본 풀이: [15-Practice-Tests-ReplicaSet.md](https://github.com/kodekloudhub/certified-kubernetes-administrator-course/blob/master/docs/02-Core-Concepts/15-Practice-Tests-ReplicaSet.md)

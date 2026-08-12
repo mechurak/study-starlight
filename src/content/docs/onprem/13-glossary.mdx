@@ -27,6 +27,7 @@ import TermIntro from '../../../components/docs/TermIntro.astro';
 | egress 프록시 | Egress Proxy | 내부→외부 트래픽을 대신 내보내는 사내 중계 | [4](/onprem/04-tls-dns/) |
 | SLO | Service Level Objective | 스스로 정한 서비스 목표치 | [1](/onprem/01-why/) |
 | 실패 도메인 | Failure Domain | 함께 죽는 범위. 백업을 여기에 같이 두면 안 된다 | [11](/onprem/11-backup/) |
+| DR | Disaster Recovery | 사이트·클러스터 전체를 잃었을 때 다른 환경에서 되살리는 계획과 절차 | [11](/onprem/11-backup/) |
 
 ## ① 바닥 — 클러스터 · 네트워크 · 스토리지
 
@@ -66,7 +67,7 @@ import TermIntro from '../../../components/docs/TermIntro.astro';
 
 | 용어 | 풀 이름 | 뜻 | 장 |
 |---|---|---|---|
-| S3 API | — | 오브젝트 스토리지의 사실상 표준 HTTP 인터페이스 | [6](/onprem/06-minio/) |
+| S3 API | Simple Storage Service API | 오브젝트 스토리지의 사실상 표준 HTTP 인터페이스 | [6](/onprem/06-minio/) |
 | 버킷 · 객체 · 키 | Bucket · Object · Key | 그릇 · 데이터 · 이름. **키의 `/`는 폴더가 아니라 접두사** | [6](/onprem/06-minio/) |
 | path-style | — | `호스트/버킷/키` 형식. **온프렘은 대개 이걸 켠다** | [6](/onprem/06-minio/) |
 | 라이프사이클 | Lifecycle | "N일 지난 객체는 삭제" 규칙. 디스크가 차는 걸 막는 장치 | [6](/onprem/06-minio/) |
@@ -102,12 +103,13 @@ import TermIntro from '../../../components/docs/TermIntro.astro';
 | sync wave | — | 설치 순서를 강제하는 순번 | [9](/onprem/09-gitops/) |
 | 부트스트랩 | Bootstrap | 빈 클러스터에 **자기 자신을 관리할 첫 조각**을 손으로 심는 일 | [9](/onprem/09-gitops/) |
 | SealedSecret | — | 공개키로 암호화해 Git에 올리는 봉투. 클러스터 안 컨트롤러만 푼다 | [10](/onprem/10-secrets/) |
-| sealing key | 마스터키 | SealedSecret을 푸는 개인키. **잃으면 Git의 모든 암호문이 안 풀린다** | [10](/onprem/10-secrets/) |
-| 스코프 | Scope | 암호문을 **어느 이름·NS에서 풀 수 있는지**. 기본은 strict — 옮기면 거부된다 | [10](/onprem/10-secrets/) |
-| SOPS · age | — | 파일 암호화 도구와 키 형식. **마스터키 백업을 지키는 "키의 키"** | [10](/onprem/10-secrets/) |
+| sealing key 세트 | 봉인 키 세트 | SealedSecret을 푸는 개인키들의 묶음. **갱신된 키까지 모두 백업해야 한다** | [10](/onprem/10-secrets/) |
+| 스코프 | Scope | 암호문을 **어느 이름·네임스페이스에서 풀 수 있는지**. 기본은 strict — 옮기면 거부된다 | [10](/onprem/10-secrets/) |
+| SOPS | Secrets OPerationS | YAML·JSON 같은 설정 파일의 값을 암호화해 편집하는 도구 | [10](/onprem/10-secrets/) |
+| age | — | 공개 recipient로 암호화하고 개인 identity로 푸는 파일 암호화 도구·키 방식 | [10](/onprem/10-secrets/) |
 | ESO | External Secrets Operator | 외부 금고의 값을 Secret으로 만들어 주는 오퍼레이터. Git엔 참조만 | [10](/onprem/10-secrets/) |
 | Reflector | — | Secret을 **네임스페이스 간 복제**. 암호화와는 무관하다 | [10](/onprem/10-secrets/) |
-| RPO · RTO | Recovery Point · Time Objective | 얼마나 최근까지 / 얼마나 빨리 되살리나 | [11](/onprem/11-backup/) |
+| RPO · RTO | Recovery Point Objective · Recovery Time Objective | 얼마나 최근까지 / 얼마나 빨리 되살리나 | [11](/onprem/11-backup/) |
 | etcd 스냅샷 | — | 클러스터 오브젝트 전체를 뜬 파일. 복구는 최후 수단 | [11](/onprem/11-backup/) |
 | Velero · Kopia | — | 리소스·PV 백업 도구 / 그 파일 백업 엔진 | [11](/onprem/11-backup/) |
 | 버전 스큐 | Version Skew | 컴포넌트 사이에 허용되는 버전 차이 | [12](/onprem/12-ops/) |

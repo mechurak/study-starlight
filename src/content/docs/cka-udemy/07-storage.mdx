@@ -10,6 +10,12 @@ import { LinkCard } from '@astrojs/starlight/components';
 스토리지 실습의 핵심 질문은 하나다 — **"왜 Pending인가."**
 PVC가 Pending인 이유가 랩마다 다르고, 그 차이가 곧 출제 포인트다.
 
+:::tip[실습 전 확인]
+PV(PersistentVolume)는 관리자가 준비한 저장 공간, PVC(PersistentVolumeClaim)는 앱의 요청,
+StorageClass는 요청이 올 때 PV를 자동 생성하는 규칙이다. PVC가 `Pending`이면
+**클래스 · access mode · 용량 · 셀렉터**가 맞는지 `describe pvc`의 Events에서 확인한다.
+:::
+
 ## PV와 PVC — Practice Test: Persistent Volume Claims
 
 원본 풀이: [10-Practice-Test-Persistent-Volume-Claims.md](https://github.com/kodekloudhub/certified-kubernetes-administrator-course/blob/master/docs/08-Storage/10-Practice-Test-Persistent-Volume-Claims.md)

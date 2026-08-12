@@ -1,5 +1,5 @@
 ---
-title: "8. 인증서 · kubeconfig · RBAC — 접근 제어 일곱 벌"
+title: "8. 인증서 · kubeconfig · RBAC — 접근 제어 아홉 벌"
 description: "인증서 읽기, CSR 승인/거부, kubeconfig 수리, Role과 ClusterRole, ServiceAccount, 프라이빗 레지스트리, admission 컨트롤러"
 ---
 
@@ -10,7 +10,15 @@ import { LinkCard } from '@astrojs/starlight/components';
 아홉 실습이 전부 "요청이 통과해야 하는 세 관문"(인증 → 인가 → admission) 위에 있다.
 어느 관문의 문제인지부터 가르면 절반은 푼 것이다.
 
-## 인증서 읽기 — Practice Test: View Certificate Details
+:::tip[실습 전 확인]
+인증은 **누구인지**, 인가는 **그 신원이 해도 되는지**, admission은 **요청 내용이 정책에
+맞는지**를 본다. RBAC(Role-Based Access Control, 역할 기반 접근 제어)은 역할에 권한을
+정의하고 사용자·그룹·ServiceAccount를 그 역할에 묶는 인가 방식이다.
+:::
+
+## 인증서와 kubeconfig
+
+### 인증서 읽기 — Practice Test: View Certificate Details
 
 원본 풀이: [10-Practice-Test-View-Certificate-Details.md](https://github.com/kodekloudhub/certified-kubernetes-administrator-course/blob/master/docs/07-Security/10-Practice-Test-View-Certificate-Details.md)
 
@@ -42,7 +50,7 @@ etcd는 **자체 CA**(`pki/etcd/ca.crt`)를 쓴다. API 서버의 `--etcd-cafile
 — *ETCD has its own CA. The right CA must be used for the ETCD-CA file in /etc/kubernetes/manifests/kube-apiserver.yaml.*
 :::
 
-## CSR 승인 — Practice Test: Certificates API
+### CSR 승인 — Practice Test: Certificates API
 
 원본 풀이: [12-Practice-Test-Certificates-API.md](https://github.com/kodekloudhub/certified-kubernetes-administrator-course/blob/master/docs/07-Security/12-Practice-Test-Certificates-API.md)
 
@@ -71,7 +79,7 @@ CSR YAML의 뼈대(`signerName: kubernetes.io/kube-apiserver-client`, `usages: [
 `system:masters` 그룹을 요구하는 CSR은 승인하면 안 된다 — 거부 문제로 나온다.
 :::
 
-## kubeconfig — Practice Test: KubeConfig
+### kubeconfig — Practice Test: KubeConfig
 
 원본 풀이: [14-Practice-Test-KubeConfig.md](https://github.com/kodekloudhub/certified-kubernetes-administrator-course/blob/master/docs/07-Security/14-Practice-Test-KubeConfig.md)
 
@@ -95,7 +103,9 @@ kubectl config --kubeconfig=/root/my-kube-config use-context research
 — *The path to certificate is incorrect in the kubeconfig file. Fix it. All users certificates are stored at /etc/kubernetes/pki/users*.
 :::
 
-## Role과 RoleBinding — Practice Test: RBAC
+## RBAC으로 권한 주기
+
+### Role과 RoleBinding — Practice Test: RBAC
 
 원본 풀이: [18-Practice-Test-RBAC.md](https://github.com/kodekloudhub/certified-kubernetes-administrator-course/blob/master/docs/07-Security/18-Practice-Test-RBAC.md)
 
@@ -123,7 +133,7 @@ kubectl create rolebinding dev-user-binding --role=developer --user=dev-user -n 
 edit로 고칠 때 이 필드를 놓치면 계속 403이다.
 :::
 
-## ClusterRole — Practice Test: Cluster Roles
+### ClusterRole — Practice Test: Cluster Roles
 
 원본 풀이: [20-Practice-Test-Cluster-Roles.md](https://github.com/kodekloudhub/certified-kubernetes-administrator-course/blob/master/docs/07-Security/20-Practice-Test-Cluster-Roles.md)
 
@@ -146,7 +156,9 @@ kubectl create clusterrolebinding michelle-storage-admin \
 가르는 기준은 [cka 14장](/cka/14-rbac/). rules YAML을 직접 써야 하면 공식
 [RBAC 문서](https://kubernetes.io/docs/reference/access-authn-authz/rbac/)의 예시에서 복사한다.
 
-## ServiceAccount — Practice Test: Service Accounts
+## 워크로드 신원과 이미지 접근
+
+### ServiceAccount — Practice Test: Service Accounts
 
 원본 풀이: [22-Practice-Test-Service-Accounts.md](https://github.com/kodekloudhub/certified-kubernetes-administrator-course/blob/master/docs/07-Security/22-Practice-Test-Service-Accounts.md)
 
@@ -169,7 +181,7 @@ kubectl create token dashboard-sa            # 수명 있는 토큰 발급 (Toke
 지금은 **`kubectl create token`으로 수명 있는 토큰을 발급**한다 — [cka 14장](/cka/14-rbac/).
 :::
 
-## 프라이빗 레지스트리 — Practice Test: Image Security
+### 프라이빗 레지스트리 — Practice Test: Image Security
 
 원본 풀이: [24-Practice-Test-Image-Security.md](https://github.com/kodekloudhub/certified-kubernetes-administrator-course/blob/master/docs/07-Security/24-Practice-Test-Image-Security.md)
 
@@ -194,7 +206,9 @@ kubectl create secret docker-registry private-reg-cred \
 이 Secret이 없다는 신호다 — *Use the kubectl edit deployment command to edit the image name
 to myprivateregistry.com:5000/nginx:alpine*. Secret 타입은 `docker-registry`라는 것까지 기억.
 
-## admission 플러그인 켜고 끄기 — Lab: Admission Controllers (2025 신규)
+## Admission으로 요청 내용 검사
+
+### admission 플러그인 켜고 끄기 — Lab: Admission Controllers (2025 신규)
 
 소스: 강의 노트 [(2025 Updates) Admission Controllers](https://notes.kodekloud.com/docs/Certified-Kubernetes-Administrator-CKA/Scheduling/2025-Updates-Admission-Controllers/page)
 — 원본 레포에는 이 랩의 풀이 문서가 없다 (2025년 추가 랩).
@@ -237,7 +251,7 @@ ps -ef | grep kube-apiserver | grep admission-plugins
 "다음 중 기본으로 켜져 있지 않은 것은?" 유형의 답이 된다.
 :::
 
-## admission webhook 등록 — Lab: Validating and Mutating Admission Controllers (2025 신규)
+### admission webhook 등록 — Lab: Validating and Mutating Admission Controllers (2025 신규)
 
 소스: 강의 노트 [(2025 Updates) Validating and Mutating Admission Controllers](https://notes.kodekloud.com/docs/Certified-Kubernetes-Administrator-CKA/Scheduling/2025-Updates-Validating-and-Mutating-Admission-Controllers/page).
 내장 플러그인이 아니라 **직접 만든 규칙**을 거는 쪽 — [cka 14장의 외부 webhook 절](/cka/14-rbac/#외부-webhook--직접-만드는-admission)이 개념 짝이다.

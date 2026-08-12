@@ -16,6 +16,7 @@ import TermIntro from '../../../components/docs/TermIntro.astro';
     ['Velero', '', '쿠버네티스 리소스와 PV 데이터를 오브젝트 스토리지로 백업·복구하는 도구. 온프렘 클러스터 백업의 사실상 표준이다.'],
     ['Kopia', '', 'Velero가 PV 파일을 복사할 때 쓰는 백업 엔진. CSI 스냅샷을 못 쓰는 스토리지에서도 파일 단위로 백업할 수 있게 해 준다.'],
     ['실패 도메인', 'Failure Domain', '함께 죽는 범위. **백업을 백업 대상과 같은 실패 도메인에 두면 백업이 아니다**.'],
+    ['DR', 'Disaster Recovery, 재해 복구', '사이트·클러스터 전체를 잃었을 때 다른 환경에서 서비스를 되살리는 계획과 절차. **백업 파일만이 아니라 복구 순서와 연습**까지 포함한다.'],
   ]}
 />
 
@@ -30,7 +31,7 @@ import TermIntro from '../../../components/docs/TermIntro.astro';
 | **PV 데이터** | 앱이 쌓아 둔 파일 | Velero (+ CSI 스냅샷) |
 | **데이터베이스** | 업무 데이터 | CNPG 백업 + WAL ([7장](/onprem/07-cnpg/)) |
 | **오브젝트 스토리지** | 로그·트레이스·백업 자체 | 복제 또는 오프사이트 ([6장](/onprem/06-minio/)) |
-| **Sealed Secrets 마스터키** | **Git의 모든 비밀을 영영 못 푼다** | 별도 금고 ([10장](/onprem/10-secrets/)) |
+| **Sealed Secrets sealing key 세트** | **Git의 모든 비밀을 영영 못 푼다** | 별도 금고 ([10장](/onprem/10-secrets/)) |
 | **사내 CA 개인키** | 발급한 인증서 체계를 다시 세워야 | 별도 금고 ([4장](/onprem/04-tls-dns/)) |
 | **Keycloak realm 설정** | SSO를 처음부터 다시 | CNPG 백업 (DB가 원본) |
 
@@ -50,7 +51,7 @@ flowchart LR
         ETCD["etcd"]
         PV["PV 데이터"]
         DB["PostgreSQL"]
-        KEY["마스터키 · CA 키"]
+        KEY["sealing key 세트 · CA 키"]
     end
     subgraph dst["보관처"]
         direction TB
@@ -163,7 +164,7 @@ mc mirror --overwrite store/pg-backups dr/pg-backups
 | PostgreSQL | 베이스 1일 + WAL 연속 | **분 단위** | 새 Cluster로 PITR | 1~수 시간 (데이터 크기) |
 | PV 데이터 | 1일 | 24시간 | Velero restore | 시간 |
 | 오브젝트 스토리지 | 지속 복제 | 분~시간 | 복제본으로 전환 | 데이터 크기에 비례 |
-| 마스터키·CA 키 | **변경·갱신 시마다** | 0 | 금고에서 복원 ([10장](/onprem/10-secrets/)) | 분 |
+| sealing key 세트·CA 키 | **변경·갱신 시마다** | 0 | 금고에서 복원 ([10장](/onprem/10-secrets/)) | 분 |
 
 :::tip[핵심 — 클러스터 전체를 잃었을 때의 순서]
 숫자보다 중요한 건 **순서**다. 각 단계가 다음 단계의 전제다.
@@ -174,7 +175,7 @@ mc mirror --overwrite store/pg-backups dr/pg-backups
 
 2. **새 클러스터**를 세운다 (또는 DR 클러스터를 쓴다)
 
-3. **Sealed Secrets 마스터키**를 복원한다 — 없으면 Git의 비밀을 못 푼다 ([10장](/onprem/10-secrets/))
+3. **Sealed Secrets sealing key 세트**를 복원한다 — 없으면 Git의 비밀을 못 푼다 ([10장](/onprem/10-secrets/))
 
 4. **Argo CD**를 손으로 깔고 root Application을 적용한다 → 플랫폼이 스스로 펼쳐진다
 
@@ -223,8 +224,8 @@ velero restore create drill-$(date +%F) \
   --include-namespaces prod --namespace-mappings prod:drill-prod
 velero restore describe drill-$(date +%F) --details
 
-# ③ 시크릿 — 마스터키로 실제 복호화가 되나 (백업본으로)
-kubeseal --recovery-unseal --recovery-private-key sealed-secrets-master.key \
+# ③ 시크릿 — sealing key 세트로 실제 복호화가 되나 (백업본으로)
+kubeseal --recovery-unseal --recovery-private-key sealed-secrets-keys.yaml \
   < observability/loki/sealedsecret-s3.yaml | head
 
 # ④ etcd 스냅샷 — 파일이 온전한가
@@ -238,7 +239,7 @@ kubectl delete ns drill drill-prod
 |---|---|
 | WAL 보존이 짧아 원하는 시점으로 못 간다 | [7장](/onprem/07-cnpg/) `retentionPolicy` |
 | 복구본이 뜰 StorageClass·용량이 없다 | 여유 용량을 미리 확보 |
-| 마스터키 백업이 3개월 전 것이다 | 키 회전 후 백업을 안 했다 |
+| sealing key 세트 백업이 3개월 전 것이다 | 키 갱신 후 백업을 안 했다 |
 | Velero가 CRD를 복구하지 못한다 | 포함 규칙과 순서 확인 |
 | 절차서의 명령이 옛 버전 것이다 | 리허설 중에 고친다 |
 
@@ -262,7 +263,7 @@ mc ls dr/cluster-backups/etcd/ | tail -3      # 오프사이트에도 갔나
 
 ## 11장 요약
 
-- 백업 계획은 **선언(Git) + 상태(etcd · PV · DB · 오브젝트) + 열쇠(마스터키 · CA 키)** 로 나눈다
+- 백업 계획은 **선언(Git) + 상태(etcd · PV · DB · 오브젝트) + 열쇠(sealing key 세트 · CA 키)** 로 나눈다
 - **GitOps는 절반만 백업한다** — "무엇이 깔려 있었나"는 복원돼도 데이터는 안 돌아온다
 - etcd 복구는 **최후의 수단**이다. GitOps가 있으면 새로 세우고 동기화하는 편이 대개 낫다
 - **DB는 DB의 방식으로**(CNPG PITR). Velero의 파일 복사로 대신하지 않는다

@@ -11,6 +11,12 @@ import { LinkCard } from '@astrojs/starlight/components';
 요약이 비어 있어 뺐다 — 그 두 유형의 진단 순서는 [cka 18장](/cka/18-troubleshooting/)이
 컨트롤 플레인 층·노드 층 절에서 다룬다. 여기 남긴 것은 셋이다.
 
+:::tip[실습 전 확인]
+먼저 `kubectl get nodes`와 `kubectl get pods -A`로 **컨트롤 플레인 · 노드 · 앱 중 어느
+층인지** 가른다. Pod 문제는 `describe`의 Events 다음 `logs`, 네트워크 문제는
+Service → EndpointSlice → Pod IP → CNI 순으로 한 겹씩 확인한다.
+:::
+
 ## metrics-server — Practice Test: Monitor Cluster Components
 
 원본 풀이: [03-Practice-Test-Monitor-Cluster-Components.md](https://github.com/kodekloudhub/certified-kubernetes-administrator-course/blob/master/docs/04-Logging-and-Monitoring/03-Practice-Test-Monitor-Cluster-Components.md)

@@ -10,6 +10,12 @@ import { LinkCard } from '@astrojs/starlight/components';
 이 장의 실습 네 개는 전부 "**조회 → 원인 찾기 → 명령 한 줄로 해결**"의 반복이다.
 여기서 몸에 붙는 패턴이 이후 모든 장의 재료가 된다.
 
+:::tip[실습 전 확인]
+`k`는 시험 환경의 `kubectl` 별칭이다. Pod은 컨테이너를 실행하는 최소 단위이고,
+네임스페이스는 이름의 범위다. 조회 결과가 이상하면 **`get`으로 현상 확인 → `describe`의
+Events로 이유 확인** 순서로 들어간다.
+:::
+
 ## Pod 기초 — Practice Test: PODs
 
 원본 풀이: [13-Practice-Test-PODs.md](https://github.com/kodekloudhub/certified-kubernetes-administrator-course/blob/master/docs/02-Core-Concepts/13-Practice-Test-PODs.md)

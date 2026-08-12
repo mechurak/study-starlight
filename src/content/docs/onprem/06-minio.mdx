@@ -11,7 +11,7 @@ import TermIntro from '../../../components/docs/TermIntro.astro';
 <TermIntro
   terms={[
     ['오브젝트 스토리지', 'Object Storage', '파일을 **HTTP API로** 통째로 넣고 빼는 저장소. 디렉터리에 마운트하지 않는다. 큰 파일·백업·로그처럼 "통째로 쓰고 통째로 읽는" 데이터에 강하다.'],
-    ['S3 API', '', 'AWS S3가 만든 오브젝트 스토리지 HTTP 인터페이스. 사실상 표준이라 **거의 모든 도구가 이 API로 말한다** — 그래서 온프렘에서도 S3 호환 제품을 세운다.'],
+    ['S3 API', 'Simple Storage Service API', 'AWS S3가 만든 오브젝트 스토리지 HTTP 인터페이스. 사실상 표준이라 **거의 모든 도구가 이 API로 말한다** — 그래서 온프렘에서도 S3 호환 제품을 세운다.'],
     ['버킷 · 객체 · 키', 'Bucket · Object · Key', '버킷은 최상위 그릇, 객체는 데이터 한 덩어리, 키는 그 이름. **키 안의 `/`는 진짜 폴더가 아니라 접두사(prefix)** 다.'],
     ['path-style · virtual-host style', '', '엔드포인트 형식. `http://호스트/버킷/키`(path-style)와 `http://버킷.호스트/키`(virtual-host). **온프렘은 대개 path-style**을 켠다 — 버킷마다 DNS를 만들 수 없어서다.'],
     ['erasure coding', '소거 부호', '객체를 데이터 조각 + 패리티 조각으로 쪼개 여러 디스크·노드에 흩어 두는 방식. 일부가 죽어도 복원된다.'],
