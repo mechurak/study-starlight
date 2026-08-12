@@ -4,7 +4,7 @@ description: "메트릭의 생김새와 타입 넷, PromQL 다섯 형태, RED와
 ---
 
 import { Tabs, TabItem, LinkCard } from '@astrojs/starlight/components';
-import TermIntro from '../../../components/TermIntro.astro';
+import TermIntro from '../../../components/docs/TermIntro.astro';
 
 > 알림이 없는 메트릭은 **사고가 난 뒤에 보는 부검 자료**다 — 이 장의 절반이 알림인 이유다
 
@@ -157,7 +157,7 @@ PromQL은 문법이 넓지만, 실전에서 쓰는 모양은 사실상 다섯 �
 <Tabs>
 <TabItem label="① 고르기">
 
-```promql
+```text
 up{job="node-exporter"}                       # 라벨로 고른다
 up{job=~"node.*"}                             # =~ 정규식, != 부정, !~ 정규식 부정
 node_filesystem_avail_bytes{fstype!~"tmpfs|overlay"}
@@ -169,7 +169,7 @@ node_filesystem_avail_bytes{fstype!~"tmpfs|overlay"}
 </TabItem>
 <TabItem label="② 속도 내기">
 
-```promql
+```text
 rate(http_requests_total[5m])                 # 초당 몇 건인가 (5분 창의 평균)
 increase(http_requests_total[1h])             # 1시간 동안 몇 건 늘었나
 ```
@@ -183,7 +183,7 @@ increase(http_requests_total[1h])             # 1시간 동안 몇 건 늘었나
 </TabItem>
 <TabItem label="③ 묶기">
 
-```promql
+```text
 sum by (service) (rate(http_requests_total[5m]))          # 서비스별 합계
 sum without (pod, instance) (rate(...))                    # 이 라벨들만 지우고 합친다
 topk(5, sum by (namespace) (rate(...)))                    # 상위 5개만
@@ -196,7 +196,7 @@ count by (node) (kube_pod_info)                            # 노드별 파드 �
 </TabItem>
 <TabItem label="④ 비율 내기">
 
-```promql
+```text
 # 에러율 = 5xx 속도 / 전체 속도
   sum by (service) (rate(http_requests_total{status=~"5.."}[5m]))
 /
@@ -209,7 +209,7 @@ count by (node) (kube_pod_info)                            # 노드별 파드 �
 </TabItem>
 <TabItem label="⑤ 분위수와 예측">
 
-```promql
+```text
 # p99 지연 — 안쪽부터 읽는다: rate → sum by(le) → quantile
 histogram_quantile(0.99,
   sum by (le, service) (rate(http_request_duration_seconds_bucket[5m])))
@@ -254,7 +254,7 @@ predict_linear(node_filesystem_avail_bytes{mountpoint="/"}[6h], 24*3600) < 0
 | 답하는 것 | **사용자가 지금 아픈가** | **왜 아픈가 (어디가 모자란가)** |
 | 알림을 건다면 | **여기에 건다** — 증상이다 | 조사용. 알림으로 걸면 시끄럽다 |
 
-```promql
+```text
 # RED — 서비스 하나에 이 셋이면 충분하다
 sum by (service) (rate(http_requests_total[5m]))                                  # Rate
 sum by (service) (rate(http_requests_total{status=~"5.."}[5m]))

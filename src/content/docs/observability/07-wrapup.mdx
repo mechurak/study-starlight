@@ -4,7 +4,7 @@ description: "전체 지도와 장별 한 문장, 조사 한 번의 전체 흐�
 ---
 
 import { LinkCard, CardGrid, Card, Steps } from '@astrojs/starlight/components';
-import TermIntro from '../../../components/TermIntro.astro';
+import TermIntro from '../../../components/docs/TermIntro.astro';
 
 > 관측은 도구 넷을 아는 일이 아니라 **알림에서 원인까지 가는 길을 아는 일**이다
 
@@ -84,7 +84,7 @@ flowchart LR
 
 1. **얼마나·언제부터인가** — 메트릭으로 범위를 좁힌다 ([2장](/observability/02-prometheus/))
 
-   ```promql
+   ```text
    sum by (service) (rate(http_requests_total{status=~"5.."}[5m]))
      / sum by (service) (rate(http_requests_total[5m]))
    ```
@@ -93,7 +93,7 @@ flowchart LR
 
 2. **지연도 같이 튀었나** — 원인의 성격을 가른다
 
-   ```promql
+   ```text
    histogram_quantile(0.99,
      sum by (le, service) (rate(http_request_duration_seconds_bucket{service="orders"}[5m])))
    ```
@@ -103,7 +103,7 @@ flowchart LR
 
 3. **무슨 일이 있었나** — Explore 분할 화면에서 로그 ([3장](/observability/03-loki/))
 
-   ```logql
+   ```text
    {namespace="prod", app="orders"} |= "error" | json | line_format "{{.err}}"
    ```
 
@@ -113,7 +113,7 @@ flowchart LR
 
    또는 ID를 모른다면 TraceQL로 직접:
 
-   ```traceql
+   ```text
    { resource.service.name = "orders" && duration > 2s } >> { span.db.system = "postgresql" }
    ```
 
@@ -121,7 +121,7 @@ flowchart LR
 
 5. **그 서비스에서 무슨 일이** — 스팬에서 `Logs for this span`
 
-   ```logql
+   ```text
    {namespace="prod", app="inventory"} | json | duration_ms > 1000
    ```
 

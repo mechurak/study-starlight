@@ -4,7 +4,7 @@ description: "이 덱의 대상과 범위, 왜 노션이 아니라 문서 사이
 ---
 
 import { Card, CardGrid, LinkCard } from '@astrojs/starlight/components';
-import TermIntro from '../../../components/TermIntro.astro';
+import TermIntro from '../../../components/docs/TermIntro.astro';
 
 > 이 덱의 예제는 전부 **지금 보고 있는 이 사이트**다 — 읽다가 궁금하면 레포를 열면 된다
 
@@ -88,8 +88,8 @@ Starlight 전체 API 레퍼런스 — 공식 문서로 링크만 한다.
 
 ```mermaid
 flowchart LR
-    C["콘텐츠<br/>src/content/docs/<br/>(마크다운 · MDX)"] --> B["빌드<br/>pnpm build"]
-    S["구조<br/>astro.config.mjs<br/>(덱 목록 · 사이드바 · 사이트 설정)"] --> B
+    C["콘텐츠<br/>src/content/docs/<br/>(마크다운 · MDX)"] --> B["검사 · 빌드<br/>pnpm check"]
+    S["구조<br/>src/data/decks.mjs · astro.config.mjs<br/>(덱 manifest · 사이트 설정)"] --> B
     P["표현<br/>src/components/ · custom.css<br/>(컴포넌트 · 스타일)"] --> B
     B --> D["dist/<br/>정적 HTML + 검색 인덱스"]
 
@@ -122,7 +122,7 @@ flowchart LR
 
 - 대상은 **이 사이트를 고치거나 비슷한 것을 만들려는 사람**, 예제는 이 레포 자체
 - 노션 대신 문서 사이트인 이유는 **본문을 파일로 소유**하기 위해서다 — git · 검색 · 에이전트 협업이 따라온다
-- 멘탈 모델은 3층 분리: **콘텐츠**(`src/content/docs/`) / **구조**(`astro.config.mjs`) / **표현**(`src/components/`)
+- 멘탈 모델은 3층 분리: **콘텐츠**(`src/content/docs/`) / **구조**(`src/data/decks.mjs` · `astro.config.mjs`) / **표현**(`src/components/`)
 - 기준은 Starlight 0.41 · Astro 7 (2026-08) — 예제가 레포와 다르면 레포가 맞다
 
 <LinkCard

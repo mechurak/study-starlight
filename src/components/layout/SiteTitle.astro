@@ -8,7 +8,7 @@ import SidebarToggle from './SidebarToggle.astro';
 // 있어야 관례에 맞는다 — 그 자리가 title-wrapper다.
 // 덱 목록이 드롭다운으로 접히면서 어느 덱을 보고 있는지가 사이드바 상단
 // 버튼 하나에만 남았다 — 헤더에도 띄워 스크롤 위치와 무관하게 보이게 한다.
-// 라벨은 topics 플러그인의 라우트 데이터에서 오므로 astro.config.mjs와 항상 일치하고,
+// 라벨은 topics 플러그인의 라우트 데이터에서 오므로 덱 manifest와 항상 일치하고,
 // 랜딩처럼 topic 밖 페이지는 isCurrent가 없어 사이트 제목만 남는다.
 const topic = Astro.locals.starlightSidebarTopics?.topics.find((t) => t.isCurrent);
 ---

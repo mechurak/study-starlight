@@ -8,10 +8,11 @@
 
 | 변경 | 방법 | 파일 |
 |---|---|---|
-| 덱 = topic 사이드바 | `starlight-sidebar-topics` 플러그인 | `astro.config.mjs` |
+| 덱 = topic 사이드바 | 단일 덱 manifest + `starlight-sidebar-topics` | `src/data/decks.mjs` · `astro.config.mjs` |
 | 테마 (Vitesse 계열) | `starlight-theme-rapide` 플러그인 | `astro.config.mjs` |
 | mermaid 펜스 렌더 | `astro-mermaid` 통합 (**starlight보다 먼저**) | `astro.config.mjs` |
-| 검색 결과에 덱 이름 표시 | `MarkdownContent` 컴포넌트 override | `src/components/MarkdownContent.astro` |
+| 검색 결과에 덱 이름 표시 | `MarkdownContent` 컴포넌트 override | `src/components/layout/MarkdownContent.astro` |
+| 덱 index 별칭 검색 | manifest의 `aliases`를 본문 앞에 표시 | `src/data/decks.mjs` · `MarkdownContent.astro` |
 | 본문 폰트 Pretendard | `customCss` (dynamic subset) | `astro.config.mjs` |
 | 본문 폭 45→55rem | `--sl-content-width` | `src/styles/custom.css` |
 | mermaid 가로 스크롤 | `.mermaid` overflow | `src/styles/custom.css` |
@@ -35,13 +36,13 @@ mermaid 통합 순서·topics slug처럼 "깨뜨리면 안 되는" 항목은
 
 세 파일이 한 세트다 —
 
-1. **`src/components/MarkdownContent.astro`** — Starlight 기본 `MarkdownContent`를
+1. **`src/components/layout/MarkdownContent.astro`** — Starlight 기본 `MarkdownContent`를
    감싸는 override. `data-pagefind-meta="덱:<라벨>"` 빈 span 하나를 본문 앞에 심는다.
    - Pagefind는 `<main data-pagefind-body>` **안의** meta만 수집하는데, Starlight이
      그 속성을 `<main>`에 붙이므로 본문 첫 공통 진입점인 이 컴포넌트에서 심는다
    - 덱 라벨은 `starlight-sidebar-topics`의 라우트 데이터
      (`Astro.locals.starlightSidebarTopics`)에서 `isCurrent`인 topic의 label을 읽는다
-     → **config의 topics label과 자동으로 일치**하고, 새 덱을 만들어도 손댈 곳이 없다
+	 → **덱 manifest의 topic label과 자동으로 일치**하고, 새 덱을 만들어도 손댈 곳이 없다
    - 랜딩(`/`)처럼 topic 밖 페이지는 meta 없이 렌더된다 (라벨 없음)
 2. **`astro.config.mjs`** — `components.MarkdownContent` 등록 한 줄
 3. **`src/styles/custom.css`** — Pagefind 기본 UI는 커스텀 meta를 결과 카드 **맨 아래**
@@ -75,7 +76,7 @@ URL에 언어 프리픽스가 없고, Starlight UI 문구(검색 버튼, 목차 
 
 - **검색은 Pagefind 기본 UI 그대로** — 위의 meta 주입만 얹었다.
   `Search` 컴포넌트를 교체하지 않았으므로 업그레이드 영향이 없다
-- 프론트매터·사이드바·TOC 등 콘텐츠 규칙은 전부 Starlight 기본 동작이다
-  (쓰는 방식의 규칙은 [CLAUDE.md](../CLAUDE.md) "콘텐츠 규칙" 절)
+- 기본 프론트매터에 검색·현재성용 `aliases` · `reviewedAt` · `status`만 확장했다
+  (쓰는 방식의 규칙은 [content-authoring.md](content-authoring.md))
 - `pnpm-workspace.yaml`은 Starlight 커스텀이 아니라 pnpm 빌드 스크립트 허용 설정
   — [deploy.md](deploy.md) 참고

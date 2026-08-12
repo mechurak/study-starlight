@@ -13,12 +13,12 @@
     tone   mermaid classDef · DeckMap과 같은 여섯 팔레트 — 카테고리 식별색
     decks  덱 카드 목록
       href      덱 index 링크 ('/cka/')
-      icon      Starlight 아이콘 이름 — astro.config.mjs topics의 icon과 맞춘다
+      icon      Starlight 아이콘 이름 — src/data/decks.mjs의 topic과 같은 값
       title     덱 이름
       desc      한 줄 소개 (평문 — 서식 처리 없음)
       chapters  장 수 — 카드 오른쪽 위 분량 표시
 
-  덱을 추가하면 여기(index.mdx의 sections prop)와 topics 양쪽에 넣는다.
+  덱을 추가하면 src/data/decks.mjs 한 곳만 고친다.
 */
 import { Icon } from '@astrojs/starlight/components';
 

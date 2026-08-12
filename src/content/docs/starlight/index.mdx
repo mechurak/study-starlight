@@ -4,7 +4,7 @@ description: Starlight — 이 사이트를 만든 도구의 선택 이유, MDX�
 ---
 
 import { LinkCard, LinkButton } from '@astrojs/starlight/components';
-import DeckMap from '../../../components/DeckMap.astro';
+import DeckMap from '../../../components/docs/DeckMap.astro';
 
 > 이 덱의 실습 환경은 따로 없다 — **지금 보고 있는 이 사이트가 실습 환경**이다
 
@@ -42,7 +42,7 @@ import DeckMap from '../../../components/DeckMap.astro';
 ## 전체를 관통하는 두 문장
 
 **콘텐츠 · 구조 · 표현은 다른 층이다.** 글은 `src/content/docs/`의 마크다운,
-덱 목록과 순서는 `astro.config.mjs`, 시각 패턴은 `src/components/` — 층이 분리되어
+덱 목록과 순서는 `src/data/decks.mjs`, 사이트 설정은 `astro.config.mjs`, 시각 패턴은 `src/components/` — 층이 분리되어
 있어서 글을 고치다 사이트 구조를 깨뜨릴 수 없고, 그 역도 성립한다.
 무언가 이상하면 "어느 층인가"부터 묻는다.
 

@@ -2,9 +2,15 @@
   "name": "study-starlight",
   "type": "module",
   "version": "0.0.1",
+  "packageManager": "pnpm@11.20.0",
+  "engines": {
+    "node": ">=24"
+  },
   "scripts": {
     "dev": "astro dev",
     "start": "astro dev",
+    "check:content": "node scripts/check-content.mjs",
+    "check": "pnpm run check:content && astro build",
     "build": "astro build",
     "preview": "astro preview",
     "astro": "astro"

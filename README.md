@@ -8,19 +8,20 @@
 ## 구조
 
 ```
-astro.config.mjs              # 사이트 설정 + topics(덱 목록) 정의 — 덱 목록의 원본
+astro.config.mjs              # 사이트 설정 — 덱 manifest를 Starlight에 연결
+src/data/decks.mjs            # 덱·사이드바·랜딩 카드의 단일 원본
 src/content/docs/
   index.mdx                   # 랜딩 페이지 (splash + 덱 카드)
   cka/ …                      # 덱 하나 = 디렉터리 하나 = topic 하나
     index.mdx                 #   덱 개요 페이지
     00-intro.mdx …            #   본문 페이지 (컴포넌트를 쓰므로 전부 .mdx)
-src/components/               # 문서에서 import 하는 데모·시각화 컴포넌트
+src/components/               # layout / docs / demos 역할별 컴포넌트
 src/styles/custom.css         # 폰트·본문 폭·mermaid 오버플로 커스텀
-docs/                         # 레포 운영 문서 (배포, Starlight 변경 내역, 덱별 기준 시점)
-CLAUDE.md                     # 작업 규칙 (Claude Code 용)
+docs/                         # 작성·검증·배포·Starlight 운영 문서
+CLAUDE.md                     # 에이전트 작업 진입점
 ```
 
-어떤 덱이 있는지는 `astro.config.mjs`의 topics(또는 사이트 상단의 topic 전환 메뉴)를 보면 된다.
+어떤 덱이 있는지는 `src/data/decks.mjs` 또는 사이트 상단의 topic 전환 메뉴를 보면 된다.
 
 - **덱 하나 = topic 하나** — [starlight-sidebar-topics](https://starlight-sidebar-topics.netlify.app)가
   상단에서 덱을 전환하고 덱마다 독립된 사이드바를 준다
@@ -36,15 +37,15 @@ CLAUDE.md                     # 작업 규칙 (Claude Code 용)
 pnpm install
 pnpm dev        # http://localhost:4321
 pnpm build      # dist/ 생성 + Pagefind 인덱스
+pnpm check      # 콘텐츠 규칙 검사 + build
 pnpm preview
 ```
 
 ## 새 덱 추가
 
 1. `src/content/docs/<덱이름>/` 에 `index.mdx`(개요)와 본문 페이지를 만든다
-2. `astro.config.mjs`의 `starlightSidebarTopics([...])` 배열에 topic을 추가한다
-   (label / link / icon / items — 사이드바 그룹과 페이지 slug를 여기서 정한다)
-3. `src/content/docs/index.mdx` 랜딩의 카드 목록과 hero 액션에 항목을 추가한다
+2. `src/data/decks.mjs`에 덱 메타데이터와 사이드바 그룹·slug를 추가한다
+3. `pnpm check`로 manifest와 실제 파일이 맞는지 확인한다
 
 README나 CLAUDE.md는 고칠 필요가 없다 — 덱에 특별한 규칙·기준이 생기면
 그 덱 폴더에 `_baseline.md`를 만들어 적는다 ([CLAUDE.md](CLAUDE.md)의 "덱" 절 참고.
@@ -54,7 +55,9 @@ README나 CLAUDE.md는 고칠 필요가 없다 — 덱에 특별한 규칙·기�
 
 | 문서 | 내용 |
 |---|---|
-| [CLAUDE.md](CLAUDE.md) | **문서 작성 규칙**(제목 계층, aside, 컴포넌트, mermaid 팔레트), 깨뜨리면 안 되는 설정, 검증 절차 |
+| [CLAUDE.md](CLAUDE.md) | 작업 진입점, 반드시 읽을 문서와 깨뜨리면 안 되는 설정 |
+| [docs/content-authoring.md](docs/content-authoring.md) | 제목 계층, 프론트매터, 컴포넌트, Mermaid 작성 규칙 |
+| [docs/verification.md](docs/verification.md) | 자동 검사와 변경별 브라우저 검증 |
 | [docs/starlight-changes.md](docs/starlight-changes.md) | 기본 Starlight에서 바꾼 것 전체 목록 — 업그레이드 전에 볼 것 |
 | [docs/deploy.md](docs/deploy.md) | Cloudflare Pages 연동, `PNPM_VERSION`, 도메인 변경 |
 | `src/content/docs/<덱>/_baseline.md` | 덱별 기준·규칙 — 있으면 그 덱을 고치기 전에 읽는다 (cka: 커리큘럼·버전, shadcn: 서술 규칙, server: Ubuntu 24.04 고정) |

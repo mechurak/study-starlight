@@ -32,7 +32,7 @@
   vertical-align: middle;
 }
 
-/* 사이드바 접기 — 버튼은 src/components/SidebarToggle.astro, 여기는 레이아웃만.
+/* 사이드바 접기 — 버튼은 src/components/layout/SidebarToggle.astro, 여기는 레이아웃만.
    Starlight의 규칙은 @layer starlight.core 안에 있고 customCss는 레이어 밖이라
    특이도와 무관하게 이 파일이 이긴다.
    --sl-content-inline-start는 Page.astro가 레이어 없이 [data-has-sidebar]로 주므로

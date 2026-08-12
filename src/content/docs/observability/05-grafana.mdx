@@ -4,7 +4,7 @@ description: "세 데이터소스를 잇는 상관 관계 설정, Explore로 실
 ---
 
 import { Tabs, TabItem, LinkCard, Steps } from '@astrojs/starlight/components';
-import TermIntro from '../../../components/TermIntro.astro';
+import TermIntro from '../../../components/docs/TermIntro.astro';
 
 > Grafana의 값은 그래프가 아니라 **메트릭에서 로그로, 로그에서 트레이스로 두 번 클릭에 가는 것**이다
 
@@ -114,7 +114,7 @@ datasources:
 
 2. **메트릭으로 범위를 좁힌다** ([2장](/observability/02-prometheus/))
 
-   ```promql
+   ```text
    sum by (service) (rate(http_requests_total{status=~"5.."}[5m]))
    ```
 
@@ -123,7 +123,7 @@ datasources:
 
 3. **분할 화면으로 로그를 연다** (`Split` 버튼) ([3장](/observability/03-loki/))
 
-   ```logql
+   ```text
    {namespace="prod", app="orders"} |= "error" | json | line_format "{{.msg}} {{.err}}"
    ```
 

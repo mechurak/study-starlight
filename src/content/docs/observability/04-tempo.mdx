@@ -4,7 +4,7 @@ description: "스팬의 생김새, 계측이라는 진입 장벽과 컨텍스트
 ---
 
 import { Tabs, TabItem, LinkCard, Steps } from '@astrojs/starlight/components';
-import TermIntro from '../../../components/TermIntro.astro';
+import TermIntro from '../../../components/docs/TermIntro.astro';
 
 > 추적은 앞의 둘과 성격이 다르다 — **앱 코드를 건드려야 시작된다**
 
@@ -96,7 +96,7 @@ events:
 <Tabs>
 <TabItem label="기본 필터">
 
-```traceql
+```text
 { resource.service.name = "orders" && duration > 2s }
 { span.http.response.status_code >= 500 }
 { status = error }
@@ -109,7 +109,7 @@ events:
 </TabItem>
 <TabItem label="구조로 찾기">
 
-```traceql
+```text
 # orders를 거친 트레이스 중, 그 아래 어딘가에서 느린 DB 질의가 있던 것
 { resource.service.name = "orders" } >> { span.db.system = "postgresql" && duration > 1s }
 
@@ -124,7 +124,7 @@ events:
 </TabItem>
 <TabItem label="집계와 선택">
 
-```traceql
+```text
 # 조건에 맞는 스팬이 3개 이상인 트레이스 (N+1 질의 찾기)
 { span.db.system = "postgresql" } | count() > 3
 

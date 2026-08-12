@@ -12,7 +12,7 @@ import { Steps, CardGrid, LinkCard } from '@astrojs/starlight/components';
 **콘텐츠 · 구조 · 표현은 다른 층이고, 층마다 판정자가 다르다.**
 
 - 콘텐츠(`src/content/docs/`)는 마크다운/MDX — 문법은 빌드가, 렌더는 브라우저가 판정한다
-- 구조(`astro.config.mjs`)는 topics와 사이트 설정 — slug 어긋남은 빌드가 잡는다
+- 구조(`src/data/decks.mjs` · `astro.config.mjs`)는 덱 manifest와 사이트 설정 — slug 어긋남은 `check:content`가 잡는다
 - 표현(`src/components/` · `custom.css`)은 컴포넌트와 스타일 — 라이트/다크 두 모드가 판정한다
 
 무언가 이상할 때 "어느 층의 문제인가"부터 물으면, 뒤질 파일과 문서가 바로 좁혀진다.
@@ -23,7 +23,7 @@ import { Steps, CardGrid, LinkCard } from '@astrojs/starlight/components';
 |---|---|
 | [1. 지형](/starlight/01-landscape/) | 선택의 축은 "본문이 어디에 사는가" — Starlight는 **파일 소유 + 내장 기본값**의 답 |
 | [2. Astro](/starlight/02-astro/) | 기본값이 zero-JS — 컴포넌트는 빌드 시점 템플릿, JS는 섬만 |
-| [3. 구조](/starlight/03-starlight/) | 파일 경로 = slug = URL, 구조의 원본은 config 한 곳 |
+| [3. 구조](/starlight/03-starlight/) | 파일 경로 = slug = URL, 덱 구조의 원본은 manifest 한 곳 |
 | [4. MDX](/starlight/04-mdx/) | 문서인 척하는 소스 코드 — 중괄호 · 들여쓰기 · 닫는 `**`가 지뢰 |
 | [5. 내장 컴포넌트](/starlight/05-components/) | 절차는 Steps, 갈래는 Tabs, 분류는 Card — 색 여섯 개의 약속 |
 | [6. 커스텀](/starlight/06-custom/) | 사다리 아래 칸부터 — 만들면 머리 주석에 "왜"를 남긴다 |
@@ -41,19 +41,19 @@ import { Steps, CardGrid, LinkCard } from '@astrojs/starlight/components';
    장 파일명은 `00-intro.mdx` 부터 번호로. 처음부터 전부 `.mdx`로 만든다.
    덱 index의 "구성" 절은 mermaid가 아니라 `<DeckMap>`으로.
 
-2. `astro.config.mjs`의 topics 배열에 덱을 등록한다
+2. `src/data/decks.mjs`에 덱을 등록한다
 
    `label` · `link` · `icon` · `items`(그룹 라벨 + slug 문자열). 등록하지 않으면
    `Failed to find the topic` 으로 빌드가 실패한다 — 잊어도 잡힌다.
 
-3. 랜딩(`src/content/docs/index.mdx`)에 카드와 hero 액션을 추가한다
+   같은 데이터로 사이드바와 랜딩 카드가 만들어지고, 장 수는 slug 개수에서 계산된다.
 
-4. 덱 고유의 규칙이 있으면 `_baseline.md`를 덱 폴더에 만든다
+3. 덱 고유의 규칙이 있으면 `_baseline.md`를 덱 폴더에 만든다
 
    기준 버전 고정, 서술 규칙, "왜 이렇게 쓰였는가" — CLAUDE.md가 아니라 여기에.
    `_` 파일이라 빌드에는 안 잡힌다.
 
-5. `pnpm build` 로 판정하고, 장의 리듬(인용구 → TermIntro → h2 5~9개 → 요약 → LinkCard)을 유지한다
+4. `pnpm check`로 판정하고, 장의 리듬(인용구 → TermIntro → h2 5~9개 → 요약 → LinkCard)을 유지한다
 
 </Steps>
 

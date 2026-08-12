@@ -4,7 +4,7 @@ description: "MDX의 해부와 remark·rehype 변환 파이프라인, 마크다�
 ---
 
 import { LinkCard } from '@astrojs/starlight/components';
-import TermIntro from '../../../components/TermIntro.astro';
+import TermIntro from '../../../components/docs/TermIntro.astro';
 
 > MDX 파일은 문서인 척하는 **프로그램 소스**다 — 그래서 빌드가 문법을 잡아 주고, 그래서 문법에 함정이 있다
 
@@ -44,7 +44,7 @@ description: "..."
 ---
 
 import { LinkCard } from '@astrojs/starlight/components';   // ② import
-import TermIntro from '../../../components/TermIntro.astro';
+import TermIntro from '../../../components/docs/TermIntro.astro';
 
 일반 마크다운 본문이 흐르다가...                              // ③ 마크다운
 
@@ -148,7 +148,7 @@ grep -rho '\*\*[^<*]\{0,45\}' dist --include=index.html | sort -u
   바꾸고 링크를 걱정하는 일을 없앴다 — slug는 확장자와 무관하므로(3장) 비용도 없다
 - `@astrojs/mdx`는 Starlight의 전이 의존성이라 **별도 설치가 없다** — package.json에 안 보여도 정상
 - 컴포넌트 import는 두 종류뿐이다 — 내장은 `@astrojs/starlight/components`에서,
-  커스텀은 `../../../components/이름.astro` 상대 경로로
+  커스텀은 역할에 따라 `../../../components/docs/` 또는 `../../../components/demos/` 상대 경로로
 
 ## 4장 요약
 
