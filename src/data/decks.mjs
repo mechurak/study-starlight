@@ -308,6 +308,24 @@ export const deckDefinitions = [
 			['마무리', ['starlight/09-wrapup']],
 		],
 	},
+	{
+		slug: 'gpustack',
+		topicOrder: 13,
+		label: 'GPUStack',
+		title: 'GPUStack',
+		icon: 'server',
+		aliases: ['GPU 클러스터 관리', 'DGX Spark 모델 서빙'],
+		description: 'DGX Spark 10대를 모델 서빙 풀로 묶는다 — LiteLLM 경계, vLLM, FastAPI, 2대 pair와 운영.',
+		category: 'platform',
+		groups: [
+			['시작', ['gpustack/00-position']],
+			['관리 평면', ['gpustack/01-architecture', 'gpustack/02-install']],
+			['워크로드', ['gpustack/03-vllm-embedding', 'gpustack/04-custom-backends']],
+			['배치와 라우팅', ['gpustack/05-pairs-routing']],
+			['운영과 선택', ['gpustack/06-operations', 'gpustack/07-adoption']],
+			['마무리', ['gpustack/08-wrapup']],
+		],
+	},
 ];
 
 export const topics = [...deckDefinitions].sort((a, b) => a.topicOrder - b.topicOrder).map((deck) => ({
@@ -335,6 +353,7 @@ export const termIntroDeckSlugs = [
 	'onprem',
 	'observability',
 	'rl',
+	'gpustack',
 ];
 
 export const deckCatalogSections = categories.map((category) => ({

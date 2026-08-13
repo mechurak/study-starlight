@@ -1,0 +1,137 @@
+---
+title: "4. FastAPI 자체 모델"
+description: "ARM64 FastAPI classification·embedding container를 GPUStack custom backend와 Generic Proxy로 운영한다"
+---
+
+import { FileTree, Steps, LinkCard } from '@astrojs/starlight/components';
+import TermIntro from '../../../components/docs/TermIntro.astro';
+
+> GPUStack이 FastAPI 코드를 이해할 필요는 없다 — **실행 명령·health·port라는 계약**만 맞으면 된다
+
+<TermIntro
+  terms={[
+    ['custom backend', '', 'GPUStack 내장 engine이 아닌 container image와 실행 명령을 관리자가 등록한 backend다.'],
+    ['health endpoint', '', 'process가 떠 있는지를 넘어 실제 요청을 받을 준비가 됐는지 알려 주는 HTTP 경로다.'],
+    ['Generic Proxy', '', 'OpenAI 형식이 아닌 upstream API로 경로와 body를 그대로 전달하는 GPUStack gateway 기능이다.'],
+    ['readiness', '준비 상태', 'model weight load와 warm-up까지 끝나 새 요청을 받아도 되는 상태다. 단순 process 생존과 다르다.'],
+  ]}
+/>
+
+## 컨테이너 계약을 작게 만든다
+
+```text
+FastAPI container
+├─ GET  /health/live   # process 생존
+├─ GET  /health/ready  # model load·warm-up 완료
+├─ POST /predict       # classification
+├─ POST /embed         # 필요할 때 embedding
+└─ GET  /metrics       # Prometheus 형식
+```
+
+GPUStack custom backend에는 image, health-check path, 실행 명령과 환경변수를 등록한다. 명령에서
+`{{model_path}}`, `{{model_name}}`, `{{port}}`, `{{worker_ip}}`, `{{gpu_count}}`, `{{gpu_ids}}`를
+치환할 수 있다. FastAPI는 반드시 GPUStack이 준 port와 접근 가능한 host에 bind한다.
+
+## image가 책임질 것
+
+<FileTree>
+- app/
+  - **main.py** — route와 lifespan에서 model load
+  - schemas.py — 요청·응답 contract
+  - inference.py — preprocessing·batching·postprocessing
+- model/ — 작은 고정 weight를 image에 포함할 때
+- **Dockerfile** — ARM64·CUDA 호환 base와 immutable dependency
+- requirements.lock — Python dependency 고정
+</FileTree>
+
+모델 weight 배포 방식은 둘 중 하나로 고정한다.
+
+- **image 포함:** 작은 모델, 배포 artifact 하나, 시작이 빠름. weight만 바뀌어도 image를 다시 만든다.
+- **외부 artifact:** 큰 모델, image와 weight 수명 분리. startup 때 versioned object를 내려받거나
+  GPUStack의 `model_path`를 mount한다.
+
+local path는 GPUStack이 worker 사이에 자동 동기화하지 않는다. failover가 필요하면 target worker 모두에
+같은 절대 경로를 준비하거나 shared storage를 쓴다. artifact checksum도 readiness 전에 확인한다.
+
+## custom backend 등록 예
+
+아래는 구조를 보여 주는 예다. 실제 image는 ARM64 또는 multi-arch로 빌드하고 digest를 고정한다.
+
+```yaml
+backend_name: fastapi-classifier-custom
+health_check_path: /health/ready
+default_run_command: >-
+  python -m uvicorn app.main:app
+  --host 0.0.0.0
+  --port {{port}}
+version_configs:
+  v1:
+    image_name: registry.internal/ml/classifier@sha256:<digest>
+    custom_framework: cuda
+default_version: v1
+```
+
+GPUStack 공식 custom backend 예제도 FastAPI image를 `uvicorn ... --port {{port}}` 형태로 실행한다.
+
+## 배포 순서
+
+<Steps>
+
+1. **로컬 contract를 검증한다**
+
+   ARM64 Spark에서 image를 직접 실행해 GPU 접근, ready 전환, SIGTERM 종료와 `/metrics`를 확인한다.
+
+2. **custom backend를 등록한다**
+
+   health path와 기본 실행 명령을 저장한다. backend 이름은 `-custom`으로 끝낸다.
+
+3. **deployment를 만든다**
+
+   worker selector, replica 수, 환경변수와 model source를 정한다. classification은 한 worker 안에서 끝낸다.
+
+4. **Generic Proxy를 켠다**
+
+   새 연동은 path 기반 형식을 쓴다. header 기반 형식은 deprecated다.
+
+   ```bash
+   curl https://gpustack.internal/model/proxy/42/predict \
+     -H "Authorization: Bearer $GPUSTACK_API_KEY" \
+     -H 'Content-Type: application/json' \
+     -d '{"texts":["배송이 늦어요"]}'
+   ```
+
+   upstream FastAPI에는 `/predict`와 body가 그대로 도착한다.
+
+5. **두 replica와 장애를 시험한다**
+
+   서로 다른 worker에 놓고 한 instance를 죽인다. 새 요청 성공, target 제거 시간, controller 재생성 시간을 잰다.
+
+</Steps>
+
+## FastAPI 자체 모델의 운영 contract
+
+| 항목 | 최소 약속 |
+|---|---|
+| API version | URL 또는 media type으로 명시하고 호환되지 않는 변경을 분리한다 |
+| readiness | weight load·GPU warm-up·필수 artifact 검증 후에만 200 |
+| shutdown | SIGTERM에서 새 요청을 막고 진행 중 batch를 제한 시간 안에 정리한다 |
+| metrics | 요청 수·오류·latency·batch size·queue depth·model version |
+| logging | request ID·model version·worker 이름, 민감 입력 원문은 기본적으로 제외 |
+| resource | CPU thread·memory·GPU 사용량을 부하 시험으로 기록한다 |
+
+:::caution[함정]
+custom backend는 multi-worker inference를 지원하지 않는다. classification과 embedding은 한 node에서
+끝내고 replica로 확장한다. 여러 node를 한 process처럼 써야 한다면 custom backend 계약 밖이다.
+:::
+
+## 참고 자료
+
+- [GPUStack Inference Backend Management](https://docs.gpustack.ai/latest/user-guide/inference-backend-management/) — custom image·command·health와 multi-worker 제한.
+- [GPUStack Custom Backend Tutorial](https://docs.gpustack.ai/2.0/tutorials/using-custom-backends/) — FastAPI container 실행 예.
+- [GPUStack Generic Proxy](https://docs.gpustack.ai/latest/user-guide/model-deployment-management/) — path 기반 일반 API 전달과 deprecated 형식.
+
+<LinkCard
+  title="5. 독립 노드와 2대 pair"
+  description="worker label, 수동 선택, replica와 distributed instance를 분리하고 route로 다시 합친다."
+  href="/gpustack/05-pairs-routing/"
+/>

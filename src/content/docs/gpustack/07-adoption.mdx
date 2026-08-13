@@ -1,0 +1,118 @@
+---
+title: "7. GPUStack으로 시작할지 판단하기"
+description: "PoC 합격 기준과 KServe·Ray Serve·Slurm 대안, 단계별 도입안"
+---
+
+import { Card, CardGrid, Steps, LinkCard } from '@astrojs/starlight/components';
+import TermIntro from '../../../components/docs/TermIntro.astro';
+
+> 도구 선택은 기능 개수 비교가 아니라 **우리의 배포 단위가 무엇인지 고르는 일**이다
+
+<TermIntro
+  terms={[
+    ['model platform', '', '모델 artifact를 실행하고 route·version·관측하는 데 초점을 둔 플랫폼. GPUStack과 KServe가 이 문제를 푼다.'],
+    ['application platform', '', '모델뿐 아니라 DB·queue·job·sidecar·network policy까지 일반 workload를 운영하는 기반. Kubernetes가 대표적이다.'],
+    ['canary', '카나리 배포', '새 버전에 일부 traffic만 보내 실제 환경에서 위험을 제한해 검증하는 방식이다.'],
+    ['SLO', 'Service Level Objective', '가용성·지연 같은 서비스 목표를 측정 가능한 값과 기간으로 표현한 약속이다.'],
+  ]}
+/>
+
+## 이 환경의 1차 선택
+
+<CardGrid>
+<Card title="GPUStack으로 시작" icon="rocket">
+Docker 기반 Spark 열 대를 빨리 묶는다.
+
+vLLM과 embedding이 중심이다.
+
+자체 모델은 단일 FastAPI container다.
+
+모델별 replica·route·재시작이 주 요구다.
+
+별도 LiteLLM이 사용자 정책을 맡는다.
+</Card>
+<Card title="Kubernetes로 시작" icon="puzzle">
+이미 운영 가능한 cluster와 담당팀이 있다.
+
+모델 서비스가 여러 container와 stateful dependency를 갖는다.
+
+GitOps·secret·network policy·admission·autoscaling이 처음부터 필수다.
+
+모델 외 workload도 같은 장비 풀에 올린다.
+</Card>
+</CardGrid>
+
+현재 시나리오는 왼쪽이다. NVIDIA GPU Operator는 DGX Spark와 ARM64, K3s를 지원 목록에 포함하고
+KServe는 vLLM·custom model server를 제공하므로 Kubernetes 경로도 기술적으로 가능하다. 그러나
+가능하다는 사실과 지금 운영할 가치가 있다는 판단은 다르다.
+
+## 대안은 무엇을 잘하나
+
+| 선택 | 잘하는 일 | 지금의 비용 |
+|---|---|---|
+| GPUStack | GPU fleet·model backend·route를 한 제품에서 관리 | 일반 앱 orchestration은 제한적 |
+| K3s + GPU Operator + KServe | model과 일반 Kubernetes 생태계, custom runtime·rollout | control plane·CNI·storage·operator 운영이 추가됨 |
+| Ray Serve | Python graph·분산 inference logic·application composition | fleet 전체 정책·gateway·운영 조합을 더 만들어야 함 |
+| Slurm | 학습·batch job queue, priority·fair-share | 장시간 API route와 model lifecycle은 별도 구축 |
+| 개별 Docker + Portainer | host·container를 단순히 보고 조작 | model-aware scheduling·route·artifact lifecycle이 약함 |
+
+KServe의 multi-node vLLM도 가능하지만 Standard mode, RWX PVC, autoscaling 제한이 있다. pair 몇 세트를
+운영한다는 이유만으로 Kubernetes가 자동으로 더 단순해지지는 않는다.
+
+## PoC 합격표
+
+기능 시연이 아니라 운영 질문에 점수를 준다.
+
+| 영역 | 합격 기준 예 |
+|---|---|
+| 재현성 | 새 Spark에 같은 image digest·model revision으로 동일 배포 성공 |
+| 장애 | single replica 하나 종료 시 route가 살아 있는 target으로 새 요청 전달 |
+| 복구 | worker 재부팅 후 정한 RTO 안에 instance Ready 복귀 |
+| LiteLLM | streaming·timeout·quota·모델 alias·fallback이 end-to-end 동작 |
+| FastAPI | Generic Proxy, readiness, schema 오류, auto-restart 확인 |
+| 메모리 | 목표 동시성·context에서 OOM 없이 headroom 유지 |
+| pair | member 장애가 route에 반영되고 다른 pair 또는 fallback이 동작 |
+| 운영 | 로그 한곳 진입, 핵심 metric·alert, image/model rollback 성공 |
+| 보안 | 관리망 격리, TLS, API key 회전, secret 비노출 |
+
+수치는 팀의 SLO와 모델 크기에 따라 채운다. 표의 빈칸을 채우지 못했다면 "GPUStack이 안 된다"가 아니라
+아직 운영 가능성을 증명하지 못한 것이다.
+
+## 단계별 도입안
+
+<Steps>
+
+1. **2대 PoC** — single-node vLLM replica 둘, embedding 하나, FastAPI classification 하나를 순서대로 시험한다.
+2. **4대 pilot** — 실제 LiteLLM traffic 일부, route weight 변경, node reboot, artifact pre-warm과 alert를 검증한다.
+3. **pair 검증** — 한 대에 안 들어가는 모델이 있을 때만 ConnectX-7으로 2대를 묶고 single·pair benchmark를 비교한다.
+4. **10대 운영 풀** — workload·environment·cell label을 적용하고 staging과 spare capacity를 남긴다.
+5. **분기별 경계 재평가** — custom service가 복잡해지거나 platform 공통 요구가 늘면 KServe 전환 비용을 다시 잰다.
+
+</Steps>
+
+## 넘어갈 신호
+
+다음 중 여러 개가 반복되면 GPUStack custom backend에 일반 플랫폼을 억지로 넣고 있는 것이다.
+
+- FastAPI마다 Redis·Kafka·database·sidecar를 별도 스크립트로 붙인다
+- secret·config rollout과 network isolation이 모델보다 더 어려워진다
+- GPU 외 CPU batch job과 scheduled job을 같은 queue에서 공정하게 나눠야 한다
+- GitOps, namespace tenancy, policy-as-code가 감사 요구사항이 된다
+- custom backend의 multi-container·multi-node 배포가 표준이 된다
+
+그때는 GPUStack을 버린다고 보기보다 model endpoint contract와 artifact 규칙을 유지한 채
+KServe `InferenceService` 또는 custom runtime으로 실행 계층을 옮긴다. LiteLLM의 northbound contract는
+그대로 남길 수 있다.
+
+## 참고 자료
+
+- [NVIDIA GPU Operator Platform Support](https://docs.nvidia.com/datacenter/cloud-native/gpu-operator/latest/platform-support.html) — DGX Spark·ARM64·K3s 지원 범위.
+- [KServe Runtime Overview](https://kserve.github.io/website/docs/model-serving/predictive-inference/frameworks/overview) — vLLM과 custom model server.
+- [KServe Multi-node vLLM](https://kserve.github.io/website/docs/model-serving/generative-inference/multi-node) — Standard mode·RWX PVC·autoscaling 제한.
+- [GPUStack 공식 개요](https://docs.gpustack.ai/) — model-aware scheduler와 custom backend의 제품 범위.
+
+<LinkCard
+  title="8. 마무리"
+  description="전체 요청 지도, 배포 패턴 선택표와 실제 도입 체크리스트를 한 장으로 다시 본다."
+  href="/gpustack/08-wrapup/"
+/>

@@ -1,0 +1,123 @@
+---
+title: "3. vLLM과 임베딩"
+description: "DGX Spark 한 대를 기본 단위로 LLM·embedding을 배포하고 replica와 LiteLLM 경로를 설계한다"
+---
+
+import { Tabs, TabItem, LinkCard } from '@astrojs/starlight/components';
+import TermIntro from '../../../components/docs/TermIntro.astro';
+
+> 한 대에 들어가는 모델은 **분산하지 말고 독립 replica를 늘린다**
+
+<TermIntro
+  terms={[
+    ['vLLM', '', 'continuous batching과 PagedAttention으로 여러 생성 요청을 묶어 처리하고 OpenAI 호환 API를 제공하는 inference engine이다.'],
+    ['continuous batching', '', '실행 중인 batch가 끝날 때까지 기다리지 않고 새 요청을 빈 자리에 계속 넣어 GPU 사용률을 높이는 방식이다.'],
+    ['KV cache', 'Key-Value cache', '이미 처리한 token의 attention 중간값. 긴 context와 동시 요청이 많을수록 커져 모델 weight 외 메모리를 크게 쓴다.'],
+    ['served model name', '', 'API 요청의 `model` 값으로 노출할 이름. 내부 Hugging Face repository 이름과 사용자용 alias를 분리할 수 있다.'],
+  ]}
+/>
+
+## LLM의 기본 배포 패턴
+
+```mermaid
+flowchart LR
+    LITE["LiteLLM<br/>corp-chat"] --> ROUTE["GPUStack route<br/>qwen-prod"]
+    ROUTE --> A["replica 1<br/>spark-01 · vLLM"]
+    ROUTE --> B["replica 2<br/>spark-02 · vLLM"]
+    ROUTE -.-> F["fallback<br/>작은 모델 또는 외부 provider"]
+
+    classDef key  fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
+    classDef ok   fill:#dcfce7,stroke:#16a34a,color:#14532d
+    classDef warn fill:#fef3c7,stroke:#d97706,color:#78350f
+    class LITE,ROUTE key
+    class A,B ok
+    class F warn
+```
+
+replica 둘은 같은 weight를 각자 메모리에 올리고 요청을 독립적으로 처리한다. 메모리를 합치는 방식은
+아니지만 처리량과 장애 격리를 얻는다. 한 worker가 죽어도 다른 target으로 새 요청을 보낼 수 있다.
+
+### 배포 전에 고정할 값
+
+| 항목 | 이유 |
+|---|---|
+| model revision | 같은 이름의 repository 내용이 바뀌는 것을 막는다 |
+| backend image digest | ARM64·GB10용 kernel과 vLLM 버전을 재현한다 |
+| `max-model-len` | 긴 context가 KV cache를 잠식하는 상한을 만든다 |
+| `gpu-memory-utilization` | unified memory에서 OS와 CPU process의 여유를 남긴다 |
+| served model name | GPUStack route와 LiteLLM alias 변경을 분리한다 |
+| health·startup timeout | 큰 model load를 장애로 오인하지 않는다 |
+
+GPUStack의 자동 추정치는 시작점이다. 실제 동시 요청, prompt 길이, 출력 길이를 넣은 load test로
+`max-model-len`과 동시성 상한을 결정한다. Spark의 128GB는 CPU와 GPU가 함께 쓰므로 weight가
+들어간다는 사실만으로 안정적이라고 결론내리지 않는다.
+
+## 임베딩은 먼저 표준 경로를 시험한다
+
+GPUStack의 vLLM backend는 embedding과 reranker model도 지원한다. 모델이 지원 목록에 있고
+특수한 전처리가 없다면 `/v1/embeddings`를 그대로 쓰는 편이 가장 단순하다.
+
+<Tabs>
+<TabItem label="vLLM embedding">
+
+**장점:** LiteLLM과 OpenAI client를 그대로 쓰며 LLM과 같은 배포·route·관측 방식을 재사용한다.
+
+**적합:** text input → vector output이 표준 contract로 충분하고 vLLM이 해당 architecture를 지원한다.
+
+```text
+client → LiteLLM /v1/embeddings
+       → GPUStack /v1/embeddings
+       → vLLM embedding model
+```
+
+</TabItem>
+<TabItem label="FastAPI embedding">
+
+**장점:** 문서별 전처리, sparse+dense 결합, 자체 pooling, batch contract를 자유롭게 구현한다.
+
+**비용:** custom image·health·metrics·API 문서를 직접 책임진다. OpenAI contract가 아니면 LiteLLM을
+우회해 Generic Proxy 또는 사내 Gateway를 쓴다.
+
+```text
+client → API Gateway
+       → GPUStack /model/proxy/<route-id>/embed
+       → FastAPI /embed
+```
+
+</TabItem>
+</Tabs>
+
+## LiteLLM에는 route 하나만 보인다
+
+개념적인 LiteLLM upstream은 다음 형태다. 실제 key와 URL은 환경변수·secret에서 읽는다.
+
+```yaml
+model_list:
+  - model_name: corp-chat
+    litellm_params:
+      model: openai/qwen-prod
+      api_base: https://gpustack.internal/v1
+      api_key: os.environ/GPUSTACK_API_KEY
+```
+
+`corp-chat`은 이용자에게 약속한 이름이고 `qwen-prod`는 GPUStack route다. worker 주소나 instance port는
+LiteLLM 설정에 들어가지 않는다.
+
+:::caution[함정]
+retry는 이미 token을 streaming한 뒤에는 다른 replica로 투명하게 넘길 수 없다. replica는 새 요청의
+가용성을 높이지, 진행 중 생성 요청을 이어 쓰게 만들지는 않는다. client retry와 중복 과금·중복 작업
+정책을 함께 정한다.
+:::
+
+## 참고 자료
+
+- [GPUStack Built-in Inference Backends](https://docs.gpustack.ai/latest/user-guide/built-in-inference-backends/) — vLLM의 LLM·embedding·reranker 지원과 주요 parameter.
+- [GPUStack Embedding Models](https://docs.gpustack.ai/2.0/using-models/using-embedding-models/) — embedding 배포와 API 호출 흐름.
+- [NVIDIA DGX Spark vLLM](https://build.nvidia.com/spark/vllm/i) — Spark에서 검증한 image·recipe와 multi-node 경로.
+- [DGX Spark unified memory 보고](https://nvidia.custhelp.com/app/answers/detail/a_id/5728/) — 전통적인 VRAM 지표와 다른 메모리 해석.
+
+<LinkCard
+  title="4. FastAPI 자체 모델"
+  description="classification과 특수 embedding을 custom backend로 감싸고 Generic Proxy로 노출한다."
+  href="/gpustack/04-custom-backends/"
+/>
