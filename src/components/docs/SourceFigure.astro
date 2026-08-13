@@ -1,0 +1,77 @@
+---
+/*
+  공식 문서 등 외부 출처에서 가져온 그림을 본문에 일관되게 싣는다.
+
+  src         public 아래에 보관한 로컬 사본. 외부 원본이 바뀌거나 느려져도 문서가 깨지지 않는다.
+  alt         그림을 보지 못해도 핵심을 이해할 수 있는 대체 텍스트.
+  width/height 원본 크기. 지연 로딩 전에도 자리를 예약해 레이아웃 이동을 막는다.
+  caption     이 문서에서 그림을 어떻게 읽을지 설명한다.
+  sourceHref  원본이 실린 공식 문서 주소. 이미지 파일 주소가 아니라 맥락이 있는 페이지를 건다.
+  sourceLabel 출처 이름.
+*/
+interface Props {
+  src: string;
+  alt: string;
+  width: number;
+  height: number;
+  caption: string;
+  sourceHref: string;
+  sourceLabel: string;
+}
+
+const { src, alt, width, height, caption, sourceHref, sourceLabel } = Astro.props;
+---
+
+<figure class="source-figure">
+  <a class="source-figure__image-link" href={src} aria-label={`${alt} — 원본 크기로 열기`}>
+    <img src={src} alt={alt} width={width} height={height} loading="lazy" decoding="async" />
+  </a>
+  <figcaption>
+    <span>{caption}</span>
+    <a href={sourceHref}>출처: {sourceLabel}</a>
+  </figcaption>
+</figure>
+
+<style>
+  .source-figure {
+    margin: 1.5rem 0 1.8rem;
+  }
+
+  .source-figure__image-link {
+    display: block;
+    overflow: hidden;
+    border: 1px solid var(--sl-color-gray-5, #d4d4d8);
+    border-radius: 0.6rem;
+    background: #fff;
+    box-shadow: 0 0.4rem 1.2rem rgb(15 23 42 / 8%);
+  }
+
+  .source-figure__image-link:hover {
+    border-color: var(--sl-color-accent, #4f46e5);
+  }
+
+  img {
+    display: block;
+    width: 100%;
+    height: auto;
+  }
+
+  figcaption {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    gap: 0.25rem 0.8rem;
+    margin-top: 0.55rem;
+    color: var(--sl-color-gray-3);
+    font-size: 0.78rem;
+    line-height: 1.55;
+  }
+
+  figcaption span {
+    flex: 1 1 24rem;
+  }
+
+  figcaption a {
+    flex: none;
+  }
+</style>

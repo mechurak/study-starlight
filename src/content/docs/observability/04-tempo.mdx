@@ -5,18 +5,13 @@ description: "스팬의 생김새, 계측이라는 진입 장벽과 컨텍스트
 
 import { Tabs, TabItem, LinkCard, Steps } from '@astrojs/starlight/components';
 import TermIntro from '../../../components/docs/TermIntro.astro';
+import SourceFigure from '../../../components/docs/SourceFigure.astro';
 
 > 추적은 앞의 둘과 성격이 다르다 — **앱 코드를 건드려야 시작된다**
 
 <TermIntro
   terms={[
     ['트레이스 · 스팬', 'Trace · Span', '요청 하나의 전체 여정이 트레이스, 그 안의 구간 하나가 스팬이다. `API 호출 3초` 아래 `DB 질의 2.8초`처럼 **트리로 쌓인다**.'],
-    ['컨텍스트 전파', 'Context Propagation', '서비스 A가 B를 부를 때 **트레이스 ID를 HTTP 헤더에 실어 넘기는 것**. 이게 끊기면 트레이스가 조각난다. 표준 헤더는 `traceparent`(W3C).'],
-    ['리소스 속성 · 스팬 속성', 'Resource · Span Attributes', '**프로세스 전체에 붙는 꼬리표**(어느 서비스·어느 파드인가)와 **그 구간에만 붙는 꼬리표**(어떤 URL·어떤 SQL인가). TraceQL에서 둘을 다르게 쓴다.'],
-    ['OTLP', 'OpenTelemetry Protocol', 'OpenTelemetry의 전송 프로토콜. 지금은 **트레이스·메트릭·로그 모두** 이걸로 보낸다 — 백엔드를 바꿔도 계측은 그대로다.'],
-    ['샘플링', 'Sampling', '모든 요청을 저장하지 않고 **일부만 남기는 것**. head(시작할 때 결정)와 tail(끝나고 결과를 보고 결정) 두 방식이 있다.'],
-    ['TraceQL', '', 'Tempo의 트레이스 질의 언어. `{ duration > 2s && resource.service.name = "orders" }` 같은 조건으로 **느린 트레이스만 골라낸다**.'],
-    ['서비스 그래프', 'Service Graph', '트레이스에서 자동 생성한 "누가 누구를 부르나" 지도. 문서에 없는 실제 호출 관계가 드러난다.'],
   ]}
 />
 
@@ -36,7 +31,25 @@ import TermIntro from '../../../components/docs/TermIntro.astro';
 | 로그 | "그 시각에 이런 에러가" — **무슨 일이 있었는지**는 안다 |
 | **트레이스** | "3.2초 중 2.8초가 재고 서비스의 DB 질의" — **어디서 갔는지**를 안다 |
 
+<SourceFigure
+  src="/images/observability/tempo-trace-explore.png"
+  alt="Grafana Explore의 로그 결과에서 TraceID를 찾아 Tempo 트레이스를 열고, 여러 서비스의 스팬을 가로 막대로 보는 공식 예시 화면"
+  width={1474}
+  height={788}
+  caption="왼쪽 로그의 TraceID가 오른쪽 요청 여정으로 이어진다. 오른쪽 가로 막대 하나가 스팬이고, 긴 막대가 시간을 많이 쓴 구간이다."
+  sourceHref="https://grafana.com/docs/tempo/latest/introduction/"
+  sourceLabel="Grafana Tempo 공식 문서 — Introduction"
+/>
+
 ## 스팬 하나는 어떻게 생겼나
+
+<TermIntro
+  title="스팬 안의 두 종류 꼬리표"
+  terms={[
+    ['리소스 속성', 'Resource Attributes', '어느 서비스·파드인가처럼 **프로세스 전체에 붙는 꼬리표**.'],
+    ['스팬 속성', 'Span Attributes', '어떤 URL·SQL인가처럼 **그 구간에만 붙는 꼬리표**.'],
+  ]}
+/>
 
 트레이스는 **스팬의 트리**이고, 스팬 하나는 이런 물건이다.
 
@@ -84,6 +97,13 @@ events:
 :::
 
 ## TraceQL — 느린 것만 골라낸다
+
+<TermIntro
+  title="이 절에서 쓰는 말"
+  terms={[
+    ['TraceQL', '', 'Tempo의 트레이스 질의 언어. 서비스·시간·오류 같은 조건으로 **원하는 요청만 골라낸다.**'],
+  ]}
+/>
 
 트레이스 ID를 이미 알고 있으면 그냥 열면 된다. 문제는 **ID를 모를 때** —
 "어제 새벽에 느렸던 주문 요청"을 찾아야 하는 경우다. 그게 TraceQL이다.
@@ -146,6 +166,14 @@ events:
 
 ## 계측 — 앱을 고쳐야 한다
 
+<TermIntro
+  title="요청을 끊기지 않게 잇는 말"
+  terms={[
+    ['컨텍스트 전파', 'Context Propagation', '서비스 A가 B를 부를 때 **같은 트레이스 ID를 HTTP 헤더로 넘기는 것**. 끊기면 요청 여정도 둘로 갈라진다.'],
+    ['OTLP', 'OpenTelemetry Protocol', '앱과 수집기가 트레이스를 주고받는 표준 전송 방식. 저장소를 바꿔도 앱 계측을 유지하게 해 준다.'],
+  ]}
+/>
+
 메트릭과 로그는 앱이 가만히 있어도 어느 정도 모인다(노드 exporter, stdout).
 **추적은 다르다.** 요청이 서비스를 건널 때 트레이스 ID를 이어 주는 코드가 필요하다.
 
@@ -196,6 +224,13 @@ Grafana의 derived field가 그 링크를 만들어 준다 ([5장](/observabilit
 :::
 
 ## 샘플링 — 전부 저장할 수는 없다
+
+<TermIntro
+  title="이 절의 핵심 용어"
+  terms={[
+    ['샘플링', 'Sampling', '모든 요청을 저장하지 않고 **일부만 남기는 것**. 시작할 때 정하는 방식과 요청이 끝난 뒤 정하는 방식이 있다.'],
+  ]}
+/>
 
 트레이스는 세 신호 중 **가장 빨리 용량을 먹는다.** 요청 하나가 스팬 수십 개다.
 
@@ -276,6 +311,13 @@ Tempo 3.0은 **인입과 질의를 분리한 새 아키텍처**로 갈아엎었�
 | 메트릭 생성(서비스 그래프·스팬 메트릭)을 쓰겠다 | 3.0에서는 **Kafka가 인입 경로에 들어온다** ([Kafka 덱](/kafka/)) — 도입 비용을 먼저 따진다 |
 
 ### 부산물 — 서비스 그래프와 스팬 메트릭
+
+<TermIntro
+  title="트레이스에서 덤으로 얻는 것"
+  terms={[
+    ['서비스 그래프', 'Service Graph', '트레이스에서 자동 생성한 **누가 누구를 부르는가** 지도. 문서와 다른 실제 호출 관계가 드러난다.'],
+  ]}
+/>
 
 Tempo는 트레이스를 보고 **메트릭을 만들어 낼 수 있다.**
 

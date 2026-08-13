@@ -5,18 +5,15 @@ description: "메트릭의 생김새와 타입 넷, PromQL 다섯 형태, RED와
 
 import { Tabs, TabItem, LinkCard } from '@astrojs/starlight/components';
 import TermIntro from '../../../components/docs/TermIntro.astro';
+import SourceFigure from '../../../components/docs/SourceFigure.astro';
 
 > 알림이 없는 메트릭은 **사고가 난 뒤에 보는 부검 자료**다 — 이 장의 절반이 알림인 이유다
 
 <TermIntro
   terms={[
     ['pull 모델', '', 'Prometheus가 대상에 **직접 접속해 긁어 오는(scrape)** 방식. 대상이 보내 주는(push) 방식과 반대다. "긁으러 갔는데 없더라"로 **죽은 것도 알 수 있다**는 게 큰 차이다.'],
-    ['exporter', '익스포터', 'Prometheus가 읽을 수 있는 형식으로 메트릭을 내주는 작은 프로그램. `node-exporter`(노드 상태), `kube-state-metrics`(쿠버네티스 오브젝트 상태)가 대표적이다.'],
     ['카운터 · 게이지 · 히스토그램', 'Counter · Gauge · Histogram', '메트릭의 세 가지 성격. **늘기만 하는 것 · 오르내리는 것 · 분포를 담는 것**이다. 성격을 모르고 질의하면 그래프가 조용히 거짓말을 한다.'],
     ['PromQL', 'Prometheus Query Language', '메트릭 질의 언어. **`rate()`로 속도를 내고 `sum by()`로 묶는** 두 동작이 전체의 8할이다.'],
-    ['RED · USE', '', '무엇을 재야 하는지의 두 관례. RED는 서비스를 **요청 수 · 에러 · 지연**으로, USE는 자원을 **사용률 · 포화 · 오류**로 본다. 대시보드와 알림 설계의 출발점이다.'],
-    ['ServiceMonitor · PodMonitor', '', '"이 Service·Pod를 긁어라"를 선언하는 CRD. Prometheus 설정 파일을 직접 고치지 않고 **쿠버네티스 리소스로** 대상을 추가한다.'],
-    ['Alertmanager', '', '알림의 라우팅·묶음·중복 제거·억제(inhibit)·침묵(silence)을 담당하는 별도 컴포넌트. Prometheus는 "규칙이 참이다"까지만 하고 나머지는 여기가 한다.'],
   ]}
 />
 
@@ -36,6 +33,16 @@ Prometheus는 대상이 보내 주기를 기다리지 않고 **직접 긁으러 
 `up` 메트릭 하나가 "이 대상이 살아 있나"를 그대로 알려 준다.
 **대부분의 온프렘 알림은 결국 `up == 0`과 디스크·인증서 만료 세 가지에서 시작한다.**
 :::
+
+<SourceFigure
+  src="/images/observability/prometheus-architecture.svg"
+  alt="Prometheus가 서비스와 익스포터의 메트릭을 직접 긁고, 저장한 시계열을 Grafana와 Alertmanager에 제공하는 공식 구성도"
+  width={1351}
+  height={811}
+  caption="지금은 가운데 Prometheus에서 왼쪽 대상들로 향하는 pull 화살표만 본다. 나머지 구성 요소는 이 장 뒤에서 하나씩 만난다."
+  sourceHref="https://prometheus.io/docs/introduction/overview/"
+  sourceLabel="Prometheus 공식 문서 — Overview"
+/>
 
 ## 메트릭은 어떻게 생겼나
 
@@ -244,6 +251,14 @@ predict_linear(node_filesystem_avail_bytes{mountpoint="/"}[6h], 24*3600) < 0
 
 ## 무엇을 재나 — RED와 USE
 
+<TermIntro
+  title="이 절에서 처음 나오는 말"
+  terms={[
+    ['RED', 'Rate · Errors · Duration', '서비스를 **요청 수 · 에러 · 지연**으로 보는 관례. 사용자가 겪는 증상이라 알림의 출발점이다.'],
+    ['USE', 'Utilization · Saturation · Errors', 'CPU·디스크 같은 자원을 **사용률 · 포화 · 오류**로 보는 관례. 원인을 파고들 때 쓴다.'],
+  ]}
+/>
+
 메트릭을 낼 수 있다고 아무거나 내면 시계열만 는다.
 **무엇을 재야 하는지에는 검증된 관례 둘이 있다** — 대상이 다르다.
 
@@ -277,6 +292,14 @@ CPU가 40%인데 DB 잠금으로 전부 실패하는 상황은 그 알림이 못
 :::
 
 ## 세우기 — kube-prometheus-stack
+
+<TermIntro
+  title="설정에 들어가기 전에"
+  terms={[
+    ['exporter', '익스포터', '노드나 시스템의 상태를 Prometheus가 읽을 수 있는 메트릭으로 내주는 작은 프로그램.'],
+    ['ServiceMonitor · PodMonitor', '', '"이 Service·Pod를 긁어라"를 선언하는 쿠버네티스 리소스. Prometheus 설정 파일을 직접 고치지 않게 해 준다.'],
+  ]}
+/>
 
 | 방식 | 성격 |
 |---|---|
@@ -437,6 +460,13 @@ spec:
 :::
 
 ## 알림 설계 — 이 장의 핵심
+
+<TermIntro
+  title="알림 경로의 마지막 조각"
+  terms={[
+    ['Alertmanager', '', 'Prometheus가 발견한 알림을 **묶고 · 중복을 없애고 · 담당자에게 보내는** 별도 컴포넌트.'],
+  ]}
+/>
 
 **규칙 200개짜리 대시보드보다 잘 고른 알림 20개가 낫다.** 원칙 넷.
 

@@ -5,17 +5,13 @@ description: "세 데이터소스를 잇는 상관 관계 설정, Explore로 실
 
 import { Tabs, TabItem, LinkCard, Steps } from '@astrojs/starlight/components';
 import TermIntro from '../../../components/docs/TermIntro.astro';
+import SourceFigure from '../../../components/docs/SourceFigure.astro';
 
 > Grafana의 값은 그래프가 아니라 **메트릭에서 로그로, 로그에서 트레이스로 두 번 클릭에 가는 것**이다
 
 <TermIntro
   terms={[
-    ['데이터소스', 'Data Source', 'Grafana가 붙는 저장소 하나. Prometheus · Loki · Tempo · PostgreSQL이 각각 하나씩이다. **uid**로 서로를 참조한다.'],
-    ['프로비저닝', 'Provisioning', '데이터소스·대시보드를 **파일이나 CRD로 미리 넣어 두는 것**. UI에서 만든 것과 달리 파드가 사라져도 남고, Git으로 관리된다.'],
-    ['derived field', '파생 필드', '로그 한 줄에서 정규식으로 값을 뽑아 **다른 데이터소스로 가는 링크**를 만드는 기능. `trace_id` → Tempo 링크가 대표적이다.'],
-    ['Explore', '탐색', '대시보드가 아니라 **질의 한 줄을 그때그때 던지는 화면**. 조사는 대부분 여기서 하고, 반복되는 것만 대시보드로 굳힌다.'],
-    ['템플릿 변수', 'Template Variable', '대시보드 위쪽의 드롭다운. `$service` 하나로 **대시보드 100개를 1개로 줄이는** 장치다.'],
-    ['Unified Alerting', '통합 알림', 'Grafana가 자체적으로 알림 규칙을 평가·발송하는 기능. Alertmanager와 **역할이 겹쳐서** 어느 쪽에 둘지 정해야 한다.'],
+    ['Grafana', '', '메트릭·로그·트레이스를 저장하는 곳이 아니라, **세 저장소를 한 시간축에서 조회하고 서로 잇는 창**이다.'],
   ]}
 />
 
@@ -37,7 +33,26 @@ Prometheus UI, Loki 조회, Tempo — 각각 따로 열면 조사할 때마다 �
 
 이 이동을 없애는 것이 Grafana를 쓰는 이유다. **대시보드가 예쁜 건 부수적이다.**
 
+<SourceFigure
+  src="/images/observability/grafana-explore-split.png"
+  alt="Grafana Explore에서 두 질의를 좌우 분할 화면으로 열고 같은 시간 범위에서 비교하는 공식 예시 화면"
+  width={1746}
+  height={850}
+  caption="Explore의 Split은 두 화면의 시간 범위를 묶는다. 이 덱에서는 왼쪽에 메트릭, 오른쪽에 로그를 두고 같은 순간을 비교한다."
+  sourceHref="https://grafana.com/docs/grafana/latest/visualizations/explore/get-started-with-explore/"
+  sourceLabel="Grafana 공식 문서 — Get started with Explore"
+/>
+
 ## 데이터소스와 상관 관계 — 먼저 이것부터 설정한다
+
+<TermIntro
+  title="연결 설정에 필요한 말"
+  terms={[
+    ['데이터소스', 'Data Source', 'Grafana가 붙는 저장소 하나. Prometheus · Loki · Tempo가 각각 하나이며 고유한 `uid`로 서로를 참조한다.'],
+    ['프로비저닝', 'Provisioning', '데이터소스·대시보드를 **파일로 미리 넣어 두는 것**. UI에서 손으로 만든 설정과 달리 Git으로 관리할 수 있다.'],
+    ['derived field', '파생 필드', '로그에서 `trace_id` 같은 값을 뽑아 **다른 데이터소스로 가는 링크**로 만드는 기능.'],
+  ]}
+/>
 
 ```mermaid
 flowchart LR
@@ -104,6 +119,13 @@ datasources:
 
 ## Explore — 실제 조사는 여기서 한다
 
+<TermIntro
+  title="대시보드와 구분할 말"
+  terms={[
+    ['Explore', '탐색', '저장된 대시보드가 아니라 **질의를 그때그때 던지고 결과를 비교하는 화면**. 사고 조사는 대부분 여기서 한다.'],
+  ]}
+/>
+
 대시보드는 **미리 알고 있던 질문**에 답한다. 사고는 대개 **몰랐던 질문**으로 시작하고,
 그때 여는 화면이 Explore다. 앞 장들이 쌓아 온 것이 여기서 한 줄기로 이어진다.
 
@@ -157,6 +179,13 @@ Explore 화면에는 **Share 링크**가 있다. 조사가 끝나면
 | **서비스별** | RED 한 벌 + 그 서비스 로그 | **변수로 하나만 만든다** — 아래 |
 
 ### 서비스마다 대시보드를 만들지 않는다
+
+<TermIntro
+  title="대시보드를 줄이는 장치"
+  terms={[
+    ['템플릿 변수', 'Template Variable', '대시보드 위쪽의 드롭다운. `$service` 값을 바꾸며 **여러 서비스가 한 대시보드를 공유**하게 한다.'],
+  ]}
+/>
 
 서비스가 30개면 대시보드도 30개가 되는 게 가장 흔한 실패다.
 **템플릿 변수 하나면 1개로 끝난다.**
@@ -315,6 +344,13 @@ auto_assign_org_role = Viewer
 | 로컬 admin이 남아 있는가 | 깨진 유리 계정 ([온프렘 덱 5장](/onprem/05-identity/)) |
 
 ## 알림을 어디에 두나 — Grafana vs Alertmanager
+
+<TermIntro
+  title="여기서 비교하는 기능"
+  terms={[
+    ['Unified Alerting', '통합 알림', 'Grafana가 직접 알림 규칙을 평가하고 보내는 기능. Alertmanager와 역할이 겹치므로 한쪽을 주인으로 정한다.'],
+  ]}
+/>
 
 둘 다 알림을 보낼 수 있어서 **섞으면 이중 발송이나 사각지대가 생긴다.** 하나로 정한다.
 
