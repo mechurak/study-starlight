@@ -123,12 +123,75 @@ Service와 달리 **Pod은 기본적으로 DNS 레코드가 없거나 IP 기반*
 "Pod을 이름으로 조회하라"는 보기가 나오면 의심부터 할 것 — 원리는 [cka 10장](/cka/10-dns/).
 :::
 
+## Service → DNS → 외부 경로를 한 겹씩 검증하기
+
+Service를 만들었다는 사실만으로 트래픽 경로가 완성되지는 않는다. **백엔드 → Service → DNS →
+외부 진입점** 순서로 통과 지점을 늘리면, 뒤 단계가 실패해도 이미 통과한 층은 원인에서 제외할 수 있다.
+
+1. **셀렉터와 실제 백엔드가 연결됐는지 확인한다.**
+
+   ```bash
+   kubectl describe svc <service> -n <namespace>       # Selector / Port / TargetPort
+   kubectl get pods -n <namespace> -l '<key>=<value>' --show-labels
+   kubectl get endpointslices -n <namespace> \
+     -l kubernetes.io/service-name=<service> -o wide
+   ```
+
+   `EndpointSlice`의 주소가 비었으면 아직 네트워크 경로를 시험할 단계가 아니다. Service 셀렉터와
+   Pod 라벨, Pod `Ready`, `targetPort`를 먼저 맞춘다. 옛 `Endpoints` API는 v1.33부터 deprecated이므로,
+   실습 판정의 단일 원본은 `EndpointSlice`로 잡는다.
+
+2. **같은 디버그 Pod에서 Pod IP와 ClusterIP를 차례로 호출한다.**
+
+   ```bash
+   kubectl run netcheck -n <namespace> --image=busybox:1.36 \
+     --restart=Never --rm -it -- sh
+
+   # 컨테이너 안에서
+   wget -qO- http://<pod-ip>:<target-port>
+   wget -qO- http://<cluster-ip>:<service-port>
+   ```
+
+   Pod IP부터 실패하면 애플리케이션·컨테이너 포트 문제다. Pod IP는 되는데 ClusterIP가 실패하면
+   Service 포트, EndpointSlice, kube-proxy 규칙을 본다.
+
+3. **이름 해석과 실제 HTTP 연결을 분리한다.**
+
+   ```bash
+   nslookup kubernetes.default
+   nslookup <service>.<namespace>.svc.cluster.local
+   wget -qO- http://<service>.<namespace>.svc.cluster.local:<service-port>
+   ```
+
+   첫 조회는 클러스터 DNS 전체의 기준점이고, 둘째는 대상 레코드만 확인한다. `nslookup` 성공은
+   IP를 얻었다는 뜻일 뿐 백엔드 응답까지 증명하지 않으므로 마지막 호출도 성공해야 한다.
+
+4. **NodePort라면 클러스터 밖에서 마지막 한 겹을 확인한다.**
+
+   ```bash
+   kubectl get svc <service> -n <namespace> -o wide     # NODE-PORT 확인
+   kubectl get nodes -o wide                           # 도달 가능한 노드 주소 확인
+
+   # 클러스터 밖의 셸에서
+   curl -fsS http://<reachable-node-ip>:<node-port>
+   ```
+
+   내부 FQDN 호출까지 되는데 외부 요청만 실패하면 앱·셀렉터·DNS를 다시 고치지 않는다. 도달 가능한
+   노드 주소인지, NodePort 범위와 노드 방화벽·보안 그룹이 열렸는지 확인한다.
+   `externalTrafficPolicy: Local`이면 요청을 받은 노드에 Ready 백엔드가 있는지도 함께 본다.
+
+공식 기준은 Kubernetes v1.35의
+[Service](https://v1-35.docs.kubernetes.io/docs/concepts/services-networking/service/),
+[EndpointSlice](https://v1-35.docs.kubernetes.io/docs/concepts/services-networking/endpoint-slices/),
+[DNS 진단](https://v1-35.docs.kubernetes.io/docs/tasks/administer-cluster/dns-debugging-resolution/) 문서다.
+
 ## 이 장에서 남길 것
 
 - 조회형 문제는 명령보다 **열 이름**(TYPE·Endpoints·INTERNAL-IP·CLUSTER-IP)을 기억한다
 - 세 IP 대역(노드/Pod/Service)은 각각 다른 명령으로 찾는다 — 컨트롤 플레인 Pod은 호스트 IP라 제외
 - 듣는 포트는 `netstat -nplt | grep <프로세스>`
 - DNS 문제의 절반은 `<service>.<namespace>` 형식으로 끝난다
+- 증명 순서는 **EndpointSlice → Pod IP → ClusterIP → FQDN → 외부 NodePort**다
 
 <LinkCard
   title="6. Ingress와 NetworkPolicy"

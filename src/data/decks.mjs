@@ -70,8 +70,8 @@ export const deckDefinitions = [
 		label: 'CKA 실습',
 		title: 'CKA 실습',
 		icon: 'pencil',
-		aliases: ['KodeKloud CKA Practice Test', 'CKA 연습 문제'],
-		description: 'KodeKloud 랩 46개를 cka 덱 장 순서로 재편성한 “시키면 어떻게 하나” 풀이 패턴.',
+		aliases: ['KodeKloud CKA Practice Test', 'CKA 연습 문제', 'CKA labs', 'Kubernetes 관리자 실습'],
+		description: 'KodeKloud 랩을 뼈대로 여러 실습의 실패 진단·완료 검증·복구 패턴을 모은 CKA 연습 덱.',
 		category: 'kubernetes',
 		groups: [
 			[

@@ -224,7 +224,7 @@ spec:
 ```
 
 이 골격을 손으로 치지 않는다 — 시험 중에는 공식
-[CustomResourceDefinition 문서](https://kubernetes.io/docs/tasks/extend-kubernetes/custom-resources/custom-resource-definitions/)의
+[CustomResourceDefinition 문서](https://v1-35.docs.kubernetes.io/docs/tasks/extend-kubernetes/custom-resources/custom-resource-definitions/)의
 전체 예시를 복사해 이름·스키마만 깎아내는 게 정석이다.
 
 ### CRD를 만들면 무슨 일이 생기나
@@ -250,8 +250,10 @@ flowchart LR
 
 ```bash
 kubectl apply -f backup-crd.yaml
-kubectl get crd
+kubectl wait --for=condition=Established \
+  crd/backups.ops.example.com --timeout=60s
 kubectl api-resources | grep backups
+kubectl get --raw='/apis/ops.example.com/v1'
 kubectl explain backup.spec              # ★ 스키마가 있으니 explain도 동작한다
 ```
 
@@ -263,6 +265,22 @@ metadata:
 spec:
   schedule: "0 3 * * *"
 ```
+
+CR까지 적용한 뒤 저장 여부와 조정 여부를 따로 판정한다.
+
+```bash
+kubectl apply -f backup.yaml
+kubectl get backup nightly \
+  -o jsonpath='{.metadata.uid}{"\t"}{.metadata.resourceVersion}{"\n"}'
+kubectl get backup nightly \
+  -o jsonpath='{.metadata.generation}{"\t"}{.status.conditions}{"\n"}'
+```
+
+CRD의 `Established=True`, discovery 응답, CR의 `uid`·`resourceVersion`은 각각 **새 API 등록과
+객체 저장**을 증명한다. 여기까지 성공해도 백업 같은 실제 작업은 아직 증명되지 않는다.
+그 결과는 컨트롤러가 기록한 `status.conditions`, 컨트롤러가 만든 하위 리소스, 컨트롤러 로그로
+따로 확인해야 한다. CRD만 있는 예제에서 `status`가 비어 있는 것은 저장 실패가 아니라
+**조정할 컨트롤러가 없다는 경계**다.
 
 :::caution[함정]
 **CRD만 만들면 아무 일도 일어나지 않는다.**

@@ -1,6 +1,7 @@
 ---
 title: 개요
-description: 유데미 CKA 강의의 KodeKloud 실습 풀이 46개를 cka 덱 장 순서로 재편성한 연습 덱
+description: KodeKloud 실습 풀이 46개를 뼈대로, 여러 실습에서 확인한 실패 진단·완료 검증·복구 패턴을 CKA 장 순서로 모은 연습 덱
+aliases: [CKA labs, Kubernetes 관리자 실습]
 ---
 
 import { LinkButton, LinkCard } from '@astrojs/starlight/components';
@@ -14,6 +15,10 @@ import DeckMap from '../../../components/docs/DeckMap.astro';
 [KodeKloud 노트 사이트](https://notes.kodekloud.com/docs/Certified-Kubernetes-Administrator-CKA/)를 소스로 보강했다.
 개념 설명은 cka 덱이 맡고, 이 덱은 "**이런 문제가 나오면 이렇게 푼다**"만 맡는다.
 
+여기에 다른 실습을 수행하며 얻은 **완료 판정·실패 분기·복구 후 재검증 패턴**도 덧붙인다.
+특정 과정의 문제나 해답을 옮기지 않고, 여러 환경에서 다시 쓸 수 있는 패턴만 Kubernetes v1.35
+공식 문서로 재검증해 자기 문장으로 남긴다.
+
 <LinkButton href="/cka-udemy/01-basics/" icon="right-arrow">첫 장부터 읽기</LinkButton>
 
 ## cka 덱과의 관계
@@ -26,21 +31,23 @@ import DeckMap from '../../../components/docs/DeckMap.astro';
   이 덱은 랩을 돌기 전의 예습과 돈 뒤의 복습용이다.
 - 원본 레포는 유데미 강의 시점의 구버전 Kubernetes 기준이다. **명령이 낡은 곳은
   시험 환경(v1.35) 기준으로 고쳐 실었고**, 고친 자리마다 표시를 남겼다.
+- `Practice Test` 제목이 없는 절은 특정 문제의 추가 해답이 아니라, 실습 뒤에도 성공 여부를 판정하고
+  실패 지점을 좁힐 수 있도록 보강한 출처 중립적 검증 루프다. 현재 동작의 근거는 절마다 공식 문서로 남긴다.
 
 ## 구성
 
 <DeckMap
   steps={[
     { label: '1장', title: '기본 조작', href: '/cka-udemy/01-basics/', desc: 'Pod · 네임스페이스 · 명령형 커맨드 · JSONPath', items: [['cka 2장', '/cka/02-architecture/'], ['cka 3장', '/cka/03-kubectl/'], ['cka 4장', '/cka/04-pods/']], tone: 'key' },
-    { label: '2장', title: '워크로드', href: '/cka-udemy/02-workloads/', desc: 'ReplicaSet · Deployment · 롤링 업데이트', items: [['cka 5장', '/cka/05-workloads/']], tone: 'key' },
-    { label: '3장', title: 'Pod 설정', href: '/cka-udemy/03-pod-config/', desc: 'command/args · 환경 변수 · Secret · securityContext · 멀티 컨테이너 · init', items: [['cka 4장', '/cka/04-pods/'], ['cka 6장', '/cka/06-config/']], tone: 'ok' },
-    { label: '4장', title: '스케줄링', href: '/cka-udemy/04-scheduling/', desc: '수동 배치 · 라벨 · taint · affinity · 리소스 · DaemonSet · 스태틱 Pod', items: [['cka 7장', '/cka/07-scheduling/']], tone: 'ok' },
-    { label: '5장', title: 'Service와 DNS', href: '/cka-udemy/05-services-dns/', desc: 'Service · 서비스 네트워킹 · 환경 탐색 · CoreDNS', items: [['cka 9장', '/cka/09-services/'], ['cka 10장', '/cka/10-dns/']], tone: 'warn' },
-    { label: '6장', title: 'Ingress와 NetworkPolicy', href: '/cka-udemy/06-ingress-netpol/', desc: 'Ingress 두 벌 · NetworkPolicy', items: [['cka 11장', '/cka/11-ingress-gateway/'], ['cka 12장', '/cka/12-networkpolicy/']], tone: 'warn' },
-    { label: '7장', title: '스토리지', href: '/cka-udemy/07-storage/', desc: 'PV/PVC · StorageClass', items: [['cka 13장', '/cka/13-storage/']], tone: 'zone' },
-    { label: '8장', title: '인증서 · kubeconfig · RBAC', href: '/cka-udemy/08-security/', desc: '인증서 · CSR · kubeconfig · RBAC · ClusterRole · ServiceAccount · 프라이빗 레지스트리 · admission 컨트롤러', items: [['cka 14장', '/cka/14-rbac/']], tone: 'zone' },
-    { label: '9장', title: '클러스터 라이프사이클', href: '/cka-udemy/09-cluster-lifecycle/', desc: 'kubeadm 설치 · drain · 업그레이드 · etcd 백업/복구 두 벌', items: [['cka 15장', '/cka/15-cluster-lifecycle/']], tone: 'bad' },
-    { label: '10장', title: '모니터링과 트러블슈팅', href: '/cka-udemy/10-troubleshooting/', desc: 'metrics-server · 로그 · 네트워크 트러블슈팅', items: [['cka 8장', '/cka/08-autoscaling/'], ['cka 18장', '/cka/18-troubleshooting/']], tone: 'bad' },
+    { label: '2장', title: '워크로드', href: '/cka-udemy/02-workloads/', desc: 'ReplicaSet · Deployment rollout/rollback · Job 완료·실패', items: [['cka 5장', '/cka/05-workloads/']], tone: 'key' },
+    { label: '3장', title: 'Pod 설정', href: '/cka-udemy/03-pod-config/', desc: 'command/args · ConfigMap 반영 · Secret · securityContext · 멀티 컨테이너 · init', items: [['cka 4장', '/cka/04-pods/'], ['cka 6장', '/cka/06-config/']], tone: 'ok' },
+    { label: '4장', title: '스케줄링', href: '/cka-udemy/04-scheduling/', desc: '수동 배치 · 라벨/taint · affinity · quota · DaemonSet 업데이트 · 스태틱 Pod', items: [['cka 7장', '/cka/07-scheduling/']], tone: 'ok' },
+    { label: '5장', title: 'Service와 DNS', href: '/cka-udemy/05-services-dns/', desc: 'EndpointSlice · Service · CoreDNS · 내부에서 외부까지 계층별 검증', items: [['cka 9장', '/cka/09-services/'], ['cka 10장', '/cka/10-dns/']], tone: 'warn' },
+    { label: '6장', title: 'Ingress와 NetworkPolicy', href: '/cka-udemy/06-ingress-netpol/', desc: 'Ingress · Gateway API · 외부 요청 검증 · NetworkPolicy', items: [['cka 11장', '/cka/11-ingress-gateway/'], ['cka 12장', '/cka/12-networkpolicy/']], tone: 'warn' },
+    { label: '7장', title: '스토리지', href: '/cka-udemy/07-storage/', desc: 'PV/PVC · StorageClass · 정적/동적 프로비저닝 · 스토리지 quota', items: [['cka 13장', '/cka/13-storage/']], tone: 'zone' },
+    { label: '8장', title: '인증서 · kubeconfig · RBAC', href: '/cka-udemy/08-security/', desc: 'TLS · 인증서 · kubeconfig/API · RBAC · ServiceAccount · admission · 저장 확인', items: [['cka 14장', '/cka/14-rbac/']], tone: 'zone' },
+    { label: '9장', title: '클러스터 라이프사이클', href: '/cka-udemy/09-cluster-lifecycle/', desc: 'kubeadm 설치 검증 · drain · 업그레이드 · etcd 백업/복구', items: [['cka 15장', '/cka/15-cluster-lifecycle/']], tone: 'bad' },
+    { label: '10장', title: '모니터링과 트러블슈팅', href: '/cka-udemy/10-troubleshooting/', desc: 'metrics-server · 증상별 로그 진입점 · 네트워크 트러블슈팅', items: [['cka 8장', '/cka/08-autoscaling/'], ['cka 18장', '/cka/18-troubleshooting/']], tone: 'bad' },
   ]}
 />
 

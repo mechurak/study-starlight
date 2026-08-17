@@ -93,6 +93,54 @@ toleration을 줘도 그 노드로 **유도되지는 않는다** — 갈 수 있
 → *Which node is the POD mosquito on now?*
 :::
 
+### 라벨과 taint는 교집합으로 판정한다
+
+전용 노드 배치는 조건 하나씩 따로 보지 않고 **라벨로 고른 후보 ∩ taint를 견디는 후보**가
+남는지 확인한다. 다음 Pod은 `workload=batch` 라벨이 있고 `reserved=batch:NoSchedule` taint도
+견디는 노드에만 배치될 수 있다.
+
+```yaml
+spec:
+  nodeSelector:
+    workload: batch
+  tolerations:
+    - key: reserved
+      operator: Equal
+      value: batch
+      effect: NoSchedule
+```
+
+```bash
+# 1. Pod이 요구하는 두 조건을 확인한다
+kubectl get pod placement-check \
+  -o jsonpath='{.spec.nodeSelector}{"\n"}{.spec.tolerations}{"\n"}'
+
+# 2. 라벨 후보를 찾고, 그 후보의 taint를 대조한다
+kubectl get nodes -l workload=batch --show-labels
+kubectl describe node <candidate-node> | grep -A3 Taints
+
+# 3. 아직 nodeName이 비어 있으면 스케줄링 실패다. Events가 탈락 조건을 말한다
+kubectl get pod placement-check \
+  -o custom-columns='NAME:.metadata.name,NODE:.spec.nodeName,PHASE:.status.phase'
+kubectl describe pod placement-check
+kubectl get events --field-selector involvedObject.name=placement-check \
+  --sort-by=.lastTimestamp
+```
+
+`spec.nodeName`이 비어 있고 Events에 `didn't match Pod's node affinity/selector`가 나오면 라벨 후보가
+0개인 것이고, `had untolerated taint`면 후보 노드에 견디지 못한 taint가 남은 것이다. 두 조건을 고친
+뒤에는 `NODE`가 기대한 노드인지와 Pod이 `Running`·`Ready`인지까지 확인해야 배치가 끝난다.
+
+:::tip[Pending에서는 로그보다 Events]
+아직 노드가 정해지지 않은 Pod에는 실행된 컨테이너가 없으므로 `kubectl logs`로 내려가지 않는다.
+`nodeName`이 채워진 뒤 `ContainerCreating`이나 `CrashLoopBackOff`로 실패하면 그때부터는
+[10장 로그 진단](/cka-udemy/10-troubleshooting/#증상에-맞는-로그-진입점을-고른다)으로 넘긴다.
+:::
+
+공식 근거: [Pod을 노드에 배치](https://v1-35.docs.kubernetes.io/docs/concepts/scheduling-eviction/assign-pod-node/),
+[taint와 toleration](https://v1-35.docs.kubernetes.io/docs/concepts/scheduling-eviction/taint-and-toleration/),
+[Pending Pod 진단](https://v1-35.docs.kubernetes.io/docs/tasks/debug/debug-application/debug-pods/#my-pod-stays-pending).
+
 ## nodeAffinity — Practice Test: Node Affinity
 
 원본 풀이: [10-Practice-Test-Node-Affinity.md](https://github.com/kodekloudhub/certified-kubernetes-administrator-course/blob/master/docs/03-Scheduling/10-Practice-Test-Node-Affinity.md)
@@ -142,6 +190,71 @@ with the nginx image and 2 replicas, and ensure it gets placed on the controlpla
 Pod 수준 리소스 수정도 원칙은 재생성이지만, 요즘 시험 기준(v1.35)에는
 **in-place resize**(`--subresource=resize`)가 GA다 — [cka 4장](/cka/04-pods/) 끝 절 참고.
 
+### 네임스페이스 제한은 새 Pod과 Used/Hard로 증명한다
+
+`LimitRange`는 새 컨테이너에 기본 requests/limits를 채우고, `ResourceQuota`는 네임스페이스의
+합계를 막는다. 오브젝트를 만들었다는 출력만 보지 말고 **기본값 주입 → quota 사용량 → 초과 거부**를
+차례로 확인한다. 개념과 전체 필드 설명은 [cka 6장](/cka/06-config/#네임스페이스-단위-제약)에 있다.
+
+```yaml
+# quota-check.yaml
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: defaults
+  namespace: quota-check
+spec:
+  limits:
+    - type: Container
+      default:
+        cpu: 500m
+        memory: 256Mi
+      defaultRequest:
+        cpu: 100m
+        memory: 128Mi
+---
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: compute
+  namespace: quota-check
+spec:
+  hard:
+    requests.cpu: 100m
+    requests.memory: 128Mi
+    limits.cpu: 500m
+    limits.memory: 256Mi
+    pods: "1"
+```
+
+```bash
+kubectl create namespace quota-check
+kubectl apply -f quota-check.yaml
+
+# resources를 생략한 새 Pod 템플릿을 만든다
+kubectl -n quota-check create deployment quota-check --image=nginx:1.29-alpine
+kubectl -n quota-check rollout status deployment/quota-check --timeout=120s
+
+# LimitRange가 실제 Pod에 주입한 값과 ResourceQuota의 현재 합계를 확인한다
+kubectl -n quota-check get pod -l app=quota-check \
+  -o jsonpath='{.items[0].spec.containers[0].resources}{"\n"}'
+kubectl -n quota-check describe resourcequota compute
+
+# 두 번째 Pod은 총량을 넘는다. Deployment 생성/scale 성공만으로 판정하지 않는다
+kubectl -n quota-check scale deployment quota-check --replicas=2
+kubectl -n quota-check describe replicaset
+```
+
+마지막 `describe`의 Events에 `FailedCreate`, `403 Forbidden`, `exceeded quota`가 보이면 총량 제한도
+증명됐다. 공식 [LimitRange](https://v1-35.docs.kubernetes.io/docs/concepts/policy/limit-range/) 문서대로
+기본값은 **admission 시점의 새 Pod에만** 들어간다. 공식
+[ResourceQuota](https://v1-35.docs.kubernetes.io/docs/concepts/policy/resource-quotas/) 문서대로
+Deployment 자체는 만들어져도 그 컨트롤러가 추가 Pod 생성에 실패할 수 있으므로 ReplicaSet 이벤트를 본다.
+
+```bash
+kubectl delete namespace quota-check
+```
+
 ## DaemonSet — Practice Test: DaemonSets
 
 원본 풀이: [15-Practice-Test-DaemonSets.md](https://github.com/kodekloudhub/certified-kubernetes-administrator-course/blob/master/docs/03-Scheduling/15-Practice-Test-DaemonSets.md)
@@ -163,6 +276,36 @@ kubectl create deployment elasticsearch -n kube-system \
 
 고칠 곳: `kind: DaemonSet`, `replicas`·`strategy`·`status` 삭제. `spec.selector`와
 템플릿 라벨은 그대로 두면 짝이 맞는다.
+
+### 업데이트와 롤백은 전략까지 확인한다
+
+DaemonSet은 전체 개수만 보지 않고 **대상 노드마다 준비된 Pod이 하나인지** 확인한다.
+이미지 변경 뒤에는 전략, 리비전, 노드별 실제 이미지를 함께 본다.
+
+```bash
+kubectl -n kube-system get ds elasticsearch \
+  -o jsonpath='{.spec.updateStrategy.type}{"\n"}'
+kubectl -n kube-system rollout status ds/elasticsearch --timeout=120s
+kubectl -n kube-system rollout history ds/elasticsearch
+kubectl -n kube-system get pods -l app=elasticsearch \
+  -o custom-columns='NAME:.metadata.name,NODE:.spec.nodeName,READY:.status.containerStatuses[*].ready,IMAGE:.spec.containers[*].image'
+```
+
+`RollingUpdate`가 실패하면 정상 리비전으로 되돌리고 rollout 완료까지 다시 기다린다.
+
+```bash
+kubectl -n kube-system rollout undo ds/elasticsearch --to-revision=2
+kubectl -n kube-system rollout status ds/elasticsearch --timeout=120s
+```
+
+:::caution[함정 — OnDelete는 롤백 뒤에도 기존 Pod을 유지한다]
+`OnDelete`에서는 이미지 변경뿐 아니라 `rollout undo`도 **DaemonSet 템플릿만** 바꾼다.
+기존 Pod은 자동 교체되지 않으므로 노드별 이미지를 확인하고, 오래된 Pod을 하나씩 삭제해
+되돌린 템플릿으로 재생성시킨 뒤 다시 검증한다. `rollout status`만 기다려서는 끝나지 않는다.
+:::
+
+공식 근거: [DaemonSet 업데이트](https://v1-35.docs.kubernetes.io/docs/tasks/manage-daemon/update-daemon-set/),
+[DaemonSet 롤백](https://v1-35.docs.kubernetes.io/docs/tasks/manage-daemon/rollback-daemon-set/).
 
 ## 스태틱 Pod — Practice Test: Static Pods
 
@@ -200,9 +343,12 @@ staticPodPath의 파일을 지워야 사라진다. 경로가 기본값(`/etc/kub
 ## 이 장에서 남길 것
 
 - Pending 진단은 `describe pod`의 Events 한 줄로 끝나는 경우가 대부분
+- 라벨 후보와 taint 허용 후보의 교집합이 비면 Pending이다 — `nodeName`이 비어 있으면 로그를 보지 않는다
 - taint 제거는 명령 끝에 `-`, 컨트롤 플레인 키는 `node-role.kubernetes.io/control-plane`
 - toleration은 Pod 스펙 수준, affinity는 Deployment면 템플릿 쪽 — **넣는 위치**가 반은 먹는다
+- 네임스페이스 제한은 새 Pod의 주입값, quota의 Used/Hard, ReplicaSet의 초과 이벤트로 증명한다
 - DaemonSet은 Deployment YAML을 뽑아 kind만 바꾼다
+- DaemonSet 롤백은 전략을 함께 본다 — `OnDelete`면 기존 Pod을 직접 교체해야 한다
 - 스태틱 Pod은 파일이 원본 — 만들 때도 지울 때도 매니페스트 디렉터리
 
 <LinkCard

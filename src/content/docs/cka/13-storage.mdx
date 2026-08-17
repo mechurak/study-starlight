@@ -360,12 +360,16 @@ stateDiagram-v2
 | 정책 | PVC 삭제 시 |
 |---|---|
 | **`Retain`** | PV는 남고 상태가 **`Released`** 가 된다. **데이터 보존**. 재사용하려면 수동 조치 |
-| **`Delete`** | PV와 **실제 스토리지까지 삭제**한다. 동적 프로비저닝의 기본값 |
+| **`Delete`** | 지원하는 프로비저너·플러그인이 PV와 **실제 스토리지까지 삭제**한다. 동적 프로비저닝의 기본값 |
 | `Recycle` | **deprecated** — 쓰지 말 것. 대신 동적 프로비저닝을 쓴다 |
 
 ```bash
 kubectl patch pv pv-data -p '{"spec":{"persistentVolumeReclaimPolicy":"Retain"}}'
 ```
+
+`Delete`는 **원하는 회수 동작**이지 삭제 성공의 증거가 아니다. 직접 만든 NFS·local PV처럼
+수명 주기를 대신 관리할 외부 프로비저너가 없거나 플러그인이 삭제를 지원하지 않으면 실제 백엔드는
+남거나 PV가 `Failed`가 될 수 있다. PVC를 지운 뒤 `kubectl get pv`와 백엔드를 함께 확인한다.
 
 :::caution[함정]
 `Released` 상태의 PV는 **자동으로 재사용되지 않는다.**
@@ -837,6 +841,7 @@ PV·PVC·Pod 세 YAML을 손으로 처음부터 치는 건 낭비다 — 시험 
 - 바인딩 조건: **storageClassName · accessModes · 용량**. 1:1이고 남는 용량은 낭비된다
 - **RWO는 "노드 하나"다**. Pod 하나로 제한하려면 `ReadWriteOncePod`
 - `Retain`이면 PVC 삭제 후 **`Released`** — `claimRef`를 지워야 재사용된다
+- `Delete`도 프로비저너·플러그인 지원이 필요하다 — PVC 삭제 뒤 PV와 실제 백엔드를 확인한다
 - **`WaitForFirstConsumer`에서의 Pending은 정상**이다
 - 확장은 **`allowVolumeExpansion: true`** 필요, **늘리기만** 가능
 - **StatefulSet의 PVC는 남는다.** `volumeClaimTemplates`는 수정 불가

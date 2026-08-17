@@ -106,12 +106,102 @@ volumeBindingMode: WaitForFirstConsumer
 Pod을 만들면 그때 바인딩된다.
 :::
 
+## 정적·동적 프로비저닝 완료 판정
+
+### 정적 PV — Bound 뒤에 실제 마운트까지
+
+`PV=Bound`, `PVC=Bound`는 클래스·access mode·용량 같은 **API 바인딩 조건**을 통과했다는 뜻이다.
+NFS 서버 주소·export 경로나 노드의 `/sbin/mount.nfs`까지 검증한 것은 아니다. 소비 Pod을 만들어
+마운트하고 파일을 읽고 써야 정적 프로비저닝 완료를 증명한다.
+
+```bash
+# 1) 바인딩과 claim 연결
+kubectl get pv,pvc
+kubectl describe pvc <claim>
+
+# 2) 실제 마운트 — 실패하면 Pod Events에서 서버·경로·mount helper를 확인
+kubectl get pod <pod> -o wide
+kubectl describe pod <pod>
+
+# 3) 컨테이너가 마운트한 경로에 실제로 읽고 쓸 수 있는가
+kubectl exec <pod> -- sh -c 'echo storage-ok > /data/probe && cat /data/probe'
+```
+
+NFS는 모든 소비 노드에서 서버 export에 닿아야 하고 NFS mount helper도 있어야 한다. `Bound`인데
+Pod이 `ContainerCreating`이면 PVC를 다시 만들기 전에 Pod Events와 해당 노드의 kubelet 로그를 본다.
+공식 [Persistent Volumes](https://v1-35.docs.kubernetes.io/docs/concepts/storage/persistent-volumes/#types-of-persistent-volumes)에도
+NFS PV를 마운트하려면 `/sbin/mount.nfs` 같은 helper가 필요하다고 명시돼 있다.
+
+### 동적 프로비저닝 — 생성 주체까지 추적
+
+동적 프로비저닝은 **StorageClass 오브젝트 자체가 PV를 만드는 것이 아니다.** `provisioner` 필드와 같은
+이름으로 동작하는 컨트롤러가 PVC를 보고 백엔드 볼륨과 PV를 만든다. 특히 NFS에는 Kubernetes 내장
+프로비저너가 없으므로 외부 프로비저너나 CSI 드라이버가 실제로 실행 중이어야 한다.
+
+```bash
+# 1) 클래스 이름·provisioner·binding mode
+kubectl get sc <class> -o yaml
+
+# 2) PVC Events에서 누구를 기다리는지 확인
+kubectl describe pvc <claim>
+
+# 3) 동적으로 생긴 PV와 생성 주체 확인
+kubectl get pv
+kubectl get pv <pv> -o jsonpath='{.metadata.annotations.pv\.kubernetes\.io/provisioned-by}{"\n"}'
+
+# 4) Bound 뒤에도 소비 Pod의 마운트와 읽기·쓰기를 확인
+kubectl describe pod <pod>
+kubectl exec <pod> -- sh -c 'echo dynamic-ok > /data/probe && cat /data/probe'
+```
+
+PVC가 계속 `Pending`이면 다음 순서로 범위를 줄인다.
+
+1. `storageclass not found` — PVC의 `storageClassName` 오타 또는 클래스 없음
+2. `waiting for first consumer` — `WaitForFirstConsumer`의 정상 대기. PVC를 쓰는 Pod을 만든다
+3. `waiting for a volume to be created ... by external provisioner` — provisioner 이름이 맞는지,
+   컨트롤러 Pod이 Running인지, 컨트롤러 로그에 백엔드·권한 오류가 있는지 확인
+4. PVC는 `Bound`인데 Pod이 멈춤 — 프로비저닝이 아니라 노드 attach·mount 층의 문제다
+
+세부 필드와 외부 프로비저너의 경계는 공식
+[Storage Classes](https://v1-35.docs.kubernetes.io/docs/concepts/storage/storage-classes/)에서 확인한다.
+
+## 스토리지 quota 검증
+
+스토리지 quota는 네임스페이스의 PVC **개수와 요청 용량 합**을 admission에서 제한한다.
+
+```yaml
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: storage-quota
+spec:
+  hard:
+    persistentvolumeclaims: "5"
+    requests.storage: 20Gi
+    fast.storageclass.storage.k8s.io/persistentvolumeclaims: "3"
+    fast.storageclass.storage.k8s.io/requests.storage: 10Gi
+```
+
+```bash
+kubectl describe quota storage-quota -n <namespace>   # Used / Hard
+kubectl create -f pvc.yaml -n <namespace>             # 초과 시 즉시 Forbidden
+```
+
+`requests.storage`의 `Used`는 PVC의 `spec.resources.requests.storage` 합이다. 마운트 안에 큰 파일을
+써도 이 값은 늘지 않는다. 즉 quota가 통과했다는 사실은 NFS 공유의 실제 용량 제한이나 여유 공간을
+증명하지 않는다. 클래스별 키를 쓰면 비싼 클래스와 일반 클래스를 따로 제한할 수 있다. 정확한 키는
+공식 [Resource Quotas](https://v1-35.docs.kubernetes.io/docs/concepts/policy/resource-quotas/#quota-for-storage)에서
+확인한다.
+
 ## 이 장에서 남길 것
 
 - PVC Pending의 원인은 둘 — **맞는 PV가 없다** vs **WaitForFirstConsumer 대기**
 - 바인딩 조건: accessModes · 용량 · storageClassName
+- `Bound`는 바인딩 성공일 뿐 — 소비 Pod의 **mount와 읽기·쓰기**까지 확인
 - 바인딩 후 용량은 PV 기준, PV는 Released여도 자동 재사용 안 됨
 - `no-provisioner` = 동적 프로비저닝 불가 = PV를 손으로 만들어야 한다
+- 동적 Pending은 **StorageClass → provisioner 컨트롤러 → PVC Events → Pod mount** 순서로 좁힌다
+- 스토리지 quota는 **PVC 요청 용량·개수**를 세며 실제 파일 사용량은 세지 않는다
 
 <LinkCard
   title="8. 인증서 · kubeconfig · RBAC"

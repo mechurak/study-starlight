@@ -25,17 +25,47 @@ etcd 스냅샷은 컨트롤 플레인 노드, `drain`은 클러스터를 조작�
 
 <Steps>
 
-1. 두 노드 모두: 커널 모듈·파라미터 (`overlay`, `br_netfilter`, ip_forward)
+1. 두 노드 모두: swap을 끄고 커널 모듈·파라미터를 적용한다
 
    ```bash
+   swapoff -a
+
+   cat <<EOF | tee /etc/modules-load.d/k8s.conf
+   overlay
+   br_netfilter
+   EOF
+   modprobe overlay
+   modprobe br_netfilter
+
    cat <<EOF | tee /etc/sysctl.d/k8s.conf
    net.bridge.bridge-nf-call-iptables = 1
    net.ipv4.ip_forward = 1
    EOF
    sysctl --system
+
+   # 파일을 썼다는 사실보다 현재 커널 값이 중요하다
+   swapon --show
+   lsmod | grep -E 'overlay|br_netfilter'
+   sysctl net.bridge.bridge-nf-call-iptables net.ipv4.ip_forward
    ```
 
-2. 두 노드 모두: pkgs.k8s.io 저장소 등록 후 정확한 버전으로 설치·고정
+2. 두 노드 모두: containerd를 systemd cgroup 드라이버로 맞추고 재시작한다
+
+   ```bash
+   containerd config default | tee /etc/containerd/config.toml
+   sed -i 's/SystemdCgroup = false/SystemdCgroup = true/' /etc/containerd/config.toml
+   systemctl restart containerd
+
+   systemctl is-active containerd
+   containerd config dump | grep SystemdCgroup
+   ```
+
+   공식 [Container Runtimes](https://v1-35.docs.kubernetes.io/docs/setup/production-environment/container-runtimes/#cgroup-drivers)
+   문서처럼 containerd와 kubelet의 cgroup 드라이버가 다르면 kubelet이 정상 동작하지 않는다.
+   배포판 패키지의 `/etc/containerd/config.toml`에서 `disabled_plugins`에 `cri`가 들어 있다면
+   제거한 뒤 containerd를 다시 시작한다.
+
+3. 두 노드 모두: pkgs.k8s.io 저장소 등록 후 정확한 버전으로 설치·고정
 
    ```bash
    # "Install the kubeadm, kubelet and kubectl packages at exact version 1.24.0 on the controlplane and node01."
@@ -43,7 +73,7 @@ etcd 스냅샷은 컨트롤 플레인 노드, `drain`은 클러스터를 조작�
    apt-mark hold kubelet kubeadm kubectl   # hold = apt 자동 업그레이드 금지 — 버전이 몰래 틀어지는 걸 막는다
    ```
 
-3. 컨트롤 플레인에서 init — advertise 주소는 `eth0`의 IP(`ip a` 확인)
+4. 컨트롤 플레인에서 init — advertise 주소는 `eth0`의 IP(`ip a` 확인)
 
    ```bash
    # "Initialize Control Plane Node (Master Node)."
@@ -57,9 +87,9 @@ etcd 스냅샷은 컨트롤 플레인 노드, `drain`은 클러스터를 조작�
    mkdir -p ~/.kube && cp /etc/kubernetes/admin.conf ~/.kube/config
    ```
 
-4. init 출력의 `kubeadm join ...`을 복사해 워커에서 실행 (`ssh node01`) — *Join node01 to the cluster using the join token*
+5. init 출력의 `kubeadm join ...`을 복사해 워커에서 실행 (`ssh node01`) — *Join node01 to the cluster using the join token*
 
-5. CNI 설치 전까지 노드가 `NotReady`인 것은 **정상** — 문제에서 준 네트워크
+6. CNI 설치 전까지 노드가 `NotReady`인 것은 **정상** — 문제에서 준 네트워크
    플러그인 매니페스트를 apply하면 Ready가 된다 — *Install a Network Plugin*
 
 </Steps>
@@ -67,6 +97,77 @@ etcd 스냅샷은 컨트롤 플레인 노드, `drain`은 클러스터를 조작�
 :::tip[join 토큰을 잃어버렸으면]
 `kubeadm token create --print-join-command`가 다시 만들어준다 — *Generate a kubeadm join token*
 :::
+
+## 설치 완료 증명 — Ready에서 외부 접근까지
+
+`kubeadm join`이 성공했다는 출력만으로 설치가 끝난 것은 아니다. 아래 순서로 **노드 → 시스템 Pod →
+샘플 앱 → Service 내부 경로 → NodePort 외부 경로**를 한 층씩 확인한다. 중간 단계가 실패하면
+그보다 바깥 단계는 아직 조사하지 않는다.
+
+<Steps>
+
+1. 두 노드와 CNI·CoreDNS가 준비됐는지 확인한다
+
+   ```bash
+   kubectl wait --for=condition=Ready nodes --all --timeout=180s
+   kubectl get nodes -o wide
+   kubectl get pods -n kube-system -o wide
+
+   # kubeadm이 만든 kubelet 설정도 런타임과 systemd로 일치해야 한다
+   grep '^cgroupDriver:' /var/lib/kubelet/config.yaml
+   ```
+
+   공식 [Creating a cluster with kubeadm](https://v1-35.docs.kubernetes.io/docs/setup/production-environment/tools/kubeadm/create-cluster-kubeadm/#pod-network)
+   문서는 Pod 네트워크가 설치되기 전에는 CoreDNS가 시작하지 않으며, 설치 뒤 CoreDNS가
+   `Running`인지 확인하라고 안내한다. 노드가 `NotReady`면 `kubectl describe node <노드>`의
+   `Ready`·`NetworkReady` 조건과 `journalctl -u kubelet`부터 본다.
+
+2. 샘플 앱을 만들고 실제 Pod이 준비됐는지 확인한다
+
+   ```bash
+   kubectl create deployment web-check --image=nginx:1.29-alpine
+   kubectl rollout status deployment/web-check --timeout=120s
+   kubectl get pods -l app=web-check -o wide
+   ```
+
+3. NodePort Service와 EndpointSlice의 연결을 확인한다
+
+   ```bash
+   kubectl expose deployment web-check --type=NodePort --port=80 --target-port=80
+   kubectl get svc web-check
+   kubectl get endpointslices -l kubernetes.io/service-name=web-check
+   ```
+
+   EndpointSlice에 Ready 주소가 없으면 NodePort나 방화벽으로 넘어가지 않는다. 먼저 Service의
+   셀렉터, Pod 라벨, readiness를 고친다.
+
+4. 클러스터 안에서 Service를 통과하는지 확인한다
+
+   ```bash
+   kubectl run web-check-client --image=busybox:1.36 --rm -it --restart=Never -- \
+     wget -qO- http://web-check
+   ```
+
+5. 클러스터 밖의 터미널에서 노드 IP와 할당된 포트로 확인한다
+
+   ```bash
+   kubectl get nodes -o wide
+   kubectl get svc web-check
+   curl http://<외부에서-도달-가능한-노드-IP>:<표시된-NODE-PORT>
+   ```
+
+   공식 [Service 문서의 NodePort 절](https://v1-35.docs.kubernetes.io/docs/concepts/services-networking/service/#type-nodeport)대로
+   기본값에서는 같은 NodePort가 모든 노드에서 Service로 전달된다. 내부 Service 호출은 되는데
+   외부 `curl`만 실패하면 노드 주소의 라우팅 가능 여부, 호스트 방화벽·클라우드 보안 규칙,
+   kube-proxy의 `nodePortAddresses`를 확인한다. `externalTrafficPolicy: Local`이라면 Pod이 있는
+   노드로 요청했는지도 함께 확인한다.
+
+</Steps>
+
+```bash
+# 확인을 마친 뒤 실습 자원 정리
+kubectl delete deployment,service web-check
+```
 
 ## 노드 비우기 — Practice Test: OS Upgrades
 
@@ -123,6 +224,23 @@ uncordon은 "다시 스케줄 가능"으로 돌릴 뿐이다. 기존 Pod이 재�
 빼먹으면 `kubectl get nodes`의 VERSION이 안 바뀐다** — 채점은 이걸 본다.
 :::
 
+### 업그레이드 완료 증명
+
+마지막 `uncordon` 뒤에는 **Ready · kubelet 버전 · 스케줄 가능 상태**를 한 번에 확인한다.
+
+```bash
+kubectl wait --for=condition=Ready nodes --all --timeout=180s
+kubectl get nodes
+kubectl get nodes \
+  -o custom-columns='NAME:.metadata.name,KUBELET:.status.nodeInfo.kubeletVersion,UNSCHEDULABLE:.spec.unschedulable'
+kubectl get pods -n kube-system -o wide
+```
+
+공식 v1.35 [kubeadm 업그레이드 문서](https://v1-35.docs.kubernetes.io/docs/tasks/administer-cluster/kubeadm/kubeadm-upgrade/#verify-the-status-of-the-cluster)도
+모든 노드의 `STATUS`가 `Ready`이고 버전이 갱신됐는지를 마지막에 확인한다. `Ready`인데 버전만
+예전이면 대상 노드의 kubelet 패키지·재시작을, `UNSCHEDULABLE=true`면 빠뜨린 `uncordon`을 확인한다.
+시스템 Pod이 비정상이면 다음 노드로 넘어가기 전에 해당 Pod의 Events와 로그를 본다.
+
 ## etcd 백업과 복구 — Practice Test: Backup and Restore Methods
 
 원본 풀이: [09-Practice-Test-Backup-and-Restore-Methods.md](https://github.com/kodekloudhub/certified-kubernetes-administrator-course/blob/master/docs/06-Cluster-Maintenance/09-Practice-Test-Backup-and-Restore-Methods.md)
@@ -134,10 +252,19 @@ uncordon은 "다시 스케줄 가능"으로 돌릴 뿐이다. 기존 Pod이 재�
 # ETCDCTL_API=3: v3 API 강제 — 요즘 etcdctl은 3이 기본이라 없어도 되지만, 답안 관습으로 남아 있다
 # "Take a snapshot of the ETCD database using the built-in snapshot functionality. Store the backup file at location /opt/snapshot-pre-boot.db"
 ETCDCTL_API=3 etcdctl snapshot save /opt/snapshot-pre-boot.db \
+  --endpoints=https://127.0.0.1:2379 \
   --cacert=/etc/kubernetes/pki/etcd/ca.crt \
   --cert=/etc/kubernetes/pki/etcd/server.crt \
   --key=/etc/kubernetes/pki/etcd/server.key
+
+# "saved" 출력만 믿지 않고 파일과 스냅샷 메타데이터를 함께 확인한다
+sudo test -s /opt/snapshot-pre-boot.db
+sudo etcdutl --write-out=table snapshot status /opt/snapshot-pre-boot.db
 ```
+
+공식 v1.35 [etcd 운영 문서](https://v1-35.docs.kubernetes.io/docs/tasks/administer-cluster/configure-upgrade-etcd/#built-in-snapshot)는
+`snapshot save` 뒤 `etcdutl snapshot status`로 hash·revision·key 수·크기를 확인한다.
+`etcdctl snapshot status`는 etcd 3.5부터 deprecated이므로 `etcdutl`을 우선한다.
 
 복구는 두 단계 — **새 디렉터리로 복원 + etcd가 그 디렉터리를 보게 변경**:
 
@@ -195,7 +322,8 @@ chown -R etcd:etcd /var/lib/etcd-data-new           # 복원 디렉터리 소유
 
 - kubeadm: 커널 설정 → 패키지 고정 설치 → init → join → CNI. NotReady는 CNI 전까지 정상
 - drain은 단독 Pod에서 멈춘다(`--force`는 유실 감수). uncordon은 재배치가 아니다
-- 업그레이드: 컨트롤 플레인 `upgrade apply`, 워커 `upgrade node`, **kubelet까지 올려야 끝**
+- 업그레이드: 컨트롤 플레인 `upgrade apply`, 워커 `upgrade node`, **모든 노드의 Ready·버전·schedulable까지 봐야 끝**
+- etcd 백업은 파일 존재뿐 아니라 `etcdutl snapshot status`의 메타데이터까지 확인한다
 - etcd 복구 = 새 디렉터리로 restore + etcd의 시선(hostPath 또는 --data-dir)을 그리로
 - 외부 etcd면 systemd — scp·chown·daemon-reload가 추가된다
 

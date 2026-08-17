@@ -792,12 +792,16 @@ flowchart LR
       E2[("etcd")]
       E3[("etcd")]
     end
+    X["external etcd<br/>endpoint 목록"]
     LB --> A1
     LB --> A2
     LB --> A3
-    A1 --> E1
-    A2 --> E2
-    A3 --> E3
+    A1 --> X
+    A2 --> X
+    A3 --> X
+    X --> E1
+    X --> E2
+    X --> E3
     E1 <-->|"Raft"| E2
     E2 <-->|"Raft"| E3
 
@@ -806,19 +810,22 @@ flowchart LR
     classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
     class A1,A2,A3 api
     class E1,E2,E3 db
-    class LB mute
+    class LB,X mute
 ```
 
 - 노드 6대 이상 필요
 - 장애 영향이 분리된다
 - 운영 복잡도가 높다
+- 각 API 서버는 같은 **external etcd endpoint 목록**을 사용한다
 
 </TabItem>
 </Tabs>
 
-**공통 요구사항**
+**공통 요구사항과 quorum 경계**
 
-- **컨트롤 플레인 노드는 홀수(3, 5)** — etcd의 Raft 합의 때문
+- 컨트롤 플레인은 최소 3대가 필요하다. stacked topology에서는 각 노드가 etcd 멤버이기도 하므로
+  **3, 5처럼 홀수**로 둔다
+- external topology에서는 control plane 수와 별개로 **etcd 멤버를 홀수(3, 5)** 로 둔다
 - 앞단에 **로드밸런서**가 필요하다 (haproxy + keepalived 등)
 - `kubeadm init --control-plane-endpoint=<LB주소>:6443` 으로 시작해야 한다
 
@@ -834,9 +841,93 @@ kubeadm token create --print-join-command --certificate-key $(kubeadm init phase
 ```
 
 `--certificate-key`가 더 붙는 이유 — 컨트롤 플레인으로 조인하는 노드는
-워커와 달리 **CA 키까지 포함한 인증서 일습을 그대로 받아야** 한다.
-`upload-certs`가 그 인증서들을 암호화해 클러스터에 잠시 올려두고,
-이 키가 그것을 푸는 열쇠다 (기본 2시간 뒤 만료). 이 명령 자체는 외울 필요 없다.
+워커와 달리 **컨트롤 플레인끼리 공유해야 하는 인증서와 키를 받아야** 한다.
+`upload-certs`가 그 파일들을 `kubeadm-certs` Secret에 암호화해 잠시 올려두고,
+이 키가 그것을 푸는 열쇠다. 노드별 SAN(Subject Alternative Name)이 필요한 인증서는
+조인할 때 kubeadm이 따로 만든다.
+
+Secret과 복호화 키는 기본 **2시간 뒤 만료**된다. 조인이 늦어졌다면 기존 키를 재사용하려 하지 말고
+`kubeadm init phase upload-certs --upload-certs`로 다시 올려 새 키를 받는다.
+키는 클러스터의 민감한 인증서에 접근할 수 있으므로 토큰처럼 로그나 저장소에 남기지 않는다.
+
+### HA를 장애 전·중·후로 검증하기
+
+노드 세 대가 `Ready`인 것만으로 HA가 증명되지는 않는다. 클라이언트가 **로드밸런서의 안정된
+endpoint**를 보고 있는지, 로드밸런서 뒤의 API 서버와 etcd 과반이 실제 요청을 계속 처리하는지를
+장애 전·중·후의 같은 명령으로 비교해야 한다. 기준 흐름은 Kubernetes v1.35의
+[kubeadm HA 구성](https://v1-35.docs.kubernetes.io/docs/setup/production-environment/tools/kubeadm/high-availability/)과
+[API health endpoint](https://v1-35.docs.kubernetes.io/docs/reference/using-api/health-checks/) 문서에서 다시 확인한다.
+
+<Steps>
+
+1. **장애 전 기준선을 남긴다**
+
+   ```bash
+   # kubeconfig가 개별 노드가 아니라 control-plane endpoint를 보는가
+   kubectl config view --minify \
+     -o jsonpath='{.clusters[0].cluster.server}{"\n"}'
+
+   kubectl get nodes
+   kubectl get pods -n kube-system -o wide | grep -E 'apiserver|etcd'
+   kubectl get --raw='/readyz?verbose'
+
+   # 인증서 옵션은 위의 etcd 접근 준비 절처럼 실제 etcd.yaml에서 읽는다
+   sudo etcdctl endpoint status --cluster -w table ...
+   sudo etcdctl endpoint health --cluster ...
+   ```
+
+   `readyz`의 `etcd` 검사까지 성공하고, etcd 표에 기대한 멤버 수와 리더가 보여야 다음 단계로 간다.
+
+2. **같은 endpoint를 계속 호출하며 control plane 한 대만 중단한다**
+
+   ```bash
+   while true; do
+     date '+%H:%M:%S'
+     kubectl get --raw='/readyz' >/dev/null \
+       && echo API_READY || echo API_FAILED
+     sleep 1
+   done
+   ```
+
+   별도 터미널에서 control plane 한 대를 중단한다. 로드밸런서에서는 그 backend만 빠지고,
+   위 루프는 남은 API 서버로 이어져야 한다. kubeconfig가 중단한 노드의 주소를 직접 보고 있었다면
+   여기서 실패한다. 그것은 etcd 장애가 아니라 **안정된 endpoint를 쓰지 않은 실패**다.
+
+3. **조회뿐 아니라 쓰기와 quorum을 확인한다**
+
+   ```bash
+   kubectl create configmap ha-write-check \
+     --from-literal=checked-at="$(date -Iseconds)" \
+     --dry-run=client -o yaml | kubectl apply -f -
+   kubectl get configmap ha-write-check \
+     -o jsonpath='{.metadata.resourceVersion}{"\n"}'
+
+   sudo etcdctl endpoint status --cluster -w table ...
+   sudo etcdctl endpoint health --cluster ...
+   ```
+
+   세 멤버 중 하나가 내려가도 두 멤버가 건강하고 새 `resourceVersion`이 생기면
+   API 경로와 etcd 쓰기 quorum이 함께 유지된 것이다. `readyz`의 `etcd`가 실패하거나 쓰기가
+   멈추면 로드밸런서보다 etcd peer 통신·인증서·과반부터 확인한다.
+
+4. **복귀까지 닫는다**
+
+   ```bash
+   kubectl get nodes
+   kubectl get --raw='/readyz?verbose'
+   sudo etcdctl endpoint health --cluster ...
+   kubectl delete configmap ha-write-check
+   ```
+
+   중단했던 노드를 되살린 뒤 모든 control plane과 etcd 멤버가 건강해졌는지 확인하고
+   검증용 객체를 지운다. 장애 중 API가 잠시 유지됐어도 멤버가 복귀하지 않았다면 복구는 끝난 것이 아니다.
+
+</Steps>
+
+:::caution[HA의 경계]
+이 루프는 **control plane 한 대의 장애**를 검증한다. 로드밸런서가 한 대뿐이면 그 장비가 여전히
+단일 장애점이다. 로드밸런서 자체의 이중화는 Kubernetes 밖의 인프라 설계로 따로 검증한다.
+:::
 
 ### etcd 멤버 관리
 
@@ -1005,8 +1096,8 @@ ConfigMap만 고치면 이미 떠 있는 kubelet은 꿈쩍도 하지 않는다.
 - 복구는 **새 디렉터리로 restore → `etcd.yaml`의 `hostPath` 변경**
 - **etcd 멤버는 홀수(3, 5).** 짝수는 이득이 없다 — Raft가 **과반으로 합의하기 때문이다**
 - 인증서는 1년. **`kubeadm certs check-expiration` / `renew all`**
-- HA는 **토폴로지 두 가지와 홀수·로드밸런서·`--control-plane-endpoint`까지만** —
-  구축 절차 자체를 외우는 데 시간을 쓰지 않는다
+- HA는 **토폴로지 두 가지·홀수·로드밸런서·`--control-plane-endpoint`**를 이해하고,
+  장애 전·중·후에 **같은 endpoint의 `readyz`·쓰기·etcd quorum**을 비교한다
 
 :::note[손 연습]
 이 장 범위의 KodeKloud 실습 풀이 — [CKA 실습 9장 · 클러스터 라이프사이클](/cka-udemy/09-cluster-lifecycle/)

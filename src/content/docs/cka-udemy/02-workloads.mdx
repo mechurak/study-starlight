@@ -1,6 +1,6 @@
 ---
-title: "2. 워크로드 — ReplicaSet · Deployment · 롤링 업데이트"
-description: "깨진 정의 파일 고치기와 롤아웃 제어 — 워크로드 컨트롤러 실습 패턴"
+title: "2. 워크로드 — ReplicaSet · Deployment · Job"
+description: "깨진 정의 파일 고치기, 롤아웃 제어, Job 완료·실패·재실행 진단 — 워크로드 컨트롤러 실습 패턴"
 ---
 
 import { LinkCard } from '@astrojs/starlight/components';
@@ -67,6 +67,13 @@ kind는 대문자로 시작한다.
 kubectl create deployment httpd-frontend --image=httpd:2.4-alpine --replicas=3
 ```
 
+:::caution[함정 — 생성 뒤 selector는 바꿀 수 없다]
+`apps/v1` Deployment의 `spec.selector`는 생성 뒤 불변이다. `kubectl edit`·`apply`·Helm 업그레이드로도
+바꿀 수 없다. selector와 Pod 템플릿 라벨이 어긋난 파일은 생성 전에 함께 고치고, 이미 만든
+Deployment의 selector를 바꿔야 한다면 기존 워크로드·Service 영향을 확인한 뒤 삭제·재생성하거나
+새 이름으로 교체한다.
+:::
+
 ## 롤링 업데이트와 롤백 — Practice Test: Rolling Updates and Rollbacks
 
 원본 풀이: [03-Practice-Test-RollingUpdates-Rollback.md](https://github.com/kodekloudhub/certified-kubernetes-administrator-course/blob/master/docs/05-Application-Lifecycle-Management/03-Practice-Test-RollingUpdates-Rollback.md)
@@ -93,12 +100,94 @@ Recreate 전략에는 rollingUpdate 파라미터가 있을 수 없다.
 `strategy` 예시를 복사해 온다.
 :::
 
+### 실패한 롤아웃은 새 ReplicaSet부터 내려간다
+
+`set image`가 성공했다는 출력은 새 템플릿이 저장됐다는 뜻일 뿐, 새 Pod이 준비됐다는 뜻이 아니다.
+완료를 기다리고, 실패하면 Deployment → 새 ReplicaSet → 새 Pod 순서로 원인을 좁힌다.
+
+```bash
+kubectl rollout status deploy/frontend --timeout=120s
+
+kubectl describe deploy frontend
+kubectl get rs --sort-by=.metadata.creationTimestamp
+kubectl get pods -l app=frontend -o wide
+kubectl describe pod <new-pod>
+kubectl logs <new-pod> --all-containers
+kubectl get events --sort-by=.lastTimestamp
+```
+
+`ProgressDeadlineExceeded`는 자동 롤백 신호가 아니다. Deployment 컨트롤러는 계속 재시도하므로,
+시간이 부족하거나 새 템플릿 자체가 잘못됐다면 정상 리비전을 확인해 직접 되돌린다.
+
+```bash
+kubectl rollout history deploy/frontend
+kubectl rollout history deploy/frontend --revision=2
+kubectl rollout undo deploy/frontend --to-revision=2
+kubectl rollout status deploy/frontend --timeout=120s
+
+# 복구 완료는 컨트롤러와 실제 Pod 양쪽에서 확인한다
+kubectl get deploy frontend
+kubectl get pods -l app=frontend \
+  -o custom-columns='NAME:.metadata.name,READY:.status.containerStatuses[*].ready,IMAGE:.spec.containers[*].image'
+```
+
+공식 근거: [Deployments](https://v1-35.docs.kubernetes.io/docs/concepts/workloads/controllers/deployment/).
+
+## Job — 완료·실패·재실행 진단
+
+Job은 Pod이 생겼다는 사실이 아니라 **터미널 condition**으로 성공과 실패를 판정한다.
+성공은 `Complete=True`, 실패는 `Failed=True`이며, 완료된 Job과 Pod은 기본적으로 남으므로
+삭제하기 전에 상태와 로그를 증거로 확인한다.
+
+```bash
+kubectl create job sleepy --image=busybox:1.36 -- sh -c 'sleep 3; echo done'
+kubectl wait --for=condition=complete job/sleepy --timeout=60s
+
+# Job 판정 → 소유 Pod → 실행 출력 순서
+kubectl get job sleepy \
+  -o jsonpath='{range .status.conditions[*]}{.type}{"="}{.status}{" reason="}{.reason}{"\n"}{end}'
+kubectl get pods -l batch.kubernetes.io/job-name=sleepy -o wide
+kubectl logs -l batch.kubernetes.io/job-name=sleepy --all-containers --prefix
+```
+
+`kubectl wait`가 timeout이면 같은 명령을 반복하기보다 Job condition과 Pod을 내려간다.
+
+```bash
+kubectl describe job sleepy
+kubectl get pods -l batch.kubernetes.io/job-name=sleepy
+kubectl describe pod <failed-pod>
+kubectl logs <failed-pod>
+kubectl get events --sort-by=.lastTimestamp
+```
+
+- `DeadlineExceeded`면 Job의 `spec.activeDeadlineSeconds`를 넘겼다
+- `BackoffLimitExceeded`면 Pod 실패가 `spec.backoffLimit`에 닿았다
+- `restartPolicy: Never`는 실패마다 새 Pod가 생기므로 실패 Pod 각각의 로그를 확인한다
+- `restartPolicy: OnFailure`는 같은 Pod 안에서 컨테이너가 재시작하므로 `logs --previous`도 확인한다
+
+:::caution[함정 — 실패한 Job은 저절로 다시 시작하지 않는다]
+Job이 `Failed=True`에 도달하면 원인을 고쳐도 같은 Job이 자동으로 재실행되지 않는다.
+실패 Pod을 지우는 것도 재실행 절차가 아니다. 로그와 condition을 먼저 보존한 뒤 원본 매니페스트를
+고치고 Job을 삭제·재생성해 새 실행으로 검증한다.
+:::
+
+```bash
+kubectl delete job sleepy
+kubectl create -f job.yaml
+kubectl wait --for=condition=complete job/sleepy --timeout=60s
+```
+
+공식 근거: [Jobs](https://v1-35.docs.kubernetes.io/docs/concepts/workloads/controllers/job/).
+
 ## 이 장에서 남길 것
 
 - 깨진 YAML은 **에러 메시지 → `kubectl explain`** 순서로 고친다
 - 셀렉터와 템플릿 라벨은 항상 짝이다 — 불일치가 단골 출제
+- Deployment selector는 생성 뒤 불변 — 바꾸려면 영향 확인 후 재생성
 - ReplicaSet 직접 수정은 롤아웃되지 않는다. 롤아웃이 필요하면 Deployment
 - Recreate로 바꿀 땐 rollingUpdate 파라미터 삭제까지
+- rollout 실패는 **Deployment → 새 ReplicaSet → 새 Pod**로 내려가고 정상 리비전으로 직접 복구한다
+- Job은 **condition → 소유 Pod → 로그·이벤트** 순서로 판정하고, 실패 후에는 원인을 고쳐 재생성한다
 
 <LinkCard
   title="3. Pod 설정"
