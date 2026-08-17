@@ -116,7 +116,8 @@ kubectl create secret generic db-secret \
   --from-literal=DB_Password=password123
 ```
 
-Pod에 통째로 주입은 ConfigMap과 대칭이다 —
+Pod에 통째로 주입할 때는 ConfigMap과 대칭으로 공식 문서의
+[`envFrom.secretRef`](https://kubernetes.io/docs/tasks/inject-data-application/distribute-credentials-secure/#configure-all-key-value-pairs-in-a-secret-as-container-environment-variables)를 쓴다 —
 
 ```yaml
     envFrom:
