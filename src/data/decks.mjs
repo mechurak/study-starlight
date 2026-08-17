@@ -295,7 +295,7 @@ export const deckDefinitions = [
 				'주변 제품',
 				['supabase/08-storage', 'supabase/09-realtime', 'supabase/10-edge-functions', 'supabase/11-extensions'],
 			],
-			['애플리케이션 통합', ['supabase/12-vercel', 'supabase/13-nextjs']],
+			['애플리케이션 통합', ['supabase/12-vercel', 'supabase/12-deploy-guide', 'supabase/13-nextjs']],
 			['운영과 규모', ['supabase/14-ops', 'supabase/15-perf-cost']],
 			['마무리', ['supabase/16-patterns', 'supabase/17-wrapup']],
 		],
