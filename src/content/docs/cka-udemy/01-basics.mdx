@@ -137,6 +137,24 @@ kubectl config view --kubeconfig=my-kube-config \
 명령이 맞아도 리다이렉트(`> /opt/outputs/...`)를 빼먹으면 0점이다.
 :::
 
+## 시험장에서 공식 문서 찾기
+
+검색창에는 아래 영문을 그대로 넣는다. YAML이 필요한 문제는 문서를 처음부터 읽지 말고
+예제 매니페스트나 `--dry-run=client -o yaml` 부분으로 바로 이동한다.
+
+| 이 장의 섹션 | 검색어 | 공식 문서에서 가져올 것 |
+|---|---|---|
+| Pod 기초 | `Pods` | [Pods](https://kubernetes.io/docs/concepts/workloads/pods/)의 Pod 예시에서 `apiVersion: v1`, `kind: Pod`, `spec.containers` 골격 |
+| 네임스페이스 | `Namespaces` | [Namespaces](https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/)의 `--namespace` 사용법. YAML이면 `metadata.namespace`만 대상 리소스에 추가 |
+| 명령형 커맨드 | `imperative commands` | [Managing Kubernetes Objects Using Imperative Commands](https://kubernetes.io/docs/tasks/manage-kubernetes-objects/imperative-command/)의 `run`·`expose`·`create`와 `--dry-run=client -o yaml` 조합 |
+| JSONPath와 정렬 | `JSONPath` | [JSONPath Support](https://kubernetes.io/docs/reference/kubectl/jsonpath/)의 `range`, 필터 `?()`, 음수 인덱스 예시. 이 절은 YAML 작성보다 출력식 복사용 |
+
+:::tip[문서와 explain의 역할]
+공식 문서에서는 **완성 예시의 구조**를 찾고, 현재 클러스터의 정확한 필드 경로는
+`kubectl explain pod.spec.containers --recursive`로 확인한다. 둘을 함께 쓰면 버전 차이와 들여쓰기
+실수를 가장 빨리 줄일 수 있다.
+:::
+
 ## 이 장에서 남길 것
 
 - 모든 진단은 `get → describe → Events`로 시작한다

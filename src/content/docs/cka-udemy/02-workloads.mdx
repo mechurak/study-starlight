@@ -179,6 +179,19 @@ kubectl wait --for=condition=complete job/sleepy --timeout=60s
 
 공식 근거: [Jobs](https://v1-35.docs.kubernetes.io/docs/concepts/workloads/controllers/job/).
 
+## 시험장에서 공식 문서 찾기
+
+| 이 장의 섹션 | 검색어 | 공식 문서에서 가져올 것 |
+|---|---|---|
+| ReplicaSet | `ReplicaSet` | [ReplicaSet](https://kubernetes.io/docs/concepts/workloads/controllers/replicaset/)의 **Writing a ReplicaSet manifest** 예시. `apps/v1`, `selector.matchLabels`, `template.metadata.labels`를 한 묶음으로 복사 |
+| Deployment 생성 | `Deployments` | [Deployments](https://kubernetes.io/docs/concepts/workloads/controllers/deployment/)의 첫 매니페스트. ReplicaSet과 같은 selector/label 짝에 `spec.replicas`를 더한다 |
+| 롤링 업데이트·롤백 | `Deployments strategy rollingUpdate` | 같은 [Deployments](https://kubernetes.io/docs/concepts/workloads/controllers/deployment/) 문서의 **Strategy**와 **Rolling Back a Deployment** 절에서 `type`, `maxUnavailable`, `maxSurge` 확인 |
+| Job | `Jobs backoffLimit restartPolicy` | [Jobs](https://kubernetes.io/docs/concepts/workloads/controllers/job/)의 Job 예시에서 `batch/v1`, Pod 템플릿, `restartPolicy: Never`를 복사하고 실패 제어 필드 확인 |
+
+문서 예시가 길면 먼저 `kubectl create deployment ... --dry-run=client -o yaml` 또는
+`kubectl create job ... --dry-run=client -o yaml`로 골격을 만든 뒤, 문서에서 명령형 플래그로 만들 수 없는
+`strategy`·`backoffLimit` 같은 필드만 찾아 붙인다.
+
 ## 이 장에서 남길 것
 
 - 깨진 YAML은 **에러 메시지 → `kubectl explain`** 순서로 고친다

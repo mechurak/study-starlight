@@ -439,6 +439,22 @@ ps -ef | grep kube-apiserver | grep admission-plugins
 [인가와 `auth can-i`](https://v1-35.docs.kubernetes.io/docs/reference/access-authn-authz/authorization/#checking-api-access),
 [admission 컨트롤러](https://v1-35.docs.kubernetes.io/docs/reference/access-authn-authz/admission-controllers/).
 
+## 시험장에서 공식 문서 찾기
+
+| 이 장의 섹션 | 검색어 | 공식 문서에서 가져올 것 |
+|---|---|---|
+| 인증서 경로 | `PKI certificates requirements` | [PKI certificates and requirements](https://kubernetes.io/docs/setup/best-practices/certificates/)의 인증서 표. 실제 경로는 스태틱 Pod 플래그가 최종 근거이며 새 YAML 작성용 페이지는 아님 |
+| CSR | `Certificate Signing Requests` | [Certificates and Certificate Signing Requests](https://kubernetes.io/docs/reference/access-authn-authz/certificate-signing-requests/)의 `certificates.k8s.io/v1` CSR 예시에서 `request`, `signerName`, `usages` |
+| kubeconfig | `Organizing Cluster Access kubeconfig` | [Organizing Cluster Access Using kubeconfig Files](https://kubernetes.io/docs/concepts/configuration/organize-cluster-access-kubeconfig/)에서 clusters/users/contexts의 연결 구조 확인 |
+| Role·ClusterRole·Binding | `RBAC` | [Using RBAC Authorization](https://kubernetes.io/docs/reference/access-authn-authz/rbac/)의 Role, ClusterRole, RoleBinding, ClusterRoleBinding 예시. namespace와 `roleRef.kind`를 특히 확인 |
+| ServiceAccount | `Service Accounts` | [Service Accounts](https://kubernetes.io/docs/concepts/security/service-accounts/)에서 Pod의 `serviceAccountName`과 토큰 방식 확인 |
+| 프라이빗 레지스트리 | `Pull Image Private Registry` | [Pull an Image from a Private Registry](https://kubernetes.io/docs/tasks/configure-pod-container/pull-image-private-registry/)에서 docker-registry Secret 생성과 Pod 수준 `imagePullSecrets` 예시 |
+| admission 플러그인 | `Admission Controllers` | [Admission Control in Kubernetes](https://kubernetes.io/docs/reference/access-authn-authz/admission-controllers/)에서 기본 활성 플러그인과 kube-apiserver 플래그 확인 |
+| admission webhook | `Dynamic Admission Control` | [Dynamic Admission Control](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/)에서 `ValidatingWebhookConfiguration`·`MutatingWebhookConfiguration`, `clientConfig`, `rules` 예시 |
+
+RBAC YAML은 이름이 비슷해도 범위가 다르다. 문서에서 예시를 고를 때 먼저 대상 리소스가
+namespaced인지 `kubectl api-resources --namespaced=true/false`로 확인한 뒤 Role과 ClusterRole을 가른다.
+
 ## 이 장에서 남길 것
 
 - 인증서 문제의 근거는 `/etc/kubernetes/manifests/`의 실제 플래그다. kubeadm 기본 경로를 외우지 말고

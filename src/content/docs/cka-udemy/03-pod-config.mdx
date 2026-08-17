@@ -201,6 +201,20 @@ init의 command부터 읽을 것.
 init은 **순서대로, 성공해야** 다음으로 넘어간다.
 :::
 
+## 시험장에서 공식 문서 찾기
+
+| 이 장의 섹션 | 검색어 | 공식 문서에서 가져올 것 |
+|---|---|---|
+| command와 args | `Define command arguments container` | [Define a Command and Arguments for a Container](https://kubernetes.io/docs/tasks/inject-data-application/define-command-argument-container/)의 `command`·`args` 배열과 셸 실행 패턴 |
+| 환경 변수·ConfigMap | `Configure Pod ConfigMap` | [Configure a Pod to Use a ConfigMap](https://kubernetes.io/docs/tasks/configure-pod-container/configure-pod-configmap/)에서 `env.valueFrom`, `envFrom.configMapRef`, ConfigMap 볼륨 중 문제에 맞는 예시 |
+| Secret | `Distribute credentials securely Secrets` | [Distribute Credentials Securely Using Secrets](https://kubernetes.io/docs/tasks/inject-data-application/distribute-credentials-secure/)에서 `secretKeyRef`, `envFrom.secretRef`, Secret 볼륨 예시 |
+| securityContext | `Configure Security Context` | [Configure a Security Context for a Pod or Container](https://kubernetes.io/docs/tasks/configure-pod-container/security-context/)에서 Pod/컨테이너 수준의 위치와 `capabilities` 구조 |
+| 멀티 컨테이너·사이드카 | `Sidecar Containers` | [Sidecar Containers](https://kubernetes.io/docs/concepts/workloads/pods/sidecar-containers/)에서 일반 앱 컨테이너와 네이티브 사이드카(`initContainers` + `restartPolicy: Always`) 구조 구분 |
+| init 컨테이너 | `Init Containers` | [Init Containers](https://kubernetes.io/docs/concepts/workloads/pods/init-containers/)의 `spec.initContainers` 예시. 일반 init에는 컨테이너 수준 `restartPolicy`를 붙이지 않는다 |
+
+ConfigMap·Secret 페이지는 예시가 많다. 문제 문장에서 **한 키만 주입**이면 `env.valueFrom`,
+**전체 키 주입**이면 `envFrom`, **파일로 제공**이면 `volumes`를 검색해 해당 블록만 가져온다.
+
 ## 이 장에서 남길 것
 
 - Pod 스펙 수정 = **뽑고(`-o yaml`) → 지우고 → 재생성**. `replace --force`면 한 번에

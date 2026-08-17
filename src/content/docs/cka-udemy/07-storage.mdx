@@ -193,6 +193,18 @@ kubectl create -f pvc.yaml -n <namespace>             # 초과 시 즉시 Forbid
 공식 [Resource Quotas](https://v1-35.docs.kubernetes.io/docs/concepts/policy/resource-quotas/#quota-for-storage)에서
 확인한다.
 
+## 시험장에서 공식 문서 찾기
+
+| 이 장의 섹션 | 검색어 | 공식 문서에서 가져올 것 |
+|---|---|---|
+| hostPath·PV·PVC·Pod | `Configure PersistentVolume Storage` | [Configure a Pod to Use a PersistentVolume for Storage](https://kubernetes.io/docs/tutorials/configuration/configure-persistent-volume-storage/) 한 페이지에서 PV, PVC, `persistentVolumeClaim` 볼륨의 세 YAML |
+| 바인딩·reclaim 진단 | `Persistent Volumes` | [Persistent Volumes](https://kubernetes.io/docs/concepts/storage/persistent-volumes/)에서 `accessModes`, `storageClassName`, `persistentVolumeReclaimPolicy`, claim 상태 의미 |
+| StorageClass·동적 프로비저닝 | `Storage Classes` | [Storage Classes](https://kubernetes.io/docs/concepts/storage/storage-classes/)의 `storage.k8s.io/v1` 예시에서 `provisioner`, `reclaimPolicy`, `volumeBindingMode` 구조 |
+| 스토리지 quota | `Resource Quotas storage` | [Resource Quotas — Storage Resource Quota](https://kubernetes.io/docs/concepts/policy/resource-quotas/#storage-resource-quota)의 전체·클래스별 `spec.hard` 키 |
+
+PV/PVC 문제에서는 문서 예시를 통째로 복사한 뒤 **스토리지 구현 필드만** 문제에 맞게 바꾼다.
+예를 들어 `hostPath`, `nfs`, `csi`는 같은 위치의 대안이므로 둘 이상을 함께 남기면 안 된다.
+
 ## 이 장에서 남길 것
 
 - PVC Pending의 원인은 둘 — **맞는 PV가 없다** vs **WaitForFirstConsumer 대기**

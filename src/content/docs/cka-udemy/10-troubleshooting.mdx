@@ -142,6 +142,19 @@ kubectl edit ds -n kube-system kube-proxy            # --config=/var/lib/kube-pr
 정답인 경우가 많다 — 로그를 안 보고 재시작만 반복하면 영원히 못 찾는다.
 :::
 
+## 시험장에서 공식 문서 찾기
+
+| 이 장의 섹션 | 검색어 | 공식 문서에서 확인할 것 |
+|---|---|---|
+| metrics-server·top | `Resource metrics pipeline` | [Resource metrics pipeline](https://kubernetes.io/docs/tasks/debug/debug-cluster/resource-metrics-pipeline/)에서 metrics-server → Metrics API → `kubectl top` 경로. 설치 YAML은 시험이 제공한 매니페스트나 공식 metrics-server 배포본을 사용 |
+| 애플리케이션 로그 | `Logging Architecture` | [Logging Architecture](https://kubernetes.io/docs/concepts/cluster-administration/logging/)에서 컨테이너 stdout/stderr, 노드 로그 경로, 로그 회전의 경계 |
+| Pending·CrashLoopBackOff | `Debug Pods` | [Debug Pods](https://kubernetes.io/docs/tasks/debug/debug-application/debug-pods/)의 `describe` Events와 Pod 상태별 진단 순서. 새 YAML보다 실패한 스펙과 이벤트 대조용 |
+| Service·DNS·kube-proxy | `Debug Services` | [Debug Services](https://kubernetes.io/docs/tasks/debug/debug-application/debug-service/)의 Pod → Service → EndpointSlice → DNS → kube-proxy 체크리스트 |
+| 노드·control plane | `Troubleshooting Clusters` / `crictl` | [Troubleshooting Clusters](https://kubernetes.io/docs/tasks/debug/debug-cluster/)에서 kubelet·control plane 진입점을, API가 죽었으면 [Debugging Kubernetes nodes with crictl](https://kubernetes.io/docs/tasks/debug/debug-cluster/crictl/)에서 런타임 명령을 확인 |
+
+트러블슈팅 문제에서는 새 YAML을 쓰기 전에 공식 체크리스트로 실패 층을 정한다. 원인이 필드 오타로
+좁혀진 뒤에만 `kubectl get ... -o yaml`로 현재 객체를 뽑아 최소 수정한다.
+
 ## 이 장에서 남길 것
 
 - `kubectl top`은 metrics-server 설치가 선행 조건, 값이 뜰 때까지 시간이 걸린다

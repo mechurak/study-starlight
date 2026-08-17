@@ -185,6 +185,18 @@ Service를 만들었다는 사실만으로 트래픽 경로가 완성되지는 �
 [EndpointSlice](https://v1-35.docs.kubernetes.io/docs/concepts/services-networking/endpoint-slices/),
 [DNS 진단](https://v1-35.docs.kubernetes.io/docs/tasks/administer-cluster/dns-debugging-resolution/) 문서다.
 
+## 시험장에서 공식 문서 찾기
+
+| 이 장의 섹션 | 검색어 | 공식 문서에서 가져올 것 |
+|---|---|---|
+| Service 기초 | `Service defining a Service` | [Service](https://kubernetes.io/docs/concepts/services-networking/service/)의 첫 YAML에서 `spec.selector`, `ports[].port`, `targetPort`, `type` 구조 |
+| 환경·서비스 네트워킹 | `Service ClusterIP NodePort` | 같은 [Service](https://kubernetes.io/docs/concepts/services-networking/service/) 문서의 Service 타입과 가상 IP 설명. 인터페이스·라우팅 조회는 YAML 작성 없이 `ip`·`ss`로 확인 |
+| CoreDNS와 이름 규칙 | `DNS for Services and Pods` | [DNS for Services and Pods](https://kubernetes.io/docs/concepts/services-networking/dns-pod-service/)에서 Service FQDN 규칙 확인. Corefile을 고칠 때는 [Debugging DNS Resolution](https://kubernetes.io/docs/tasks/administer-cluster/dns-debugging-resolution/)의 `coredns` ConfigMap 예시 |
+| Service 경로 진단 | `Debug Services` | [Debug Services](https://kubernetes.io/docs/tasks/debug/debug-application/debug-service/)의 Service → DNS → EndpointSlice → Pod 순서. 새 YAML보다 기존 Service의 selector/port를 대조할 때 사용 |
+
+Service YAML은 `kubectl expose ... --dry-run=client -o yaml`로 뼈대를 얻는 편이 빠르다. 문서에서는
+`port`와 `targetPort`의 의미, `NodePort`·`ExternalName`처럼 명령형 출력에 없는 필드만 확인한다.
+
 ## 이 장에서 남길 것
 
 - 조회형 문제는 명령보다 **열 이름**(TYPE·Endpoints·INTERNAL-IP·CLUSTER-IP)을 기억한다
