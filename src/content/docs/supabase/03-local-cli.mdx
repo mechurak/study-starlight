@@ -1,0 +1,206 @@
+---
+title: "3A. 로컬 개발 명령어"
+description: "Supabase CLI와 Docker·Colima로 로컬 스택을 시작하고, 구분하고, 검증하고, 안전하게 내리는 실전 명령어"
+reviewedAt: 2026-08-17
+status: stable
+---
+
+import { LinkCard } from '@astrojs/starlight/components';
+
+> 평소에는 `start → status → 작업 → reset·lint·types → stop`만 기억하면 된다
+
+[3장](/supabase/03-start/)에서 로컬 개발 흐름을 익혔다면, 이 페이지는 작업 중 바로 찾아보는
+명령어 표다. 특히 macOS에서 Colima를 쓰거나 로컬 Supabase 프로젝트를 둘 이상 띄울 때
+**지금 어느 프로젝트를 조작하는지**, **중지해도 데이터가 남는지**를 판단하는 데 초점을 둔다.
+
+## 무엇이 어디서 도는가
+
+`supabase start`는 Supabase 자체 서버 하나를 실행하는 명령이 아니다. CLI가 Docker API를 통해
+Postgres, Auth, Storage, Realtime, Studio 같은 여러 컨테이너를 한 세트로 만든다.
+
+| 층 | 맡는 일 | 확인 명령 |
+|---|---|---|
+| 프로젝트 폴더 | `supabase/config.toml`, 마이그레이션, 시드 보관 | `pwd` |
+| Supabase CLI | 프로젝트별 컨테이너 세트 구성·제어 | `supabase status` |
+| Docker 엔진 | 컨테이너와 DB 볼륨 실행·보관 | `docker ps` |
+| Colima | macOS에서 Docker 엔진이 도는 Linux VM 제공 | `colima status` |
+
+Colima는 Docker Desktop의 대체 런타임일 뿐, Supabase 명령은 그대로다. `docker context show`가
+`colima`를 가리키면 Supabase CLI도 그 Docker 엔진에 컨테이너를 만든다.
+
+```bash
+colima status
+docker context show
+docker info
+```
+
+## 하루 작업 순서
+
+```bash
+# 1. 컨테이너 런타임 준비
+colima start
+
+# 2. 반드시 작업할 프로젝트 폴더에서 실행
+cd /path/to/my-project
+supabase start
+supabase status
+
+# 3. 스키마를 바꾼 뒤 재현성과 오류 검사
+supabase db reset --local
+supabase db lint --local
+supabase gen types typescript --local > lib/database.types.ts
+
+# 4. 작업 종료 — DB 데이터는 보존된다
+supabase stop
+```
+
+`colima start`는 이미 실행 중이면 다시 할 필요가 없다. 프로젝트별 `supabase start`와
+`supabase stop`을 먼저 사용하고, Docker를 쓰는 다른 작업도 모두 끝났을 때만 `colima stop`으로
+VM 전체를 내린다.
+
+## 스택 시작·확인·중지
+
+| 목적 | 명령 | 결과 |
+|---|---|---|
+| 로컬 스택 시작 | `supabase start` | 설정·마이그레이션·시드를 적용하고 컨테이너를 띄운다 |
+| URL과 키 다시 보기 | `supabase status` | API·DB·Studio·Mailpit 주소와 로컬 키를 출력한다 |
+| 스크립트용 JSON 출력 | `supabase status -o json` | 같은 정보를 JSON으로 출력한다 |
+| 현재 프로젝트 중지 | `supabase stop` | 컨테이너를 내리고 로컬 데이터는 Docker 볼륨에 보존한다 |
+| 특정 프로젝트 중지 | `supabase stop --project-id <local-project-id>` | 현재 폴더와 무관하게 지정한 로컬 스택만 내린다 |
+| 모든 로컬 스택 중지 | `supabase stop --all` | 이 Docker 엔진의 모든 로컬 Supabase 프로젝트를 내린다 |
+
+:::caution[데이터 삭제 옵션]
+`supabase stop --no-backup`은 단순 중지가 아니다. 중지한 뒤 데이터 볼륨까지 삭제한다.
+여러 프로젝트에 `supabase stop --all --no-backup`을 쓰면 **모든 로컬 Supabase 데이터가
+삭제된다.** 깨끗한 재시작이 꼭 필요할 때만 사용한다.
+:::
+
+## 프로젝트가 둘 이상일 때
+
+CLI는 `supabase/config.toml`의 `project_id`로 같은 Docker 엔진 안의 로컬 프로젝트를 구분한다.
+이 값은 호스팅 프로젝트의 `project-ref`와 다른 **로컬 식별자**다.
+
+```toml title="supabase/config.toml"
+project_id = "timeline"
+```
+
+평소에는 해당 프로젝트 폴더에서 명령을 실행하는 게 가장 읽기 쉽다.
+
+```bash
+cd /Users/me/workspace/timeline
+supabase status
+supabase stop
+
+cd /Users/me/workspace/time-table
+supabase status
+supabase stop
+```
+
+폴더를 이동하지 않으려면 로컬 ID를 명시한다.
+
+```bash
+supabase stop --project-id timeline
+supabase stop --project-id time-table
+```
+
+어느 세트가 떠 있는지 Docker에서 확인할 때는 CLI가 붙인 프로젝트 라벨로 좁힌다.
+
+```bash
+# 실행 중인 모든 로컬 Supabase 컨테이너와 프로젝트 ID
+docker ps --filter label=com.supabase.cli.project \
+  --format 'table {{.Names}}\t{{.Label "com.supabase.cli.project"}}\t{{.Status}}'
+
+# 한 프로젝트만
+docker ps --filter label=com.supabase.cli.project=timeline \
+  --format 'table {{.Names}}\t{{.Status}}'
+```
+
+컨테이너 이름도 보통 `supabase_<service>_<project_id>` 형태지만, 자동화에는 이름 문자열보다
+라벨이나 Supabase CLI를 우선한다.
+
+:::caution[동시 실행 조건]
+두 프로젝트의 `project_id`만 다르게 해서는 부족하다. API, DB, Studio, Mailpit 등
+`config.toml`에서 호스트에 공개하는 **모든 활성 서비스 포트도 서로 달라야 한다.** 한쪽이 기본
+`54321`–`54329` 범위를 쓴다면 다른 쪽은 `55321`–`55329`처럼 별도 범위를 잡는다.
+:::
+
+## 스키마 변경과 검증
+
+| 상황 | 명령 | 기억할 점 |
+|---|---|---|
+| 빈 마이그레이션 생성 | `supabase migration new create_posts` | 생성된 SQL에 의도를 직접 작성한다 |
+| Studio 변경을 SQL로 추출 | `supabase db diff -f create_posts` | 생성 SQL을 반드시 검토한다 |
+| 로컬 DB 재구축 | `supabase db reset --local` | DB를 비우고 마이그레이션과 시드를 다시 실행한다 |
+| 시드 없이 재구축 | `supabase db reset --local --no-seed` | 스키마만 검증할 때 쓴다 |
+| DB 정적 검사 | `supabase db lint --local` | 함수·프로시저의 타입 오류 등을 찾는다 |
+| pgTAP 테스트 | `supabase test db --local` | `supabase/tests/`의 DB 테스트를 실행한다 |
+| 타입 생성 | `supabase gen types typescript --local` | 앱의 타입 파일로 리다이렉션해 저장한다 |
+
+`db reset`은 로컬의 수동 변경을 지우므로, Studio에서 먼저 실험했다면 `db diff -f <name>`으로
+마이그레이션을 만든 뒤 실행한다.
+
+:::caution[로컬과 원격을 명시한다]
+`supabase db reset --local`은 로컬 DB를 다시 만들지만, `supabase db reset --linked`는 연결된
+**원격 DB를 지우고** 로컬 마이그레이션으로 재구축한다. 습관적으로 `--local` 또는 `--linked`를
+명시하면 명령의 대상을 검토하기 쉽다. 프로덕션에는 `db reset --linked`를 사용하지 않는다.
+:::
+
+## 로컬 Edge Functions
+
+```bash
+# 모든 함수를 로컬에서 제공
+supabase functions serve
+
+# 함수용 환경변수 파일 지정
+supabase functions serve --env-file supabase/functions/.env
+```
+
+함수는 `http://127.0.0.1:54321/functions/v1/<function-name>`으로 호출한다.
+`--no-verify-jwt`는 인증이 없는 함수를 의도적으로 시험할 때만 사용한다. 인증 문제를 피하려고
+상시 붙이면 로컬 테스트가 배포 환경의 보안 조건과 달라진다.
+
+## Colima까지 내릴지 판단하기
+
+| 상황 | 권장 명령 |
+|---|---|
+| 한 프로젝트만 작업 종료 | 해당 폴더에서 `supabase stop` |
+| 여러 Supabase 프로젝트 모두 종료 | 각각 `supabase stop` 또는 `supabase stop --all` |
+| Docker를 사용하는 작업이 전부 끝남 | Supabase를 중지한 뒤 `colima stop` |
+| 다음 작업 시작 | `colima start` 후 프로젝트 폴더에서 `supabase start` |
+
+`colima stop`은 VM 전체의 전원을 끄는 동작이지 프로젝트별 정리는 아니다. 프로젝트를 명시적으로
+`supabase stop`한 다음 Colima를 내리면, 다음 시작 때 어떤 스택이 살아날지 예측하기 쉽다.
+
+## 문제가 생겼을 때
+
+```bash
+# Supabase가 엉뚱한 Docker 엔진을 보는지 확인
+docker context show
+docker info
+
+# 프로젝트 컨테이너 상태 확인
+docker ps -a --filter label=com.supabase.cli.project=<local-project-id>
+
+# DB 로그 확인 — 먼저 위 명령으로 실제 컨테이너 이름을 찾는다
+docker logs supabase_db_<local-project-id> --tail 100
+
+# 설정과 데이터를 보존한 일반 재시작
+supabase stop
+supabase start
+```
+
+일반 재시작으로 해결되지 않을 때도 곧바로 `--no-backup`을 쓰지 않는다. 필요한 로컬 데이터를
+SQL로 내보내거나 마이그레이션·시드로 재현 가능한지 확인한 뒤 데이터 볼륨 삭제를 선택한다.
+
+## 참고 자료
+
+- [Supabase CLI 시작하기](https://supabase.com/docs/guides/local-development/cli/getting-started) — 로컬 스택 시작·접속·데이터를 보존한 중지
+- [Supabase CLI 명령 레퍼런스](https://supabase.com/docs/reference/cli/supabase-stop) — `stop`, `status`, `db reset` 등 명령과 플래그
+- [Supabase CLI 설정](https://supabase.com/docs/guides/local-development/cli/config) — `project_id`와 서비스별 로컬 포트
+- [Colima 공식 README](https://github.com/abiosoft/colima) — Docker 런타임과 `start`, `stop`, `status`
+
+<LinkCard
+  title="3B. 원격 프로젝트 명령어"
+  description="호스팅 프로젝트의 대상 확인부터 스키마·설정·시크릿·Functions 배포까지."
+  href="/supabase/03-remote-cli/"
+/>

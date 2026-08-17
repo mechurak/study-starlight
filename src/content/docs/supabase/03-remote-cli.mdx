@@ -1,0 +1,241 @@
+---
+title: "3B. 원격 프로젝트 명령어"
+description: "Supabase CLI로 호스팅 프로젝트를 연결하고, 원격 스키마·설정·시크릿·Edge Functions를 안전하게 조회하고 배포하는 명령어"
+reviewedAt: 2026-08-17
+status: stable
+---
+
+import { LinkCard } from '@astrojs/starlight/components';
+
+> 원격에서는 `대상 확인 → 이력 확인 → dry-run → 배포 → 재확인` 순서를 깨지 않는다
+
+[3A장](/supabase/03-local-cli/)은 Docker 안의 로컬 스택을 다뤘다. 이 페이지는 Supabase가
+호스팅하는 개발·스테이징·프로덕션 프로젝트를 CLI로 조회하고 변경할 때 바로 찾아보는 명령어 표다.
+같은 `supabase` 명령이라도 원격 플래그 하나가 실제 서비스의 데이터와 설정을 바꿀 수 있으므로,
+**무엇을 실행하는가보다 어디에 실행하는가**를 먼저 확인한다.
+
+## 대상 이름부터 구분한다
+
+Supabase CLI의 이름과 플래그는 문맥에 따라 뜻이 달라진다.
+
+| 이름 | 가리키는 대상 | 예시·확인 위치 |
+|---|---|---|
+| 로컬 `project_id` | 한 Docker 엔진 안의 로컬 스택 | `supabase/config.toml`의 `project_id` |
+| 원격 project ref | Supabase가 호스팅하는 프로젝트 | 대시보드 URL의 `/project/<project-ref>` |
+| `--local` | 현재 폴더의 로컬 DB | `db reset`, `db lint`, `gen types` |
+| `--linked` | 현재 폴더에 연결된 원격 프로젝트 | `migration list`, `db pull`, `db push` |
+| `--project-ref` | Management API 명령의 명시적 원격 대상 | `config`, `secrets`, `functions` |
+| `--db-url` | 연결 문자열로 직접 지정한 Postgres | 연결된 프로젝트를 거치지 않을 때 |
+
+:::caution[같은 project-id라도 문맥이 다르다]
+`supabase stop --project-id timeline`의 `project-id`는 **로컬 ID**지만,
+`supabase gen types --project-id abcdef...`의 `project-id`는 **원격 project ref**다.
+원격 타입 생성은 연결된 프로젝트에서 `--linked`를 쓰는 편이 덜 헷갈린다.
+:::
+
+## 처음 한 번: 로그인하고 연결한다
+
+```bash
+# 1. Personal Access Token으로 CLI 인증
+supabase login
+
+# 2. 접근 가능한 원격 프로젝트와 ref 확인
+supabase projects list
+
+# 3. 현재 supabase/ 디렉터리를 정확한 원격 프로젝트에 연결
+supabase link --project-ref <project-ref>
+
+# 4. 연결된 대상과 마이그레이션 이력 확인
+supabase projects list
+supabase migration list --linked
+```
+
+`supabase login`은 Supabase Management API를 호출할 자격을 얻는 과정이고,
+`supabase link`는 **현재 로컬 폴더**가 어느 원격 프로젝트를 가리킬지 저장하는 과정이다.
+한 번 로그인했다고 모든 폴더가 같은 프로젝트에 자동 연결되는 것은 아니다.
+
+| 명령 | 결과 |
+|---|---|
+| `supabase login` | 브라우저에서 로그인하고 Personal Access Token을 로컬에 저장한다 |
+| `supabase projects list` | 로그인한 사용자가 접근할 수 있는 프로젝트와 연결 상태를 보여준다 |
+| `supabase link --project-ref <ref>` | 현재 프로젝트 폴더를 원격 프로젝트에 연결한다 |
+| `supabase unlink` | 현재 폴더의 연결 정보를 지운다. 원격 프로젝트 자체는 삭제하지 않는다 |
+| `supabase logout` | 로컬에 저장된 CLI 액세스 토큰을 삭제한다 |
+
+`--password <value>`로 DB 비밀번호를 명령줄에 직접 쓰면 셸 기록과 프로세스 목록에 노출될 수 있다.
+대화형 입력, 운영체제 자격 증명 저장소, `SUPABASE_DB_PASSWORD` 환경변수를 우선한다.
+
+## 스키마를 가져오고 배포한다
+
+### 원격에서 로컬로 가져오기
+
+```bash
+# 원격과 로컬 마이그레이션 이력 비교
+supabase migration list --linked
+
+# 원격 스키마 차이를 새 로컬 마이그레이션으로 생성
+supabase db pull --linked remote_schema
+
+# 생성 파일을 검토한 뒤 로컬에서 처음부터 재현
+supabase db reset --local
+```
+
+`db pull`은 원격 DB를 읽지만 **로컬 마이그레이션 파일을 만든다.** 기존 원격 프로젝트를 처음
+버전 관리로 가져오거나, 누군가 원격 대시보드에서 직접 바꾼 스키마를 이력으로 흡수할 때 사용한다.
+마이그레이션 중심으로 운영하기 시작한 뒤에는 원격 대시보드에서 스키마를 직접 바꾸지 않는다.
+
+### 로컬에서 원격으로 배포하기
+
+```bash
+# 1. 로컬에서 재현성 확인
+supabase db reset --local
+supabase db lint --local
+
+# 2. 로컬과 원격 이력 비교
+supabase migration list --linked
+
+# 3. 적용될 마이그레이션만 미리 확인
+supabase db push --linked --dry-run
+
+# 4. 원격에 아직 없는 마이그레이션 적용
+supabase db push --linked
+
+# 5. 적용 결과 재확인
+supabase migration list --linked
+```
+
+`db push`는 `supabase_migrations.schema_migrations` 이력을 기준으로 원격에 아직 적용되지 않은
+마이그레이션만 타임스탬프 순서로 실행한다. `--dry-run`은 SQL의 실행 결과를 예측하는 기능이 아니라
+**적용 대상 마이그레이션 목록을 확인하는 단계**다. SQL과 잠금 영향은 별도로 검토한다.
+
+:::caution[프로덕션 시드]
+`supabase db push --linked --include-seed`는 원격에 마이그레이션뿐 아니라 설정된 시드까지 실행한다.
+시드는 개발·스테이징의 초기 데이터에만 사용하고 프로덕션에는 포함하지 않는다.
+:::
+
+## 원격 조회와 타입 생성
+
+원격 상태를 읽기만 하거나 파일로 내려받는 명령도 대상을 명시한다.
+
+| 목적 | 명령 | 원격 변경 |
+|---|---|---|
+| 마이그레이션 이력 비교 | `supabase migration list --linked` | 없음 |
+| 원격 스키마로 타입 생성 | `supabase gen types --lang typescript --linked` | 없음 |
+| 스키마 덤프 | `supabase db dump --linked -f schema.sql` | 없음 |
+| 데이터 덤프 | `supabase db dump --linked --data-only -f data.sql` | 없음 |
+| Edge Functions 목록 | `supabase functions list --project-ref <ref>` | 없음 |
+| Edge Function 시크릿 이름·다이제스트 목록 | `supabase secrets list --project-ref <ref>` | 없음 |
+| Preview Branch 목록 | `supabase branches list --project-ref <ref>` | 없음 |
+
+```bash
+supabase gen types --lang typescript --linked > lib/database.types.ts
+```
+
+`db dump` 파일에는 민감한 스키마나 실제 사용자 데이터가 들어갈 수 있다. 특히 `--data-only` 결과는
+Git에 커밋하지 말고 접근 권한과 삭제 시점을 정한다. 덤프는 복구 전략의 일부일 뿐이며,
+실제 복구 가능 여부는 별도로 시험한다 ([14장](/supabase/14-ops/#백업과-복구)).
+
+## 프로젝트 설정과 시크릿
+
+`db push`, `config push`, `secrets set`은 서로 다른 대상을 바꾼다.
+
+| 명령 | 원격에서 바꾸는 것 |
+|---|---|
+| `supabase db push --linked` | `supabase/migrations/`의 DB 스키마 변경 |
+| `supabase config push --project-ref <ref>` | `config.toml`이 지원하는 Auth 등 프로젝트 설정 |
+| `supabase secrets set --project-ref <ref> NAME=value` | Edge Functions 런타임 시크릿 |
+| `supabase secrets unset --project-ref <ref> NAME` | Edge Functions 런타임 시크릿 삭제 |
+
+```bash
+# 현재 시크릿 이름 확인
+supabase secrets list --project-ref <project-ref>
+
+# 셸 기록을 피하려면 Git에서 제외한 파일로 주입
+supabase secrets set --project-ref <project-ref> --env-file .env.functions.production
+
+# 더 이상 사용하지 않는 시크릿 제거
+supabase secrets unset --project-ref <project-ref> OLD_SECRET
+```
+
+`.env.functions.production`은 반드시 `.gitignore`에 넣는다. `secrets set`은 앱 호스팅 서비스의
+환경변수나 DB 접속 비밀번호를 저장하는 명령이 아니라 **Supabase Edge Functions 환경변수**를
+관리하는 명령이다. 시크릿 변경은 다시 함수를 배포하지 않아도 반영된다.
+
+:::caution[config push에는 dry-run이 없다]
+`config push` 전에 `config.toml`의 `site_url`, redirect URL, OAuth provider와 환경변수 참조를 직접
+검토한다. 로컬의 `localhost` 설정을 프로덕션에 올리면 로그인 반환 주소가 깨질 수 있다.
+:::
+
+## Edge Functions를 배포한다
+
+```bash
+# 한 함수만 배포
+supabase functions deploy hello-world --project-ref <project-ref>
+
+# 모든 로컬 함수 배포
+supabase functions deploy --project-ref <project-ref>
+
+# 배포 결과 확인
+supabase functions list --project-ref <project-ref>
+```
+
+인증이 필요한 함수는 배포 전에 `supabase functions serve`로 로컬 검증한다.
+`--no-verify-jwt`는 인증 없는 webhook처럼 설계상 필요한 함수에만 사용하고, 가능하면 함수별 설정을
+`config.toml`에 기록해 로컬과 원격 동작을 맞춘다.
+
+:::caution[prune은 삭제한다]
+`supabase functions deploy --prune`은 원격에는 있지만 로컬에는 없는 Edge Function을 삭제한다.
+전체 함수 목록과 대상 project ref를 확인하지 않은 상태에서는 사용하지 않는다.
+:::
+
+## CI에서는 대상을 값으로 고정한다
+
+대화형 `login` 대신 CI 시크릿과 명시적인 project ref를 사용한다. 전체 배포 파이프라인은
+[14장](/supabase/14-ops/#cicd)에서 다루고, 여기서는 CLI에 필요한 값만 구분한다.
+
+| 환경변수 | 용도 |
+|---|---|
+| `SUPABASE_ACCESS_TOKEN` | Management API 인증용 Personal Access Token |
+| `SUPABASE_DB_PASSWORD` | 원격 Postgres에 연결하는 명령의 DB 인증 |
+| `SUPABASE_PROJECT_REF` | 배포할 호스팅 프로젝트의 명시적 식별자 |
+
+```bash
+supabase link --project-ref "$SUPABASE_PROJECT_REF"
+supabase migration list --linked
+supabase db push --linked --dry-run
+supabase db push --linked
+supabase functions deploy --project-ref "$SUPABASE_PROJECT_REF"
+```
+
+프로덕션 배포 권한은 필요한 저장소와 워크플로에만 주고, 사람마다 로컬에서 `db push`하는 경로와
+CI 배포 경로를 동시에 운영하지 않는다.
+
+## 위험 명령과 복구 도구
+
+| 명령·옵션 | 위험 | 사용할 수 있는 범위 |
+|---|---|---|
+| `supabase db reset --linked` | 원격 DB를 지우고 로컬 마이그레이션으로 재구축 | 폐기 가능한 개발·스테이징만 |
+| `supabase db push --linked --include-seed` | 테스트 데이터 삽입·중복 가능 | 의도한 개발·스테이징만 |
+| `supabase migration repair --linked` | SQL 실행 없이 원격 이력 테이블 상태 변경 | 실제 스키마와 이력을 대조한 복구 작업만 |
+| `supabase functions deploy --prune` | 로컬에 없는 원격 함수 삭제 | 함수 목록과 Git 기준이 확실할 때만 |
+| `supabase secrets unset` | 실행 중 함수가 쓰는 시크릿 제거 | 사용처 제거와 배포를 확인한 뒤 |
+
+:::caution[프로덕션 금지]
+`supabase db reset --linked`는 연결된 원격 DB의 데이터를 지운다. 프로덕션에서는 사용하지 않는다.
+마이그레이션 이력이 어긋났다고 곧바로 `migration repair`를 실행하지 말고, `migration list --linked`,
+Git의 마이그레이션 파일, 실제 스키마를 먼저 대조한다.
+:::
+
+## 참고 자료
+
+- [Supabase 데이터베이스 마이그레이션](https://supabase.com/docs/guides/deployment/database-migrations) — `login`, `link`, `db pull`, `db push`와 팀 배포 흐름
+- [Supabase CLI 레퍼런스](https://supabase.com/docs/reference/cli/supabase-link) — 원격 DB·설정·시크릿·Functions 명령과 플래그
+- [Supabase 로컬 개발 워크플로](https://supabase.com/docs/guides/local-development/cli-workflows) — `--linked`, dry-run, 원격 reset의 범위
+- [Edge Function 배포](https://supabase.com/docs/guides/functions/deploy) — 함수 배포, project ref, CI 예제
+- [Edge Function 시크릿](https://supabase.com/docs/guides/functions/secrets) — 로컬 `.env`와 원격 `secrets set`의 차이
+
+<LinkCard
+  title="4. Postgres 최소 지식"
+  description="Supabase를 잘 쓰기 위해 꼭 필요한 만큼만 — profiles 패턴, 타입, 인덱스, 트랜잭션."
+  href="/supabase/04-postgres/"
+/>

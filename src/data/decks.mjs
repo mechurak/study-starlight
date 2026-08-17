@@ -277,7 +277,16 @@ export const deckDefinitions = [
 		category: 'backend',
 		groups: [
 			['시작', ['supabase/00-intro', 'supabase/01-why']],
-			['기반 — Postgres와 개발 환경', ['supabase/02-architecture', 'supabase/03-start', 'supabase/04-postgres']],
+			[
+				'기반 — Postgres와 개발 환경',
+				[
+					'supabase/02-architecture',
+					'supabase/03-start',
+					'supabase/03-local-cli',
+					'supabase/03-remote-cli',
+					'supabase/04-postgres',
+				],
+			],
 			[
 				'핵심 — 데이터와 권한',
 				['supabase/05-data-api', 'supabase/06-auth', 'supabase/06-auth-reference', 'supabase/07-rls'],
