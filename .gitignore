@@ -13,6 +13,9 @@ yarn-error.log*
 pnpm-debug.log*
 .playwright-cli/
 
+# local reference documents
+local-references/
+
 
 # environment variables
 .env
