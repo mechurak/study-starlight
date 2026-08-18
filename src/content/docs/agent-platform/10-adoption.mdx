@@ -1,0 +1,131 @@
+---
+title: "10. 두 Agent로 시작하기"
+description: 기본 runtime을 정하고 read-only·write Agent로 공통 계약과 두 adapter의 도입 가정을 검증한다
+---
+
+import { LinkCard, Steps } from '@astrojs/starlight/components';
+import TermIntro from '../../../components/docs/TermIntro.astro';
+
+> 첫 PoC의 목적은 Agent 데모가 아니라 **권한·배포·실패 계약이 실제로 지켜지는지** 확인하는 것이다
+
+<TermIntro
+  terms={[
+    ['walking skeleton', 'Walking Skeleton', '기능은 작지만 등록부터 호출·감사까지 production 경로 전체를 관통하는 첫 구현이다.'],
+    ['acceptance test', 'Acceptance Test', '기능이 있다는 설명이 아니라 조직의 요구조건을 통과했는지 판정하는 실행 가능한 시험이다.'],
+    ['default target', 'Default Deployment Target', '특별한 제약이 없을 때 먼저 배포하는 runtime. 운영 중점과 투자 우선순위를 만든다.'],
+  ]}
+/>
+
+## 기본 target 하나를 먼저 정한다
+
+두 adapter를 처음부터 같은 깊이로 만들면 platform core보다 provider 차이를 맞추는 데 시간이 든다.
+
+- AWS가 승인된 실행·data 경계이고 managed 운영이 우선이면 AgentCore를 default로 둔다.
+- 실행과 data가 온프렘에 남아야 하거나 Kubernetes 기반이 이미 강하면 kagent를 default로 둔다.
+- 다른 target은 hard constraint가 있는 Agent부터 지원한다.
+
+선택은 영구 결론이 아니다. 공통 contract test와 stable endpoint가 있기 때문에 default를 바꿀 수 있어야 한다.
+
+## PoC Agent 두 개
+
+| Agent | 검증 목적 | 권한 |
+|---|---|---|
+| 사내 규정 Q&A | 구성형, knowledge, streaming, read-only, 기본 catalog | 전사 invoke 또는 한 부서 |
+| 비용 승인 Agent | 코드형, private API, write action, OBO/HITL, audit | 특정 부서 + 특정 개인 |
+
+두 번째 Agent가 중요하다. 단순 Q&A만 성공하면 가장 위험한 identity propagation, action policy, side effect와
+human approval을 검증하지 못한다.
+
+## 구현 순서
+
+<Steps>
+1. **Domain과 identity를 먼저 만든다**
+
+   `Agent`, `Version`, `Grant`, `DeploymentTarget`, `Deployment`, `Publication` schema와 IdP principal 동기화를 만든다.
+
+2. **Portal gateway를 세운다**
+
+   catalog 조회와 invoke endpoint에서 같은 ACL 결정을 사용하고 session ownership을 저장한다.
+
+3. **첫 adapter의 walking skeleton을 만든다**
+
+   `validate → deploy → status → invoke → stop → rollback` 한 바퀴를 두 Agent로 통과한다.
+
+4. **공급망과 승인 gate를 붙인다**
+
+   digest, SBOM, scan, signature, tool/data approval과 immutable version을 강제한다.
+
+5. **두 번째 adapter를 contract test로 추가한다**
+
+   첫 adapter code를 복사하지 않고 같은 port와 fixture를 구현한다. capability 차이는 명시한다.
+
+6. **운영 실패를 주입한다**
+
+   IdP group 변경, runtime API timeout, model 429, tool deny, DX 단절, provider resource 수동 삭제를 시험한다.
+</Steps>
+
+## 반드시 통과할 acceptance test
+
+- 허용 부서는 catalog에서 Agent를 보고 호출한다.
+- 금지 사용자에게는 검색·직접 endpoint 호출 모두 거부된다.
+- email 변경 뒤에도 같은 principal 권한이 유지된다.
+- 부서 이동 뒤 token refresh 범위 안에 권한이 회수된다.
+- creator는 새 version을 만들 수 있지만 자기 승인만으로 위험한 write Agent를 공개하지 못한다.
+- image digest가 바뀌면 새 version 없이는 배포되지 않는다.
+- 배포 API 응답 유실 뒤 재시도해도 resource는 하나다.
+- 이전 published deployment로 정해진 시간 안에 rollback한다.
+- 다른 사용자의 session ID 재사용이 거부된다.
+- 금지 tool action이 model 밖에서 차단되고 decision log가 남는다.
+- prompt·tool input redaction과 retention이 실제 저장소에 적용된다.
+
+## kagent PoC에서 볼 것
+
+- namespaced RBAC와 controller watch scope
+- BYO A2A contract와 signed image
+- ServiceAccount·NetworkPolicy·security context
+- controller/DB 장애 뒤 reconciliation
+- portal ACL을 우회하는 controller endpoint가 노출되지 않는지
+- cluster·model capacity가 noisy Agent를 격리하는지
+
+## AgentCore PoC에서 볼 것
+
+- ARM64 image build와 protocol contract
+- PrivateLink를 통한 invoke, VPC에서 private API로 egress
+- private IdP의 discovery/JWKS와 custom claim
+- user-session binding과 microVM lifecycle
+- Runtime version·endpoint rollback
+- ECR·S3·CloudWatch endpoint와 DX 단절 behavior
+- Registry Preview를 빼도 core workflow가 동작하는지
+
+## 결정 기록
+
+PoC 결과는 "기능 있음" 표보다 운영 증거로 남긴다.
+
+| 결정 | 기록할 증거 |
+|---|---|
+| default target | acceptance 통과율, 운영 인력, data boundary, 비용 model |
+| secondary target | 필요한 hard constraint와 추가 운영비 |
+| portable 범위 | 두 adapter contract test가 실제로 공통인 항목 |
+| provider extension | 어느 Agent가 왜 lock-in을 수용하는지 |
+| GA 전 의존성 | Preview 기능 제거 시 fallback path |
+
+## 단계적 도입
+
+1단계는 read-only 구성형 Agent와 승인된 MCP만 받는다. 2단계에서 code형 Agent와 sandbox pipeline을 연다.
+3단계에서 write tool·OBO·HITL을 제한된 부서에 연다. 4단계에서 secondary target과 검증된 failover를 추가한다.
+
+자유로운 업로드보다 빠른 feedback이 중요하다. 거부 reason과 고칠 방법을 creator에게 자동으로 돌려줘야 안전한
+경로를 우회하지 않는다.
+
+## 10장 요약
+
+- 기본 target 하나로 end-to-end walking skeleton을 먼저 만든다.
+- read-only와 write Agent 두 개가 권한·action·audit 차이를 드러낸다.
+- provider 설명이 아니라 실패 주입과 contract test로 선택한다.
+- 구성형 → 코드형 → write action → secondary target 순으로 위험을 연다.
+
+<LinkCard
+  title="11. 마무리"
+  description="전체 구조와 production 준비 체크리스트를 한 장으로 다시 묶는다."
+  href="/agent-platform/11-wrapup/"
+/>

@@ -404,6 +404,23 @@ export const deckDefinitions = [
 			['마무리', ['langfuse/13-glossary', 'langfuse/14-wrapup']],
 		],
 	},
+	{
+		slug: 'agent-platform',
+		topicOrder: 18,
+		label: 'Agent 배포 플랫폼',
+		title: '사내 Agent 배포 플랫폼',
+		icon: 'setting',
+		aliases: ['AI Agent Platform', 'Agent Runtime', 'kagent', 'Amazon Bedrock AgentCore'],
+		description: 'Agent·권한·배포 계약을 제품 밖에 둔다 — kagent와 AgentCore를 교체 가능한 실행 어댑터로 연결하는 설계.',
+		category: 'platform',
+		groups: [
+			['큰 그림', ['agent-platform/00-position', 'agent-platform/01-planes']],
+			['제품 밖의 계약', ['agent-platform/02-domain-model', 'agent-platform/03-lifecycle', 'agent-platform/04-authorization']],
+			['실행 어댑터', ['agent-platform/05-adapter-contract', 'agent-platform/06-kagent', 'agent-platform/07-agentcore']],
+			['하이브리드 운영', ['agent-platform/08-hybrid', 'agent-platform/09-operations']],
+			['도입과 마무리', ['agent-platform/10-adoption', 'agent-platform/11-wrapup']],
+		],
+	},
 ];
 
 export const topics = [...deckDefinitions].sort((a, b) => a.topicOrder - b.topicOrder).map((deck) => ({
@@ -436,6 +453,7 @@ export const termIntroDeckSlugs = [
 	'databricks',
 	'litellm',
 	'langfuse',
+	'agent-platform',
 ];
 
 export const deckCatalogSections = categories.map((category) => ({
