@@ -1,11 +1,11 @@
 ---
 /*
-  랜딩(/)의 덱 목록 — 카테고리 섹션 × 덱 카드.
+  랜딩(/)의 덱 목록 — 카테고리 카드 · 정렬 가능한 테이블.
 
-  원래 랜딩은 hero 액션 12개 + 평면 CardGrid 12장이었다. 덱이 늘면서
-  액션 줄은 읽을 수 없는 링크 띠가 됐고, 카드 그리드는 분류 없이 길어져
-  "무엇부터 볼지"가 안 보였다. 이 컴포넌트는 덱을 카테고리로 묶고,
-  카드 전체를 링크로 만들어 목록 자체가 내비게이션이 되게 한다.
+  카드 보기는 덱을 카테고리로 묶어 처음 둘러보기 좋게 하고,
+  테이블 보기는 덱이 많을 때 전체를 빠르게 비교하게 한다.
+  테이블의 카테고리와 최근 수정일 제목행은 버튼이며, 누를 때마다 오름차순과
+  내림차순을 바꾼다. 현재 보기는 localStorage에 저장한다.
 
   sections: 카테고리 하나 = 섹션 하나
     title  카테고리 이름 (h2)
@@ -75,6 +75,14 @@ const sectionsWithDates = sections.map((section) => ({
   }),
 }));
 
+const tableDecks = sectionsWithDates.flatMap((section) =>
+  section.decks.map((deck) => ({
+    ...deck,
+    category: section.title,
+    tone: section.tone,
+  })),
+);
+
 const formatDate = (date: Date) =>
   date.toLocaleDateString('ko-KR', {
     year: 'numeric',
@@ -84,37 +92,205 @@ const formatDate = (date: Date) =>
   });
 ---
 
-<div class="catalog">
-  {sectionsWithDates.map((section) => (
-    <section class="catalog__section" data-tone={section.tone}>
-      <header class="catalog__head">
-        <h2 class="catalog__title">{section.title}</h2>
-        <p class="catalog__desc">{section.desc}</p>
-      </header>
-      <div class="catalog__grid">
-        {section.decks.map((deck) => (
-          <a class="deck" href={deck.href}>
-            <span class="deck__icon" aria-hidden="true">
-              <Icon name={deck.icon as any} size="1.25rem" />
-            </span>
-            <span class="deck__body">
-              <span class="deck__row">
-                <span class="deck__name">{deck.title}</span>
-                <span class="deck__meta">{deck.chapters}장</span>
+<div class="catalog" data-deck-catalog>
+  <div class="catalog__toolbar" role="group" aria-label="덱 표시 방식">
+    <span class="catalog__toolbar-label">보기</span>
+    <div class="catalog__view-switch">
+      <button class="catalog__view-button" type="button" data-view-button="cards" aria-pressed="true">
+        <svg viewBox="0 0 16 16" aria-hidden="true">
+          <rect x="1.5" y="1.5" width="5" height="5" rx="1"></rect>
+          <rect x="9.5" y="1.5" width="5" height="5" rx="1"></rect>
+          <rect x="1.5" y="9.5" width="5" height="5" rx="1"></rect>
+          <rect x="9.5" y="9.5" width="5" height="5" rx="1"></rect>
+        </svg>
+        카드
+      </button>
+      <button class="catalog__view-button" type="button" data-view-button="table" aria-pressed="false">
+        <svg viewBox="0 0 16 16" aria-hidden="true">
+          <path d="M2 3.5h12M2 8h12M2 12.5h12"></path>
+        </svg>
+        테이블
+      </button>
+    </div>
+  </div>
+
+  <div data-catalog-view="cards">
+    {sectionsWithDates.map((section) => (
+      <section class="catalog__section" data-tone={section.tone}>
+        <header class="catalog__head">
+          <h2 class="catalog__title">{section.title}</h2>
+          <p class="catalog__desc">{section.desc}</p>
+        </header>
+        <div class="catalog__grid">
+          {section.decks.map((deck) => (
+            <a class="deck" href={deck.href}>
+              <span class="deck__icon" aria-hidden="true">
+                <Icon name={deck.icon as any} size="1.25rem" />
               </span>
-              <span class="deck__blurb">{deck.desc}</span>
-              {deck.updatedAt && (
-                <span class="deck__updated">
-                  마지막 수정 <time datetime={deck.updatedAt.toISOString()}>{formatDate(deck.updatedAt)}</time>
+              <span class="deck__body">
+                <span class="deck__row">
+                  <span class="deck__name">{deck.title}</span>
+                  <span class="deck__meta">{deck.chapters}장</span>
                 </span>
+                <span class="deck__blurb">{deck.desc}</span>
+                {deck.updatedAt && (
+                  <span class="deck__updated">
+                    마지막 수정 <time datetime={deck.updatedAt.toISOString()}>{formatDate(deck.updatedAt)}</time>
+                  </span>
+                )}
+              </span>
+            </a>
+          ))}
+        </div>
+      </section>
+    ))}
+  </div>
+
+  <div class="catalog-table-wrap" data-catalog-view="table" hidden>
+    <table class="catalog-table">
+      <thead>
+        <tr>
+          <th scope="col">덱</th>
+          <th scope="col" data-sort-header="category" aria-sort="none">
+            <button class="catalog-table__sort" type="button" data-sort="category">
+              카테고리
+              <span class="catalog-table__sort-icon" aria-hidden="true">↕</span>
+            </button>
+          </th>
+          <th scope="col">분량</th>
+          <th scope="col" data-sort-header="updated" aria-sort="none">
+            <button class="catalog-table__sort" type="button" data-sort="updated">
+              최근 수정일
+              <span class="catalog-table__sort-icon" aria-hidden="true">↕</span>
+            </button>
+          </th>
+        </tr>
+      </thead>
+      <tbody data-deck-rows>
+        {tableDecks.map((deck, index) => (
+          <tr
+            data-category={deck.category}
+            data-updated={deck.updatedAt?.getTime() ?? ''}
+            data-original-index={index}
+          >
+            <th scope="row">
+              <a class="catalog-table__deck" href={deck.href}>
+                <span class="catalog-table__icon" data-tone={deck.tone} aria-hidden="true">
+                  <Icon name={deck.icon as any} size="1rem" />
+                </span>
+                <span>
+                  <span class="catalog-table__name">{deck.title}</span>
+                  <span class="catalog-table__blurb">{deck.desc}</span>
+                </span>
+              </a>
+            </th>
+            <td><span class="catalog-table__category" data-tone={deck.tone}>{deck.category}</span></td>
+            <td class="catalog-table__chapters">{deck.chapters}장</td>
+            <td class="catalog-table__date">
+              {deck.updatedAt ? (
+                <time datetime={deck.updatedAt.toISOString()}>{formatDate(deck.updatedAt)}</time>
+              ) : (
+                <span aria-label="수정일 없음">—</span>
               )}
-            </span>
-          </a>
+            </td>
+          </tr>
         ))}
-      </div>
-    </section>
-  ))}
+      </tbody>
+    </table>
+    <p class="sr-only" aria-live="polite" data-sort-status></p>
+  </div>
 </div>
+
+<script>
+  const VIEW_STORAGE_KEY = 'deck-catalog-view';
+
+  document.querySelectorAll<HTMLElement>('[data-deck-catalog]').forEach((catalog) => {
+    const viewButtons = catalog.querySelectorAll<HTMLButtonElement>('[data-view-button]');
+    const views = catalog.querySelectorAll<HTMLElement>('[data-catalog-view]');
+    const rowsContainer = catalog.querySelector<HTMLTableSectionElement>('[data-deck-rows]');
+    const sortButtons = catalog.querySelectorAll<HTMLButtonElement>('[data-sort]');
+    const sortStatus = catalog.querySelector<HTMLElement>('[data-sort-status]');
+    const collator = new Intl.Collator('ko-KR');
+
+    const setView = (view: string) => {
+      viewButtons.forEach((button) => {
+        button.setAttribute('aria-pressed', String(button.dataset.viewButton === view));
+      });
+      views.forEach((panel) => {
+        panel.hidden = panel.dataset.catalogView !== view;
+      });
+    };
+
+    viewButtons.forEach((button) => {
+      button.addEventListener('click', () => {
+        const view = button.dataset.viewButton ?? 'cards';
+        setView(view);
+        try {
+          localStorage.setItem(VIEW_STORAGE_KEY, view);
+        } catch {
+          // 저장소가 차단된 환경에서도 현재 페이지의 전환은 유지한다.
+        }
+      });
+    });
+
+    try {
+      const savedView = localStorage.getItem(VIEW_STORAGE_KEY);
+      if (savedView === 'table') setView(savedView);
+    } catch {
+      // localStorage를 읽을 수 없으면 기본 카드 보기를 유지한다.
+    }
+
+    sortButtons.forEach((button) => {
+      button.addEventListener('click', () => {
+        if (!rowsContainer) return;
+
+        const key = button.dataset.sort;
+        if (key !== 'category' && key !== 'updated') return;
+
+        const header = button.closest<HTMLTableCellElement>('th');
+        const currentDirection = header?.getAttribute('aria-sort');
+        const direction = currentDirection === 'ascending' ? 'descending' : 'ascending';
+        const directionFactor = direction === 'ascending' ? 1 : -1;
+        const rows = Array.from(rowsContainer.rows);
+
+        rows.sort((a, b) => {
+          let result = 0;
+
+          if (key === 'category') {
+            result = collator.compare(a.dataset.category ?? '', b.dataset.category ?? '');
+          } else {
+            const aUpdated = Number(a.dataset.updated);
+            const bUpdated = Number(b.dataset.updated);
+            const aMissing = !a.dataset.updated;
+            const bMissing = !b.dataset.updated;
+
+            if (aMissing !== bMissing) return aMissing ? 1 : -1;
+            result = aUpdated - bUpdated;
+          }
+
+          if (result === 0) {
+            return Number(a.dataset.originalIndex) - Number(b.dataset.originalIndex);
+          }
+          return result * directionFactor;
+        });
+
+        rowsContainer.append(...rows);
+
+        catalog.querySelectorAll<HTMLTableCellElement>('[data-sort-header]').forEach((sortHeader) => {
+          const active = sortHeader === header;
+          sortHeader.setAttribute('aria-sort', active ? direction : 'none');
+          const icon = sortHeader.querySelector<HTMLElement>('.catalog-table__sort-icon');
+          if (icon) icon.textContent = active ? (direction === 'ascending' ? '↑' : '↓') : '↕';
+        });
+
+        if (sortStatus) {
+          const label = key === 'category' ? '카테고리' : '최근 수정일';
+          sortStatus.textContent = `${label} ${direction === 'ascending' ? '오름차순' : '내림차순'}으로 정렬했습니다.`;
+        }
+      });
+    });
+  });
+</script>
 
 <style>
   /* 의미 팔레트 — mermaid classDef · DeckMap과 같은 여섯 색 */
@@ -134,8 +310,68 @@ const formatDate = (date: Date) =>
 
   .catalog {
     display: grid;
-    gap: 2.75rem;
+    gap: 1.5rem;
     margin-top: 1rem;
+  }
+
+  .catalog__toolbar {
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    gap: 0.65rem;
+  }
+  .catalog__toolbar-label {
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--sl-color-gray-3);
+  }
+  .catalog__view-switch {
+    display: inline-flex;
+    padding: 0.2rem;
+    border: 1px solid var(--sl-color-gray-5);
+    border-radius: 0.6rem;
+    background: var(--sl-color-gray-7);
+  }
+  .catalog__view-button {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    min-height: 2rem;
+    padding: 0.3rem 0.65rem;
+    border: 0;
+    border-radius: 0.4rem;
+    background: transparent;
+    color: var(--sl-color-gray-2);
+    font: inherit;
+    font-size: 0.8rem;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .catalog__view-button svg {
+    width: 0.9rem;
+    height: 0.9rem;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.4;
+  }
+  .catalog__view-button[aria-pressed='true'] {
+    background: var(--sl-color-bg);
+    color: var(--sl-color-white);
+    box-shadow: 0 1px 3px color-mix(in srgb, var(--sl-color-black) 12%, transparent);
+  }
+  .catalog__view-button:focus-visible,
+  .catalog-table__sort:focus-visible,
+  .catalog-table__deck:focus-visible {
+    outline: 2px solid var(--sl-color-accent-high);
+    outline-offset: 2px;
+  }
+
+  [data-catalog-view='cards'] {
+    display: grid;
+    gap: 2.75rem;
+  }
+  [data-catalog-view][hidden] {
+    display: none;
   }
 
   .catalog__head {
@@ -237,7 +473,168 @@ const formatDate = (date: Date) =>
     color: var(--sl-color-gray-3);
   }
 
+  .catalog-table-wrap {
+    max-width: 100%;
+    overflow-x: auto;
+    border: 1px solid var(--sl-color-gray-5);
+    border-radius: 0.75rem;
+    background: var(--sl-color-bg);
+  }
+  .catalog-table {
+    width: 100%;
+    min-width: 43rem;
+    border: 0;
+    border-collapse: collapse;
+    margin: 0;
+    font-size: 0.86rem;
+  }
+  .catalog-table :is(th, td) {
+    border: 0;
+    border-bottom: 1px solid var(--sl-color-gray-6);
+    padding: 0.75rem 0.85rem;
+    text-align: start;
+    vertical-align: middle;
+  }
+  .catalog-table thead th {
+    position: sticky;
+    top: 0;
+    background: var(--sl-color-gray-7);
+    color: var(--sl-color-gray-2);
+    font-size: 0.75rem;
+    font-weight: 650;
+    white-space: nowrap;
+  }
+  .catalog-table tbody tr:last-child :is(th, td) {
+    border-bottom: 0;
+  }
+  .catalog-table tbody tr:hover {
+    background: color-mix(in srgb, var(--sl-color-accent-low) 35%, transparent);
+  }
+  .catalog-table tbody th {
+    width: 52%;
+    font-weight: inherit;
+  }
+  .catalog-table__sort {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    margin: -0.3rem;
+    padding: 0.3rem;
+    border: 0;
+    border-radius: 0.3rem;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    cursor: pointer;
+  }
+  .catalog-table__sort:hover {
+    color: var(--sl-color-white);
+    background: var(--sl-color-gray-6);
+  }
+  .catalog-table__sort-icon {
+    display: inline-grid;
+    place-items: center;
+    width: 1rem;
+    color: var(--sl-color-gray-3);
+    font-size: 0.85rem;
+  }
+  [aria-sort='ascending'] .catalog-table__sort-icon,
+  [aria-sort='descending'] .catalog-table__sort-icon {
+    color: var(--sl-color-accent-high);
+  }
+  .catalog-table__deck {
+    display: flex;
+    align-items: center;
+    gap: 0.65rem;
+    color: inherit;
+    text-decoration: none;
+  }
+  .catalog-table__icon {
+    flex: none;
+    display: grid;
+    place-items: center;
+    width: 2rem;
+    height: 2rem;
+    border-radius: 0.45rem;
+    background: var(--dc-bg);
+    color: var(--dc-fg);
+  }
+  .catalog-table__icon[data-tone='key'],
+  .catalog-table__category[data-tone='key'] { --dc-bg: #dbeafe; --dc-fg: #1e3a8a; }
+  .catalog-table__icon[data-tone='ok'],
+  .catalog-table__category[data-tone='ok'] { --dc-bg: #dcfce7; --dc-fg: #14532d; }
+  .catalog-table__icon[data-tone='warn'],
+  .catalog-table__category[data-tone='warn'] { --dc-bg: #fef3c7; --dc-fg: #78350f; }
+  .catalog-table__icon[data-tone='bad'],
+  .catalog-table__category[data-tone='bad'] { --dc-bg: #fee2e2; --dc-fg: #7f1d1d; }
+  .catalog-table__icon[data-tone='zone'],
+  .catalog-table__category[data-tone='zone'] { --dc-bg: #ede9fe; --dc-fg: #4c1d95; }
+  .catalog-table__icon[data-tone='mute'],
+  .catalog-table__category[data-tone='mute'] { --dc-bg: #f1f5f9; --dc-fg: #334155; }
+  :global([data-theme='dark']) .catalog-table__icon[data-tone='key'],
+  :global([data-theme='dark']) .catalog-table__category[data-tone='key'] { --dc-bg: #1e3a8a; --dc-fg: #bfdbfe; }
+  :global([data-theme='dark']) .catalog-table__icon[data-tone='ok'],
+  :global([data-theme='dark']) .catalog-table__category[data-tone='ok'] { --dc-bg: #14532d; --dc-fg: #bbf7d0; }
+  :global([data-theme='dark']) .catalog-table__icon[data-tone='warn'],
+  :global([data-theme='dark']) .catalog-table__category[data-tone='warn'] { --dc-bg: #78350f; --dc-fg: #fde68a; }
+  :global([data-theme='dark']) .catalog-table__icon[data-tone='bad'],
+  :global([data-theme='dark']) .catalog-table__category[data-tone='bad'] { --dc-bg: #7f1d1d; --dc-fg: #fecaca; }
+  :global([data-theme='dark']) .catalog-table__icon[data-tone='zone'],
+  :global([data-theme='dark']) .catalog-table__category[data-tone='zone'] { --dc-bg: #4c1d95; --dc-fg: #ddd6fe; }
+  :global([data-theme='dark']) .catalog-table__icon[data-tone='mute'],
+  :global([data-theme='dark']) .catalog-table__category[data-tone='mute'] { --dc-bg: #334155; --dc-fg: #cbd5e1; }
+  .catalog-table__name {
+    display: block;
+    color: var(--sl-color-white);
+    font-weight: 600;
+    line-height: 1.35;
+  }
+  .catalog-table__deck:hover .catalog-table__name {
+    color: var(--sl-color-accent-high);
+  }
+  .catalog-table__blurb {
+    display: block;
+    margin-top: 0.15rem;
+    overflow: hidden;
+    color: var(--sl-color-gray-3);
+    font-size: 0.75rem;
+    font-weight: 400;
+    line-height: 1.4;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .catalog-table__category {
+    display: inline-block;
+    padding: 0.16rem 0.48rem;
+    border-radius: 999px;
+    background: var(--dc-bg);
+    color: var(--dc-fg);
+    font-size: 0.72rem;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+  .catalog-table__chapters,
+  .catalog-table__date {
+    color: var(--sl-color-gray-2);
+    white-space: nowrap;
+  }
+
+  .sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+  }
+
   @media (max-width: 30rem) {
+    .catalog__toolbar {
+      justify-content: space-between;
+    }
     .catalog__grid {
       grid-template-columns: 1fr;
     }

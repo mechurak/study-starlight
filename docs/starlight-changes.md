@@ -17,7 +17,7 @@
 | Markdown 프로세서 | 이미지 확대 호환을 위해 `unified()` 명시 | `astro.config.mjs` |
 | 검색 결과에 덱 이름 표시 | `MarkdownContent` 컴포넌트 override | `src/components/layout/MarkdownContent.astro` |
 | 덱 index 별칭 검색 | manifest의 `aliases`를 본문 앞에 표시 | `src/data/decks.mjs` · `MarkdownContent.astro` |
-| 랜딩 덱 최종 수정일 | 빌드 전 전체 Git 이력 확보 + Starlight API로 덱 문서의 최신 커밋일 계산 | `scripts/prepare-git-history.mjs` · `src/components/docs/DeckCatalog.astro` |
+| 랜딩 덱 카탈로그 | 카테고리 카드/테이블 전환 + 카테고리·최근 수정일 정렬 + Git 이력으로 수정일 계산 | `scripts/prepare-git-history.mjs` · `src/components/docs/DeckCatalog.astro` |
 | 본문 폰트 Pretendard | `customCss` (dynamic subset) | `astro.config.mjs` |
 | 본문 폭 45→55rem | `--sl-content-width` | `src/styles/custom.css` |
 | 검색 덱 라벨 위치·모양 | Pagefind UI 태그 칩 재스타일 | `src/styles/custom.css` |
@@ -95,12 +95,17 @@ Pagefind JS API(`debouncedSearch` → `result.data()` → meta로 그룹핑)로 
 이 접근법 요약을 출발점으로 삼으면 된다 — 모달 셸(버튼·Ctrl+K·dialog)은 기본
 `Search.astro`에서 복사하고, 결과 영역만 자체 렌더러로 바꾸는 구조였다.
 
-## 랜딩 덱 최종 수정일
+## 랜딩 덱 카탈로그와 최종 수정일
 
 `DeckCatalog.astro`는 Starlight가 페이지의 마지막 업데이트를 구할 때 쓰는
 `virtual:starlight/git-info`의 `getNewestCommitDate()`를 재사용한다. 각 덱의 index와 장 문서 중
 가장 최근 커밋일을 카드의 **마지막 수정**으로 표시한다. 파일 시스템 mtime은 배포 체크아웃 때
 바뀌므로 사용하지 않는다.
+
+랜딩의 보기 전환으로 카테고리 카드와 전체 덱 테이블을 오갈 수 있다. 선택한 보기는
+`localStorage` 키 `deck-catalog-view`에 저장한다. 테이블은 카테고리와 최근 수정일을 제목행
+버튼으로 정렬하며, 한 번 더 누르면 오름차순·내림차순을 바꾼다. 수정일이 없는 덱은
+정렬 방향과 관계없이 마지막에 둔다.
 
 기댄 내부 동작 (0.41.x 기준으로 확인):
 
