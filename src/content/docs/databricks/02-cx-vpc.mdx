@@ -1,0 +1,145 @@
+---
+title: "2. CX/DX와 우리 VPC"
+description: Cloud Exchange와 AWS Direct Connect를 가정한 사내망, VPC, Databricks private connectivity 설계
+aliases: [CX망, Cloud Exchange, AWS Direct Connect, DX, PrivateLink]
+reviewedAt: 2026-08-18
+status: review
+---
+
+import { LinkCard } from '@astrojs/starlight/components';
+import TermIntro from '../../../components/docs/TermIntro.astro';
+
+> 질문에 대한 짧은 답: **대체로 맞지만, 데이터가 VPC에 있는 것이 아니라 Databricks compute에서 data source까지 private reachability가 있어야 한다.**
+
+<TermIntro
+  terms={[
+    ['CX', 'Cloud Exchange', '이 덱에서는 통신사·코로케이션을 통해 사내 회선을 AWS Direct Connect에 연결하는 서비스를 뜻한다.'],
+    ['DX', 'AWS Direct Connect', '사내 network와 AWS를 전용 연결하는 서비스다. private VIF 또는 transit VIF로 VPC 경로를 만든다.'],
+    ['TGW', 'AWS Transit Gateway', '여러 VPC와 DX/VPN 연결을 hub처럼 모아 route를 전달한다.'],
+    ['PrivateLink', 'AWS PrivateLink', 'VPC endpoint와 endpoint service 사이를 private IP 경로로 잇는다. 사용 방향을 함께 적어야 한다.'],
+  ]}
+/>
+
+## 권장 큰 그림
+
+```mermaid
+flowchart LR
+    subgraph corp["사내망"]
+        USER["사용자 · BI"]
+        DB["업무 DB"]
+        DNS["사내 DNS"]
+    end
+    subgraph carrier["전용 연결"]
+        CX["Cloud Exchange"] --> DX["AWS Direct Connect"]
+    end
+    subgraph aws["회사 AWS 계정"]
+        DXGW["DX Gateway"] --> TGW["Transit Gateway"]
+        subgraph vpc["Databricks customer-managed VPC"]
+            FE["Front-end PrivateLink endpoint"]
+            BE["Back-end PrivateLink endpoints"]
+            COMP["Private subnets<br/>Classic compute"]
+            S3EP["S3 gateway endpoint"]
+            R53["Route 53 Resolver"]
+        end
+        S3["S3 Delta data"]
+    end
+    CTRL["Databricks control plane"]
+
+    USER --> CX
+    DB --> CX
+    CX --> DX --> DXGW
+    DXGW --> TGW
+    TGW --> FE
+    TGW --> COMP
+    DNS <--> R53
+    USER --> FE --> CTRL
+    COMP --> BE --> CTRL
+    COMP --> S3EP --> S3
+    COMP --> TGW --> DXGW --> DX --> CX --> DB
+
+    classDef key  fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
+    classDef ok   fill:#dcfce7,stroke:#16a34a,color:#14532d
+    classDef warn fill:#fef3c7,stroke:#d97706,color:#78350f
+    classDef zone fill:#ede9fe,stroke:#7c3aed,color:#4c1d95
+    class USER,DB,DNS key
+    class CX,DX,DXGW,TGW warn
+    class FE,BE,COMP,S3EP,R53,S3 ok
+    class CTRL zone
+```
+
+`USER → workspace`와 `compute → data`는 별도 흐름이다. 사용자가 private URL로 workspace에
+접속할 수 있어도 compute가 DB나 S3에 갈 수 있다는 뜻은 아니다. 반대로 scheduled job은 정상인데
+사내 browser가 workspace URL을 못 여는 경우도 생긴다.
+
+## "우리 VPC에 있으면 된다"를 정확히 바꾸면
+
+다음 다섯 조건이 모두 맞아야 한다.
+
+1. Databricks classic workspace가 **customer-managed VPC**를 사용한다.
+2. compute subnet에서 target S3·RDS·온프렘 DB까지 route가 있다.
+3. security group, NACL, 사내 firewall과 target ACL이 필요한 port를 양방향 return path까지 허용한다.
+4. DNS가 private hostname을 올바른 private IP로 해석한다.
+5. IAM role과 Unity Catalog가 해당 bucket·table을 읽거나 쓸 권한을 부여한다.
+
+이 중 1~4는 network reachability이고 5는 data authorization이다. 두 층을 한 규칙으로 합치지 않는다.
+
+## 데이터 위치별 경로
+
+| 실제 데이터 위치 | compute의 접근 경로 | 권장 사용 |
+|---|---|---|
+| 회사 S3 | VPC의 S3 endpoint → S3 | 분석용 원본·Delta table의 기본 위치 |
+| 같은/연결된 VPC의 RDS·service | local route, TGW 또는 peering | 작은 reference data, 운영 source의 제한적 read |
+| 온프렘 DB | VPC → TGW/DXGW → DX/CX → 사내망 | 초기 ingestion, 규제로 원본 이동이 어려운 경우 |
+| Databricks serverless에서 내부 resource | NCC → 승인된 PrivateLink endpoint pattern | resource별 지원과 NLB/endpoint 구성을 확인한 뒤 사용 |
+
+:::caution[함정]
+온프렘 DB를 매 dashboard query마다 CX/DX 너머로 읽으면 회선 latency, source 부하, 장애 전파가
+분석 서비스에 그대로 들어온다. 일반적으로는 **증분 ingestion으로 S3에 분석 copy를 만들고** 반복
+분석은 그 copy에서 수행한다.
+:::
+
+## PrivateLink도 세 종류다
+
+| 방향 | 무엇을 보호하는가 | 이 기준안에서의 역할 |
+|---|---|---|
+| inbound front-end | 사내 사용자·API client → Databricks workspace | public workspace 접근을 막고 CX/DX 경로로 UI·API 사용 |
+| classic back-end | VPC의 classic compute → Databricks control plane | compute가 public internet 없이 API와 SCC relay에 연결 |
+| serverless outbound | Databricks serverless → 회사 resource | NCC에 private endpoint rule을 두어 승인 resource에 연결 |
+
+완전 private classic 구성을 원하면 front-end와 back-end PrivateLink만 볼 것이 아니라 S3, STS,
+Kinesis 같은 필수 AWS service endpoint와 egress firewall도 함께 확인한다.
+
+## CX/DX가 해결하지 않는 것
+
+- DX는 기본적으로 전용 network path이지 자동 암호화 장치가 아니다. 조직 요구에 따라 MACsec,
+  IPsec VPN 또는 application TLS를 검토한다.
+- 한 회선만 두면 장애 시 private path가 사라진다. 이중 connection·서로 다른 location과 VPN backup을
+  business RTO에 맞춰 설계한다.
+- 사내와 VPC CIDR가 겹치면 TGW/DX route가 성립하지 않는다.
+- DNS conditional forwarding과 Route 53 Resolver가 없으면 IP reachability가 있어도 private hostname이
+  public address로 풀리거나 아예 해석되지 않는다.
+- bandwidth가 충분해도 매번 full table을 가져오면 source와 비용이 버티지 못한다. CDC·증분 watermarks를
+  ingestion 설계에 넣는다.
+
+## 네트워크팀에 줄 확인표
+
+- CX가 실제로 AWS DX의 hosted connection인지, private VIF인지 transit VIF인지 확인한다.
+- DX gateway가 VGW 또는 TGW 중 어디에 연결되는지 확인한다.
+- 사내·shared network·Databricks VPC CIDR가 겹치지 않는지 확인한다.
+- compute subnet → DB port, S3 endpoint, Databricks back-end endpoint 경로를 각각 추적한다.
+- user → front-end endpoint와 사내 DNS conditional forwarding을 별도로 검증한다.
+- primary·secondary 회선 failover와 route preference를 실제로 시험한다.
+
+## 참고 자료
+
+- [AWS Direct Connect 개요](https://docs.aws.amazon.com/directconnect/latest/UserGuide/Welcome.html) — private·public·transit VIF의 공식 역할.
+- [AWS Direct Connect gateways](https://docs.aws.amazon.com/directconnect/latest/UserGuide/direct-connect-gateways-intro.html) — DX gateway와 VGW·TGW 연결 구조.
+- [Databricks PrivateLink concepts](https://docs.databricks.com/aws/en/security/network/concepts/privatelink-concepts) — inbound, classic back-end, serverless outbound의 세 방향.
+- [Configure classic private connectivity](https://docs.databricks.com/aws/en/security/network/classic/privatelink) — customer-managed VPC와 endpoint·security group 요구사항.
+- [Configure DNS for inbound PrivateLink](https://docs.databricks.com/aws/en/security/network/classic/privatelink-dns) — 사내 DNS, Route 53 Resolver, DX/VPN 연결 점검.
+
+<LinkCard
+  title="3. S3·Delta·Unity Catalog"
+  description="private path의 끝에 실제 데이터를 어떻게 배치하고 두 겹의 권한으로 보호하는지 본다."
+  href="/databricks/03-data-foundation/"
+/>

@@ -1,0 +1,118 @@
+---
+title: "3. S3·Delta·Unity Catalog"
+description: 회사 S3에 분석 데이터를 두고 Delta table과 Unity Catalog로 수명주기와 권한을 관리하는 법
+reviewedAt: 2026-08-18
+status: review
+---
+
+import { LinkCard } from '@astrojs/starlight/components';
+import TermIntro from '../../../components/docs/TermIntro.astro';
+
+> network가 길을 열면 **S3가 실제 bytes를 보관하고, Delta가 table의 일관성을 만들며,
+> Unity Catalog가 누가 무엇을 할 수 있는지 결정한다**
+
+<TermIntro
+  terms={[
+    ['managed table', 'Managed table', 'Unity Catalog가 metadata뿐 아니라 underlying file의 배치와 삭제 lifecycle까지 관리하는 table이다.'],
+    ['external table', 'External table', 'Unity Catalog가 권한과 metadata를 관리하지만 underlying S3 file lifecycle은 회사나 외부 system이 관리한다.'],
+    ['storage credential', 'Storage credential', 'Unity Catalog가 S3에 접근할 때 사용할 AWS IAM role을 나타내는 securable object다.'],
+    ['external location', 'External location', 'storage credential과 허용할 S3 path를 묶어 catalog에서 권한을 부여할 수 있게 한 object다.'],
+  ]}
+/>
+
+## 전체 중 이 장의 자리
+
+```mermaid
+flowchart TB
+    USER["사용자 · job"] --> UC["Unity Catalog<br/>catalog.schema.table 권한"]
+    UC --> CRED["Storage credential<br/>AWS IAM role"]
+    UC --> LOC["External location<br/>s3://bucket/prefix"]
+    CRED --> IAM["IAM trust + policy"]
+    LOC --> S3["회사 S3"]
+    IAM --> S3
+    S3 --> DELTA["Parquet data files<br/>+ Delta transaction log"]
+
+    classDef key  fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
+    classDef ok   fill:#dcfce7,stroke:#16a34a,color:#14532d
+    classDef warn fill:#fef3c7,stroke:#d97706,color:#78350f
+    classDef zone fill:#ede9fe,stroke:#7c3aed,color:#4c1d95
+    class USER key
+    class UC zone
+    class CRED,LOC,IAM warn
+    class S3,DELTA ok
+```
+
+이 장을 읽고 나면 "우리 S3에 두면서 Databricks로 governance할 수 있는가"와 "IAM만 설정하면
+충분한가"에 답할 수 있다.
+
+## 데이터는 회사 cloud account에 둔다
+
+Unity Catalog managed table을 써도 underlying data는 회사 cloud account의 storage에 있고 회사가
+소유한다. managed와 external의 차이는 소유권보다 **누가 storage layout과 삭제 lifecycle을
+책임지는가**다.
+
+| 선택 | Unity Catalog가 관리 | 회사가 직접 관리 | 잘 맞는 자리 |
+|---|---|---|---|
+| Managed table | 권한, metadata, lineage, file lifecycle·최적화 | bucket·KMS·상위 IAM 경계 | 새로 만드는 정제·업무 table의 기본값 |
+| External table | 권한, metadata, lineage | S3 path와 file lifecycle | 기존 data lake, 다른 engine과 공유하는 data |
+| External volume | file 단위 권한과 path | file 내용·lifecycle | model file, document, 비정형 data |
+
+새 table은 managed를 기본으로 두고, 이미 다른 system이 ownership을 가진 S3 path나 engine 간 공유가
+필요할 때 external을 선택하면 책임 경계가 선명하다.
+
+## IAM과 Unity Catalog는 대체 관계가 아니다
+
+IAM role은 AWS가 "이 principal이 이 bucket prefix에 접근 가능한가"를 검사한다. Unity Catalog는
+"이 Databricks user가 이 catalog·schema·table·column을 사용할 수 있는가"를 검사한다.
+
+```text
+사용자 SELECT
+  → Unity Catalog: table 권한 확인
+  → storage credential: 사용할 IAM role 결정
+  → AWS IAM/KMS: S3 object read와 decrypt 허용 여부 확인
+  → data 반환
+```
+
+compute instance profile을 user마다 넓게 나눠 주거나 notebook에 access key를 넣지 않는다. S3 external
+location에는 최소 권한 IAM role을 연결하고, 사람과 service principal에는 table 수준 권한을 부여한다.
+
+## catalog 구조는 조직 구조보다 data contract를 따른다
+
+Unity Catalog의 이름은 `catalog.schema.object` 세 단계다. workspace와 catalog를 팀 수만큼 기계적으로
+늘리는 대신 environment, data domain, ownership을 반영한다.
+
+```text
+prod_customer.raw.crm_account
+prod_customer.curated.customer
+prod_sales.mart.daily_revenue
+```
+
+한 예로 catalog는 `prod_customer` 같은 environment·domain 경계, schema는 `raw`·`curated`·`mart`
+같은 책임 경계로 잡을 수 있다. 실제 규칙은 회사의 data ownership과 배포 단위를 따라야 한다.
+
+## S3 layout에서 지킬 것
+
+- workspace root bucket과 business data bucket의 역할을 분리한다.
+- dev·stage·prod의 write path와 IAM role을 분리한다.
+- bucket versioning, KMS key policy, lifecycle, access logging을 보안 기준에 맞춘다.
+- raw source는 가능한 immutable하게 보존하고 정제 결과는 reproducible pipeline으로 만든다.
+- 사람이 S3 console에서 Delta table file을 직접 수정하거나 삭제하지 못하게 한다.
+- region을 workspace·metastore·S3와 맞춰 latency와 cross-region transfer를 줄인다.
+
+:::caution[권한 우회]
+Unity Catalog table 권한을 촘촘히 만들고도 사용자가 같은 S3 path를 IAM으로 직접 읽을 수 있으면
+catalog의 row·column 통제를 우회할 수 있다. storage role과 사람 role을 분리하고 direct S3 access를
+최소화한다.
+:::
+
+## 참고 자료
+
+- [Connect to an AWS S3 external location](https://docs.databricks.com/aws/en/connect/unity-catalog/cloud-storage/s3/) — storage credential과 external location의 공식 구성.
+- [Managed versus external assets](https://docs.databricks.com/aws/en/data-governance/unity-catalog/managed-versus-external) — 두 asset의 lifecycle 책임과 고객 data ownership.
+
+<LinkCard
+  title="4. Source에서 Gold table까지"
+  description="온프렘 DB와 file을 반복 query하지 않고 증분으로 S3에 옮겨 품질 계층을 만든다."
+  href="/databricks/04-data-flow/"
+/>
+

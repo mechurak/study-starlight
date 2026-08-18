@@ -353,6 +353,22 @@ export const deckDefinitions = [
 			['마무리', ['gpu-platform/08-wrapup']],
 		],
 	},
+	{
+		slug: 'databricks',
+		topicOrder: 15,
+		label: 'Databricks',
+		title: 'Databricks on AWS',
+		icon: 'seti:db',
+		aliases: ['AWS Databricks', '데이터브릭스', 'Lakehouse', 'CX망 Databricks'],
+		description: '사내 데이터를 AWS lakehouse로 가져온다 — CX/DX, VPC, S3, Unity Catalog와 운영 경계.',
+		category: 'platform',
+		groups: [
+			['시작', ['databricks/00-position', 'databricks/01-architecture']],
+			['네트워크와 데이터', ['databricks/02-cx-vpc', 'databricks/03-data-foundation', 'databricks/04-data-flow']],
+			['소비와 통제', ['databricks/05-consumption', 'databricks/06-security', 'databricks/07-operations']],
+			['도입', ['databricks/08-adoption']],
+		],
+	},
 ];
 
 export const topics = [...deckDefinitions].sort((a, b) => a.topicOrder - b.topicOrder).map((deck) => ({
@@ -382,6 +398,7 @@ export const termIntroDeckSlugs = [
 	'rl',
 	'gpustack',
 	'gpu-platform',
+	'databricks',
 ];
 
 export const deckCatalogSections = categories.map((category) => ({

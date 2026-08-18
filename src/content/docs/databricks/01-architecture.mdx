@@ -1,0 +1,119 @@
+---
+title: "1. 세 plane과 두 compute"
+description: Databricks control plane, classic compute, serverless compute와 회사 S3의 경계
+reviewedAt: 2026-08-18
+status: review
+---
+
+import { LinkCard } from '@astrojs/starlight/components';
+import TermIntro from '../../../components/docs/TermIntro.astro';
+
+> "Databricks가 AWS에서 돈다"는 말은 맞지만, **어떤 compute를 고르느냐에 따라 실행 계정과
+> network path가 달라진다**
+
+<TermIntro
+  terms={[
+    ['control plane', 'Control plane', 'workspace UI, REST API와 orchestration 같은 Databricks 관리 기능이 있는 영역이다.'],
+    ['classic compute plane', 'Classic compute plane', '회사 AWS 계정의 VPC에서 EC2 기반 compute가 실행되는 영역이다.'],
+    ['serverless compute plane', 'Serverless compute plane', 'Databricks가 관리하는 account와 network에서 compute가 실행되는 영역이다.'],
+    ['workspace', 'Workspace', '사용자가 notebook·SQL·job·compute를 함께 다루는 협업·운영 경계다.'],
+  ]}
+/>
+
+## 전체 중 이 장의 자리
+
+```mermaid
+flowchart TB
+    subgraph databricks["Databricks 관리 영역"]
+        CTRL["Control plane<br/>UI · API · orchestration"]
+        UC["Unity Catalog metastore<br/>권한 · metadata · lineage"]
+        SV["Serverless compute plane<br/>Databricks 관리 compute"]
+    end
+    subgraph customer["회사 AWS 계정"]
+        CL["Classic compute plane<br/>EC2 in customer-managed VPC"]
+        S3["S3<br/>managed · external data"]
+        DB["RDS · 내부 API"]
+    end
+    ONP["온프렘 DB"]
+
+    CTRL --> CL
+    CTRL --> SV
+    CL --> S3
+    CL --> DB
+    CL --> ONP
+    SV -. "NCC · 허용된 private/public path" .-> S3
+    SV -.-> DB
+    UC -. "논리 권한" .-> S3
+
+    classDef key  fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
+    classDef ok   fill:#dcfce7,stroke:#16a34a,color:#14532d
+    classDef warn fill:#fef3c7,stroke:#d97706,color:#78350f
+    classDef zone fill:#ede9fe,stroke:#7c3aed,color:#4c1d95
+    class CTRL,UC zone
+    class SV warn
+    class CL,S3,DB ok
+    class ONP key
+```
+
+이 장의 질문은 두 개다. "우리 AWS 계정에서 실제로 생성되는 resource는 무엇인가", 그리고
+"CX/DX를 통해 온프렘에 바로 갈 compute는 무엇인가"다.
+
+## control plane과 데이터 처리 분리
+
+control plane에는 workspace web application, API와 관리 기능이 있다. notebook의 code와 SQL을
+실제로 실행하는 것은 compute plane이다. 이 분리는 UI 주소가 어디에 있는지와 data traffic이 어디로
+흐르는지를 따로 설계해야 한다는 뜻이다.
+
+classic workspace에는 회사 AWS 계정의 workspace storage bucket도 있다. 그러나 이를 모든 business
+data를 무분별하게 쌓는 bucket으로 보지 않는다. Unity Catalog의 managed storage와 external location을
+별도 bucket·prefix와 IAM role로 설계하는 편이 ownership과 lifecycle을 분명하게 만든다.
+
+## classic과 serverless 비교
+
+| 판단 | Classic compute | Serverless compute |
+|---|---|---|
+| 실행 위치 | 회사 AWS account의 VPC | Databricks 관리 compute plane |
+| VPC route·SG 통제 | 회사가 직접 통제 | 회사 VPC route를 자동 상속하지 않음 |
+| 온프렘 DX 접근 | VPC/TGW route로 자연스럽게 구성 | NCC와 지원되는 private endpoint pattern을 별도 설계 |
+| 준비·운영 | subnet IP, EC2 quota, policy와 시작 시간 관리 | infrastructure 운영을 Databricks가 더 많이 담당 |
+| 적합한 첫 workload | 민감한 hybrid source, custom network control | 빠른 SQL·job·notebook, 운영 단순화 |
+| 확인할 것 | egress, PrivateLink, subnet 크기, cluster policy | NCC, egress policy, resource별 private connectivity 지원 |
+
+:::tip[이 덱의 기준 선택]
+온프렘 DB가 CX/DX 뒤에 있고 private route만 허용한다면 첫 PoC는 **classic compute를 customer-managed
+VPC에 두는 안**이 가장 설명하기 쉽다. S3에 분석 copy가 안정적으로 자리 잡은 뒤 serverless SQL이나
+job을 workload별로 검토한다.
+:::
+
+## 둘을 섞어도 된다
+
+workspace 하나에서 모든 compute를 같은 방식으로 고를 필요는 없다. 예를 들어 classic job이 온프렘
+DB에서 증분 data를 읽어 S3 Delta table에 적재하고, serverless SQL warehouse가 허용된 S3 table을
+조회할 수 있다. 다만 같은 table을 본다고 해서 network policy까지 같은 것은 아니다.
+
+```mermaid
+sequenceDiagram
+    participant DB as 온프렘 DB
+    participant C as Classic ingest job
+    participant S3 as 회사 S3 Delta
+    participant UC as Unity Catalog
+    participant S as Serverless SQL
+    DB->>C: CX/DX private route로 증분 read
+    C->>S3: Bronze/Silver write
+    C->>UC: table·lineage 반영
+    S->>UC: SELECT 권한 확인
+    S->>S3: 허용된 storage path read
+```
+
+## 참고 자료
+
+- [Databricks high-level architecture](https://docs.databricks.com/aws/en/getting-started/high-level-architecture) — classic과 serverless compute의 공식 실행 위치.
+- [Databricks network deployment guide](https://docs.databricks.com/aws/en/lakehouse-architecture/deployment-guide/network) — compute model별 network control 차이.
+- [Configure a customer-managed VPC](https://docs.databricks.com/aws/en/security/network/classic/customer-managed-vpc) — VPC, subnet, security group 등록 요구사항.
+
+<LinkCard
+  title="2. CX/DX와 우리 VPC"
+  description="사내 사용자 경로와 data source 경로를 분리해 ‘VPC에 있으면 되는가’를 답한다."
+  href="/databricks/02-cx-vpc/"
+/>
+

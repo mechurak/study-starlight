@@ -1,0 +1,141 @@
+---
+title: "8. PoC에서 운영으로"
+description: AWS Databricks 도입 결정을 위한 질문, 단계별 PoC와 운영 준비 체크리스트
+reviewedAt: 2026-08-18
+status: review
+---
+
+import { LinkCard } from '@astrojs/starlight/components';
+import TermIntro from '../../../components/docs/TermIntro.astro';
+
+> 첫 PoC의 목표는 demo dashboard가 아니라 **우리 network·권한·data quality·비용 경계 안에서 한
+> data product가 반복 실행되는지 증명하는 것**이다
+
+<TermIntro
+  terms={[
+    ['PoC', 'Proof of Concept', '핵심 기술 가정이 실제 환경에서 성립하는지 제한된 범위로 검증하는 단계다.'],
+    ['SLA', 'Service Level Agreement', 'freshness, availability, latency와 지원 책임에 대한 소비자와 운영자의 약속이다.'],
+    ['acceptance criteria', 'Acceptance criteria', 'PoC가 성공했다고 판단할 측정 가능하고 사전에 합의한 조건이다.'],
+  ]}
+/>
+
+## 먼저 답할 열두 질문
+
+| 영역 | 결정 질문 |
+|---|---|
+| CX/DX | `CX`가 실제로 어떤 DX connection·VIF·gateway에 종단되는가? 이중화됐는가? |
+| network | 사내·shared·Databricks VPC CIDR와 DNS route가 겹치지 않는가? |
+| compute | 온프렘 private source 때문에 classic이 필요한가, serverless private pattern으로 충분한가? |
+| storage | 어떤 S3 bucket·prefix가 raw, managed, external, dev·prod를 맡는가? |
+| identity | IdP group과 Databricks account·workspace group을 누가 provisioning하는가? |
+| governance | catalog·schema·table owner와 승인자는 누구인가? |
+| source | source owner가 허용한 extract 방식, 시간대, QPS와 replica는 무엇인가? |
+| pipeline | delete·late data·schema change·재처리를 어떻게 처리하는가? |
+| consumption | dashboard·ML의 freshness, latency와 concurrency SLA는 무엇인가? |
+| security | public ingress·egress를 어디까지 허용하고 어떤 negative test를 통과해야 하는가? |
+| cost | owner·workload별 월 budget과 중단 threshold는 얼마인가? |
+| operations | incident, access review, data quality와 비용 alert owner는 누구인가? |
+
+## 권장 기준안
+
+```mermaid
+flowchart LR
+    ONP["사내 source"] -->|"CX/DX private route"| CLASSIC["Classic ingest<br/>customer-managed VPC"]
+    CLASSIC --> S3["회사 S3<br/>Delta Bronze/Silver/Gold"]
+    UC["Unity Catalog"] -. "권한 · lineage" .-> S3
+    S3 --> SQL["SQL warehouse · BI"]
+    S3 --> AI["Notebook · ML/AI"]
+    ID["SSO · SCIM"] -.-> UC
+    SEC["IAM · KMS · PrivateLink · audit"] -.-> CLASSIC
+    SEC -.-> S3
+
+    classDef key  fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
+    classDef ok   fill:#dcfce7,stroke:#16a34a,color:#14532d
+    classDef warn fill:#fef3c7,stroke:#d97706,color:#78350f
+    classDef zone fill:#ede9fe,stroke:#7c3aed,color:#4c1d95
+    class ONP,SQL,AI key
+    class CLASSIC,S3 ok
+    class UC zone
+    class ID,SEC warn
+```
+
+이 그림은 최종 정답이 아니라 첫 검증 기준이다. 온프렘 source를 S3로 안정적으로 적재하고 나면 SQL,
+job, serving workload별로 serverless를 추가 검토할 수 있다.
+
+## 단계별 PoC
+
+### 1단계 — 경계와 연결
+
+- account, dev workspace, Unity Catalog metastore를 만든다.
+- customer-managed VPC와 compute subnet, endpoint subnet을 준비한다.
+- CX/DX/TGW route와 DNS를 확인한다.
+- SSO·SCIM, 최소 IAM role, S3 external location을 연결한다.
+- public access를 허용할지 PrivateLink-only로 갈지 보안팀과 결정한다.
+
+**통과 조건:** 승인 user만 workspace에 접속하고 classic compute가 test source와 승인 S3 path만 읽고 쓴다.
+
+### 2단계 — data product 하나
+
+- 대표 source table 하나를 full load 후 증분 수집한다.
+- Bronze 원본, Silver 정제, Gold KPI를 만든다.
+- delete, duplicate, late data, schema change와 재실행을 시험한다.
+- owner·freshness·quality·lineage를 catalog에서 확인한다.
+
+**통과 조건:** 같은 input을 재처리해도 결과가 중복되지 않고, 실패 record와 마지막 정상 시각을 설명한다.
+
+### 3단계 — 소비와 운영
+
+- SQL dashboard 하나와 notebook 또는 ML workload 하나를 연결한다.
+- user group별 table·column 권한과 service principal을 분리한다.
+- compute auto-stop, tag, budget alert와 pipeline alert를 설정한다.
+- primary DX 또는 endpoint 장애를 주입해 runbook을 시험한다.
+
+**통과 조건:** SLA 안에서 복구되고 data·permission·비용 evidence가 남는다.
+
+### 4단계 — production 결정
+
+- classic과 serverless를 workload별로 다시 비교한다.
+- dev·stage·prod, account·workspace·catalog와 AWS account 경계를 확정한다.
+- IaC, CI/CD, access review, DR, support와 운영 RACI를 승인한다.
+- 예상 월비용을 source volume과 concurrency의 상·중·하 시나리오로 계산한다.
+
+## PoC에서 일부러 실패시킬 것
+
+- 권한 없는 group의 민감 column query
+- 허용되지 않은 S3 prefix write
+- 중복 file과 같은 CDC event 재수신
+- source column 추가·type 변경
+- DX primary path 또는 DNS resolver 장애
+- job 중간 종료 후 retry
+- 갑작스러운 dashboard concurrency 증가
+- 퇴사 처리된 user·만료 secret 접근
+
+happy path만 통과한 PoC는 운영 위험을 뒤로 미룬 demo다. 실패했을 때 data가 망가지지 않고, 원인이
+보이며, 정해진 owner가 복구할 수 있어야 한다.
+
+## 최종 답
+
+질문하신 "사내 데이터가 CX망을 통해 우리 VPC에 있으면 되는가"를 설계 문장으로 바꾸면 다음과 같다.
+
+> **CX/DX로 사내망과 customer-managed VPC를 private하게 연결하고, 그 VPC의 classic compute가
+> source와 회사 S3에 도달하게 한다. 분석용 data는 가능하면 S3 Delta table로 적재하며, IAM·KMS와
+> Unity Catalog로 접근을 통제한다. 사용자→workspace와 compute→control plane도 필요하면 각각
+> PrivateLink로 사설화한다.**
+
+즉, 방향은 맞다. 다만 `CX`, `VPC`, `S3`, `compute`, `Unity Catalog`, `PrivateLink`는 서로 대신할 수
+없는 여섯 개의 자리다. 이 자리를 구분하면 보안팀·network팀·data팀이 같은 그림으로 이야기할 수 있다.
+
+## 참고 자료
+
+- [Databricks high-level architecture](https://docs.databricks.com/aws/en/getting-started/high-level-architecture) — 최종 설계에서 plane과 account 경계를 재확인할 기준.
+- [Configure a customer-managed VPC](https://docs.databricks.com/aws/en/security/network/classic/customer-managed-vpc) — classic workspace network의 실제 요구사항.
+- [Databricks PrivateLink concepts](https://docs.databricks.com/aws/en/security/network/concepts/privatelink-concepts) — complete private isolation을 구성하는 세 연결.
+- [Connect to an AWS S3 external location](https://docs.databricks.com/aws/en/connect/unity-catalog/cloud-storage/s3/) — S3 path를 Unity Catalog에 연결하는 공식 절차.
+- [AWS Direct Connect 개요](https://docs.aws.amazon.com/directconnect/latest/UserGuide/Welcome.html) — CX 뒤 AWS 구간의 VIF와 private path 기준.
+
+<LinkCard
+  title="개요로 돌아가기"
+  description="전체 아키텍처와 장별 지도를 다시 한 화면에서 본다."
+  href="/databricks/"
+/>
+
