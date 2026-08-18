@@ -1,0 +1,100 @@
+---
+title: "9. 서비스 중단 없이 옮기기"
+description: "KServe PoC, Spark inference, B300 greenfield, A100 한 대씩 이전과 Backend.AI rollback 단계"
+reviewedAt: 2026-08-18
+status: review
+---
+
+import { Steps, LinkCard } from '@astrojs/starlight/components';
+import TermIntro from '../../../components/docs/TermIntro.astro';
+
+> 마지막 장비를 옮길 때가 아니라 **첫 장비를 되돌릴 수 있을 때** migration이 시작된다
+
+<TermIntro
+  terms={[
+    ['greenfield', '신규 환경', '기존 workload와 data 이전 부담 없이 새 운영 표준으로 처음부터 구성하는 대상이다.'],
+    ['cutover', '전환', '사용자·traffic·job 제출 경로를 기존 환경에서 새 환경으로 바꾸는 시점이다.'],
+    ['rollback', '되돌리기', '합격 조건을 만족하지 못했을 때 기존 endpoint·node·data 경로로 복귀하는 절차다.'],
+    ['shadow traffic', '그림자 트래픽', '사용자 응답에는 쓰지 않고 동일 요청을 새 backend에도 보내 결과·성능을 비교하는 방식이다.'],
+  ]}
+/>
+
+## 순서는 hardware보다 위험을 따른다
+
+<Steps>
+
+1. **기반 PoC** — CPU infra node에 KServe controller를 두고 GPU Operator·registry·CA·storage·관측을 연결한다.
+2. **Spark single serving** — ARM64 vLLM 하나와 FastAPI 하나를 Standard InferenceService로 띄운다.
+3. **LiteLLM end-to-end** — streaming·timeout·alias·fallback·request ID와 rollout drain을 검증한다.
+4. **Spark pool 확대** — replica·node reboot·model cache·잘못된 architecture 배치를 시험한 뒤 열 대로 넓힌다.
+5. **A100 serving 분리** — Backend.AI의 interactive·학습은 유지하고 상시 inference만 KServe로 옮긴다.
+6. **batch·interactive pilot** — Kueue·JobSet·Trainer·Notebook·storage로 대표 사용자 여정을 통과시킨다.
+7. **B300 greenfield** — 별도 node pool에서 full GPU·full-node 기준선과 driver upgrade를 먼저 만든다.
+8. **A100 한 대 이전** — 두 서버 중 한 대만 drain해 Kubernetes에 편입하고 다른 한 대는 rollback 자원으로 둔다.
+9. **기능 parity 확인** — 사용자·project·quota·vfolder·image·audit·portal을 비교한다.
+10. **Backend.AI 축소** — active session과 data가 없고 복구 기간을 지나면 라이선스 범위를 조정한다.
+
+</Steps>
+
+## 두 시스템을 동시에 같은 GPU에 두지 않는다
+
+A100 한 node를 Backend.AI Agent와 Kubernetes kubelet이 함께 소유하게 하지 않는다. 둘 다 container와 GPU
+allocation을 제어하면 resource accounting과 장애 책임이 깨진다.
+
+```text
+backendai-a100-01  → drain session → agent stop → 검증 → kubelet join → k8s-a100-01
+backendai-a100-02  → 기존 운영·rollback 유지
+```
+
+node 단위 cutover가 가장 명확하다. MIG profile·driver·scratch disk도 함께 ownership을 넘긴다.
+
+## PoC 합격표
+
+| 영역 | 합격 질문 |
+|---|---|
+| 재현성 | 빈 node에서 image digest·model checksum으로 같은 service가 생성되는가 |
+| placement | Spark image가 A100/B300에, amd64 image가 Spark에 배치되지 않는가 |
+| serving | streaming·cancel·timeout·rollout·fallback이 LiteLLM까지 동작하는가 |
+| 장애 | Pod kill·node reboot·NIC 단절에서 상태와 복구 시간이 측정되는가 |
+| cold start | image·model·load·compile 시간이 분리돼 보이는가 |
+| queue | 팀별 quota·borrowing·priority·pending reason이 설명 가능한가 |
+| distributed | 일부 Pod만 자원을 잡지 않고 전체 job이 시작·실패·resume하는가 |
+| interactive | Notebook·VSCode·idle 종료·개인 storage가 대표 사용자에게 동작하는가 |
+| 보안 | SSO·namespace RBAC·secret·network policy·audit가 연결되는가 |
+| rollback | 한 A100 node와 한 model endpoint를 기존 환경으로 되돌릴 수 있는가 |
+
+## traffic은 model contract 단위로 옮긴다
+
+1. 같은 model·tokenizer·generation default를 새 KServe service에 배포한다.
+2. golden prompt·embedding vector·classification fixture로 결과를 비교한다.
+3. shadow 또는 내부 사용자 traffic으로 latency·error·memory를 측정한다.
+4. LiteLLM weight를 일부만 새 endpoint로 보낸다.
+5. SLO와 품질 기준을 통과하면 weight를 늘린다.
+6. rollback window 동안 기존 endpoint와 artifact를 유지한다.
+
+GPU 세대가 바뀌면 quantization·kernel·floating-point 결과도 달라질 수 있다. HTTP 200만으로 같은 model
+contract라고 판단하지 않는다.
+
+## B300 도입을 deadline으로 사용한다
+
+B300이 도착한 뒤 platform을 설계하면 신규 장비가 임시 수동 운영으로 굳어진다. 도착 전에 다음을 정한다.
+
+- cluster·node pool·driver ownership
+- full GPU·full-node resource profile
+- image·CUDA·framework 검증 matrix
+- network·RDMA·storage 성능 기준
+- KServe serving과 Trainer job sample
+- burn-in·XID·ECC·NVLink alert
+- firmware·driver·Kubernetes upgrade 순서
+
+## 참고 자료
+
+- [GPU Operator driver upgrade](https://docs.nvidia.com/datacenter/cloud-native/gpu-operator/latest/gpu-driver-upgrades.html) — drain과 rolling upgrade 상태.
+- [KServe canary rollout](https://kserve.github.io/website/docs/model-serving/predictive-inference/rollout-strategies/canary-example) — revision traffic 전환 pattern.
+- [Backend.AI security architecture](https://docs.backend.ai/en/latest/concepts/security.html) — 기존 management·compute zone의 접근 경계.
+
+<LinkCard
+  title="10. 마무리"
+  description="전체 구조, workload 선택표, 도입 체크리스트와 장애 대응 순서를 한 장으로 모은다."
+  href="/gpu-platform/10-wrapup/"
+/>

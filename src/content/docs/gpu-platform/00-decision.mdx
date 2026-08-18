@@ -1,0 +1,102 @@
+---
+title: "0. 왜 Kubernetes-native인가"
+description: "GPUStack을 거치지 않고 KServe·Kueue로 가는 선택의 이득, 비용과 성공 조건"
+reviewedAt: 2026-08-18
+status: review
+---
+
+import { Card, CardGrid, LinkCard } from '@astrojs/starlight/components';
+import TermIntro from '../../../components/docs/TermIntro.astro';
+
+> 선택 C는 제품 하나를 바꾸는 일이 아니라 **GPU 운영의 단일 원본을 Kubernetes API로 옮기는 일**이다
+
+<TermIntro
+  terms={[
+    ['desired state', '원하는 상태', '모델 replica·job·runtime처럼 운영자가 유지하고 싶은 상태. 이 덱에서는 Kubernetes 객체와 Git이 원본이다.'],
+    ['control plane', '제어 평면', '원하는 상태를 읽고 실제 상태를 계속 맞추는 controller 집합이다.'],
+    ['data plane', '데이터 평면', '실제 요청을 처리하거나 학습 계산을 수행하는 Pod와 GPU node다.'],
+    ['platform parity', '플랫폼 기능 동등성', '기존 Backend.AI 사용자가 의존하던 기능을 새 플랫폼에서도 같은 운영 결과로 제공하는 상태다.'],
+  ]}
+/>
+
+## 바꾸려는 것은 실행 명령이 아니다
+
+Docker 기반 GPU manager에서 Kubernetes-native 구성으로 옮길 때 가장 큰 변화는 `docker run`이 Pod가
+되는 것이 아니다. 모델과 job의 원본이 제품 DB에서 Kubernetes 객체로 바뀐다.
+
+| 질문 | 별도 GPU platform | Kubernetes-native |
+|---|---|---|
+| 모델 A의 원하는 replica는 어디에 있나 | 제품 DB·UI | `InferenceService`와 Git |
+| 누가 변경을 승인했나 | 제품 audit log | pull request·Git·Argo CD |
+| 팀별 GPU quota는 어디에 있나 | 제품 resource policy | Kueue ClusterQueue·namespace 정책 |
+| 장애 시 누가 재생성하나 | 제품 agent·controller | Kubernetes·KServe·job controller |
+| 배포·학습·일반 앱의 비밀 관리는 | 각 제품별 | Secret 관리 체계 하나 |
+
+선택 C의 장점은 기능 수가 아니라 **변경·권한·복구의 문법을 통일하는 것**이다.
+
+## 세 workload를 먼저 가른다
+
+<CardGrid>
+<Card title="상시 inference" icon="rocket">
+요청을 기다리며 오래 실행된다.
+
+KServe가 replica·revision·health·route를 관리하고 LiteLLM이 이용자 정책을 맡는다.
+</Card>
+<Card title="기다리는 batch·학습" icon="setting">
+GPU가 없으면 queue에서 기다리고, 자원이 모이면 함께 시작한다.
+
+Kueue가 admission하고 JobSet·Trainer가 lifecycle을 관리한다.
+</Card>
+<Card title="interactive 개발" icon="laptop">
+사람이 Notebook·VSCode·SSH 환경을 열고 닫는다.
+
+세션 UI·idle timeout·개인 storage·image catalog가 필요하다.
+</Card>
+</CardGrid>
+
+KServe는 첫 번째만 푼다. Backend.AI를 종료하려면 나머지 둘을 별도로 채워야 한다.
+
+## GPUStack을 넣지 않는 이유
+
+GPUStack은 여러 GPU worker에서 inference backend를 빠르게 배치하고 model-aware scheduling을 제공한다.
+하지만 목표가 이미 Kubernetes-native로 정해졌다면 별도 model DB·scheduler·gateway는 두 번째 제어
+평면이 된다.
+
+| GPUStack에서 얻던 것 | 이 덱의 대체 방식 |
+|---|---|
+| 모델 deployment UI | Git의 `InferenceService` + 운영 portal은 선택 |
+| backend 선택·실행 | `ServingRuntime`·custom predictor image |
+| GPU placement | node label·taint·affinity·resource flavor·명시적 preset |
+| model route | Service·Gateway API, 상위 공개 alias는 LiteLLM |
+| worker 관측 | DCGM·kube-state-metrics·runtime metric |
+| auto recovery | Kubernetes·KServe controller |
+
+:::caution[잃는 것도 적는다]
+KServe는 model size를 보고 적절한 GPU를 자동 추천하지 않는다. image architecture·CUDA·driver 호환도
+자동으로 보장하지 않는다. GPUStack을 빼는 대신 **검증된 runtime catalog와 배치 preset을 직접 운영**한다.
+:::
+
+## 성공 조건
+
+다음에 모두 답할 수 있을 때 선택 C가 운영 가능한 상태다.
+
+- Git에서 model revision과 replica를 보고 되돌릴 수 있는가
+- Spark·A100·B300용 image가 서로 잘못 배치되지 않는가
+- full GPU·MIG·full-node 요청의 의미가 catalog에 고정됐는가
+- batch job이 GPU를 선점하지 않고 queue에서 공정하게 기다리는가
+- multi-node job의 일부 Pod만 떠서 GPU를 붙잡지 않는가
+- Backend.AI 사용자가 쓰던 Notebook·storage·image·quota 경로가 남아 있는가
+- LiteLLM request ID를 KServe와 vLLM log·metric까지 추적할 수 있는가
+- node drain·driver 변경·model rollback을 실제로 리허설했는가
+
+## 참고 자료
+
+- [KServe 개념](https://kserve.github.io/website/docs/concepts) — Kubernetes CRD로 구성하는 inference control plane.
+- [Kueue 개요](https://kueue.sigs.k8s.io/docs/overview/) — batch admission과 quota의 범위.
+- [Backend.AI 개념](https://docs.backend.ai/en/latest/concepts/index.html) — session·scheduler·resource group·storage 범위.
+
+<LinkCard
+  title="1. 세 종류의 GPU를 자원 섬으로 보기"
+  description="Spark·A100·B300을 GPU 개수 하나로 세지 않고 architecture·topology·운영 단위로 나눈다."
+  href="/gpu-platform/01-fleet/"
+/>

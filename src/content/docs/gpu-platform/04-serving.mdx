@@ -1,0 +1,155 @@
+---
+title: "4. LiteLLM에서 모델 Pod까지"
+description: "LiteLLM·Gateway API·KServe·vLLM·FastAPI의 요청 경계와 GPU별 serving pattern"
+reviewedAt: 2026-08-18
+status: review
+---
+
+import { Tabs, TabItem, LinkCard } from '@astrojs/starlight/components';
+import TermIntro from '../../../components/docs/TermIntro.astro';
+
+> 이용자는 GPU 이름을 모르고, LiteLLM은 Pod 이름을 모르며, KServe는 최종 이용자 quota를 모른다
+
+<TermIntro
+  terms={[
+    ['northbound contract', '상위 API 계약', '사용자에게 약속하는 model name·schema·인증·오류 형식이다.'],
+    ['predictor', '', 'KServe InferenceService에서 실제 model server가 실행되는 핵심 workload다.'],
+    ['revision', '리비전', 'image·model·argument가 함께 바뀐 배포 버전이다.'],
+    ['streaming', '스트리밍', '생성된 token을 응답 완료 전부터 순차 전달하는 LLM 응답 방식이다.'],
+  ]}
+/>
+
+## 요청 경로와 제어 경로
+
+```mermaid
+flowchart TB
+    subgraph request["요청 경로"]
+        direction LR
+        APP["사용자 · 앱"] --> LITE["LiteLLM"]
+        LITE --> GW["Gateway API · Service"]
+        GW --> POD["KServe predictor<br/>vLLM · FastAPI"]
+    end
+    subgraph control["제어 경로"]
+        direction LR
+        PR["Git pull request"] --> ARGO["Argo CD"]
+        ARGO --> ISVC["InferenceService"]
+        ISVC --> DEP["Deployment · Service"]
+    end
+    DEP -.-> POD
+
+    classDef key  fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
+    classDef zone fill:#ede9fe,stroke:#7c3aed,color:#4c1d95
+    classDef ok   fill:#dcfce7,stroke:#16a34a,color:#14532d
+    class APP,LITE,PR,ARGO key
+    class GW,ISVC zone
+    class DEP,POD ok
+```
+
+LiteLLM에는 KServe service endpoint와 내부 model name을 등록한다. Pod IP·node port·Spark 주소는 넣지
+않는다. KServe가 Pod를 교체해도 LiteLLM 설정은 바뀌지 않아야 한다.
+
+## 역할을 한 줄로 고정한다
+
+| 계층 | 소유하는 것 | 소유하지 않는 것 |
+|---|---|---|
+| LiteLLM | 이용자 key·team quota·공개 alias·provider fallback | node·Pod·GPU placement |
+| Gateway API | TLS·host·path·network route | 이용자별 token budget |
+| KServe | runtime·model revision·replica·health·service | driver·batch queue |
+| vLLM | continuous batching·KV cache·OpenAI API | 조직·namespace·fleet |
+| FastAPI | 전처리·schema·custom inference | GPU cluster 정책 |
+
+fallback도 층을 구분한다. 같은 model revision의 replica 선택은 KServe·Service가 하고, 다른 작은 모델이나
+외부 provider로 바꾸는 정책은 공개 model contract를 아는 LiteLLM이 맡는다.
+
+## workload별 InferenceService pattern
+
+<Tabs>
+<TabItem label="Spark vLLM">
+
+```yaml
+apiVersion: serving.kserve.io/v1beta1
+kind: InferenceService
+metadata:
+  name: corp-chat-spark
+spec:
+  predictor:
+    model:
+      modelFormat: { name: huggingface }
+      runtime: vllm-spark
+      storageUri: hf://org/model
+      resources:
+        limits:
+          nvidia.com/gpu: "1"
+      nodeSelector:
+        accelerator.platform: dgx-spark
+```
+
+실제 운영 manifest에는 toleration·image digest·model revision·readiness·grace period를 더한다.
+
+</TabItem>
+<TabItem label="A100·B300">
+
+```yaml
+resources:
+  limits:
+    nvidia.com/gpu: "8"
+nodeSelector:
+  accelerator.pool: datacenter
+  accelerator.partition: full
+```
+
+한 Pod가 한 node의 GPU 여덟 장을 받는 pattern이다. 여러 node의 Pod가 함께 떠야 하는 topology는
+`InferenceService` 하나의 resource request가 아니라 LLMInferenceService·LeaderWorkerSet 영역이다.
+
+</TabItem>
+<TabItem label="Custom FastAPI">
+
+```yaml
+predictor:
+  containers:
+    - name: model
+      image: registry.internal/ml/classifier@sha256:<digest>
+      ports: [{ containerPort: 8080 }]
+      readinessProbe:
+        httpGet: { path: /health/ready, port: 8080 }
+      resources:
+        limits:
+          nvidia.com/gpu: "1"
+```
+
+KServe가 FastAPI 내부를 이해할 필요는 없다. port·health·termination·metric 계약을 지키면 된다.
+
+</TabItem>
+</Tabs>
+
+## 공개 model name과 내부 이름을 분리한다
+
+```text
+corp-chat          LiteLLM 공개 alias
+  └─ spark-chat    KServe service·내부 model name
+       └─ revision image digest + model checksum
+```
+
+GPU 세대 이동을 공개 이름 변경으로 만들지 않는다. Spark에서 A100·B300으로 backend를 옮겨도 이용자는
+`corp-chat`을 유지한다. 단, 품질·context·오류 특성이 바뀌면 같은 contract인지 별도 검증한다.
+
+## streaming의 실패를 끝까지 본다
+
+- LiteLLM timeout이 model의 최대 생성 시간보다 짧지 않은가
+- Gateway가 streaming response를 buffer하지 않는가
+- client disconnect가 predictor까지 취소로 전달되는가
+- readiness 실패 Pod로 새 요청이 가지 않는가
+- rollout 때 기존 stream에 충분한 termination grace period가 있는가
+- request ID·model revision·node·GPU metric을 한 요청에 연결할 수 있는가
+
+## 참고 자료
+
+- [KServe text generation](https://kserve.github.io/website/docs/next/model-serving/generative-inference/tasks/text-generation) — vLLM InferenceService 예제.
+- [KServe custom model server](https://kserve.github.io/website/docs/model-serving/predictive-inference/frameworks/custom/custom-model) — custom predictor pattern.
+- [LiteLLM 문서](https://docs.litellm.ai/) — gateway·virtual key·routing 범위.
+
+<LinkCard
+  title="5. GPU가 없을 때 기다리게 하기"
+  description="상시 serving과 달리 batch·학습은 queue에서 admission된 뒤 자원을 한꺼번에 받는다."
+  href="/gpu-platform/05-kueue/"
+/>

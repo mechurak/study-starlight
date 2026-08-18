@@ -335,6 +335,25 @@ export const deckDefinitions = [
 			['마무리', ['gpustack/08-wrapup']],
 		],
 	},
+	{
+		slug: 'gpu-platform',
+		topicOrder: 14,
+		label: '온프렘 GPU 플랫폼',
+		title: '온프렘 GPU 플랫폼',
+		icon: 'server',
+		aliases: ['Kubernetes GPU 플랫폼', 'KServe GPU 클러스터', 'DGX Spark A100 B300'],
+		description: 'DGX Spark·A100·B300을 하나의 운영 모델로 묶는다 — GPU Operator, KServe, Kueue, LiteLLM과 단계적 전환.',
+		category: 'platform',
+		groups: [
+			['시작', ['gpu-platform/00-decision', 'gpu-platform/01-fleet']],
+			['GPU 기반', ['gpu-platform/02-gpu-foundation']],
+			['추론 평면', ['gpu-platform/03-kserve', 'gpu-platform/04-serving']],
+			['작업 관리', ['gpu-platform/05-kueue', 'gpu-platform/06-distributed', 'gpu-platform/07-interactive']],
+			['데이터와 연결', ['gpu-platform/08-data-network']],
+			['전환', ['gpu-platform/09-migration']],
+			['마무리', ['gpu-platform/10-wrapup']],
+		],
+	},
 ];
 
 export const topics = [...deckDefinitions].sort((a, b) => a.topicOrder - b.topicOrder).map((deck) => ({
@@ -363,6 +382,7 @@ export const termIntroDeckSlugs = [
 	'observability',
 	'rl',
 	'gpustack',
+	'gpu-platform',
 ];
 
 export const deckCatalogSections = categories.map((category) => ({
