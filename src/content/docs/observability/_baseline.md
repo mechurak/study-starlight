@@ -48,6 +48,22 @@
 | Tempo | **3.0** — 인입·질의 분리 아키텍처. ingester·compactor·v2 블록·scalable-single-binary 제거, **2.x로 다운그레이드 경로 없음** | grafana.com/blog `tempo-3-0-release` |
 | CloudNativePG | **1.30.0** (2026-06-29) — Grafana의 DB로만 등장한다 | cloudnative-pg.io/releases |
 
+## 따라 하기 실습의 경계
+
+8~9장은 개념 장과 분리된 **hands-on 경로**다. 사용자가 직접 명령을 실행하고, 문서는
+`실행 → 🔎 관찰 포인트 → 해석 → 스스로 해볼 과제 → cleanup` 순서로 안내한다.
+
+- 실습 파일은 `labs/observability/first-investigation/`에 둔다. MDX에 긴 매니페스트를 복제하지 않는다.
+- 첫 실습은 kind의 Kubernetes **v1.35.5**와 `grafana/otel-lgtm` **0.30.2**를 고정했다.
+  2026-08-18에 macOS arm64 · kind v0.32.0 · Docker 메모리 8 GiB로 전체 흐름을 검증했다.
+- LGTM 이미지는 **개발·데모 전용**이다. 단일 Pod · `emptyDir` · 로컬 admin을 운영 설치법처럼
+  서술하지 않는다. 각 실습 장 첫부분에 운영 구성과의 차이를 밝힌다.
+- 실습은 `kind-observability-lab` context와 `observability-lab` namespace만 조작한다.
+  `kubectl`이 사용자의 현재 context에 암묵적으로 적용되지 않게 모든 자동화 명령에 context를 고정한다.
+- cleanup은 `make down`으로 전용 kind 클러스터만 삭제한다. 다른 클러스터·이미지·볼륨은 건드리지 않는다.
+- 질의와 UI 절차는 추측으로 쓰지 않는다. 시나리오를 실행해 실제 메트릭 이름·Loki 필드·Tempo 스팬과
+  상관 링크를 확인한 뒤 갱신한다.
+
 ## 서술 규칙
 
 각 장 첫머리의 `<TermIntro>` 상자가 의무다 — 규칙은 CLAUDE.md "덱" 절.

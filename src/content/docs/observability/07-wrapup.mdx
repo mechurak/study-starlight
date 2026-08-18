@@ -311,6 +311,9 @@ kubectl -n observability get pods --field-selector=status.phase!=Running
 | 신뢰성 공학 | SLO · 에러 버짓 · 번 레이트 알림 | RED 알림의 다음 단계 |
 | 이벤트 | 쿠버네티스 이벤트 수집 · 감사 로그 파이프라인 | 이 덱이 다루지 않은 네 번째 신호 |
 
+개념을 읽었지만 아직 손에 잡히지 않는다면 [8장 실습 준비](/observability/08-lab-setup/)에서
+로컬 스택을 띄우고 [9장 첫 장애 조사](/observability/09-first-investigation/)를 한 번 완주한다.
+
 ## 마지막 한 장
 
 **잘 굴러가는 관측 스택과 그렇지 않은 스택의 차이는 도구 선택이 아니다.**
@@ -322,7 +325,7 @@ kubectl -n observability get pods --field-selector=status.phase!=Running
 새 도구가 나오면 "이건 어느 질문에 답하나, 옆 신호로 어떻게 건너가나"를 물으면 된다.
 
 <LinkCard
-  title="처음으로 — 덱 개요"
-  description="전체 구성과 두 문장을 다시 본다."
-  href="/observability/"
+  title="8. 실습 준비 — 작은 관측 스택 띄우기"
+  description="이제 kind에 학습용 스택과 계측된 앱을 띄우고 조사 흐름을 직접 확인한다."
+  href="/observability/08-lab-setup/"
 />

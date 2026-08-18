@@ -1,0 +1,86 @@
+# 학습·테스트 전용. 운영에 사용하지 않는다.
+# Adapted from Grafana docker-otel-lgtm v0.30.2 (Apache-2.0):
+# https://github.com/grafana/docker-otel-lgtm/blob/v0.30.2/k8s/lgtm.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: lgtm
+  namespace: observability-lab
+spec:
+  selector:
+    app: lgtm
+  ports:
+    - name: grafana
+      port: 3000
+      targetPort: 3000
+    - name: otel-http
+      port: 4318
+      targetPort: 4318
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: lgtm
+  namespace: observability-lab
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: lgtm
+  template:
+    metadata:
+      labels:
+        app: lgtm
+    spec:
+      containers:
+        - name: lgtm
+          image: grafana/otel-lgtm:0.30.2
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: GF_SECURITY_ADMIN_PASSWORD
+              value: lab-admin
+            - name: GF_USERS_ALLOW_SIGN_UP
+              value: "false"
+          ports:
+            - name: grafana
+              containerPort: 3000
+            - name: otel-http
+              containerPort: 4318
+          readinessProbe:
+            exec:
+              command: ["cat", "/tmp/ready"]
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          resources:
+            requests:
+              cpu: 500m
+              memory: 1Gi
+            limits:
+              cpu: "2"
+              memory: 3Gi
+          volumeMounts:
+            - name: tempo-data
+              mountPath: /data/tempo
+            - name: grafana-data
+              mountPath: /data/grafana
+            - name: loki-data
+              mountPath: /data/loki
+            - name: loki-storage
+              mountPath: /loki
+            - name: prometheus-storage
+              mountPath: /data/prometheus
+            - name: pyroscope-storage
+              mountPath: /data/pyroscope
+      volumes:
+        - name: tempo-data
+          emptyDir: {}
+        - name: grafana-data
+          emptyDir: {}
+        - name: loki-data
+          emptyDir: {}
+        - name: loki-storage
+          emptyDir: {}
+        - name: prometheus-storage
+          emptyDir: {}
+        - name: pyroscope-storage
+          emptyDir: {}

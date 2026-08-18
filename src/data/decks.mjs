@@ -136,6 +136,7 @@ export const deckDefinitions = [
 			['세 신호', ['observability/02-prometheus', 'observability/03-loki', 'observability/04-tempo']],
 			['하나의 창', ['observability/05-grafana']],
 			['마무리', ['observability/06-glossary', 'observability/07-wrapup']],
+			['따라 하기', ['observability/08-lab-setup', 'observability/09-first-investigation']],
 		],
 	},
 	{
