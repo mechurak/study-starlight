@@ -1,0 +1,121 @@
+---
+title: "8. 보안과 네트워크"
+description: LiteLLM의 identity·Secret·TLS·egress·로그 데이터와 공급망을 온프렘 경계에서 보호한다
+reviewedAt: 2026-08-18
+status: review
+---
+
+import { LinkCard } from '@astrojs/starlight/components';
+import TermIntro from '../../../components/docs/TermIntro.astro';
+
+> LiteLLM은 provider key와 prompt가 만나는 곳이다 — 편리한 중앙화는 **큰 blast radius**도 함께 만든다
+
+<TermIntro
+  terms={[
+    ['blast radius', '', '한 자격 증명·Pod·계정이 침해됐을 때 함께 영향을 받는 범위다.'],
+    ['egress', '', '클러스터 workload에서 외부 또는 다른 내부망으로 나가는 네트워크 트래픽이다.'],
+    ['private CA', 'Private Certificate Authority', '조직 내부 인증서에 서명하는 사설 신뢰 뿌리다.'],
+    ['data minimization', '', '목적에 꼭 필요한 정보만 수집·전송·보존해 노출 범위를 줄이는 원칙이다.'],
+  ]}
+/>
+
+## 먼저 보호할 자산
+
+| 자산 | 노출되면 | 기본 통제 |
+|---|---|---|
+| master key | 관리 API·UI 장악 | 관리자만, break-glass, rotation |
+| salt key | DB 저장 credential 복호화 경계 손상 | 생성 뒤 불변, 별도 backup |
+| provider key | 외부 비용·데이터 접근 | provider/환경별 분리, 최소 권한 |
+| virtual key/JWT | 허용 모델·team budget 오용 | workload별 발급, 만료·폐기 |
+| prompt·response | 개인정보·사내 기밀 유출 | redaction, callback 범위, 짧은 보존 |
+| model routing 설정 | 민감 요청의 외부 반출 | Git review, audit, 승인된 fallback |
+
+## identity를 두 경로로 나눈다
+
+사람이 Admin UI를 쓰는 경로와 workload가 inference API를 쓰는 경로는 요구가 다르다.
+
+- **관리자**: 조직 IdP의 SSO/MFA, 최소 RBAC, 적은 admin 수, 관리 route 별도 노출.
+- **workload**: workload별 virtual key 또는 OIDC/JWT, 허용 모델과 team mapping, 자동 rotation.
+
+SSO·JWT·SCIM·audit 같은 기능의 제공 범위는 사용 중인 LiteLLM 배포판과 라이선스에서 확인한다. 기능이 없으면
+외부 identity-aware proxy와 발급 자동화를 설계하되, master key 공유로 우회하지 않는다.
+
+## Secret 생명주기
+
+```mermaid
+flowchart LR
+    VAULT["Secret manager"] --> SYNC["CSI / secret sync"]
+    SYNC --> KS["Kubernetes Secret"]
+    KS --> POD["LiteLLM Pod"]
+    POD --> PROVIDER["provider"]
+    ROTATE["rotation"] --> VAULT
+    ROTATE --> VERIFY["새 credential 검증 후<br/>옛 credential 폐기"]
+
+    classDef key  fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
+    classDef zone fill:#ede9fe,stroke:#7c3aed,color:#4c1d95
+    classDef ok   fill:#dcfce7,stroke:#16a34a,color:#14532d
+    class VAULT,SYNC,KS key
+    class POD,PROVIDER zone
+    class ROTATE,VERIFY ok
+```
+
+credential 원문이 Helm values, ConfigMap, Pod spec diff, exception log에 남지 않는지 확인한다. provider별 key를
+나누면 하나가 유출돼도 전체 provider와 환경을 동시에 교체하지 않아도 된다.
+
+`LITELLM_SALT_KEY`는 일반 rotation 대상이 아니다. DB에 저장한 credential을 암복호화하는 기준이므로 모델을
+추가한 뒤 바꾸면 읽지 못한다. 이 key를 잃는 것은 DB backup 일부를 잃는 것과 같다.
+
+## TLS와 사내 CA
+
+client → Gateway, LiteLLM → 내부 model server, LiteLLM → 외부 provider/egress proxy, LiteLLM → Langfuse,
+LiteLLM → Postgres·Redis의 각 hop을 그린다. private CA를 쓰면 image에 임의로 인증서 파일을 bake하지 말고
+trust bundle을 versioned mount하고 갱신 절차를 둔다.
+
+`verify=false`는 CA 배포 문제를 해결하지 않고 중간자 공격 검증을 제거한다. 공식 보안 지침도 certificate
+verification을 유지하고 custom CA bundle을 구성하라고 권고한다.
+
+## egress allowlist
+
+NetworkPolicy만으로 FQDN 기반 외부 allowlist가 어려운 환경에서는 egress proxy나 firewall을 함께 사용한다.
+
+- 승인된 provider hostname·port만 허용한다.
+- internal-only model은 외부 fallback을 두지 않는다.
+- proxy credential을 별도 Secret으로 관리한다.
+- provider IP 변경을 고정 IP allowlist 실패로 오인하지 않게 DNS·proxy 계층을 관측한다.
+- callback 목적지인 Langfuse/OTel도 별도 egress로 센다.
+
+## 로그와 callback의 데이터 최소화
+
+LiteLLM은 message와 response content를 관측 provider로 보낼 수 있다. 개발에 유용하지만 production 기본값으로
+전문을 남기면 민감 데이터 복제본이 Postgres·로그·Langfuse에 퍼진다.
+
+데이터 분류별로 다음을 정한다.
+
+- prompt/response 전문을 저장할 수 있는 model group
+- user 식별자를 hash·가명화할 위치
+- tool arguments와 첨부 파일 URL의 취급
+- 장애 debug를 위해 임시 상세 로그를 켜는 승인·자동 종료 시간
+- Langfuse와 로그 저장소의 retention·삭제 책임
+
+LiteLLM은 message logging을 끄면서 cost metadata는 유지하는 설정과 API key 정보 redaction을 제공한다.
+설정 후 실제 callback payload를 표본 검사한다.
+
+## 공급망과 Pod 권한
+
+- `latest` 대신 정확한 tag와 digest를 고정한다.
+- 공식 cosign signature를 CI에서 검증한다.
+- non-root, read-only root filesystem, 불필요한 Linux capability 제거를 검증한다.
+- 전용 ServiceAccount를 쓰고 Kubernetes API 권한을 주지 않는 것을 기본으로 한다.
+- UI asset이나 migration에 writable path가 필요하면 제한된 `emptyDir`만 제공한다.
+
+## 참고 자료
+
+- [Security Best Practices](https://docs.litellm.ai/docs/proxy/security_best_practices) — 최소 권한, SSO/JWT, private network·TLS·CA와 Secret.
+- [Production Best Practices](https://docs.litellm.ai/docs/proxy/prod) — salt key, production mode와 read-only filesystem.
+- [Logging](https://docs.litellm.ai/docs/proxy/logging) — message content와 key 정보 redaction, callback 범위.
+
+<LinkCard
+  title="9. 관측과 Langfuse 연동"
+  description="gateway 건강, 요청 성능, 비용과 LLM trace를 서로 다른 신호로 나눠 연결한다."
+  href="/litellm/09-observability/"
+/>

@@ -1,0 +1,89 @@
+---
+title: "12. 용어 사전"
+description: LiteLLM Proxy와 온프렘 Kubernetes 운영에서 자주 만나는 용어 정리
+reviewedAt: 2026-08-18
+status: review
+---
+
+## 모델과 요청
+
+| 용어 | 뜻 |
+|---|---|
+| AI Gateway | 애플리케이션과 AI endpoint 사이에서 인증·제한·routing·관측 정책을 집행하는 서비스 |
+| Proxy Server | 클라이언트 대신 provider에 HTTP 요청하고 공통 응답을 돌려주는 중앙 LiteLLM 배포 방식 |
+| Python SDK | Python process 안에서 provider 호출 형식을 통일하는 LiteLLM library |
+| provider | 외부 LLM API 또는 사내 vLLM처럼 실제 추론 요청을 받는 구현 |
+| endpoint | 하나의 network 호출 주소 |
+| `model_name` | 클라이언트가 요청하는 공개 이름 또는 model group 이름 |
+| deployment | 실제 provider·model·endpoint·credential이 정해진 호출 대상 하나 |
+| model group | 같은 `model_name`으로 묶여 load balancing되는 deployment 집합 |
+| OpenAI-compatible | OpenAI SDK가 기대하는 endpoint와 요청·응답 형태를 구현한 API |
+| `hosted_vllm/` | OpenAI 호환 vLLM server를 호출하는 LiteLLM provider route |
+| streaming | 생성 token을 응답 완료 전부터 HTTP stream으로 전달하는 방식 |
+| TTFT | Time To First Token. 요청 뒤 첫 token을 받을 때까지의 시간 |
+| `call_id` | LiteLLM이 요청마다 만드는 correlation 식별자 |
+
+## 접근과 비용
+
+| 용어 | 뜻 |
+|---|---|
+| master key | 관리 API와 Admin UI를 위한 최고 권한 Proxy 자격 증명 |
+| virtual key | workload·사용자별 접근·만료·한도·비용을 분리하는 LiteLLM key |
+| team | model access·budget·rate limit을 공유하는 정책 단위 |
+| service account | 사람 대신 production workload를 대표하는 identity |
+| model access | key·user·team이 요청할 수 있는 공개 model 범위 |
+| budget | 정해진 기간의 누적 비용 한도 |
+| RPM | Requests Per Minute. 분당 요청 수 한도 |
+| TPM | Tokens Per Minute. 분당 입력·출력 token 처리량 한도 |
+| parallel limit | 동시에 처리 중일 수 있는 요청 수 한도 |
+| spend log | 요청의 model·token·비용·주체를 기록한 정산 데이터 |
+
+## Routing과 신뢰성
+
+| 용어 | 뜻 |
+|---|---|
+| load balancing | 같은 model group의 deployment 중 호출 대상을 고르는 일 |
+| retry | 실패한 호출을 제한된 횟수만큼 다시 시도하는 일 |
+| cooldown | 반복 실패한 deployment를 일정 시간 후보에서 제외하는 상태 |
+| fallback | 현재 group 실패 뒤 다른 model group으로 넘어가는 동작 |
+| context fallback | context window 초과 때 더 긴 context model group으로 이동하는 정책 |
+| content-policy fallback | content policy 거절 때 다른 승인된 group으로 이동하는 정책 |
+| timeout | 한 시도 또는 전체 요청을 더 기다리지 않는 시간 상한 |
+| idempotency | 같은 요청을 여러 번 실행해도 외부 효과가 중복되지 않는 성질 |
+| fail-open | 정책 저장소를 확인하지 못해도 요청을 허용하는 장애 모드 |
+| fail-closed | 정책을 확인하지 못하면 요청을 거절하는 장애 모드 |
+
+## Kubernetes와 상태
+
+| 용어 | 뜻 |
+|---|---|
+| monolithic | gateway·관리 API·UI를 한 LiteLLM 배포 단위로 운영하는 모드 |
+| componentized | gateway·backend·UI를 독립 서비스로 나누는 모드 |
+| Postgres | key·team·user·spend·DB 관리 설정의 system of record |
+| Redis | replica 사이의 limit·cooldown·cache·invalidation·job lock을 공유하는 저장소 |
+| migration Job | release 전 DB schema 변경을 한 번만 실행하는 Kubernetes Job |
+| liveness | process가 살아 있고 종료 중이 아닌지를 묻는 probe |
+| readiness | 현재 Pod가 traffic을 받을 준비가 됐는지 묻는 probe |
+| PDB | 자발적 중단에서 동시에 사라질 수 있는 Pod 수를 제한하는 객체 |
+| HPA | CPU 같은 metric으로 Pod replica 수를 자동 조절하는 객체 |
+| connection pool | process가 재사용하려 보유하는 DB 연결 집합 |
+| image digest | container image 내용을 고정하는 해시 식별자 |
+
+## 관측과 보안
+
+| 용어 | 뜻 |
+|---|---|
+| callback | 요청 성공·실패 뒤 Langfuse·OTel 같은 외부 시스템으로 데이터를 보내는 확장 지점 |
+| Langfuse | LLM trace·prompt·generation·token·평가를 다루는 별도 observability 플랫폼 |
+| RED | Rate·Errors·Duration으로 요청 서비스 건강을 보는 방법 |
+| cardinality | metric label 값 조합의 수 |
+| callback failure | 사용자 요청과 별개로 관측 데이터 전송만 실패한 상태 |
+| redaction | prompt·response·key·사용자 정보의 일부를 기록 전에 제거하는 처리 |
+| salt key | DB에 저장한 provider credential 암복호화에 쓰는 불변 key |
+| egress | workload에서 외부 provider나 다른 network zone으로 나가는 traffic |
+| private CA | 조직 내부 TLS 인증서를 서명하는 사설 신뢰 뿌리 |
+| blast radius | 하나의 장애나 침해가 함께 영향을 주는 범위 |
+
+## 다음 장
+
+[13장](/litellm/13-wrapup/)에서 이 용어들을 요청 경로와 운영 체크리스트 한 장으로 다시 묶는다.

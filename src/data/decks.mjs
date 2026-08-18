@@ -369,6 +369,23 @@ export const deckDefinitions = [
 			['도입', ['databricks/08-adoption']],
 		],
 	},
+	{
+		slug: 'litellm',
+		topicOrder: 16,
+		label: 'LiteLLM',
+		title: 'LiteLLM',
+		icon: 'random',
+		aliases: ['LLM Gateway', 'AI Gateway', 'LiteLLM Proxy'],
+		description: '여러 LLM 앞의 단일 제어 지점 — 온프렘 Kubernetes에서 인증·라우팅·비용·장애를 운영한다.',
+		category: 'platform',
+		groups: [
+			['시작', ['litellm/00-position', 'litellm/01-request-life']],
+			['제어 정책', ['litellm/02-model-config', 'litellm/03-access-budget', 'litellm/04-routing-reliability']],
+			['온프렘 Kubernetes', ['litellm/05-k8s-architecture', 'litellm/06-deploy', 'litellm/07-state']],
+			['운영', ['litellm/08-security', 'litellm/09-observability', 'litellm/10-operations', 'litellm/11-troubleshooting']],
+			['마무리', ['litellm/12-glossary', 'litellm/13-wrapup']],
+		],
+	},
 ];
 
 export const topics = [...deckDefinitions].sort((a, b) => a.topicOrder - b.topicOrder).map((deck) => ({
@@ -399,6 +416,7 @@ export const termIntroDeckSlugs = [
 	'gpustack',
 	'gpu-platform',
 	'databricks',
+	'litellm',
 ];
 
 export const deckCatalogSections = categories.map((category) => ({

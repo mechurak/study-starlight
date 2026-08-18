@@ -1,0 +1,135 @@
+---
+title: "9. 관측과 Langfuse 연동"
+description: LiteLLM metric·로그·call_id와 Langfuse callback을 연결하고 데이터 유실·민감정보를 감시한다
+reviewedAt: 2026-08-18
+status: review
+---
+
+import { LinkCard } from '@astrojs/starlight/components';
+import TermIntro from '../../../components/docs/TermIntro.astro';
+
+> 요청 성공과 trace 저장 성공은 다른 사건이다 — **gateway와 관측 pipeline을 따로 감시한다**
+
+<TermIntro
+  terms={[
+    ['RED', 'Rate, Errors, Duration', '요청률·오류율·지연으로 request-serving 서비스의 건강을 보는 틀이다.'],
+    ['callback failure', '', 'LLM 요청은 끝났지만 Langfuse·OTel 같은 후속 관측 목적지 전송이 실패한 상태다.'],
+    ['trace correlation', '', 'LiteLLM call id와 애플리케이션 trace id를 함께 남겨 여러 시스템의 같은 요청을 찾는 일이다.'],
+    ['cardinality', '', 'metric label 값 조합의 수. user·request id를 label로 넣으면 시계열이 폭증한다.'],
+  ]}
+/>
+
+## 관측을 세 층으로 나눈다
+
+```mermaid
+flowchart LR
+    HEALTH["플랫폼 건강<br/>Pod · DB · Redis · queue"] --> PROM["Prometheus · 로그"]
+    REQ["요청 성능<br/>rate · error · latency · routing"] --> PROM
+    LLM["LLM 행동<br/>prompt · generation · token · 평가"] --> LF["Langfuse"]
+    COST["정산 기록<br/>key · team · spend"] --> PG["LiteLLM Postgres"]
+    REQ -.->|"call_id · trace_id"| LLM
+
+    classDef key  fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
+    classDef ok   fill:#dcfce7,stroke:#16a34a,color:#14532d
+    classDef zone fill:#ede9fe,stroke:#7c3aed,color:#4c1d95
+    classDef warn fill:#fef3c7,stroke:#d97706,color:#78350f
+    class HEALTH,REQ key
+    class PROM ok
+    class LLM,LF zone
+    class COST,PG warn
+```
+
+Prometheus를 Langfuse로 대체하지 않고, Langfuse를 LiteLLM spend ledger로 대체하지 않는다. 서로 답하는 질문이
+다르며 하나의 장애가 세 곳에 다른 시간으로 나타난다.
+
+## 먼저 RED와 의존성을 본다
+
+최소 dashboard는 다음을 같은 시간축에 둔다.
+
+- 요청률과 성공/실패율 — 공개 model, 실제 provider, status class
+- latency — gateway 전체, provider 호출, 첫 token까지와 stream duration
+- in-flight requests — Pod 앞 queue/포화 단서
+- Postgres connection·query latency·error
+- Redis connection·latency·error와 spend queue
+- fallback·retry·429 비율
+- callback delivery failure
+
+LiteLLM 공식 metric에는 client가 받은 proxy total/failed request, in-flight request, budget/limit과 callback logging
+failure가 포함된다. metric 이름과 label은 version에서 바뀔 수 있으므로 dashboard는 배포한 `/metrics`로 검증한다.
+
+## Prometheus callback과 cardinality
+
+```yaml
+litellm_settings:
+  callbacks: [prometheus]
+```
+
+공식 metric은 key alias, team, user, model, provider처럼 많은 label 후보를 가진다. 원문 API key는 hash 형태를
+쓰더라도 key 수가 많으면 cardinality가 커진다. 다음 원칙으로 줄인다.
+
+- request id·trace id·prompt를 metric label에 넣지 않는다.
+- 개인 user보다 team·workload·공개 model 중심으로 dashboard를 만든다.
+- 상세 한 요청은 metric이 아니라 `call_id`로 로그·Langfuse에서 찾는다.
+- budget metric 전체 초기화 기능은 DB를 주기적으로 읽으므로 규모와 필요성을 확인한다.
+
+## Langfuse 연결
+
+LiteLLM callback은 성공·실패한 LLM 요청 정보를 Langfuse로 보낼 수 있다. 온프렘에서는 `LANGFUSE_HOST`를
+내부 Langfuse 주소로 명시하고 public cloud 기본값으로 빠지지 않게 한다.
+
+```yaml
+litellm_settings:
+  callbacks: [prometheus, langfuse]
+  redact_user_api_key_info: true
+```
+
+```text
+LANGFUSE_HOST=https://langfuse.internal.example
+LANGFUSE_PUBLIC_KEY=Secret에서 주입
+LANGFUSE_SECRET_KEY=Secret에서 주입
+```
+
+실제 field 이름과 callback 방식은 LiteLLM·Langfuse 양쪽 version 조합에서 확인한다. 성공 callback만 쓰면
+실패 요청이 trace에서 빠질 수 있으므로 사용하는 callback 설정이 성공과 실패 중 무엇을 내보내는지도 시험한다.
+
+## correlation contract
+
+애플리케이션이 이미 trace를 만들면 다음 metadata contract를 정한다.
+
+| 값 | 만든 곳 | 용도 |
+|---|---|---|
+| application trace id | 애플리케이션/OTel | 사용자 요청 전체 경로 |
+| LiteLLM `call_id` | LiteLLM | gateway 로그와 provider 시도 |
+| generation/observation id | Langfuse 연동 | 한 LLM 호출의 prompt·응답·평가 |
+| user/team/workload id | identity 계층 | 비용·품질 집계, 가명화 필요 |
+
+같은 이름의 `trace_id`를 여러 앱이 임의 형식으로 만들지 않도록 SDK wrapper나 공통 header/metadata contract로
+고정한다.
+
+## callback 유실을 탐지한다
+
+LLM 응답이 200이어도 Langfuse가 500이면 사용자는 성공하고 trace만 빠질 수 있다. 공식 Prometheus metric의
+callback logging failure를 알림으로 두고 synthetic 요청이 Langfuse에 실제 도착하는지 별도로 확인한다.
+
+1. 고유한 synthetic trace id로 주기적 요청을 보낸다.
+2. LiteLLM 2xx와 `call_id`를 기록한다.
+3. 일정 시간 안에 Langfuse에서 trace를 찾는다.
+4. 없으면 callback error, DNS·TLS·Secret과 Langfuse ingest를 순서대로 본다.
+
+## prompt 전문은 기본 관측값이 아니다
+
+장애 분석에 prompt가 편리해도 모든 요청 전문을 영구 저장할 필요는 없다. model group·team별로 content logging
+허용 범위를 나누고, production은 metadata와 token·latency 중심으로 시작한다. 상세 sampling은 승인된 구간과
+짧은 retention에만 둔다.
+
+## 참고 자료
+
+- [Prometheus metrics](https://docs.litellm.ai/docs/proxy/prometheus) — request·budget·queue와 callback failure metric.
+- [LiteLLM Logging](https://docs.litellm.ai/docs/proxy/logging) — Langfuse callback, metadata, `call_id`와 redaction.
+- [관측 덱](/observability/) — Prometheus·Loki·Tempo·Grafana를 운영하고 신호를 잇는 방법.
+
+<LinkCard
+  title="10. 일상 운영과 업그레이드"
+  description="SLO, 용량, key·model 변경과 release를 반복 가능한 운영 루틴으로 만든다."
+  href="/litellm/10-operations/"
+/>

@@ -1,0 +1,135 @@
+---
+title: "10. 일상 운영과 업그레이드"
+description: LiteLLM의 SLO·용량·정책 변경·백업·release를 반복 가능한 운영 루틴으로 만든다
+reviewedAt: 2026-08-18
+status: review
+---
+
+import { LinkCard } from '@astrojs/starlight/components';
+import TermIntro from '../../../components/docs/TermIntro.astro';
+
+> 운영의 목적은 Pod를 오래 살리는 것이 아니라 **공개 모델 계약을 예측 가능하게 지키는 것**이다
+
+<TermIntro
+  terms={[
+    ['SLO', 'Service Level Objective', '정해진 기간에 달성하려는 가용성·지연 같은 서비스 수준 목표다.'],
+    ['error budget', '', 'SLO가 허용하는 실패량. release 속도와 안정화 작업의 판단 근거로 쓴다.'],
+    ['headroom', '', '평상시 사용량 위에 장애·급증·rollout을 흡수하려 남겨 둔 여유 용량이다.'],
+    ['RTO / RPO', 'Recovery Time / Point Objective', '복구에 허용할 시간과 복구 시 잃어도 되는 데이터 시점이다.'],
+  ]}
+/>
+
+## SLO를 두 층으로 나눈다
+
+LiteLLM이 건강해도 provider가 실패할 수 있고, provider가 빨라도 gateway가 포화될 수 있다. 한 SLO로 합치면
+책임과 개선점이 흐려진다.
+
+| 층 | 예시 지표 | 운영 질문 |
+|---|---|---|
+| gateway | 인증 가능한 요청의 성공률, gateway overhead, readiness | LiteLLM과 상태 저장소가 계약을 지키나 |
+| model contract | 공개 모델별 end-to-end 성공률·TTFT·완료 시간 | 이용자가 실제로 쓸 수 있나 |
+| telemetry | callback 전달률, spend 기록 지연 | 성공 요청이 관측·정산에서도 보이나 |
+
+client 오류와 platform 오류도 나눈다. 만료 key와 허용하지 않은 모델 요청을 5xx SLO에 넣으면 실제 장애와
+사용 오류가 섞인다. 반대로 upstream 429를 전부 provider 탓으로 제외하면 gateway의 quota·routing 설계 실패를
+숨긴다.
+
+## 용량은 네 곳을 함께 본다
+
+```mermaid
+flowchart LR
+    POD["LiteLLM Pod<br/>CPU · in-flight"] --> DB["Postgres<br/>connection · write"]
+    POD --> REDIS["Redis<br/>latency · connection"]
+    POD --> MODEL["model endpoint<br/>quota · queue · GPU"]
+    SCALE["HPA maxReplicas"] --> POD
+    SCALE -.->|"상한을 함께 키움"| DB
+    SCALE -.->|"동시 요청 증가"| REDIS
+    SCALE -.->|"upstream 부하 증가"| MODEL
+
+    classDef key  fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
+    classDef warn fill:#fef3c7,stroke:#d97706,color:#78350f
+    classDef bad  fill:#fee2e2,stroke:#dc2626,color:#7f1d1d
+    class POD,SCALE key
+    class DB,REDIS warn
+    class MODEL bad
+```
+
+HPA max를 높이는 것은 DB connection과 Redis connection, provider 동시 호출 상한도 높이는 일이다. 한 계층만
+늘리면 병목 위치를 아래로 옮길 뿐이다.
+
+공식 production 지침은 worker당 1 vCPU·4Gi를 시작 floor로 제시하고 Kubernetes에서는 worker 1개/Pod와
+CPU 기반 확장을 권장한다. 메모리는 Prisma query engine의 high-water mark 성질 때문에 scale-down 신호로
+부적합할 수 있다. 이 숫자를 보장값으로 여기지 말고 실제 prompt 크기·spend logging·callback 조합으로
+부하 시험한다.
+
+## 일일·주간·월간 루틴
+
+### 매일
+
+- 공개 모델별 error·p95·p99·TTFT와 429를 본다.
+- DB·Redis error, connection과 callback failure를 확인한다.
+- 새로 급증한 key/team spend와 예상 밖 fallback을 확인한다.
+- provider status만 보지 않고 synthetic 요청 한 바퀴를 본다.
+
+### 매주
+
+- 실제로 쓰지 않는 key와 만료 예정 key를 정리한다.
+- deployment별 성공률·비용·latency로 routing weight를 검토한다.
+- top cardinality metric과 prompt logging volume을 점검한다.
+- HPA scale event, OOM/restart와 DB slow query를 함께 본다.
+
+### 매월
+
+- Postgres 복원과 salt key 접근 절차를 시험한다.
+- provider key와 master key rotation 계획을 확인한다.
+- LiteLLM stable/security release와 image signature를 검토한다.
+- 공개 모델 contract와 실제 endpoint·fallback·data zone 대응표를 승인한다.
+
+## 정책 변경 runbook
+
+모델·routing·key 정책 변경도 application release처럼 다룬다.
+
+1. 영향받는 공개 model과 team을 찾는다.
+2. 품질·cost·region·데이터 반출 차이를 적는다.
+3. staging key로 non-streaming·streaming·tool call 계약을 시험한다.
+4. 작은 traffic 또는 허용된 team부터 적용한다.
+5. 실제 deployment, fallback, latency와 spend를 확인한다.
+6. rollback 조건과 이전 config revision을 준비한다.
+
+DB 중심 설정이면 Pod별 polling 수렴 시간을 고려한다. 변경 직후 서로 다른 Pod가 다른 model list를 볼 수 있는
+창을 운영 절차에 포함한다.
+
+## release 운영
+
+LiteLLM은 provider 변화와 보안 수정 때문에 릴리스가 잦다. "최신을 즉시 production"과 "오래 고정" 사이에
+조직 release train을 둔다.
+
+- stable release와 security advisory를 정기 확인한다.
+- chart, component image, migration을 한 compatibility set으로 고정한다.
+- staging에서 기존 공개 모델 계약 regression을 자동 시험한다.
+- DB backup 뒤 migration Job과 serving rollout을 분리한다.
+- canary에서 gateway error, provider error, latency, DB·Redis, callback을 본다.
+- old image가 new schema에서 동작하는지 확인한 범위에서만 rollback한다.
+
+## 재해 복구
+
+RTO/RPO는 LiteLLM Pod가 아니라 **공개 모델 서비스를 되살리는 순서**로 시험한다.
+
+1. DNS·Gateway와 Secret 공급 경로를 복구한다.
+2. Postgres와 salt key를 함께 복구해 key·team·credential을 읽는다.
+3. Redis를 올리고 coordination state가 초기화된 효과를 확인한다.
+4. 검증한 LiteLLM image/config로 migration 후 serving을 시작한다.
+5. 내부·외부 model endpoint와 egress를 시험한다.
+6. virtual key synthetic request, spend와 Langfuse 도착을 확인한다.
+
+## 참고 자료
+
+- [Production Best Practices](https://docs.litellm.ai/docs/proxy/prod) — resource floor, CPU autoscaling, worker와 DB connection 운영.
+- [Production Deployment](https://docs.litellm.ai/docs/proxy/deploy) — autoscaling, migration과 image/chart 고정.
+- [LiteLLM Release Notes](https://github.com/BerriAI/litellm-docs/blob/main/release_notes/index.md) — release 주기와 현재 변경점.
+
+<LinkCard
+  title="11. 장애 진단"
+  description="증상에서 northbound·정책·상태·routing·provider·callback 경계를 순서대로 가른다."
+  href="/litellm/11-troubleshooting/"
+/>

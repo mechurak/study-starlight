@@ -1,0 +1,112 @@
+---
+title: "3. 접근·예산·속도 제한"
+description: master key와 virtual key를 분리하고 user·team·model access·budget·RPM·TPM을 설계한다
+reviewedAt: 2026-08-18
+status: review
+---
+
+import { LinkCard } from '@astrojs/starlight/components';
+import TermIntro from '../../../components/docs/TermIntro.astro';
+
+> 인증은 "누구인가", model access는 "무엇을", budget과 rate limit은 **"얼마나"를 서로 다른 축에서 답한다**
+
+<TermIntro
+  terms={[
+    ['master key', '', '관리 API와 Admin UI를 여는 Proxy 관리자 자격 증명. 일반 요청용 key가 아니다.'],
+    ['virtual key', '', '애플리케이션이나 이용자에게 발급해 모델 접근·만료·한도·비용을 분리하는 Proxy key다.'],
+    ['budget', '', '기간 동안 허용할 누적 비용 한도다. 순간 부하를 막는 속도 제한과 다르다.'],
+    ['RPM / TPM', 'Requests / Tokens Per Minute', '분당 요청 수와 token 수로 순간 사용량을 제한한다.'],
+  ]}
+/>
+
+## 정책의 네 질문
+
+| 질문 | 대표 설정 대상 | 막는 문제 |
+|---|---|---|
+| 누구인가 | virtual key, JWT, user, service account | 익명·공유 key 사용 |
+| 무엇을 쓰나 | allowed models, team model access | 민감·고비용 모델 오용 |
+| 얼마나 빨리 쓰나 | RPM, TPM, parallel limit | 순간 폭주와 upstream 429 |
+| 기간에 얼마 쓰나 | key·team budget과 reset | 월간 비용 초과 |
+
+한 숫자로 네 질문을 해결하려 하지 않는다. 월 budget이 넉넉해도 순간 1,000 RPM은 모델 server를 무너뜨릴
+수 있고, RPM이 낮아도 긴 prompt 몇 번이면 TPM과 비용을 크게 쓸 수 있다.
+
+## master key는 비상 열쇠다
+
+master key는 관리자 API 호출과 UI 로그인에 쓰인다. 애플리케이션에 배포하면 모든 서비스가 관리자 권한을
+공유하고, 하나를 폐기할 때 전체가 멈춘다.
+
+:::caution[함정]
+개발 편의를 위해 모든 workload에 같은 master key를 넣지 않는다. production workload마다 별도 virtual key
+또는 조직 OIDC의 서명된 identity를 주고, master key는 secret manager·break-glass 절차·감사 대상에 둔다.
+:::
+
+## key·user·team의 소유 관계
+
+```mermaid
+flowchart TB
+    TEAM["team<br/>공유 model access · budget"] --> MEMBER["user / service account<br/>팀 안의 주체"]
+    MEMBER --> KEY1["virtual key A<br/>서비스 production"]
+    MEMBER --> KEY2["virtual key B<br/>개발·실험"]
+    TEAM --> LIMIT["team RPM · TPM · budget"]
+    KEY1 --> K1["key 만료 · 허용 모델 · 개별 limit"]
+    KEY2 --> K2["더 작은 개발 limit"]
+
+    classDef key  fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
+    classDef zone fill:#ede9fe,stroke:#7c3aed,color:#4c1d95
+    classDef warn fill:#fef3c7,stroke:#d97706,color:#78350f
+    class TEAM,MEMBER zone
+    class KEY1,KEY2 key
+    class LIMIT,K1,K2 warn
+```
+
+공식 문서의 상속 규칙은 릴리스에서 달라진 적이 있다. 특히 team key에 user budget이 어떻게 적용되는지
+version별 차이가 있었으므로, 조직 정책은 암묵적 상속에 기대지 말고 **발급 API 결과와 실제 거절 시험**으로
+확인한다.
+
+## 이름을 사람 대신 workload에 묶는다
+
+운영용 key는 `결제서비스`, `검색서비스`처럼 workload 단위로 발급한다.
+
+- 폐기와 rotation의 blast radius가 작다.
+- team·환경·owner metadata를 붙여 비용을 설명할 수 있다.
+- production과 development의 모델 접근과 한도를 다르게 둔다.
+- 사람이 퇴사해도 서비스 identity가 애매해지지 않는다.
+
+사람의 interactive 사용은 SSO/JWT와 짧은 수명 정책으로 분리한다. 어떤 기능이 현재 라이선스에서 가능한지는
+배포판과 계약을 확인한다.
+
+## Redis가 한도를 전역으로 만든다
+
+rate limit counter와 여러 background job의 lock은 replica 사이에서 공유돼야 한다. Redis가 없으면 각
+프로세스의 계산은 그 프로세스 안에서는 맞아도 플랫폼 전체로는 틀리다.
+
+```text
+실효 최대치 ≈ 프로세스별 한도 × 동시에 요청을 받는 프로세스 수
+```
+
+이 식은 정확한 보장이 아니라 위험을 보는 근사치다. load balancer가 고르게 나누지 않아도 **전역 한도가
+아니라는 사실**은 변하지 않는다.
+
+## 발급과 폐기의 운영 흐름
+
+1. owner·team·환경·사용 목적을 등록한다.
+2. 필요한 공개 모델만 허용한다.
+3. RPM·TPM·parallel limit과 기간 budget을 정한다.
+4. 만료일과 rotation 주기를 둔다.
+5. secret manager를 통해 workload namespace에 전달한다.
+6. key 원문은 다시 로그하지 않고 식별 가능한 prefix/hash만 관측에 쓴다.
+7. 폐기 시험으로 해당 workload만 실패하는지 확인한다.
+
+## 참고 자료
+
+- [Virtual Keys](https://docs.litellm.ai/docs/proxy/virtual_keys) — key 생성, model access와 소유자 상속.
+- [Budgets and Rate Limits](https://docs.litellm.ai/docs/proxy/users) — 개인·team budget과 RPM/TPM 설정 범위.
+- [Security Best Practices](https://docs.litellm.ai/docs/proxy/security_best_practices) — master key 대신 scoped key와 service account를 쓰는 원칙.
+- [What Needs Redis](https://docs.litellm.ai/docs/proxy/redis_requirements) — 분산 limit과 background job에서 Redis가 맡는 상태.
+
+<LinkCard
+  title="4. Routing과 신뢰성"
+  description="load balancing, retry, cooldown과 fallback을 순서대로 분리해 장애 정책을 만든다."
+  href="/litellm/04-routing-reliability/"
+/>

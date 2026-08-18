@@ -1,0 +1,112 @@
+---
+title: "0. LiteLLM의 자리"
+description: LiteLLM Proxy가 해결하는 문제와 SDK·API Gateway·모델 서빙 플랫폼 사이의 경계
+reviewedAt: 2026-08-18
+status: review
+---
+
+import { Card, CardGrid, LinkCard } from '@astrojs/starlight/components';
+import TermIntro from '../../../components/docs/TermIntro.astro';
+
+> LiteLLM을 이해하는 가장 빠른 방법은 **모델 서버가 아니라 이용자 정책을 아는 gateway**로 보는 것이다
+
+<TermIntro
+  terms={[
+    ['AI Gateway', '', '애플리케이션과 여러 AI endpoint 사이에서 인증·제한·routing·관측 정책을 집행하는 중앙 서비스다.'],
+    ['Proxy', 'Forward proxy', '클라이언트 대신 실제 provider에 요청하고, 응답을 공통 형식으로 돌려주는 중간 서버다.'],
+    ['provider', 'Model provider', 'OpenAI·Anthropic 같은 외부 API나 사내 vLLM처럼 실제 추론을 수행하는 쪽이다.'],
+    ['control point', '', '여러 요청이 반드시 통과해서 정책을 한 번만 정의할 수 있는 지점이다.'],
+  ]}
+/>
+
+## 먼저 없으면 생기는 문제
+
+애플리케이션 다섯 개가 provider key와 endpoint를 직접 가지면 단순해 보인다. 하지만 이용자가 늘면
+같은 결정을 다섯 군데에서 반복한다.
+
+| 운영 질문 | 직접 연결 | LiteLLM을 통과 |
+|---|---|---|
+| 누가 어떤 모델을 쓸 수 있나 | 앱마다 구현 | key·team·model access에서 결정 |
+| provider key는 어디에 있나 | 앱 Secret 여러 곳 | gateway Secret 한 경계에 집중 |
+| endpoint 장애 시 어디로 가나 | 앱별 retry 코드 | router와 fallback 정책 |
+| 비용과 token은 어디서 세나 | 로그를 사후 결합 | gateway가 요청 문맥과 함께 기록 |
+| 모델을 바꾸면 앱도 바뀌나 | 모델명·SDK 수정 | 공개 alias 뒤 deployment만 교체 |
+
+가치는 provider 수가 많은 데서만 나오지 않는다. 사내 vLLM 하나만 있어도 여러 팀의 접근과 사용량을
+분리해야 한다면 중앙 제어 지점이 필요하다.
+
+## Proxy와 Python SDK
+
+LiteLLM에는 두 사용 방식이 있다.
+
+<CardGrid>
+<Card title="Proxy Server" icon="server">
+플랫폼 팀이 중앙 서비스로 운영한다. 여러 언어의 애플리케이션은 OpenAI 호환 HTTP API로 접속하고,
+virtual key·team·budget·관리 UI와 DB 기반 기능을 함께 쓴다. **이 덱의 대상이다.**
+</Card>
+<Card title="Python SDK" icon="code">
+Python 애플리케이션 프로세스 안에서 provider 호출을 통일한다. 중앙 장애점은 없지만 정책과 설정이
+각 앱에 퍼진다. 작은 단일 앱에는 맞지만 공용 플랫폼의 대체물은 아니다.
+</Card>
+</CardGrid>
+
+Proxy도 내부에서 LiteLLM SDK를 사용해 공통 요청을 provider 형식으로 바꾼다. 둘은 경쟁 제품이 아니라
+**배포 경계가 다른 같은 변환 계층**이다.
+
+## 주변 도구와의 경계
+
+```mermaid
+flowchart TB
+    USER["이용자 · 애플리케이션"] --> EDGE["일반 Gateway<br/>TLS · WAF · 외부 인증"]
+    EDGE --> LITE["LiteLLM<br/>model access · quota · routing"]
+    LITE --> SERVE["모델 서빙 플랫폼<br/>KServe · GPUStack"]
+    SERVE --> MODEL["vLLM · 모델 프로세스 · GPU"]
+    LITE -.-> OBS["Langfuse · 관측 스택"]
+
+    classDef key  fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
+    classDef zone fill:#ede9fe,stroke:#7c3aed,color:#4c1d95
+    classDef ok   fill:#dcfce7,stroke:#16a34a,color:#14532d
+    classDef warn fill:#fef3c7,stroke:#d97706,color:#78350f
+    class USER,EDGE key
+    class LITE zone
+    class SERVE,MODEL ok
+    class OBS warn
+```
+
+LiteLLM이 TLS termination이나 JWT 인증을 지원할 수 있어도 조직의 공용 Gateway를 없앤다는 뜻은 아니다.
+반대로 KServe나 GPUStack에도 route 기능이 있어도 이용자별 budget의 주인은 LiteLLM으로 둔다.
+**기능 중복보다 정책 소유자를 하나로 정하는 것**이 중요하다.
+
+## 이 덱에서의 운영 결론
+
+- 애플리케이션에는 LiteLLM 주소와 workload별 자격 증명만 준다.
+- 외부에 공개하는 모델명과 실제 provider 모델명을 분리한다.
+- LiteLLM은 여러 replica로 두되 Postgres·Redis와 migration을 먼저 설계한다.
+- provider key와 master key를 애플리케이션에 주지 않는다.
+- 요청 성공률만 보지 않고 gateway overhead, provider latency, token·비용과 fallback을 함께 본다.
+- Langfuse로 보낼 prompt·response 범위는 기술 설정 전에 데이터 정책으로 정한다.
+
+## 도입 전에 답할 질문
+
+LiteLLM 설치보다 다음 표를 먼저 채운다.
+
+| 질문 | 결정 예시 |
+|---|---|
+| 이용자는 누구인가 | 사람, 서비스 계정, 팀 |
+| 공개 모델 계약은 무엇인가 | `chat-general`, `chat-sensitive`, `embedding-default` |
+| 실제 endpoint는 어디인가 | 외부 provider, 사내 vLLM, 재해용 대체 endpoint |
+| 어느 데이터가 외부로 나가도 되는가 | prompt·response·user id·tool arguments |
+| 비용 한도와 처리량 한도는 누가 소유하나 | 팀 budget, workload RPM/TPM |
+| DB·Redis 장애 때 fail-open 가능한가 | 내부망 한정 여부와 보안 승인 |
+
+## 참고 자료
+
+- [LiteLLM 공식 시작 문서](https://docs.litellm.ai/) — Proxy와 Python SDK의 대상과 기능 차이.
+- [LiteLLM 요청 아키텍처](https://docs.litellm.ai/docs/proxy/architecture) — 인증·제한·router·provider 변환의 순서.
+- [LiteLLM production deployment](https://docs.litellm.ai/docs/proxy/deploy) — 서비스와 Postgres·Redis의 운영 구조.
+
+<LinkCard
+  title="1. 요청의 일생"
+  description="한 요청 안에서 인증, 제한, routing, provider 변환과 사후 기록이 어떤 순서로 일어나는지 따라간다."
+  href="/litellm/01-request-life/"
+/>

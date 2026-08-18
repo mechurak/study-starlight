@@ -1,0 +1,135 @@
+---
+title: "2. 모델과 설정"
+description: 공개 model_name과 실제 deployment를 분리하고 config.yaml을 Git·Secret·DB 경계에 배치한다
+reviewedAt: 2026-08-18
+status: review
+---
+
+import { LinkCard, Tabs, TabItem } from '@astrojs/starlight/components';
+import TermIntro from '../../../components/docs/TermIntro.astro';
+
+> `model_list`는 endpoint 목록이 아니라 **이용자에게 약속한 이름과 실제 구현의 대응표**다
+
+<TermIntro
+  terms={[
+    ['model_name', '', '클라이언트가 요청하는 공개 이름. 같은 이름을 여러 deployment가 공유할 수 있다.'],
+    ['deployment', '', 'provider·실제 모델·endpoint·credential이 정해진 하나의 호출 대상이다.'],
+    ['model group', '', '같은 `model_name`으로 묶여 load balancing되는 deployment 집합이다.'],
+    ['config.yaml', '', '모델 목록과 router·LiteLLM·general 설정을 선언하는 Proxy 구성 파일이다.'],
+  ]}
+/>
+
+## 이름과 구현을 분리한다
+
+```mermaid
+flowchart LR
+    APP["model: chat-general"] --> GROUP["공개 model group<br/>chat-general"]
+    GROUP --> A["deployment A<br/>외부 provider"]
+    GROUP --> B["deployment B<br/>사내 vLLM"]
+    GROUP -.-> FALL["fallback group<br/>chat-small"]
+
+    classDef key  fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
+    classDef ok   fill:#dcfce7,stroke:#16a34a,color:#14532d
+    classDef warn fill:#fef3c7,stroke:#d97706,color:#78350f
+    class APP,GROUP key
+    class A,B ok
+    class FALL warn
+```
+
+같은 `model_name`을 두 번 등록하면 같은 공개 이름 뒤의 두 deployment가 된다. 반면 fallback은
+현재 group이 실패한 뒤 **다른 공개 group**으로 이동한다. 이 차이가 4장의 routing을 이해하는 기준이다.
+
+## 온프렘과 외부 모델을 함께 등록하기
+
+다음은 구조를 읽기 위한 최소 예다. 실제 모델명·endpoint·parameter 지원 범위는 도입 환경에서 검증한다.
+
+```yaml
+model_list:
+  - model_name: chat-general
+    litellm_params:
+      model: openai/os-managed-model
+      api_key: os.environ/OPENAI_API_KEY
+
+  - model_name: chat-general
+    litellm_params:
+      model: hosted_vllm/org/internal-model
+      api_base: os.environ/INTERNAL_VLLM_API_BASE
+      api_key: os.environ/INTERNAL_VLLM_API_KEY
+
+  - model_name: embedding-default
+    litellm_params:
+      model: hosted_vllm/org/embedding-model
+      api_base: os.environ/INTERNAL_EMBEDDING_API_BASE
+
+router_settings:
+  routing_strategy: simple-shuffle
+```
+
+`hosted_vllm/`은 OpenAI 호환 vLLM server로 보내는 현재 provider route다. 옛 `vllm/` SDK 방식은
+공식 provider 문서에서 deprecated로 표시되어 있으므로 새 Proxy 구성에 섞지 않는다.
+
+## 세 종류의 설정을 나눈다
+
+| 종류 | 예 | 권장 소유 위치 |
+|---|---|---|
+| 공개 계약 | `model_name`, fallback 순서, timeout | Git의 config/Helm values |
+| 민감 값 | provider key, DB URL, salt key | Secret manager가 공급하는 Kubernetes Secret |
+| 운영 중 생성 상태 | virtual key, team, spend | Postgres |
+
+ConfigMap에 `config.yaml`을 넣더라도 credential 값은 `os.environ/NAME`으로 참조한다. Secret을 YAML에
+base64로 적어 Git에 넣는 것은 암호화가 아니다.
+
+## Git 관리와 DB 관리
+
+<Tabs>
+<TabItem label="Git 중심">
+
+모델과 정책 변경을 pull request·diff·rollback으로 관리한다. 온프렘 GitOps와 잘 맞고 재현성이 높다.
+긴급 변경도 Git 반영 전 임시 UI 수정으로 우회하지 않는 규칙이 필요하다.
+
+</TabItem>
+<TabItem label="DB 중심">
+
+`store_model_in_db: true`로 Admin UI/API에서 모델과 credential을 관리한다. 각 Pod는 DB를 polling해
+변경을 가져오므로 즉시 동시 적용이 아니라 **poll interval 안에서 수렴**한다. 공식 production 문서의
+기본 예시는 30초이며, Pod 수가 많으면 polling 부하도 함께 계산한다.
+
+</TabItem>
+</Tabs>
+
+둘을 동시에 진실의 원본으로 삼으면 Git rollback 뒤 DB 값이 다시 덮거나, UI에서 고친 설정이 다음 배포에
+사라지는 식의 충돌이 생긴다. **어느 필드를 누가 소유하는지**를 먼저 정한다.
+
+## 공개 모델 계약에 포함할 것
+
+alias만 정하고 끝내지 않는다. 애플리케이션은 다음 성질도 계약으로 기대한다.
+
+- 지원 endpoint: chat, responses, embeddings, rerank 등
+- streaming과 tool call 지원 여부
+- context window와 최대 출력
+- 데이터 반출 가능 구역과 provider 지역
+- timeout·retry·fallback 후 최악 latency
+- 비용 등급과 품질 등급
+
+provider가 달라져도 이 계약을 지킬 수 있는 deployment끼리 같은 group에 둔다.
+
+## 변경 검증 순서
+
+1. config schema와 Secret 참조가 맞는지 검증한다.
+2. 각 deployment를 직접 health/test call로 확인한다.
+3. 공개 model group으로 non-streaming과 streaming을 각각 호출한다.
+4. tool call·긴 context·embedding dimension처럼 계약된 기능을 시험한다.
+5. 한 deployment를 실패시켜 load balancing·retry·fallback 결과를 확인한다.
+6. 실제 선택된 deployment와 cost가 로그·metric·Langfuse에 남는지 본다.
+
+## 참고 자료
+
+- [LiteLLM 시작 문서](https://docs.litellm.ai/) — `model_list`와 환경 변수 참조의 기본 형태.
+- [vLLM provider](https://docs.litellm.ai/docs/providers/vllm) — `hosted_vllm/` route와 Proxy 구성.
+- [Production best practices](https://docs.litellm.ai/docs/proxy/prod) — DB 저장 설정의 Pod 간 polling과 production 설정.
+
+<LinkCard
+  title="3. 접근·예산·속도 제한"
+  description="공개 모델을 누가 얼마나 쓸 수 있는지 key, user, team과 Redis 상태로 연결한다."
+  href="/litellm/03-access-budget/"
+/>
