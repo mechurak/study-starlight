@@ -1,5 +1,5 @@
 /* 본문 폰트 — Pretendard (시스템 폴백은 Starlight이 자동으로 붙인다).
-   mermaid SVG 안 텍스트는 mermaid 자체 폰트 설정을 따르므로 영향 없음 (의도). */
+   Mermaid SVG도 astro.config의 fontFamily로 같은 계열을 쓴다. */
 :root {
   --sl-font: 'Pretendard Variable';
 
@@ -46,11 +46,4 @@
   html[data-sidebar-collapsed] {
     --sl-content-inline-start: 0rem;
   }
-}
-
-/* mermaid 다이어그램 — 폭이 넘치면 다이어그램 안에서만 가로 스크롤 */
-.mermaid {
-  overflow-x: auto;
-  display: flex;
-  justify-content: center;
 }

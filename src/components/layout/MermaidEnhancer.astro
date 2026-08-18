@@ -1,0 +1,479 @@
+---
+/*
+  astro-mermaid가 브라우저에서 만든 SVG에 사이트 공통 상호작용을 덧붙인다.
+
+  - 렌더 전 <pre class="mermaid">를 카드 프레임으로 감싸 레이아웃 이동을 줄인다.
+  - SVG나 확대 버튼을 누르면 복제한 SVG를 native dialog에서 크게 보여 준다.
+  - flowchart 노드/엣지 hover 시 연결된 요소를 함께 강조한다.
+  - astro-mermaid가 테마 전환 때 innerHTML을 교체하므로 MutationObserver로 다시 연결한다.
+
+  Mermaid 소스와 렌더러의 수명 주기는 건드리지 않는다. 이 컴포넌트는
+  MarkdownContent override에서 페이지당 한 번 렌더한다.
+*/
+---
+
+<dialog class="mermaid-zoom" aria-labelledby="mermaid-zoom-title" data-mermaid-dialog>
+	<div class="mermaid-zoom__shell">
+		<header class="mermaid-zoom__toolbar">
+			<div>
+				<strong id="mermaid-zoom-title">다이어그램 확대</strong>
+				<span>스크롤하거나 버튼으로 크기를 조절할 수 있습니다.</span>
+			</div>
+			<div class="mermaid-zoom__controls">
+				<button type="button" aria-label="다이어그램 축소" data-mermaid-zoom-out>−</button>
+				<button type="button" aria-label="다이어그램 크기 초기화" data-mermaid-zoom-reset>100%</button>
+				<button type="button" aria-label="다이어그램 확대" data-mermaid-zoom-in>＋</button>
+				<button type="button" class="mermaid-zoom__close" aria-label="다이어그램 닫기" data-mermaid-close>
+					<svg aria-hidden="true" viewBox="0 0 24 24">
+						<path d="M6 6l12 12M18 6 6 18"></path>
+					</svg>
+				</button>
+			</div>
+		</header>
+		<div class="mermaid-zoom__canvas" data-mermaid-canvas></div>
+	</div>
+</dialog>
+
+<script>
+	const frameSelector = '.mermaid-frame';
+	const interactiveSelector = '.node, .flowchart-link, .actor, .messageLine0, .messageLine1, .note, .stateGroup';
+	const activeClass = 'is-mermaid-active';
+
+	let baseWidth = 0;
+	let zoomScale = 1;
+
+	function getDialogParts() {
+		const dialog = document.querySelector<HTMLDialogElement>('[data-mermaid-dialog]');
+		const canvas = dialog?.querySelector<HTMLElement>('[data-mermaid-canvas]');
+		const reset = dialog?.querySelector<HTMLButtonElement>('[data-mermaid-zoom-reset]');
+		return { dialog, canvas, reset };
+	}
+
+	function updateZoom() {
+		const { canvas, reset } = getDialogParts();
+		const svg = canvas?.querySelector<SVGSVGElement>('svg');
+		if (!svg || !reset) return;
+
+		svg.style.width = `${Math.round(baseWidth * zoomScale)}px`;
+		reset.textContent = `${Math.round(zoomScale * 100)}%`;
+	}
+
+	function openZoom(container: HTMLElement) {
+		const source = container.querySelector<SVGSVGElement>('svg');
+		const { dialog, canvas } = getDialogParts();
+		if (!source || !dialog || !canvas) return;
+
+		const clone = source.cloneNode(true) as SVGSVGElement;
+		const viewBoxWidth = source.viewBox.baseVal.width;
+		const renderedWidth = source.getBoundingClientRect().width;
+		const comfortableWidth = Math.min(960, window.innerWidth * 0.82);
+
+		baseWidth = Math.min(1800, Math.max(viewBoxWidth, renderedWidth * 1.5, comfortableWidth));
+		zoomScale = 1;
+		clone.removeAttribute('height');
+		clone.style.maxWidth = 'none';
+		clone.style.height = 'auto';
+		canvas.replaceChildren(clone);
+		updateZoom();
+		if (!dialog.open) dialog.showModal();
+	}
+
+	function closeZoom() {
+		const { dialog, canvas } = getDialogParts();
+		if (!dialog?.open) return;
+		dialog.close();
+		canvas?.replaceChildren();
+	}
+
+	function getFlowchartNodes(svg: SVGSVGElement) {
+		const prefix = `${svg.id}-flowchart-`;
+		return [...svg.querySelectorAll<SVGGElement>('.node')]
+			.map((element) => {
+				if (!element.id.startsWith(prefix)) return undefined;
+				return { element, id: element.id.slice(prefix.length).replace(/-\d+$/, '') };
+			})
+			.filter((entry): entry is { element: SVGGElement; id: string } => Boolean(entry));
+	}
+
+	function getEdgeEndpoints(edge: SVGElement, nodes: ReturnType<typeof getFlowchartNodes>) {
+		const dataId = edge.getAttribute('data-id');
+		if (!dataId?.startsWith('L_')) return undefined;
+
+		const edgeId = dataId.slice(2).replace(/_\d+$/, '');
+		for (const source of nodes) {
+			if (!edgeId.startsWith(`${source.id}_`)) continue;
+			const targetId = edgeId.slice(source.id.length + 1);
+			const target = nodes.find((node) => node.id === targetId);
+			if (target) return { source, target };
+		}
+
+		return undefined;
+	}
+
+	function clearHighlight(svg: SVGSVGElement) {
+		svg.querySelectorAll(`.${activeClass}`).forEach((element) => element.classList.remove(activeClass));
+		svg.closest(frameSelector)?.removeAttribute('data-mermaid-hovering');
+	}
+
+	function highlight(svg: SVGSVGElement, target: SVGElement) {
+		clearHighlight(svg);
+		target.classList.add(activeClass);
+		svg.closest(frameSelector)?.setAttribute('data-mermaid-hovering', 'true');
+
+		const nodes = getFlowchartNodes(svg);
+		if (nodes.length === 0) return;
+
+		const currentNode = nodes.find((node) => node.element === target);
+		const edges = [...svg.querySelectorAll<SVGPathElement>('.flowchart-link')];
+
+		if (currentNode) {
+			for (const edge of edges) {
+				const endpoints = getEdgeEndpoints(edge, nodes);
+				if (!endpoints || (endpoints.source !== currentNode && endpoints.target !== currentNode)) continue;
+				edge.classList.add(activeClass);
+				endpoints.source.element.classList.add(activeClass);
+				endpoints.target.element.classList.add(activeClass);
+			}
+			return;
+		}
+
+		if (target.matches('.flowchart-link')) {
+			const endpoints = getEdgeEndpoints(target, nodes);
+			endpoints?.source.element.classList.add(activeClass);
+			endpoints?.target.element.classList.add(activeClass);
+		}
+	}
+
+	function enhance(container: HTMLElement) {
+		let frame = container.parentElement?.matches(frameSelector) ? container.parentElement : undefined;
+		if (!frame) {
+			frame = document.createElement('div');
+			frame.className = 'mermaid-frame';
+			container.before(frame);
+			frame.append(container);
+		}
+
+		let zoomButton = frame.querySelector<HTMLButtonElement>(':scope > .mermaid-frame__zoom');
+		if (!zoomButton) {
+			zoomButton = document.createElement('button');
+			zoomButton.type = 'button';
+			zoomButton.className = 'mermaid-frame__zoom';
+			zoomButton.setAttribute('aria-label', 'Mermaid 다이어그램 확대');
+			zoomButton.innerHTML = `
+				<svg aria-hidden="true" viewBox="0 0 24 24">
+					<path d="M9 3H3v6M15 3h6v6M9 21H3v-6M15 21h6v-6"></path>
+				</svg>`;
+			zoomButton.addEventListener('click', () => openZoom(container));
+			frame.append(zoomButton);
+		}
+
+		zoomButton.disabled = !container.querySelector('svg');
+
+		if (container.dataset.mermaidInteractions === 'true') return;
+		container.dataset.mermaidInteractions = 'true';
+		container.addEventListener('click', (event) => {
+			if (!(event.target instanceof Element) || event.target.closest('a')) return;
+			if (container.querySelector('svg')) openZoom(container);
+		});
+		container.addEventListener('pointerover', (event) => {
+			if (!(event.target instanceof Element)) return;
+			const target = event.target.closest<SVGElement>(interactiveSelector);
+			const svg = target?.closest<SVGSVGElement>('svg');
+			if (target && svg && container.contains(svg)) highlight(svg, target);
+		});
+		container.addEventListener('pointerout', (event) => {
+			if (!(event.target instanceof Element)) return;
+			const target = event.target.closest(interactiveSelector);
+			const related = event.relatedTarget instanceof Element ? event.relatedTarget.closest(interactiveSelector) : null;
+			if (target && target === related) return;
+			const svg = target?.closest<SVGSVGElement>('svg');
+			if (svg) clearHighlight(svg);
+		});
+	}
+
+	function enhanceAll() {
+		document.querySelectorAll<HTMLElement>('pre.mermaid').forEach(enhance);
+	}
+
+	const observer = new MutationObserver(enhanceAll);
+	observer.observe(document.body, { childList: true, subtree: true });
+	enhanceAll();
+
+	document.querySelector('[data-mermaid-close]')?.addEventListener('click', closeZoom);
+	document.querySelector('[data-mermaid-zoom-out]')?.addEventListener('click', () => {
+		zoomScale = Math.max(0.5, zoomScale - 0.25);
+		updateZoom();
+	});
+	document.querySelector('[data-mermaid-zoom-reset]')?.addEventListener('click', () => {
+		zoomScale = 1;
+		updateZoom();
+	});
+	document.querySelector('[data-mermaid-zoom-in]')?.addEventListener('click', () => {
+		zoomScale = Math.min(3, zoomScale + 0.25);
+		updateZoom();
+	});
+	document.querySelector<HTMLDialogElement>('[data-mermaid-dialog]')?.addEventListener('click', (event) => {
+		if (event.target === event.currentTarget) closeZoom();
+	});
+	document.querySelector<HTMLDialogElement>('[data-mermaid-dialog]')?.addEventListener('close', () => {
+		getDialogParts().canvas?.replaceChildren();
+	});
+</script>
+
+<style is:global>
+	.mermaid-frame {
+		position: relative;
+		margin: 1.75rem 0;
+		overflow: hidden;
+		border: 1px solid color-mix(in srgb, var(--sl-color-gray-5) 82%, var(--sl-color-accent));
+		border-radius: 0.85rem;
+		background:
+			radial-gradient(circle at 0 0, color-mix(in srgb, var(--sl-color-accent-low) 34%, transparent), transparent 42%),
+			var(--sl-color-bg-nav);
+		box-shadow: 0 0.7rem 2rem rgb(15 23 42 / 7%);
+		transition: border-color 160ms ease, box-shadow 160ms ease;
+	}
+
+	.mermaid-frame:hover,
+	.mermaid-frame:focus-within {
+		border-color: color-mix(in srgb, var(--sl-color-accent) 62%, var(--sl-color-gray-5));
+		box-shadow: 0 0.8rem 2.2rem rgb(15 23 42 / 11%);
+	}
+
+	.mermaid-frame > pre.mermaid {
+		display: flex !important;
+		justify-content: center;
+		margin: 0 !important;
+		padding: clamp(1.1rem, 3vw, 1.8rem) 3.5rem clamp(1.1rem, 3vw, 1.8rem) clamp(1.1rem, 3vw, 1.8rem) !important;
+		overflow: auto !important;
+		background: transparent !important;
+	}
+
+	.mermaid-frame > pre.mermaid svg {
+		max-width: 100%;
+		height: auto;
+		cursor: zoom-in;
+	}
+
+	.mermaid-frame__zoom {
+		position: absolute;
+		z-index: 2;
+		top: 0.75rem;
+		right: 0.75rem;
+		display: grid;
+		width: 2.45rem;
+		height: 2.45rem;
+		padding: 0.6rem;
+		place-items: center;
+		border: 1px solid var(--sl-color-gray-5);
+		border-radius: 999px;
+		background: color-mix(in srgb, var(--sl-color-bg-nav) 88%, transparent);
+		color: var(--sl-color-gray-2);
+		box-shadow: 0 0.25rem 0.8rem rgb(15 23 42 / 12%);
+		backdrop-filter: blur(8px);
+		cursor: zoom-in;
+		transition: color 150ms ease, border-color 150ms ease, transform 150ms ease;
+	}
+
+	.mermaid-frame__zoom:hover,
+	.mermaid-frame__zoom:focus-visible {
+		border-color: var(--sl-color-accent);
+		color: var(--sl-color-accent-high);
+		transform: scale(1.06);
+	}
+
+	.mermaid-frame__zoom:disabled {
+		visibility: hidden;
+	}
+
+	.mermaid-frame__zoom svg,
+	.mermaid-zoom__close svg {
+		width: 100%;
+		height: 100%;
+		fill: none;
+		stroke: currentColor;
+		stroke-width: 1.8;
+		stroke-linecap: round;
+		stroke-linejoin: round;
+	}
+
+	.mermaid-frame :is(.node, .actor, .note, .stateGroup),
+	.mermaid-frame :is(.flowchart-link, .messageLine0, .messageLine1) {
+		transition: opacity 150ms ease, filter 150ms ease;
+	}
+
+	.mermaid-frame :is(.node, .flowchart-link, .actor, .messageLine0, .messageLine1, .note, .stateGroup) {
+		cursor: pointer;
+	}
+
+	.mermaid-frame .flowchart-link {
+		pointer-events: stroke;
+	}
+
+	.mermaid-frame[data-mermaid-hovering] :is(.node, .actor, .note, .stateGroup) {
+		opacity: 0.42 !important;
+	}
+
+	.mermaid-frame[data-mermaid-hovering] :is(.flowchart-link, .messageLine0, .messageLine1) {
+		opacity: 0.28 !important;
+	}
+
+	.mermaid-frame[data-mermaid-hovering] .is-mermaid-active {
+		opacity: 1 !important;
+		filter: drop-shadow(0 0 0.3rem color-mix(in srgb, var(--sl-color-accent) 55%, transparent));
+	}
+
+	.mermaid-frame :is(.edge-pattern-dashed, .edge-pattern-dotted, .messageLine1),
+	.mermaid-frame .flowchart-link.is-mermaid-active {
+		stroke-dasharray: 7 5 !important;
+		animation: mermaid-edge-flow 1.15s linear infinite;
+	}
+
+	@keyframes mermaid-edge-flow {
+		to {
+			stroke-dashoffset: -24;
+		}
+	}
+
+	.mermaid-zoom {
+		width: min(96vw, 92rem);
+		height: min(92vh, 64rem);
+		max-width: none;
+		max-height: none;
+		padding: 0;
+		overflow: hidden;
+		border: 1px solid var(--sl-color-gray-5);
+		border-radius: 0.9rem;
+		background: var(--sl-color-bg);
+		color: var(--sl-color-text);
+		box-shadow: 0 1.5rem 5rem rgb(0 0 0 / 35%);
+	}
+
+	.mermaid-zoom::backdrop {
+		background: rgb(2 6 23 / 72%);
+		backdrop-filter: blur(5px);
+	}
+
+	.mermaid-zoom__shell {
+		display: grid;
+		grid-template-rows: auto minmax(0, 1fr);
+		height: 100%;
+	}
+
+	.mermaid-zoom__toolbar {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 1rem;
+		padding: 0.7rem 0.8rem 0.7rem 1rem;
+		border-bottom: 1px solid var(--sl-color-gray-5);
+		background: var(--sl-color-bg-nav);
+	}
+
+	.mermaid-zoom__toolbar > div:first-child {
+		display: flex;
+		align-items: baseline;
+		gap: 0.7rem;
+		min-width: 0;
+	}
+
+	.mermaid-zoom__toolbar strong {
+		font-size: var(--sl-text-sm);
+		white-space: nowrap;
+	}
+
+	.mermaid-zoom__toolbar span {
+		overflow: hidden;
+		color: var(--sl-color-gray-3);
+		font-size: var(--sl-text-xs);
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+
+	.mermaid-zoom__controls {
+		display: flex;
+		align-items: center;
+		gap: 0.35rem;
+	}
+
+	.mermaid-zoom__controls button {
+		display: grid;
+		min-width: 2.5rem;
+		height: 2.5rem;
+		padding: 0 0.65rem;
+		place-items: center;
+		border: 1px solid var(--sl-color-gray-5);
+		border-radius: 0.5rem;
+		background: var(--sl-color-bg);
+		color: var(--sl-color-text);
+		font: inherit;
+		font-size: var(--sl-text-sm);
+		cursor: pointer;
+	}
+
+	.mermaid-zoom__controls button:hover,
+	.mermaid-zoom__controls button:focus-visible {
+		border-color: var(--sl-color-accent);
+		color: var(--sl-color-accent-high);
+	}
+
+	.mermaid-zoom__controls .mermaid-zoom__close {
+		width: 2.5rem;
+		padding: 0.65rem;
+		margin-inline-start: 0.25rem;
+	}
+
+	.mermaid-zoom__canvas {
+		display: flex;
+		align-items: safe center;
+		justify-content: safe center;
+		overflow: auto;
+		padding: clamp(1rem, 3vw, 2rem);
+		background-color: var(--sl-color-bg);
+		background-image: radial-gradient(var(--sl-color-gray-5) 0.7px, transparent 0.7px);
+		background-size: 16px 16px;
+		overscroll-behavior: contain;
+		touch-action: pan-x pan-y pinch-zoom;
+	}
+
+	.mermaid-zoom__canvas svg {
+		display: block;
+		flex: none;
+		max-width: none !important;
+		margin: auto;
+	}
+
+	@media (max-width: 40rem) {
+		.mermaid-frame > pre.mermaid {
+			justify-content: flex-start;
+			padding-inline: 1rem !important;
+		}
+
+		.mermaid-frame__zoom {
+			top: 0.55rem;
+			right: 0.55rem;
+		}
+
+		.mermaid-zoom {
+			width: 100vw;
+			height: 100dvh;
+			border: 0;
+			border-radius: 0;
+		}
+
+		.mermaid-zoom__toolbar {
+			padding-inline-start: 0.75rem;
+		}
+
+		.mermaid-zoom__toolbar span {
+			display: none;
+		}
+	}
+
+	@media (prefers-reduced-motion: reduce) {
+		.mermaid-frame :is(.edge-pattern-dashed, .edge-pattern-dotted, .messageLine1),
+		.mermaid-frame .flowchart-link.is-mermaid-active {
+			animation: none;
+		}
+	}
+</style>

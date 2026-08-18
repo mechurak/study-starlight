@@ -36,6 +36,10 @@ Git 연결은 OAuth 승인이 필요해서 **대시보드에서만** 할 수 있
 얇은 Git checkout이면 `git fetch --unshallow` 후 Astro 빌드를 시작한다.
 대시보드의 Build command는 `pnpm build`로 그대로 둔다.
 
+D2 다이어그램은 `astro-d2`의 **D2.js/WASM 모드**로 빌드한다. 따라서 Cloudflare Pages 빌드
+이미지에 D2 CLI를 따로 설치할 필요가 없다. `experimental.useD2js`를 끄면 배포 환경에도
+D2 바이너리를 설치해야 하므로, config만 단독으로 바꾸지 않는다.
+
 ## 왜 빌드 전에 Git 이력을 받나
 
 랜딩 카드의 **마지막 수정**은 덱 폴더 안 문서들의 최신 커밋일이다.

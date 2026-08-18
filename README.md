@@ -16,7 +16,7 @@ src/content/docs/
     index.mdx                 #   덱 개요 페이지
     00-intro.mdx …            #   본문 페이지 (컴포넌트를 쓰므로 전부 .mdx)
 src/components/               # layout / docs / demos 역할별 컴포넌트
-src/styles/custom.css         # 폰트·본문 폭·mermaid 오버플로 커스텀
+src/styles/custom.css         # 폰트·본문 폭·검색 UI 전역 커스텀
 docs/                         # 작성·검증·배포·Starlight 운영 문서
 CLAUDE.md                     # 에이전트 작업 진입점
 ```
@@ -27,7 +27,12 @@ CLAUDE.md                     # 에이전트 작업 진입점
   상단에서 덱을 전환하고 덱마다 독립된 사이드바를 준다
 - **검색은 Pagefind 내장** — 빌드 시 정적 인덱스가 생성된다. 별도 설정 없음
 - **mermaid는 [astro-mermaid](https://www.npmjs.com/package/astro-mermaid)** — ```` ```mermaid ````
-  펜스를 클라이언트에서 렌더하고 라이트/다크 테마를 자동 추적한다
+  펜스를 클라이언트에서 렌더하고 라이트/다크 테마를 자동 추적한다. 공통 카드·클릭 확대·
+  연결 요소 hover 강조·점선 흐름 애니메이션은 `MermaidEnhancer.astro`가 덧붙인다
+- **D2는 [astro-d2](https://astro-d2.vercel.app)** — ```` ```d2 ```` 펜스를 빌드 때 SVG로 만들며,
+  관계를 더 정돈된 레이아웃과 애니메이션으로 강조할 때 선택한다
+- **이미지 확대는 [starlight-image-zoom](https://github.com/HiDeoo/starlight-image-zoom)** —
+  본문 이미지와 D2 다이어그램을 클릭하면 전체 화면 dialog로 연다
 - **테마는 [starlight-theme-rapide](https://starlight-theme-rapide.vercel.app), 본문 폰트는
   Pretendard**(셀프호스팅, dynamic subset)
 
@@ -56,7 +61,7 @@ README나 CLAUDE.md는 고칠 필요가 없다 — 덱에 특별한 규칙·기�
 | 문서 | 내용 |
 |---|---|
 | [CLAUDE.md](CLAUDE.md) | 작업 진입점, 반드시 읽을 문서와 깨뜨리면 안 되는 설정 |
-| [docs/content-authoring.md](docs/content-authoring.md) | 제목 계층, 프론트매터, 컴포넌트, Mermaid 작성 규칙 |
+| [docs/content-authoring.md](docs/content-authoring.md) | 제목 계층, 프론트매터, 컴포넌트, Mermaid·D2 작성 규칙 |
 | [docs/verification.md](docs/verification.md) | 자동 검사와 변경별 브라우저 검증 |
 | [docs/starlight-changes.md](docs/starlight-changes.md) | 기본 Starlight에서 바꾼 것 전체 목록 — 업그레이드 전에 볼 것 |
 | [docs/deploy.md](docs/deploy.md) | Cloudflare Pages 연동, `PNPM_VERSION`, 도메인 변경 |

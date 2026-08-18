@@ -105,6 +105,10 @@ const { title = '이 장에서 처음 나오는 말', terms } = Astro.props;
 - **사이트 전역 조정은 컴포넌트가 아니라 `src/styles/custom.css`.** 컴포넌트 스타일은
   자기 안에서 끝나야 한다 — 전역을 건드리는 컴포넌트는 디버깅 불가능한 결합을 만든다
 
+예외는 컴포넌트가 직접 렌더하지 않은 런타임 DOM을 꾸미는 경우다. `MermaidEnhancer`는
+astro-mermaid가 나중에 만든 SVG를 대상으로 하므로 `<style is:global>`이 필요하지만,
+선택자를 `.mermaid-frame` · `.mermaid-zoom` 아래로 제한해 영향 범위는 컴포넌트 안에 가둔다.
+
 ## 문자열을 HTML로 넣을 때 — set:html의 안전 규칙
 
 props로 받은 설명 문자열에 `` `코드` ``나 `**굵게**` 를 허용하고 싶을 때가 온다
@@ -162,6 +166,11 @@ starlight({
 
 이 레포의 사이드바 드롭다운·접기 토글·헤더 덱 표시가 전부 이 세트다.
 각 파일의 머리 주석에 "왜 이 구조인가"가 있고, **고치기 전에 그걸 먼저 읽는 것**이 규칙이다.
+
+`MarkdownContent.astro`는 검색 meta만 심는 데서 끝나지 않는다. 이미지 확대 플러그인이 기존
+override 때문에 자기 셸을 설치하지 못하므로 `<ImageZoom />`을 직접 합성하고, 클라이언트에서
+생기는 Mermaid SVG에는 `<MermaidEnhancer />`가 카드·확대·hover 동작을 덧붙인다. 같은 override를
+요구하는 플러그인과 자체 기능은 이렇게 **기존 override 안에서 명시적으로 합성**한다.
 
 :::caution[함정 — override는 업그레이드 부채다]
 override한 컴포넌트는 Starlight 내부 구조에 기대는 만큼, **Starlight 업그레이드 때

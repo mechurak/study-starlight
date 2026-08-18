@@ -1,6 +1,6 @@
 ---
 title: "5. 내장 컴포넌트"
-description: "Steps·Tabs·Card·FileTree·Badge·aside·mermaid — 각 컴포넌트의 역할과 쓸 자리, 쓰지 말아야 할 자리, 그리고 다이어그램 팔레트 규칙"
+description: "Steps·Tabs·Card·FileTree·Badge·aside·Mermaid·D2 — 각 컴포넌트의 역할과 쓸 자리, 쓰지 말아야 할 자리, 그리고 다이어그램 규칙"
 ---
 
 import { Tabs, TabItem, LinkCard } from '@astrojs/starlight/components';
@@ -13,7 +13,7 @@ import TermIntro from '../../../components/docs/TermIntro.astro';
     ['aside', '', '본문 흐름 밖의 보조 상자. Starlight에서는 `:::note` 같은 세 콜론 문법으로 쓴다. note · tip · caution · danger 네 종류 — 색과 아이콘이 자동으로 붙는다.'],
     ['지시어', 'Directive', '`:::이름[라벨]` 형태의 마크다운 확장 문법. aside가 이것으로 만들어진다 — 컴포넌트 import 없이 쓸 수 있는 이유.'],
     ['Badge', '', '표나 제목 옆에 붙이는 짧은 상태 라벨 컴포넌트. `variant`의 색 체계가 aside와 같아서, 사이트 전체에서 색의 의미가 이어진다.'],
-    ['펜스', 'Fence', '코드 블록을 여닫는 ``` 세 백틱. 언어 이름을 `mermaid`로 주면 astro-mermaid가 가로채 다이어그램으로 렌더한다.'],
+    ['펜스', 'Fence', '코드 블록을 여닫는 ``` 세 백틱. 언어 이름을 `mermaid`나 `d2`로 주면 해당 integration이 가로채 다이어그램으로 렌더한다.'],
   ]}
 />
 
@@ -42,6 +42,7 @@ import TermIntro from '../../../components/docs/TermIntro.astro';
 | 아이콘 | `<Card icon>` · topics의 덱 icon — **prop으로만** | 본문 문장 속 인라인 (스캔을 방해한다) |
 | aside | 시험 포인트·핵심은 tip, 함정은 caution | 본문 대체 — 상자가 본문보다 많으면 실패 |
 | mermaid 펜스 | 결정 트리 · 관계 · 상태 · 시퀀스 — **"왜 그런가"** | 훑어보기용 데이터 (그건 표) |
+| D2 펜스 | 정돈된 아키텍처 · 움직임으로 방향을 강조할 흐름 | 익숙한 Mermaid를 단지 예쁘게 바꾸는 용도 |
 
 이 표에서 오른쪽 열이 왼쪽 열만큼 중요하다 — 컴포넌트 남용의 결과는
 "전부 강조되어 아무것도 강조되지 않는" 페이지다.
@@ -125,19 +126,64 @@ import TermIntro from '../../../components/docs/TermIntro.astro';
 - 별도 이미지 파일을 만들지 않는다 — 다이어그램은 **전부 펜스 안 텍스트**다.
   diff가 되고, 검색이 되고, 고치기 쉽다
 
+렌더된 Mermaid에는 사이트 공통 상호작용이 자동으로 붙는다 — 오른쪽 위 버튼이나 SVG를 누르면
+확대 dialog가 열리고, flowchart 노드·엣지를 hover하면 직접 연결된 요소가 함께 강조된다.
+`A -.-> B`처럼 그린 점선은 방향이 흐르므로 **진행을 계속 보여 줄 연결에만** 쓴다.
+사용자가 reduced motion을 선택하면 이 애니메이션은 멈춘다.
+
 :::caution[함정 — 빌드 성공 ≠ 렌더 성공]
 mermaid 변환은 빌드에서 되지만 **렌더는 브라우저(클라이언트)에서** 일어난다(2장의 섬).
 문법이 틀린 다이어그램도 빌드는 통과한다 — mermaid를 만졌으면 브라우저에서,
 **다크 모드까지** 확인한다(8장의 검증 표).
 :::
 
+## D2 — 레이아웃과 흐름을 강조한다
+
+D2는 Mermaid 전체를 갈아엎는 대체재가 아니라 **그림의 배치와 움직임도 설명의 일부일 때** 쓰는
+두 번째 팔레트다. 이 펜스는 빌드 때 SVG 이미지로 만들어지고, 이미지를 누르면 전체 화면으로
+확대된다. 아래 움직이는 선은 소스가 브라우저에 닿는 방향을 강조한다.
+
+```d2 layout=elk pad=40 title="D2 펜스가 빌드 시 SVG로 생성되고 브라우저에서 확대되는 흐름"
+direction: right
+
+source: D2 펜스 {
+  shape: document
+}
+build: Astro 빌드 {
+  shape: hexagon
+}
+svg: SVG 이미지 {
+  shape: rectangle
+}
+browser: 브라우저 {
+  shape: rectangle
+}
+
+source -> build: 변환 {
+  style.animated: true
+}
+build -> svg: 생성 {
+  style.animated: true
+}
+svg -> browser: 표시·확대 {
+  style.animated: true
+}
+```
+
+- 기본 레이아웃은 `elk`, 여백은 `40px`, 테마는 라이트 `0` · 다크 `200`이다.
+- `style.animated: true`는 방향이 핵심인 엣지에만 쓴다. 움직임이 많으면 오히려 읽기를 방해한다.
+- 외부 SVG `<img>`가 기본이라 노드 자체의 클릭 링크·툴팁은 쓰지 않는다. 그런 상호작용이 꼭
+  필요하면 인라인 SVG와 다크 모드·확대 동작을 함께 다시 설계해야 한다.
+- D2 문법 오류는 빌드가 잡지만, **색 전환·움직임·확대 dialog**는 브라우저가 판정한다.
+
 ## 5장 요약
 
 - 컴포넌트는 장식이 아니라 **정보 모양의 선언** — 절차는 Steps, 갈래는 Tabs, 분류는 CardGrid
 - 역할 표의 오른쪽 열(쓰지 말 자리)이 일관성을 지킨다 — LinkButton은 덱당 하나, 아이콘은 prop으로만
 - aside는 네 색의 약속 + **구체 라벨 + 절제** — 상자가 본문을 이기면 실패
-- mermaid는 "왜"를 맡는다 — **여섯 색 팔레트 고정**, `color:`까지, 라벨은 `["…"]`
-- Badge는 제목에 붙여 쓴다(slug!) · mermaid는 빌드가 아니라 **브라우저가 판정**한다
+- mermaid는 "왜"를 맡는다 — **여섯 색 팔레트 고정**, 클릭 확대·연결 hover·점선 흐름은 전역 적용
+- D2는 레이아웃과 흐름을 강조할 때만 — 기본 SVG `<img>`라 클릭 확대와 다크 모드를 함께 얻는다
+- Badge는 제목에 붙여 쓴다(slug!) · 다이어그램의 최종 모습은 **브라우저가 판정**한다
 
 <LinkCard
   title="6. 커스텀 컴포넌트"

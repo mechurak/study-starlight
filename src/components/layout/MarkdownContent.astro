@@ -1,5 +1,7 @@
 ---
 import Default from '@astrojs/starlight/components/MarkdownContent.astro';
+import ImageZoom from 'starlight-image-zoom/components/ImageZoom.astro';
+import MermaidEnhancer from './MermaidEnhancer.astro';
 import { deckDefinitions } from '../../data/decks.mjs';
 
 // 헤더 검색(Pagefind) 결과에 "덱: <이름>"을 표시하기 위한 커스텀 meta.
@@ -8,6 +10,8 @@ import { deckDefinitions } from '../../data/decks.mjs';
 // 라우트 데이터에서 오므로 src/data/decks.mjs의 topic label과 항상 일치한다.
 // 랜딩처럼 topic 밖 페이지는 isCurrent가 없어 meta 없이 렌더된다.
 // 결과 카드에서의 표시 위치·모양은 src/styles/custom.css 참고.
+// 이 override가 있으면 starlight-image-zoom이 자체 MarkdownContent override를 설치하지 않으므로
+// ImageZoom과 MermaidEnhancer 런타임도 여기서 함께 렌더한다.
 const topic = Astro.locals.starlightSidebarTopics?.topics.find((t) => t.isCurrent);
 const { entry } = Astro.locals.starlightRoute;
 const data = entry.data as typeof entry.data & {
@@ -25,6 +29,8 @@ const reviewedAt = data.reviewedAt?.toLocaleDateString('ko-KR', {
 });
 ---
 
+<ImageZoom />
+<MermaidEnhancer />
 {topic && <span data-pagefind-meta={`덱:${topic.label}`} hidden></span>}
 {
 	(aliases.length > 0 || reviewedAt || statusLabel) && (

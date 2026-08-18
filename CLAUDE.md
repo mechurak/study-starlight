@@ -34,7 +34,7 @@ dev 서버는 백그라운드 모드로 띄운다: `astro dev --background`
 
 ## 절대 깨뜨리면 안 되는 것
 
-- `astro.config.mjs`에서 `mermaid()`가 `starlight()`보다 먼저 와야 한다.
+- `astro.config.mjs`에서 `astroD2()`와 `mermaid()`가 모두 `starlight()`보다 먼저 와야 한다.
 - `src/data/decks.mjs`의 topic `items`는 확장자 없는 slug 문자열이다. 파일명을 바꾸면 같이 바꾼다.
 - 랜딩(`/`)은 어느 topic에도 속하지 않는다. topic 밖 페이지는 plugin `exclude`에 추가한다.
 - 사이드바 UI는 `src/components/layout/`의 `Sidebar`·`SiteTitle`·`SidebarToggle` override 세트다.

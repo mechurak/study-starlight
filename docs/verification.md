@@ -15,14 +15,21 @@ pnpm check
 |---|---|
 | 문장·문단·링크 | `pnpm check` |
 | 표·컴포넌트 추가 | check + 모바일 넘침 |
-| Mermaid 추가·수정 | check + 라이트/다크 렌더 |
+| Mermaid 추가·수정 | check + 라이트/다크 렌더·확대·hover·모바일 |
+| D2 추가·수정 | check + SVG 로드·라이트/다크·확대·애니메이션 |
 | 테마·`custom.css`·config·override | 아래 항목 전수 |
 
 산출물을 브라우저에서 볼 때는 `pnpm preview`를 사용한다.
 
-1. Mermaid: `.mermaid` 안에 `svg`가 생기는지 확인한다. 다크 모드 전환 후 재렌더도 기다린다.
-2. 검색: 검색 dialog를 열고 한국어 질의와 덱 별칭으로 결과가 나오는지 확인한다.
-3. 모바일: 390px에서 문서 본문이 `scrollWidth > clientWidth`가 아닌지 확인한다.
+1. Mermaid: `.mermaid` 안에 `svg`가 생기고 `.mermaid-frame`이 하나씩 붙는지 확인한다.
+   flowchart 노드 hover에서 연결 노드·엣지가 강조되는지, 확대 dialog와 50~300% 조절·ESC 닫기가
+   동작하는지 본다. 다크 모드 전환 후 SVG가 재렌더되어도 프레임과 확대 버튼이 하나씩인지 확인한다.
+   점선 애니메이션은 reduced motion에서 꺼져야 한다.
+2. D2: `/d2/` 아래 SVG 이미지가 로드되는지, 확대 버튼이 dialog를 여는지 확인한다.
+   테마 전환 뒤 색이 바뀌고 animated edge가 움직이는지도 본다.
+3. 이미지: 일반 본문 이미지와 `<SourceFigure>`의 확대 dialog가 열리고 닫히는지 확인한다.
+4. 검색: 검색 dialog를 열고 한국어 질의와 덱 별칭으로 결과가 나오는지 확인한다.
+5. 모바일: 390px에서 문서 본문이 `scrollWidth > clientWidth`가 아닌지 확인한다.
    코드 블록 자체의 가로 스크롤은 정상이다.
 
 Playwright 같은 브라우저 자동화를 썼다면 검증 후 `git status --short`로 임시 로그·스냅샷이

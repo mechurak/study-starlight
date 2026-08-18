@@ -11,17 +11,49 @@
 | 덱 = topic 사이드바 | 단일 덱 manifest + `starlight-sidebar-topics` | `src/data/decks.mjs` · `astro.config.mjs` |
 | 테마 (Vitesse 계열) | `starlight-theme-rapide` 플러그인 | `astro.config.mjs` |
 | mermaid 펜스 렌더 | `astro-mermaid` 통합 (**starlight보다 먼저**) | `astro.config.mjs` |
+| mermaid 카드·확대·hover | 렌더 후 SVG를 보강하는 `MermaidEnhancer` | `MarkdownContent.astro` · `MermaidEnhancer.astro` |
+| D2 펜스 렌더 | `astro-d2` 통합 + D2.js (**starlight보다 먼저**) | `astro.config.mjs` |
+| 이미지 클릭 확대 | `starlight-image-zoom` 플러그인 + 기존 override 합성 | `astro.config.mjs` · `MarkdownContent.astro` · `SourceFigure.astro` |
+| Markdown 프로세서 | 이미지 확대 호환을 위해 `unified()` 명시 | `astro.config.mjs` |
 | 검색 결과에 덱 이름 표시 | `MarkdownContent` 컴포넌트 override | `src/components/layout/MarkdownContent.astro` |
 | 덱 index 별칭 검색 | manifest의 `aliases`를 본문 앞에 표시 | `src/data/decks.mjs` · `MarkdownContent.astro` |
 | 랜딩 덱 최종 수정일 | 빌드 전 전체 Git 이력 확보 + Starlight API로 덱 문서의 최신 커밋일 계산 | `scripts/prepare-git-history.mjs` · `src/components/docs/DeckCatalog.astro` |
 | 본문 폰트 Pretendard | `customCss` (dynamic subset) | `astro.config.mjs` |
 | 본문 폭 45→55rem | `--sl-content-width` | `src/styles/custom.css` |
-| mermaid 가로 스크롤 | `.mermaid` overflow | `src/styles/custom.css` |
 | 검색 덱 라벨 위치·모양 | Pagefind UI 태그 칩 재스타일 | `src/styles/custom.css` |
 | 한국어 단일 로케일 | `defaultLocale: 'root'` + `ko` | `astro.config.mjs` |
 
-mermaid 통합 순서·topics slug처럼 "깨뜨리면 안 되는" 항목은
+다이어그램 통합 순서·topics slug처럼 "깨뜨리면 안 되는" 항목은
 [CLAUDE.md](../CLAUDE.md)에 있다. 아래는 그 밖의 항목.
+
+## 다이어그램과 이미지 확대
+
+- **Mermaid**는 기존 관계·상태·시퀀스의 기본 수단이다. 클라이언트에서 렌더하므로 문법과
+  라이트/다크 모드는 브라우저에서 판정한다. 전역 폰트는 `astro.config.mjs`에서 Pretendard로
+  맞추고, 렌더러 로그는 끈다.
+- **`MermaidEnhancer.astro`**는 렌더러와 분리된 표시·상호작용 층이다. 모든 Mermaid를 공통 카드로
+  감싸고 가로 스크롤과 확대 버튼을 제공한다. SVG나 버튼을 누르면 native dialog가 열리며
+  50~300% 크기 조절과 ESC 닫기를 지원한다.
+- flowchart 노드나 연결선을 hover하면 DOM의 `data-id`를 이용해 연결된 노드와 엣지만 남겨 강조한다.
+  Mermaid의 점선 엣지(`-.->`)와 sequence 응답선은 흐르는 dash로 보이되,
+  `prefers-reduced-motion`이면 애니메이션을 끈다. 다른 다이어그램 종류는 hover 대상 자체만 강조한다.
+- astro-mermaid는 테마 전환 때 SVG의 `innerHTML`을 교체한다. `MermaidEnhancer`의 이벤트는 컨테이너에
+  위임하고 `MutationObserver`로 확대 버튼 상태를 다시 맞춰야 하므로, SVG에 직접 listener를 붙이는
+  방식으로 바꾸지 않는다.
+- **D2**는 레이아웃과 시각적 흐름을 더 강조할 때 선택한다. `astro-d2`가 빌드 시 SVG 파일을
+  만들고 `<img>`로 넣는다. `inline: false` 기본값을 유지해야 다크 모드와 자동 확대가 함께
+  안정적으로 동작한다. 인라인 SVG가 필요한 링크·툴팁은 별도 검토 대상이다.
+- D2 생성은 `experimental.useD2js: true`로 D2.js/WASM을 사용한다. Cloudflare Pages에 D2
+  바이너리를 설치할 필요가 없는 대신 `tala` 레이아웃은 쓸 수 없어서 기본을 `elk`로 고정했다.
+- 생성된 `public/d2/`는 빌드 산출물이므로 `.gitignore`에서 제외한다.
+- `starlight-image-zoom`은 일반 Markdown/MDX 이미지와 D2 `<img>`를 자동으로 감싼다.
+  `<SourceFigure>`는 원문 출처 링크와 이미지 확대 동작이 충돌하지 않도록 `<Zoom>`을 직접 쓴다.
+- 이 저장소는 Pagefind 덱 라벨용 `MarkdownContent` override가 이미 있으므로 플러그인이 자체
+  override를 설치하지 않는다. 기존 `MarkdownContent.astro`가 `<ImageZoom />` 런타임을 직접
+  렌더하고 `<MermaidEnhancer />`도 합성해야 검색 메타·이미지 확대·Mermaid 상호작용이 함께 동작한다.
+- `starlight-image-zoom` 0.15는 Astro 7의 기본 Sätteri 프로세서를 아직 지원하지 않아서
+  `@astrojs/markdown-remark`의 `unified()`를 명시했다. 플러그인 업그레이드 때 Sätteri 지원 여부를
+  다시 확인하고, 지원되면 이 임시 호환 설정과 직접 의존성을 함께 제거할 수 있다.
 
 ## 외관 — 세 겹
 
