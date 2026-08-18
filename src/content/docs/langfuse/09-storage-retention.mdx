@@ -1,0 +1,145 @@
+---
+title: "9. 저장소·backup·retention"
+description: Postgres·ClickHouse·Redis·S3의 데이터, backup·restore와 trace payload 보존 비용을 운영한다
+reviewedAt: 2026-08-18
+status: review
+---
+
+import { LinkCard } from '@astrojs/starlight/components';
+import TermIntro from '../../../components/docs/TermIntro.astro';
+
+> Langfuse backup은 PVC snapshot 하나가 아니라 **같은 시점의 네 저장소와 암호화 key를 다시 연결하는 일**이다
+
+<TermIntro
+  terms={[
+    ['RPO', 'Recovery Point Objective', '장애 때 잃어도 되는 최대 데이터 시간이다.'],
+    ['RTO', 'Recovery Time Objective', '서비스와 데이터 접근을 복구해야 하는 목표 시간이다.'],
+    ['retention', '', 'trace·observation·score·media를 조회 가능하게 보관하는 기간 정책이다.'],
+    ['TTL', 'Time To Live', 'ClickHouse row나 object가 일정 시간이 지나면 만료되게 하는 규칙이다.'],
+    ['raw event', '', 'Worker 처리 전 S3에 저장하는 원본 ingestion payload다.'],
+  ]}
+/>
+
+## 데이터 inventory
+
+| 저장소 | 핵심 데이터 | 복구하지 못하면 |
+|---|---|---|
+| Postgres | user·org·project·key·prompt·dataset·evaluator config | login·prompt·project 관계와 설정 손실 |
+| ClickHouse | observation·score·분석 table | trace UI·dashboard·품질 역사 손실 |
+| Redis/Valkey | queue·cache·coordination | 처리 대기 event와 cache 일관성 영향 |
+| S3 event bucket | raw ingestion event | queue 재처리·audit 원본 손실 |
+| S3 media bucket | image·audio attachment | trace의 multimodal content 깨짐 |
+| Secret store | `SALT`·`NEXTAUTH_SECRET`·`ENCRYPTION_KEY` | key 검증·저장 credential 복호화 실패 |
+
+Redis는 cache만이 아니라 queue도 맡는다. “Redis는 재생성 가능”이라고 단정하려면 S3의 어떤 raw event를 어떤 id로
+다시 enqueue할 수 있는지 실제 recovery 절차가 있어야 한다.
+
+## 성장률을 event 크기에서 계산한다
+
+```text
+일일 logical ingest
+= 일 요청 수
+× 요청당 observation 수
+× observation 평균 payload
+× replication/dual-write/backfill 계수
+```
+
+Prompt·response 전문, retrieved documents와 judge reasoning이 평균 payload를 크게 만든다. application traffic이 2배가
+아니어도 agent step 수와 online evaluation 비율이 늘면 observation은 더 빠르게 증가한다.
+
+capacity review에는 다음을 같은 그래프에 둔다.
+
+- 하루 observation 수와 평균/상위 payload bytes
+- ClickHouse data·index·system table disk와 merge backlog
+- event/media bucket 증가량과 multipart 실패
+- Redis queue depth·oldest age·memory
+- retention deletion throughput과 실패
+- v4 migration 중 dual write/backfill의 임시 배수
+
+## Retention을 데이터 종류로 나눈다
+
+| 데이터 | 보존 예시 | 이유 |
+|---|---|---|
+| metadata·timing·usage | 90일 | trend·capacity·release 비교 |
+| sampled masked content | 30일 | incident와 품질 debug |
+| media | 승인된 짧은 기간 | 크기·개인정보 위험 |
+| dataset item | 명시적 lifecycle | regression contract |
+| audit/export | 별도 archive policy | 제품 UI retention과 분리 |
+
+공식 project-level retention은 self-hosted Enterprise Edition 기능이다. 정책이 없으면 self-hosted event data가 자동
+삭제되지 않는다. OSS에서 ClickHouse TTL이나 S3 lifecycle을 직접 쓰면 entity 관계와 media reference를 깨뜨리지
+않는지 별도 검증한다.
+
+:::caution[함정]
+Media bucket에 단순 age-based lifecycle delete를 걸면 trace reference가 깨지고 같은 content hash의 재업로드도
+문제가 될 수 있다. 가능하면 Langfuse의 data-retention 경로로 trace·media를 함께 지운다.
+:::
+
+## Backup 주기
+
+| 대상 | 방식 예시 | 검증 |
+|---|---|---|
+| Postgres | PITR + 정기 logical/physical backup | 새 instance에 restore·migration |
+| ClickHouse | managed backup, native backup 또는 volume snapshot | representative query와 row count |
+| Redis | HA + persistence/backup 정책 | queue 장애 시 duplicate/loss test |
+| S3 | replication·object lock/backup 정책 | raw event와 media checksum |
+| Secret | 별도 encrypted escrow | DB와 함께 key 검증·복호화 |
+
+ClickHouse replica는 backup이 아니다. 같은 operator 오류나 잘못된 delete가 모든 replica에 복제된다. S3 versioning도
+무조건 켜지 않는다. ClickHouse external disk는 파일을 자주 갱신해 version이 빠르게 늘 수 있으므로 공식 권고와
+storage 특성을 확인한다.
+
+## Restore 순서
+
+```mermaid
+flowchart LR
+    SEC["1. Secret/key"] --> STATE["2. Postgres · S3"]
+    STATE --> CH["3. ClickHouse"]
+    CH --> REDIS["4. Redis queue/cache"]
+    REDIS --> APP["5. Web · Worker"]
+    APP --> VERIFY["6. trace/prompt/score 검증"]
+
+    classDef key  fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
+    classDef zone fill:#ede9fe,stroke:#7c3aed,color:#4c1d95
+    classDef warn fill:#fef3c7,stroke:#d97706,color:#78350f
+    classDef ok   fill:#dcfce7,stroke:#16a34a,color:#14532d
+    class SEC,STATE key
+    class CH,REDIS zone
+    class APP warn
+    class VERIFY ok
+```
+
+정확한 순서는 장애와 backup 방식에 따라 달라질 수 있지만 Web/Worker를 먼저 열어 새 event가 불완전한 저장소에
+섞이게 하지 않는다. restore point 사이 시간 차이 때문에 project는 있는데 ClickHouse row가 없거나, queue reference가
+없는 object를 가리킬 수 있다.
+
+## 복구 검증 시나리오
+
+- 기존 user가 SSO/login 후 project를 볼 수 있는가
+- project key로 새 trace를 ingest하고 조회할 수 있는가
+- 과거 trace의 tree·score·media가 열린다
+- production prompt label이 올바른 immutable version을 가리킨다
+- dataset과 experiment run의 trace link가 기대만큼 남아 있다
+- queue를 재처리해도 observation이 비정상 중복되지 않는다
+- backup 이후 변경된 key와 encrypted LLM credential을 읽을 수 있다
+
+## 삭제와 export
+
+Retention은 UI에서 보이지 않는 것과 법적 삭제를 구분한다. ClickHouse row만 지우고 raw event나 media backup이 남으면
+완전 삭제가 아니다. 삭제 대상과 backup 만료·export archive·object version까지 data map에 포함한다.
+
+장기 분석이 필요하면 product hot store를 무한히 늘리기보다 승인된 enriched observation export를 별도 lake에 두고
+접근·schema·deletion 정책을 독립 운영한다.
+
+## 참고 자료
+
+- [Backup Strategies](https://langfuse.com/self-hosting/configuration/backups) — ClickHouse·Postgres·Redis·S3 backup 방식.
+- [Data Retention](https://langfuse.com/docs/administration/data-retention) — 적용 entity·삭제 기준·self-hosted availability.
+- [Scaling Langfuse](https://langfuse.com/self-hosting/configuration/scaling) — S3·ClickHouse disk 증가와 retention 주의.
+- [ClickHouse Self-hosting](https://langfuse.com/self-hosting/deployment/infrastructure/clickhouse) — external disk와 lifecycle 주의.
+
+<LinkCard
+  title="10. 보안과 데이터 경계"
+  description="Prompt가 애플리케이션을 떠나기 전 masking하고 key·SSO·network·encryption을 저장소까지 잇는다."
+  href="/langfuse/10-security/"
+/>

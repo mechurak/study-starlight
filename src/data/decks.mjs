@@ -386,6 +386,24 @@ export const deckDefinitions = [
 			['마무리', ['litellm/12-glossary', 'litellm/13-wrapup']],
 		],
 	},
+	{
+		slug: 'langfuse',
+		topicOrder: 17,
+		label: 'Langfuse',
+		title: 'Langfuse',
+		icon: 'analytics',
+		aliases: ['LLM Observability', 'LLMOps', 'LLM 평가', 'Prompt Management'],
+		description: 'LLM 앱이 왜 그런 응답을 냈는지 추적하고, prompt·평가·실험을 production 피드백 루프로 잇는다.',
+		category: 'platform',
+		groups: [
+			['시작', ['langfuse/00-position', 'langfuse/01-data-model']],
+			['관측 설계', ['langfuse/02-instrumentation', 'langfuse/03-trace-design']],
+			['개선 루프', ['langfuse/04-prompt-management', 'langfuse/05-evaluation', 'langfuse/06-datasets-experiments']],
+			['온프렘 Kubernetes', ['langfuse/07-k8s-architecture', 'langfuse/08-deploy-upgrade', 'langfuse/09-storage-retention']],
+			['운영', ['langfuse/10-security', 'langfuse/11-operations', 'langfuse/12-troubleshooting']],
+			['마무리', ['langfuse/13-glossary', 'langfuse/14-wrapup']],
+		],
+	},
 ];
 
 export const topics = [...deckDefinitions].sort((a, b) => a.topicOrder - b.topicOrder).map((deck) => ({
@@ -417,6 +435,7 @@ export const termIntroDeckSlugs = [
 	'gpu-platform',
 	'databricks',
 	'litellm',
+	'langfuse',
 ];
 
 export const deckCatalogSections = categories.map((category) => ({

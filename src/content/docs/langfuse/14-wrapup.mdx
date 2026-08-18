@@ -1,0 +1,142 @@
+---
+title: "14. 마무리"
+description: Langfuse v4의 trace·prompt·평가 개선 루프와 온프렘 Kubernetes 운영 결정을 한 장으로 묶는다
+reviewedAt: 2026-08-18
+status: review
+---
+
+import { LinkCard } from '@astrojs/starlight/components';
+
+> Langfuse 운영을 한 문장으로 줄이면 **실행을 observation으로 남기고, 판정을 다음 release의 재현 가능한 근거로 되돌리는 일**이다
+
+## 전체 지도
+
+```mermaid
+flowchart LR
+    APP["LLM 앱<br/>root · retrieval · tool · generation"] -->|"SDK / OTLP batch"| WEB["Langfuse Web"]
+    WEB --> S3[("S3 raw event")]
+    WEB --> REDIS[("Redis queue")]
+    REDIS --> WORKER["Worker"]
+    S3 --> WORKER
+    WORKER --> CH[("ClickHouse<br/>observation · score")]
+    WEB --> PG[("Postgres<br/>prompt · dataset · config")]
+
+    CH --> FIND["낮은 score · 높은 cost · error"]
+    FIND --> DATA["dataset item"]
+    DATA --> EXP["experiment"]
+    EXP --> PROMPT["prompt production label"]
+    PROMPT --> APP
+
+    classDef key  fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
+    classDef zone fill:#ede9fe,stroke:#7c3aed,color:#4c1d95
+    classDef warn fill:#fef3c7,stroke:#d97706,color:#78350f
+    classDef ok   fill:#dcfce7,stroke:#16a34a,color:#14532d
+    class APP,WEB key
+    class WORKER,FIND,DATA zone
+    class S3,REDIS,CH,PG warn
+    class EXP,PROMPT ok
+```
+
+왼쪽 절반은 **관측 data pipeline**, 오른쪽 절반은 **product improvement loop**다. Pipeline만 있으면 trace archive이고,
+loop만 있으면 production evidence 없는 lab test다.
+
+## 설계 결정 열두 가지
+
+1. Trace 한 개는 보통 한 chatbot turn 또는 한 agent run으로 둔다.
+2. v4의 분석 단위는 observation이고 trace는 같은 `trace_id`의 논리적 tree로 본다.
+3. Root에 전체 input/output, generation·tool·retriever에 각 operation의 input/output을 둔다.
+4. Stable name·type과 environment·release·version을 분석 계약으로 관리한다.
+5. User/session/metadata는 관련 child observation에 전파한다.
+6. Prompt version은 immutable history, label은 deployment pointer로 구분한다.
+7. `latest`가 아니라 검증된 `production` label을 application이 fetch한다.
+8. Score에는 target·rubric·source·evaluator version과 sampling을 함께 둔다.
+9. Production edge case를 dataset으로 되돌려 offline experiment를 release gate로 쓴다.
+10. SDK batch·Web ingest·S3·Redis·Worker·ClickHouse의 비동기 경계를 따로 관측한다.
+11. Prompt 전문은 기본 수집값이 아니며 client-side masking을 첫 방어선으로 둔다.
+12. Backup은 Postgres·ClickHouse·Redis·S3와 encryption key를 같은 복구 runbook으로 묶는다.
+
+## Production 준비 checklist
+
+### Trace contract
+
+- [ ] Root 범위와 session 범위가 문서화됐다.
+- [ ] Agent·tool·retriever·generation의 stable name/type 목록이 있다.
+- [ ] Generation에 model·usage·cost와 prompt version이 연결된다.
+- [ ] Environment·release·version과 가명 user/session이 child에 전파된다.
+- [ ] Application log와 LiteLLM을 잇는 correlation id가 있다.
+- [ ] Error·streaming·client disconnect가 완결 상태로 남는다.
+
+### Prompt와 평가
+
+- [ ] Production code는 `latest`가 아닌 승인 label을 fetch한다.
+- [ ] Cache TTL·cold start·fallback과 version 공존을 시험했다.
+- [ ] Prompt variable/output schema contract test가 있다.
+- [ ] Score name·type·rubric·target·evaluator version이 정의됐다.
+- [ ] Judge는 human label로 calibration하고 sampling·비용을 감시한다.
+- [ ] 핵심 dataset의 quality·cost·latency·safety release gate가 있다.
+- [ ] 낮은 production score를 dataset item으로 승격하는 owner와 절차가 있다.
+
+### Kubernetes와 storage
+
+- [ ] Server·SDK·chart·storage version과 image digest를 고정했다.
+- [ ] Web·Worker는 각각 여러 replica와 분산·PDB·resource가 있다.
+- [ ] Postgres·ClickHouse·Redis/Valkey·S3는 독립 HA와 backup이 있다.
+- [ ] ClickHouse는 지원되는 단일 shard·replica 구조와 disk headroom을 가진다.
+- [ ] Web·Worker 최대 replica의 DB/Redis/CH connection과 downstream capacity를 계산했다.
+- [ ] Health/readiness와 end-to-end synthetic trace를 구분했다.
+- [ ] Queue depth·oldest age·freshness SLO와 alert가 있다.
+
+### 보안과 lifecycle
+
+- [ ] Field별 수집 allowlist와 client-side masking이 있다.
+- [ ] S3 raw event·media·backup·export까지 data map에 들어간다.
+- [ ] Project key는 workload별로 분리되고 rotation을 시험했다.
+- [ ] `SALT`·`NEXTAUTH_SECRET`·`ENCRYPTION_KEY`를 DB와 함께 복구할 수 있다.
+- [ ] SSO/RBAC와 production prompt label 권한을 검증했다.
+- [ ] Web·Worker의 ingress/egress NetworkPolicy가 역할별로 다르다.
+- [ ] Retention·deletion·archive의 기간과 license/구현 경로가 정해졌다.
+- [ ] Public trace와 외부 export는 승인된 예외로만 사용한다.
+
+## 장애 대응 카드
+
+| 증상 | 첫 확인 | 하지 않을 것 |
+|---|---|---|
+| trace가 전혀 없음 | SDK endpoint·key·flush·Web status | app 200을 exporter 성공으로 간주 |
+| ingest 2xx인데 늦음 | queue age·Worker·CH insert | UI refresh만 반복 |
+| child tree가 끊김 | OTel context·span filter·provider | 모든 span을 무조건 export |
+| child를 user/session으로 못 찾음 | attribute propagation | root만 뒤늦게 update |
+| prompt 일부 Pod만 다름 | cache TTL·실제 version | `latest`로 즉시 통일 |
+| score만 없음 | target name/type·judge credential | trace ingestion 장애로 확대 |
+| ClickHouse disk 급증 | payload·retention·dual/backfill | 지원 안 되는 multi-shard 추가 |
+| masking callback 장애 | fail mode·S3 raw event | prompt 전문을 log에 출력 |
+
+## v4 전환에서 기억할 날짜와 경계
+
+2026년 8월 18일 기준 server v4, Python SDK v4, JS/TS SDK v5가 GA다. Langfuse Cloud의 legacy API·ingestion
+제거 예정일은 **2026년 11월 16일**이다. Self-hosted v3에서 v4로 갈 때는 infrastructure → server/write mode →
+producer/read API/evaluator/export → history → `events_only` 순서를 지킨다.
+
+Cloud 일정과 self-hosted cutover를 섞지 않는다. Self-hosted는 조직이 commit 시점을 정하지만, 오래된 SDK와 deprecated
+API를 계속 두면 다음 upgrade의 위험을 미루는 것뿐이다.
+
+## 다른 덱으로 이어 가기
+
+- [LiteLLM](/litellm/) — Langfuse generation metadata에 실제 model routing과 gateway call id를 연결한다.
+- [관측](/observability/) — Langfuse Web·Worker·storage 자체의 metric·log·OTel trace를 운영한다.
+- [온프렘 Kubernetes](/onprem/) — Gateway API·TLS·DNS·SSO·Postgres·backup 공통 기반을 세운다.
+- [GPUStack](/gpustack/) · [온프렘 GPU 플랫폼](/gpu-platform/) — Langfuse가 관측할 사내 model endpoint를 운영한다.
+
+## 다시 볼 장
+
+- [1. Observation-first 데이터 모델](/langfuse/01-data-model/) — 계측 tree와 분석 단위를 잡을 때
+- [4. Prompt 관리](/langfuse/04-prompt-management/) — version·label·cache·rollback을 설계할 때
+- [5. 평가와 score](/langfuse/05-evaluation/) — 품질 측정 계약을 만들 때
+- [7. Kubernetes 운영 구조](/langfuse/07-k8s-architecture/) — Web·Worker와 네 저장소를 배치할 때
+- [9. 저장소·backup·retention](/langfuse/09-storage-retention/) — 보존 비용과 복구를 검토할 때
+- [12. 장애 진단](/langfuse/12-troubleshooting/) — trace 유실·지연을 pipeline 단계로 가를 때
+
+<LinkCard
+  title="Langfuse 개요로 돌아가기"
+  description="덱의 구성과 관측 → 평가 → 실험 → 배포 loop를 다시 본다."
+  href="/langfuse/"
+/>

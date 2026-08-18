@@ -1,0 +1,140 @@
+---
+title: "1. Observation-first 데이터 모델"
+description: Langfuse v4의 observation·trace·session·generation·score 관계와 분석에 필요한 속성
+reviewedAt: 2026-08-18
+status: review
+---
+
+import { LinkCard } from '@astrojs/starlight/components';
+import TermIntro from '../../../components/docs/TermIntro.astro';
+
+> v4의 핵심은 **trace를 먼저 조립해서 읽지 않고, 관심 있는 operation을 observation 한 행으로 바로 찾는 것**이다
+
+<TermIntro
+  terms={[
+    ['observation', '', 'LLM 호출·tool 실행·검색처럼 시작과 끝 또는 한 시점을 가진 애플리케이션 작업 하나다.'],
+    ['trace', '', '같은 `trace_id`를 공유하는 observation의 논리적 묶음이다. 보통 한 turn이나 agent run이다.'],
+    ['root observation', '', '부모가 없고 전체 요청의 input/output과 시간을 대표하는 observation이다.'],
+    ['session', '', '여러 trace를 대화나 장기 workflow 하나로 묶는 `session_id` 기반 그룹이다.'],
+    ['score', '', 'trace·observation·session·experiment run에 붙는 품질 측정 결과다.'],
+  ]}
+/>
+
+## 한 chatbot turn을 펼친다
+
+```mermaid
+flowchart TB
+    ROOT["span: chat-turn<br/>trace_id=t1"] --> RET["retriever: search-docs"]
+    ROOT --> AGENT["agent: answer-question"]
+    AGENT --> GEN["generation: draft-answer<br/>model · usage · cost"]
+    AGENT --> TOOL["tool: lookup-policy"]
+    AGENT --> GEN2["generation: final-answer"]
+    GEN2 -.-> SCORE["score: groundedness=0.92"]
+
+    classDef key  fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
+    classDef zone fill:#ede9fe,stroke:#7c3aed,color:#4c1d95
+    classDef ok   fill:#dcfce7,stroke:#16a34a,color:#14532d
+    classDef warn fill:#fef3c7,stroke:#d97706,color:#78350f
+    class ROOT key
+    class RET,AGENT,TOOL zone
+    class GEN,GEN2 ok
+    class SCORE warn
+```
+
+tree는 한 실행을 디버깅하는 보기다. table과 dashboard는 여러 실행의 `generation: final-answer`만 골라 p95 latency,
+cost, score를 집계하는 보기다. 좋은 계측은 두 보기를 모두 가능하게 한다.
+
+## Observation type은 역할을 말한다
+
+| type | 표현할 일 | 대표 속성 |
+|---|---|---|
+| `span` | 일반 code block이나 request 범위 | input·output·latency·metadata |
+| `generation` | chat/completion 같은 생성 모델 호출 | model·model parameters·usage·cost |
+| `embedding` | embedding model 호출 | model·usage·cost |
+| `agent` | 다음 행동과 흐름을 결정하는 단계 | input·output·child tool/generation |
+| `tool` | 외부 API나 function 실행 | arguments·result·latency·error |
+| `retriever` | vector DB·검색에서 문맥을 가져오는 단계 | query·retrieved items |
+| `evaluator` | 품질을 판정하는 실행 | rubric input·result |
+| `event` | duration 없는 순간 사건 | timestamp·payload |
+
+type은 장식이 아니다. evaluator target과 dashboard filter가 type을 사용한다. 모든 함수를 `span` 하나로 두면 LLM cost를
+직접 찾기 어렵고, 모든 것을 `generation`으로 만들면 model 호출 통계가 오염된다.
+
+## Trace와 session의 범위
+
+chatbot에서는 보통 **한 user message와 그 응답이 trace 하나**, 대화 thread가 session 하나다.
+
+```text
+session s-42
+├─ trace t-1: "배송 조회해 줘" → tool → generation
+├─ trace t-2: "주소도 바꿔 줘" → tool → generation
+└─ trace t-3: "고마워" → generation
+```
+
+대화 전체를 하나의 열린 trace로 유지하면 언제 끝나는지 알 수 없고, 오래 산 span의 flush·오류·재시작 처리가 어려워진다.
+반대로 한 LLM call마다 trace를 새로 만들면 retrieval과 tool을 한 사용자 요청으로 묶지 못한다.
+
+## v4에서 trace 속성은 각 행에 있다
+
+`user_id`, `session_id`, `tags`, `metadata`, `release`, `version`, `environment`처럼 trace 전체를 설명하는 속성은
+관련 observation에 전파된다. 그래서 ClickHouse가 trace table과 observation table을 매번 join하지 않고도
+`production에서 release 2026.08의 특정 generation`을 바로 찾는다.
+
+| 속성 | 좋은 값 | 피할 값 |
+|---|---|---|
+| `name` | `chat-turn`, `retrieve-policy`, `final-answer` | request id가 붙은 동적 이름 |
+| `environment` | `production`, `staging` | 개발자 이름이 섞인 자유 문자열 |
+| `release` | image digest와 연결되는 배포 id | `latest` |
+| `version` | agent workflow나 component version | 매 요청 timestamp |
+| `user_id` | 가명화된 안정 id | 이메일·주민번호 |
+| `metadata` | tenant tier, route, feature flag | prompt 전문 전체의 중복 복사 |
+
+:::caution[함정]
+native OpenTelemetry를 직접 보낼 때 root span에만 `session_id`나 `user_id`를 두면 v4의 observation 단위 filter에서
+child가 빠질 수 있다. SDK의 attribute propagation을 쓰거나 필요한 span 모두에 trace-wide 속성을 전파한다.
+:::
+
+## Input과 output의 주인은 observation이다
+
+v4에서는 trace-level input/output이 deprecated다. 전체 요청과 응답은 root observation에, LLM prompt와 응답은 해당
+generation에, tool arguments와 결과는 tool observation에 둔다. 같은 큰 payload를 여러 level에 복사하지 않는다.
+
+이 원칙은 평가 target도 선명하게 만든다.
+
+- 답변 품질: `generation: final-answer`의 input/output을 평가한다.
+- retrieval relevance: `retriever: search-docs`를 평가한다.
+- 전체 대화 만족도: session score를 붙인다.
+- end-to-end SLA: root observation latency를 본다.
+
+## Usage와 cost
+
+`generation`과 `embedding`에는 model과 input/output token 같은 usage를 남긴다. Langfuse가 아는 model definition과
+가격이면 cost를 계산할 수 있고, custom model은 project별 definition이나 명시적 cost가 필요하다.
+
+모델명만 남기고 usage가 없으면 latency는 보여도 비용은 추정하기 어렵다. 반대로 gateway에서 계산한 비용과 Langfuse
+cost가 다르면 currency·token category·cache token·model price effective date를 먼저 맞춘다.
+
+## Score는 어디에 붙는가
+
+| 대상 | 예시 |
+|---|---|
+| observation | final generation의 groundedness, tool call 성공 여부 |
+| trace/root | 한 turn의 end-to-end task success |
+| session | 대화 전체 만족도, 해결 여부 |
+| experiment run | dataset 전체 평균·회귀 gate |
+
+score type은 numeric·categorical·boolean·text가 있다. `quality=0.8`만 남기지 말고 name, data type, 범위와 evaluator
+version을 함께 고정한다. 서로 다른 rubric의 같은 이름 score를 평균내면 숫자는 있어도 의미가 없다.
+
+## 참고 자료
+
+- [Langfuse Observability Core Concepts](https://langfuse.com/docs/observability/data-model) — v4 observation-first 구조와 속성 전파.
+- [Observation Types](https://langfuse.com/docs/observability/features/observation-types) — generation·agent·tool·retriever 등 type의 의미.
+- [Sessions](https://langfuse.com/docs/observability/features/sessions) — 여러 trace를 대화 단위로 묶는 방법.
+- [Token & Cost Tracking](https://langfuse.com/docs/observability/features/token-and-cost-tracking) — generation usage와 cost 계산.
+
+<LinkCard
+  title="2. 계측과 수집 경로"
+  description="SDK와 OpenTelemetry가 observation을 만들고 batch·flush·비동기 ingestion으로 전달하는 과정을 따른다."
+  href="/langfuse/02-instrumentation/"
+/>

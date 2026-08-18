@@ -1,0 +1,146 @@
+---
+title: "6. Dataset과 experiment"
+description: Production trace를 dataset item으로 만들고 task·evaluator·experiment run으로 변경을 비교한다
+reviewedAt: 2026-08-18
+status: review
+---
+
+import { LinkCard } from '@astrojs/starlight/components';
+import TermIntro from '../../../components/docs/TermIntro.astro';
+
+> Dataset은 예제 모음이 아니다 — **앞으로 다시 깨지면 안 되는 production 경험의 계약**이다
+
+<TermIntro
+  terms={[
+    ['dataset', '', '반복 평가할 input과 선택적 expected output을 가진 test case 집합이다.'],
+    ['dataset item', '', 'input·expected output·metadata와 원본 trace link를 가진 사례 하나다.'],
+    ['task', '', 'dataset item 하나를 받아 현재 application 또는 prompt·model variant를 실행하는 함수다.'],
+    ['evaluator', '', 'task output을 기준에 따라 score로 바꾸는 함수다.'],
+    ['experiment run', '', '한 version의 task를 dataset 전체에 실행한 결과와 score 묶음이다.'],
+  ]}
+/>
+
+## Production에서 release gate까지
+
+```mermaid
+flowchart LR
+    TRACE["낮은 score의<br/>production trace"] --> ITEM["dataset item<br/>input · expected · metadata"]
+    ITEM --> BASE["run A<br/>현재 production"]
+    ITEM --> CAND["run B<br/>새 prompt/model/code"]
+    BASE --> EVAL["같은 evaluators"]
+    CAND --> EVAL
+    EVAL --> COMP["quality · cost · latency 비교"]
+    COMP -->|"통과"| DEPLOY["production 배포"]
+    DEPLOY --> TRACE
+
+    classDef key  fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
+    classDef zone fill:#ede9fe,stroke:#7c3aed,color:#4c1d95
+    classDef ok   fill:#dcfce7,stroke:#16a34a,color:#14532d
+    classDef warn fill:#fef3c7,stroke:#d97706,color:#78350f
+    class TRACE,ITEM key
+    class BASE,CAND zone
+    class EVAL,COMP warn
+    class DEPLOY ok
+```
+
+원본 trace link를 유지하면 왜 이 item이 들어왔는지 확인할 수 있다. 하지만 retention으로 trace가 삭제되면 link가
+끊길 수 있으므로 장기 regression에 필요한 input·expected output·안전한 context는 item 자체에 둔다.
+
+## 좋은 dataset item
+
+| 필드 | 넣을 것 | 이유 |
+|---|---|---|
+| input | 재현 가능한 사용자 요청과 필요한 context | task가 같은 조건을 만들 수 있음 |
+| expected output | 정답 또는 acceptable criteria | evaluator calibration |
+| metadata | language·tenant tier·failure class | segment별 regression 확인 |
+| source | production trace id·incident·synthetic | provenance 추적 |
+| policy | PII 제거·사용 동의·만료 | 학습/평가 데이터 경계 |
+
+LLM output은 여러 표현이 가능하므로 expected output을 완전한 한 문장 exact match로만 두지 않는다. structured field,
+필수 사실, 금지 행동과 reference evidence를 분리하면 code·judge evaluator가 더 안정적이다.
+
+## Dataset을 작게 시작한다
+
+처음부터 천 개를 만들기보다 20~50개의 대표 사례로 시작한다.
+
+- 핵심 happy path
+- 이미 겪은 production incident
+- safety·policy boundary
+- long context·tool failure·empty retrieval
+- 언어·tenant·format별 중요한 segment
+
+각 item이 어떤 위험을 대표하는지 metadata로 남긴다. 비슷한 쉬운 질문이 수백 개이고 중요한 edge case가 하나면 평균은
+좋아도 release가 위험하다.
+
+## Experiment 실행 단위
+
+한 run에는 비교 대상을 하나만 명확히 바꾼다.
+
+```text
+run name: support-prompt-v18-gpt5mini-app-2026.08.18
+task:      production과 같은 retrieval + generation code
+variant:   prompt v18, model chat-general
+dataset:   support-regression v7
+evaluator: schema-v2, groundedness-v3, policy-v5
+```
+
+prompt·model·retrieval code를 한 번에 모두 바꾸면 좋아진 이유를 분리하기 어렵다. 실제 release가 묶여야 한다면
+component experiment 뒤에 end-to-end candidate run을 추가한다.
+
+## SDK experiment와 UI experiment
+
+| 방식 | 장점 | 쓸 때 |
+|---|---|---|
+| SDK | 실제 application task·custom evaluator·CI를 그대로 실행 | code/retrieval/agent 변화 포함 |
+| UI | dataset과 prompt version을 빠르게 조합 | prompt 중심의 빠른 비교 |
+
+SDK가 만든 각 task execution도 trace가 되어 실패 항목을 tree로 debug할 수 있다. local dataset으로 SDK experiment를
+실행하면 trace는 생겨도 Langfuse dataset run comparison이 제한될 수 있으므로, 공식 문서의 현재 data model과 UI
+비교가 필요하면 Langfuse dataset을 기준으로 한다.
+
+## 비교할 네 축
+
+| 축 | metric 예시 |
+|---|---|
+| 품질 | task success, groundedness, policy compliance |
+| 비용 | input/output token, judge cost 포함 total cost |
+| 시간 | end-to-end p50/p95, TTFT, tool latency |
+| 안정성 | parse failure, tool error, timeout, 빈 output |
+
+Candidate가 quality 1%를 올리고 cost 3배, p95 2배라면 “승리”가 아니다. 제품 SLO와 traffic 규모를 반영한 gate를
+미리 정한다.
+
+## Production trace를 item으로 승격하는 기준
+
+- 낮은 user feedback이지만 흔한 문제인가
+- 새로운 failure class인가, 기존 item과 중복인가
+- PII·secret을 제거하고도 재현 가능한가
+- expected behavior를 domain owner가 합의했는가
+- 특정 model의 일시 장애가 아니라 application contract 문제인가
+
+incident마다 무조건 item을 추가하면 dataset이 중복으로 부풀고 CI가 느려진다. root cause를 대표하는 최소 사례와
+boundary 변형만 남긴다.
+
+## CI release gate
+
+1. candidate environment에서 정확한 prompt label과 model contract를 고정한다.
+2. 같은 dataset에 baseline과 candidate를 실행한다.
+3. evaluator version과 random seed·temperature 조건을 기록한다.
+4. 전체 평균과 critical segment를 비교한다.
+5. failure trace를 artifact link로 남긴다.
+6. gate 통과 뒤 production label 또는 application release를 배포한다.
+
+Non-determinism 때문에 작은 차이를 한 번의 run으로 확정하지 않는다. 중요한 item은 반복 실행하거나 confidence interval,
+bootstrap 같은 통계 기준을 사용한다.
+
+## 참고 자료
+
+- [Evaluation Core Concepts](https://langfuse.com/docs/evaluation/core-concepts) — dataset·task·evaluator·experiment의 관계.
+- [Experiments Data Model](https://langfuse.com/docs/evaluation/experiments/data-model) — dataset run item과 trace·score 연결.
+- [Experiments via SDK](https://langfuse.com/docs/evaluation/experiments/experiments-via-sdk) — task와 evaluator 실행 방식.
+
+<LinkCard
+  title="7. Kubernetes 운영 구조"
+  description="Web·Worker와 Postgres·ClickHouse·Redis·S3를 비동기 수집 경로로 배치한다."
+  href="/langfuse/07-k8s-architecture/"
+/>

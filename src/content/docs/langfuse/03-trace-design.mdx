@@ -1,0 +1,146 @@
+---
+title: "3. 좋은 trace 설계"
+description: Agent·RAG·chatbot trace 범위, observation naming, correlation과 payload를 분석 가능한 계약으로 만든다
+reviewedAt: 2026-08-18
+status: review
+---
+
+import { LinkCard } from '@astrojs/starlight/components';
+import TermIntro from '../../../components/docs/TermIntro.astro';
+
+> 좋은 trace는 많이 기록한 trace가 아니라 **질문 하나에 안정된 filter로 답할 수 있는 trace**다
+
+<TermIntro
+  terms={[
+    ['naming contract', '', '같은 역할의 observation이 release가 바뀌어도 같은 name과 type을 쓰는 약속이다.'],
+    ['correlation id', '', 'Langfuse trace를 application log·LiteLLM·일반 OTel trace와 연결하는 식별자다.'],
+    ['cardinality', '', '속성 값 조합의 수. request id 같은 고유값을 집계 차원에 쓰면 폭증한다.'],
+    ['sampling', '', '모든 실행 대신 정해진 비율이나 조건의 실행만 상세 수집·평가하는 정책이다.'],
+  ]}
+/>
+
+## 먼저 답할 분석 질문
+
+계측 코드를 쓰기 전에 dashboard와 incident에서 답할 질문을 적는다.
+
+- 어느 release부터 final answer score가 떨어졌는가
+- retrieval이 느린가, 첫 generation이 느린가
+- 어떤 tool이 가장 자주 실패하고 agent가 몇 번 재시도하는가
+- 어떤 prompt version이 더 비싸지만 품질 차이는 없는가
+- LiteLLM이 선택한 deployment별 품질과 latency가 다른가
+
+질문에 쓰지 않을 payload와 span을 무조건 모으면 storage와 UI noise만 늘어난다.
+
+## Agent trace의 권장 tree
+
+```mermaid
+flowchart TB
+    ROOT["agent-run<br/>root span"] --> PLAN["agent: plan"]
+    PLAN --> G1["generation: decide-next-action"]
+    PLAN --> T1["tool: search-internal-docs"]
+    PLAN --> T2["tool: fetch-ticket"]
+    PLAN --> G2["generation: compose-final-answer"]
+    G2 -.-> S["score: task-success"]
+
+    classDef key  fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
+    classDef zone fill:#ede9fe,stroke:#7c3aed,color:#4c1d95
+    classDef ok   fill:#dcfce7,stroke:#16a34a,color:#14532d
+    classDef warn fill:#fef3c7,stroke:#d97706,color:#78350f
+    class ROOT key
+    class PLAN zone
+    class G1,G2 ok
+    class T1,T2 warn
+    class S zone
+```
+
+agent observation은 흐름을 결정하는 범위, generation은 실제 model 호출, tool은 외부 행동이다. agent의 반복 loop가
+있으면 iteration을 metadata나 child span으로 드러내되 `agent-loop-173821` 같은 동적 name을 만들지 않는다.
+
+## RAG trace의 권장 tree
+
+| 단계 | type/name | 남길 것 | 그대로 남기지 않을 것 |
+|---|---|---|---|
+| 질문 정규화 | `span: normalize-query` | 변환 종류·시간 | 원문 중 PII |
+| 검색 | `retriever: retrieve-context` | query hash·document id·score·top-k | 문서 전문 전체의 중복 |
+| rerank | `span: rerank-context` | candidate 수·선택 id·model | 거대한 embedding vector |
+| 답변 | `generation: final-answer` | prompt link·model·usage·output | provider secret |
+| 평가 | score | faithfulness·relevance | rubric 없는 `quality` 한 값 |
+
+retrieval input/output을 generation prompt에 다시 포함하더라도 분석용 metadata에는 document id와 rank처럼 작은 구조를
+둔다. 전문이 필요하면 media/object storage 정책과 masking을 먼저 정한다.
+
+## 안정된 name과 낮은 cardinality
+
+좋은 name은 코드 함수명이 아니라 제품 역할이다. refactor 후에도 `final-answer`는 유지할 수 있다.
+
+```text
+좋음: chat-turn / retrieve-policy / final-answer / lookup-order
+나쁨: answer_20260818 / user-924-final / POST-/api/chat/84e3...
+```
+
+request·user·session id는 검색 속성으로 필요하지만 name이나 metric dimension처럼 반복 집계하는 자리에 넣지 않는다.
+개별 실행은 trace id로 찾고, 비교는 environment·release·version·stable name으로 한다.
+
+## Correlation contract
+
+| 식별자 | 만든 곳 | Langfuse에 둘 자리 |
+|---|---|---|
+| application request id | edge/application | root metadata |
+| W3C trace id | OTel tracer | trace context 또는 metadata |
+| Langfuse trace id | SDK/OTel | trace 자체 |
+| LiteLLM call id | LiteLLM | generation metadata |
+| session id | chat/workflow service | propagated `session_id` |
+| user id | identity 계층 | 가명화한 `user_id` |
+
+이 값들을 log에도 구조화해 남기면 “사용자 ticket → app log → Langfuse generation → LiteLLM provider attempt”로
+건널 수 있다. secret key나 원본 API key는 correlation id가 아니다.
+
+## Error와 streaming
+
+exception을 catch한 뒤 정상 output처럼 반환하면 observation은 성공으로 보일 수 있다. error type·message의 안전한
+요약과 status를 남기고 stack trace의 secret·payload 노출을 검토한다.
+
+streaming은 다음 시간을 구분한다.
+
+- root 시작부터 generation 시작까지: retrieval·queue·application overhead
+- generation 시작부터 첫 token까지: TTFT
+- 첫 token부터 끝까지: stream duration
+- client disconnect 뒤: model call을 취소했는지, usage·output이 어디까지 확정됐는지
+
+응답 조각마다 observation을 만들지 않는다. generation 하나에 최종 사용량과 완결 상태를 남기고, 꼭 필요한 stream
+event만 제한적으로 기록한다.
+
+## 수집 수준을 tier로 나눈다
+
+| tier | 대상 | 내용 |
+|---|---|---|
+| 기본 | 모든 production 요청 | name·timing·model·usage·status·가명 id |
+| sampled content | 승인된 비율 | masking된 input/output·tool arguments |
+| incident debug | 짧은 기간·특정 workload | 더 상세한 metadata, 명시적 만료 |
+| 금지 | secret·원문 credential·규제 데이터 | 수집 전에 제거 |
+
+sampling은 실패만 제외하지 않는다. 정상 baseline이 없으면 실패가 얼마나 특이한지 비교할 수 없다. error 100%, 정상
+일부, 고가 요청과 낮은 score를 조건부로 더 많이 모으는 식으로 설계한다.
+
+## Trace review checklist
+
+- root가 한 user-visible operation을 대표하는가
+- 같은 역할이 release 사이에 같은 name과 type인가
+- child가 parent보다 긴 비정상 timing을 보이지 않는가
+- generation에 model·usage·prompt version이 있는가
+- `production`과 `staging`이 environment로 분리되는가
+- user/session/metadata가 필요한 child에 전파되는가
+- payload가 policy보다 더 많이 복제되지 않는가
+- 일반 APM과 LiteLLM으로 건너갈 id가 있는가
+
+## 참고 자료
+
+- [What Does a Good Trace Look Like?](https://langfuse.com/docs/observability/best-practices) — trace scope·name·attribute와 평가 연결.
+- [Observation Types](https://langfuse.com/docs/observability/features/observation-types) — agent·tool·retriever·generation type.
+- [Sessions](https://langfuse.com/docs/observability/features/sessions) — turn과 conversation의 범위 분리.
+
+<LinkCard
+  title="4. Prompt 관리"
+  description="trace가 가리키는 prompt version을 label·cache·rollback 가능한 production 계약으로 만든다."
+  href="/langfuse/04-prompt-management/"
+/>

@@ -1,0 +1,92 @@
+---
+title: 개요
+description: Langfuse v4로 LLM 애플리케이션의 동작·비용·품질을 추적하고 prompt와 평가의 개선 루프를 운영한다
+aliases: [LLM Observability, LLMOps, LLM 평가, Prompt Management]
+reviewedAt: 2026-08-18
+status: review
+---
+
+import { LinkCard, LinkButton } from '@astrojs/starlight/components';
+import DeckMap from '../../../components/docs/DeckMap.astro';
+
+> Langfuse는 예쁜 trace viewer가 아니다 — **production 실행을 다음 prompt·코드 변경의 근거로 바꾸는 곳**이다
+
+LLM 애플리케이션은 같은 입력에도 모델·검색 결과·tool 상태에 따라 다른 답을 낸다. HTTP 200과 latency만으로는
+왜 그런 답이 나왔는지, prompt 변경이 품질을 높였는지, 비용이 어느 단계에서 늘었는지 설명하기 어렵다.
+
+Langfuse는 한 turn이나 agent run을 trace로 묶고 그 안의 LLM 호출·검색·tool 실행을 observation으로 남긴다.
+여기에 prompt version, token·cost와 score를 연결하면 **관측 → 평가 → 실험 → 배포 → 다시 관측**의 루프가 된다.
+
+```mermaid
+flowchart LR
+    APP["LLM 애플리케이션<br/>agent · RAG · chatbot"] -->|"OTel observation batch"| LF["Langfuse<br/>trace · cost · quality"]
+    LF --> FIND["문제 발견<br/>느림 · 비쌈 · 낮은 score"]
+    FIND --> DATA["dataset에 사례 추가"]
+    DATA --> EXP["prompt · model 실험"]
+    EXP -->|"검증된 version"| PROD["production label 배포"]
+    PROD --> APP
+    APP --> GATE["LiteLLM<br/>인증 · routing"]
+
+    classDef key  fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
+    classDef zone fill:#ede9fe,stroke:#7c3aed,color:#4c1d95
+    classDef ok   fill:#dcfce7,stroke:#16a34a,color:#14532d
+    classDef warn fill:#fef3c7,stroke:#d97706,color:#78350f
+    class APP,LF key
+    class FIND,DATA zone
+    class EXP,PROD ok
+    class GATE warn
+```
+
+**2026년 8월 18일 기준** Langfuse v4와 최신 GA SDK를 기준으로 확인했다. Cloud는 2026년 11월 16일까지
+legacy 경로를 제거하는 전환 기간이므로, 새 계측은 Python SDK v4·JS/TS SDK v5·OpenTelemetry 경로로 시작한다.
+
+<LinkButton href="/langfuse/00-position/" icon="right-arrow">첫 장부터 읽기</LinkButton>
+
+## 구성
+
+<DeckMap
+  steps={[
+    { label: '0~1장', href: '/langfuse/00-position/', title: '자리와 데이터 모델', tone: 'key',
+      desc: '관측 플랫폼의 경계 · observation · trace · session · score',
+      note: '무엇을 어떤 단위로 남겨야 질문에 답할 수 있는가' },
+    { label: '2~3장', href: '/langfuse/02-instrumentation/', title: '관측 설계', tone: 'zone',
+      desc: 'OTel 기반 SDK · batch와 flush · agent/RAG trace 구조',
+      note: '실행을 잃지 않으면서 분석 가능한 이름과 문맥을 어떻게 남기는가' },
+    { label: '4~6장', href: '/langfuse/04-prompt-management/', title: '개선 루프', tone: 'ok',
+      desc: 'prompt version·label · score · online eval · dataset experiment',
+      note: 'production 실패를 재현 가능한 release gate로 어떻게 되돌리는가' },
+    { label: '7~9장', href: '/langfuse/07-k8s-architecture/', title: '온프렘 Kubernetes', tone: 'warn',
+      desc: 'Web·Worker · Postgres·ClickHouse·Redis·S3 · 배포·upgrade·retention',
+      note: '비동기 수집 경로를 여러 replica와 복구 가능한 저장소로 어떻게 운영하는가' },
+    { label: '10~12장', href: '/langfuse/10-security/', title: '운영', tone: 'bad',
+      desc: 'masking·key·SSO · queue·storage 관측 · 장애 진단',
+      note: '요청은 성공했는데 trace가 없을 때 어느 경계부터 가르는가' },
+    { label: '13~14장', href: '/langfuse/13-glossary/', title: '마무리', tone: 'mute',
+      desc: '용어 사전 · 전체 지도 · production 준비 체크리스트' },
+  ]}
+/>
+
+## 전체를 관통하는 세 문장
+
+**Trace는 tree이고 분석의 행은 observation이다.** v4에서 LLM call·tool·retrieval을 직접 검색하고 평가한다.
+trace는 같은 `trace_id`를 가진 observation 묶음이며 root observation이 한 실행의 대표가 된다.
+
+**수집 성공은 저장 완료가 아니다.** SDK가 background batch를 Web API로 보내면 raw event가 S3에 놓이고 Redis
+queue를 거쳐 Worker가 ClickHouse에 적재한다. 이 경로 때문에 애플리케이션 latency와 관측 저장을 분리할 수 있지만,
+trace 유실을 찾을 때는 각 경계를 따로 봐야 한다.
+
+**평가는 끝이 아니라 loop의 연결부다.** production에서 낮은 score를 받은 사례를 dataset으로 옮기고, 새 prompt와
+model을 같은 항목에 실행한 뒤, 통과한 prompt version의 `production` label을 이동한다.
+
+## 다른 덱과의 경계
+
+- provider 선택·virtual key·budget·fallback은 [LiteLLM](/litellm/)이 맡고 Langfuse는 그 실행을 관측한다.
+- Prometheus·Loki·Tempo·Grafana는 [관측](/observability/)이 맡고 Langfuse는 LLM 의미와 품질을 맡는다.
+- 모델 Pod·GPU와 serving endpoint는 [GPUStack](/gpustack/) 또는 [온프렘 GPU 플랫폼](/gpu-platform/)이 맡는다.
+- Gateway API·TLS·DNS·SSO의 공통 기반은 [온프렘 Kubernetes](/onprem/)이 맡는다.
+
+<LinkCard
+  title="0. Langfuse의 자리"
+  description="일반 APM, LiteLLM, 모델 서버 사이에서 Langfuse가 답하는 질문과 답하지 않는 질문을 먼저 긋는다."
+  href="/langfuse/00-position/"
+/>

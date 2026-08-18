@@ -1,0 +1,145 @@
+---
+title: "4. Prompt 관리"
+description: Langfuse prompt의 immutable version, deployment label, compile, cache와 production rollback을 운영한다
+reviewedAt: 2026-08-18
+status: review
+---
+
+import { LinkCard } from '@astrojs/starlight/components';
+import TermIntro from '../../../components/docs/TermIntro.astro';
+
+> Prompt를 UI로 옮기는 목적은 문자열 편집이 아니라 **어떤 version이 production을 만들었는지 추적하는 것**이다
+
+<TermIntro
+  terms={[
+    ['prompt version', '', 'prompt를 저장할 때마다 생기는 immutable 번호와 내용의 역사다.'],
+    ['label', '', '`production`·`staging`처럼 특정 version을 가리키는 움직이는 배포 pointer다.'],
+    ['compile', '', 'template variable과 message placeholder를 runtime 값으로 채워 model input을 만드는 동작이다.'],
+    ['cache TTL', 'Time To Live', 'SDK가 받은 prompt version을 다시 확인하기 전까지 로컬에서 신선하다고 보는 시간이다.'],
+  ]}
+/>
+
+## Prompt object의 범위
+
+Langfuse prompt는 instruction text만이 아니다. text 또는 chat message 구조, template variable, 선택적 model
+configuration과 version·label metadata를 함께 관리한다.
+
+| 구분 | 예시 | 원칙 |
+|---|---|---|
+| text prompt | 하나의 긴 template | 단일 completion이나 간단 instruction |
+| chat prompt | system/user/assistant message 배열 | 대화 역할과 few-shot 구조 보존 |
+| variable | `{{customer_tier}}` | 작은 동적 값 삽입 |
+| message placeholder | conversation history | message 배열을 안전하게 삽입 |
+| prompt reference | 공통 policy prompt 재사용 | 복제 대신 composition |
+
+business data 전체를 prompt 관리에 넣지 않는다. prompt는 실행 논리의 version이고 customer-specific data는 runtime
+input이다.
+
+## Version과 label
+
+```mermaid
+flowchart LR
+    V1["version 1<br/>이전 production"]
+    V2["version 2<br/>새 예시 추가"]
+    V3["version 3<br/>실험 중"]
+    PROD["label: production"] --> V2
+    STAGE["label: staging"] --> V3
+    LATEST["label: latest"] --> V3
+    ROLLBACK["rollback"] -.->|"pointer 이동"| V1
+
+    classDef key  fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
+    classDef zone fill:#ede9fe,stroke:#7c3aed,color:#4c1d95
+    classDef ok   fill:#dcfce7,stroke:#16a34a,color:#14532d
+    classDef warn fill:#fef3c7,stroke:#d97706,color:#78350f
+    class V1,V2,V3 key
+    class PROD ok
+    class STAGE zone
+    class LATEST warn
+    class ROLLBACK zone
+```
+
+새 prompt를 저장하면 새 version과 `latest`가 생긴다. 검증이 끝나면 `production` label을 그 version으로 옮긴다.
+rollback은 내용을 다시 편집하는 것이 아니라 label을 이전 immutable version으로 되돌리는 일이다.
+
+:::caution[함정]
+Production code가 `latest`를 fetch하면 저장하는 순간 검증되지 않은 prompt가 배포된다. 명시적으로 `production`
+label을 사용하고 label 이동 권한과 변경 기록을 운영 절차로 둔다.
+:::
+
+## Runtime fetch와 compile
+
+```python
+from langfuse import get_client
+
+langfuse = get_client()
+prompt = langfuse.get_prompt("support-answer", label="production")
+
+messages = prompt.compile(
+    customer_tier="enterprise",
+    question="백업 복구 절차를 알려줘",
+)
+```
+
+실제 generation을 만들 때 prompt object를 연결하면 trace에서 어떤 prompt version이 사용됐는지 볼 수 있다. compile된
+문자열만 별도로 복사하면 내용은 보이지만 version별 score·cost 비교 연결이 끊긴다.
+
+## Cache가 availability를 만든다
+
+SDK는 prompt를 client-side cache한다. 공식 기본 TTL은 60초이며 fresh hit는 network를 쓰지 않는다. TTL이 지난
+stale prompt는 즉시 반환하면서 background에서 revalidate할 수 있다. 그래서 Langfuse의 짧은 장애가 곧바로 모든
+LLM 요청 장애가 되지 않는다.
+
+| 상황 | 동작 설계 |
+|---|---|
+| cache hit | memory의 version 사용 |
+| stale | 기존 version으로 응답하고 background revalidate |
+| 첫 startup + Langfuse 정상 | API에서 fetch |
+| 첫 startup + Langfuse 장애 | prefetch 또는 code fallback이 있어야 계속 가능 |
+
+prompt 변경이 모든 Pod에 동시에 반영된다고 가정하지 않는다. TTL 동안 두 version이 공존할 수 있으므로 trace에 실제
+prompt version을 남기고, 엄격한 cutover가 필요하면 prefetch·짧은 TTL·controlled rollout을 함께 쓴다.
+
+## Production 배포 흐름
+
+1. 새 version을 만들고 작성자·의도·관련 ticket을 metadata로 남긴다.
+2. `staging` label에서 representative dataset experiment를 실행한다.
+3. quality·cost·latency와 안전성 gate를 확인한다.
+4. 승인자가 `production` label을 새 version으로 이동한다.
+5. application release와 prompt version별 online score를 관측한다.
+6. regression이면 label을 이전 version으로 되돌리고 실패 trace를 dataset에 추가한다.
+
+Prompt 배포와 code 배포가 분리돼도 책임은 사라지지 않는다. code가 기대하는 variable schema와 prompt가 만드는 output
+schema가 호환되는지 contract test를 둔다.
+
+## Git과 Langfuse의 역할
+
+| Git | Langfuse Prompt Management |
+|---|---|
+| code review·branch·CI와 함께 변경 | domain expert의 빠른 iteration과 runtime fetch |
+| application과 atomic release 가능 | label 이동으로 code 배포 없는 rollback |
+| offline·air-gapped fallback | 실제 trace·score와 prompt version 연결 |
+
+둘 중 하나만 고집할 필요는 없다. canonical source와 sync 방향을 명확히 정한다. 양쪽에서 동시에 수정하고 자동 merge를
+기대하면 어느 것이 production 진실인지 모호해진다.
+
+## 운영 checklist
+
+- production code가 `production` 또는 조직의 고정 label을 명시하는가
+- label 이동 권한과 승인 절차가 있는가
+- variable·message schema에 contract test가 있는가
+- cache TTL 동안 version 공존을 dashboard에서 구분할 수 있는가
+- cold start 때 Langfuse 장애를 견딜 prefetch/fallback이 필요한가
+- generation trace가 prompt name·version을 실제로 가리키는가
+- rollback 뒤에도 실패 사례와 평가 결과가 보존되는가
+
+## 참고 자료
+
+- [Prompt Management Concepts](https://langfuse.com/docs/prompt-management/data-model) — prompt type·variable·version·label 모델.
+- [Prompt Version Control](https://langfuse.com/docs/prompt-management/features/prompt-version-control) — production label과 rollback.
+- [Prompt Caching](https://langfuse.com/docs/prompt-management/features/caching) — client cache·background revalidation·fallback.
+
+<LinkCard
+  title="5. 평가와 score"
+  description="사람·사용자·코드·LLM judge의 판정을 같은 score 모델로 만들고 online 품질 신호로 운영한다."
+  href="/langfuse/05-evaluation/"
+/>

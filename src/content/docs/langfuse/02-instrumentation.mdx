@@ -1,0 +1,177 @@
+---
+title: "2. 계측과 수집 경로"
+description: Python·JS SDK와 OpenTelemetry로 observation을 만들고 batch·flush·비동기 ingestion 유실을 다룬다
+reviewedAt: 2026-08-18
+status: review
+---
+
+import { Tabs, TabItem, LinkCard } from '@astrojs/starlight/components';
+import TermIntro from '../../../components/docs/TermIntro.astro';
+
+> 계측의 성공 기준은 코드가 실행되는 것이 아니라 **원하는 tree가 완결된 상태로 도착하는 것**이다
+
+<TermIntro
+  terms={[
+    ['OpenTelemetry', 'OTel', 'trace·metric·log를 공통 API와 전송 형식으로 계측하는 표준이다.'],
+    ['OTLP', 'OpenTelemetry Protocol', 'OTel telemetry를 collector나 backend로 보내는 protocol이다.'],
+    ['context propagation', '', '현재 trace/span 문맥을 child function과 비동기 작업으로 전달하는 동작이다.'],
+    ['batch', '', '여러 observation event를 묶어 background HTTP 요청 수를 줄이는 단위다.'],
+    ['flush', '', 'client queue에 남은 event를 즉시 전송하도록 기다리는 동작이다.'],
+  ]}
+/>
+
+## 세 가지 계측 경로
+
+| 경로 | 쓸 때 | 주의점 |
+|---|---|---|
+| Langfuse SDK | Python·JS/TS 앱 | Langfuse attribute·prompt link·media·filter를 가장 잘 처리 |
+| framework integration | LangChain·LlamaIndex·OpenAI wrapper 등 | 자동 tree의 이름·payload·중복 span을 검토 |
+| native OTel | 다른 언어 또는 기존 OTel 표준화 | observation type과 trace-wide attribute mapping을 직접 책임 |
+
+Python과 JS/TS에서는 최신 Langfuse SDK를 기본으로 한다. 이미 OTel collector가 있어도 SDK의 span processor를 기존
+provider에 함께 연결할 수 있다. 두 provider가 같은 span을 Langfuse로 중복 export하지 않는지 확인한다.
+
+## 최소 수동 계측
+
+<Tabs>
+<TabItem label="Python SDK v4">
+
+```python
+from langfuse import get_client, observe
+
+langfuse = get_client()
+
+@observe(name="chat-turn")
+def answer(question: str) -> str:
+    with langfuse.start_as_current_observation(
+        as_type="generation",
+        name="final-answer",
+        input={"question": question},
+        model="chat-general",
+    ) as generation:
+        response = call_model(question)
+        generation.update(output=response)
+        return response
+```
+
+</TabItem>
+<TabItem label="JS/TS SDK v5">
+
+```ts
+import { startActiveObservation } from "@langfuse/tracing";
+
+await startActiveObservation("chat-turn", async (root) => {
+  root.update({ input: { question } });
+
+  const answer = await startActiveObservation(
+    "final-answer",
+    async (generation) => {
+      const response = await callModel(question);
+      generation.update({ output: response });
+      return response;
+    },
+    { asType: "generation" },
+  );
+
+  root.update({ output: answer });
+});
+```
+
+</TabItem>
+</Tabs>
+
+예시는 관계를 보여주기 위한 최소 형태다. 실제 LLM wrapper integration이 model·usage를 자동 수집한다면 같은 호출을
+수동 generation으로 한 번 더 감싸 중복 기록하지 않는다.
+
+## Trace-wide 속성을 먼저 전파한다
+
+한 request의 root observation을 만든 직후 다음 문맥을 scope에 전파한다.
+
+- `trace_name`: 안정된 workflow 이름
+- `user_id`: 가명화된 이용자 id
+- `session_id`: conversation/thread id
+- `tags`: 실험 cohort나 기능 분류
+- `metadata`: tenant tier, feature flag, LiteLLM call id
+- `environment`, `release`: 보통 process 환경 변수로 고정
+
+v4는 이 값이 child observation에도 있어야 직접 filter할 수 있다. 이미 만들어 export한 span에 뒤늦게 root 속성을
+update해도 과거 child 행이 자동으로 바뀐다고 기대하지 않는다.
+
+## Native OTel endpoint
+
+Langfuse v4는 OTLP/HTTP endpoint를 제공한다. 다른 언어나 collector에서는 project public/secret key를 Basic Auth로
+보내고 v4 ingestion header를 명시한다.
+
+```text
+OTEL_EXPORTER_OTLP_ENDPOINT=https://langfuse.internal.example/api/public/otel
+OTEL_EXPORTER_OTLP_HEADERS=Authorization=Basic <base64(public:secret)>,x-langfuse-ingestion-version=4
+```
+
+signal-specific endpoint를 쓸 때 traces 경로는 `/api/public/otel/v1/traces`다. 공식 문서 기준 HTTP/JSON과
+HTTP/protobuf를 지원하고 gRPC는 지원하지 않는다.
+
+:::caution[함정]
+`x-langfuse-ingestion-version: 4`만 붙인다고 legacy event가 v4-ready span으로 바뀌지 않는다. 각 operation을 완결된
+OTel span 하나로 보내고 input/output은 해당 observation에, trace-wide 속성은 관련 span 모두에 둬야 한다.
+:::
+
+## SDK에서 서버까지
+
+```mermaid
+sequenceDiagram
+    participant A as 애플리케이션
+    participant Q as SDK memory queue
+    participant W as Langfuse Web
+    participant S as S3 event bucket
+    participant R as Redis queue
+    participant K as Worker
+    participant C as ClickHouse
+
+    A->>Q: observation 종료
+    Q->>W: time/size 기준 batch
+    W->>S: raw event 저장
+    W->>R: S3 reference enqueue
+    W-->>Q: ingest 응답
+    K->>R: job consume
+    K->>S: raw event 읽기
+    K->>K: validate · enrich · mask
+    K->>C: observation/score 적재
+```
+
+Web의 2xx는 event가 최종 query table에 나타났다는 뜻이 아니다. queue backlog나 Worker 장애가 있으면 ingest는
+받았지만 UI에는 늦게 보일 수 있다.
+
+## Batch와 process 종료
+
+SDK는 요청 latency를 줄이기 위해 event를 background queue에서 묶는다. 다음 환경은 종료 전에 명시적 flush나
+shutdown이 필요하다.
+
+- CLI·batch job처럼 짧게 사는 process
+- serverless function이 응답 뒤 freeze되는 runtime
+- Kubernetes Pod가 SIGTERM 뒤 짧은 grace period만 갖는 경우
+- test runner가 process를 강제 종료하는 경우
+
+flush를 매 observation마다 호출하면 batch 이점을 잃는다. 평소에는 default를 쓰고 process lifecycle 경계에서만
+flush한다. 종료 hook은 Langfuse flush 뒤에 network와 runtime을 닫도록 순서를 정한다.
+
+## 첫 계측 검증
+
+1. 고유한 synthetic input으로 한 요청을 보낸다.
+2. root·retriever·generation·tool의 parent/child 관계가 의도와 같은지 본다.
+3. generation에 model·usage·cost가 있는지 확인한다.
+4. `environment`, `release`, `user_id`, `session_id`로 child observation이 검색되는지 본다.
+5. exception과 streaming 중단도 observation status와 output에 남는지 본다.
+6. process를 즉시 종료하는 test에서 flush 유실이 없는지 확인한다.
+
+## 참고 자료
+
+- [Langfuse SDK Overview](https://langfuse.com/docs/observability/sdk/overview) — 최신 Python·JS/TS SDK와 self-host 호환성.
+- [Event Queuing and Batching](https://langfuse.com/docs/observability/features/queuing-batching) — batch 옵션과 short-lived process의 flush.
+- [Native OpenTelemetry Integration](https://langfuse.com/integrations/native/opentelemetry) — OTLP endpoint·Basic Auth·v4 ingestion header.
+- [Custom Ingestion v4 Migration](https://langfuse.com/integrations/native/opentelemetry/migration-to-v4) — 완결된 span과 attribute propagation checklist.
+
+<LinkCard
+  title="3. 좋은 trace 설계"
+  description="자동으로 생긴 span을 분석 가능한 agent·RAG tree와 안정된 naming contract로 다듬는다."
+  href="/langfuse/03-trace-design/"
+/>
