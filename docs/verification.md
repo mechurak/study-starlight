@@ -15,16 +15,15 @@ pnpm check
 |---|---|
 | 문장·문단·링크 | `pnpm check` |
 | 표·컴포넌트 추가 | check + 모바일 넘침 |
-| Mermaid 추가·수정 | check + 라이트/다크 렌더·확대·hover·모바일 |
+| Mermaid 추가·수정 | check + 라이트/다크 렌더·클릭 확대·모바일 |
 | D2 추가·수정 | check + SVG 로드·라이트/다크·확대·애니메이션 |
 | 테마·`custom.css`·config·override | 아래 항목 전수 |
 
 산출물을 브라우저에서 볼 때는 `pnpm preview`를 사용한다.
 
 1. Mermaid: `.mermaid` 안에 `svg`가 생기고 `.mermaid-frame`이 하나씩 붙는지 확인한다.
-   flowchart 노드 hover에서 연결 노드·엣지가 강조되는지, 확대 dialog와 50~300% 조절·ESC 닫기가
-   동작하는지 본다. 다크 모드 전환 후 SVG가 재렌더되어도 프레임과 확대 버튼이 하나씩인지 확인한다.
-   점선 애니메이션은 reduced motion에서 꺼져야 한다.
+   SVG와 확대 버튼이 dialog를 열고 ESC·닫기 버튼·바깥 영역 클릭으로 닫히는지 본다.
+   다크 모드 전환 후 SVG가 재렌더되어도 프레임과 확대 버튼이 하나씩인지 확인한다.
 2. D2: `/d2/` 아래 SVG 이미지가 로드되는지, 확대 버튼이 dialog를 여는지 확인한다.
    테마 전환 뒤 색이 바뀌고 animated edge가 움직이는지도 본다.
 3. 이미지: 일반 본문 이미지와 `<SourceFigure>`의 확대 dialog가 열리고 닫히는지 확인한다.

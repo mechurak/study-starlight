@@ -27,8 +27,8 @@ CLAUDE.md                     # 에이전트 작업 진입점
   상단에서 덱을 전환하고 덱마다 독립된 사이드바를 준다
 - **검색은 Pagefind 내장** — 빌드 시 정적 인덱스가 생성된다. 별도 설정 없음
 - **mermaid는 [astro-mermaid](https://www.npmjs.com/package/astro-mermaid)** — ```` ```mermaid ````
-  펜스를 클라이언트에서 렌더하고 라이트/다크 테마를 자동 추적한다. 공통 카드·클릭 확대·
-  연결 요소 hover 강조·점선 흐름 애니메이션은 `MermaidEnhancer.astro`가 덧붙인다
+  펜스를 클라이언트에서 렌더하고 라이트/다크 테마를 자동 추적한다. `MermaidZoom.astro`가
+  공통 카드와 클릭 확대를 덧붙인다
 - **D2는 [astro-d2](https://astro-d2.vercel.app)** — ```` ```d2 ```` 펜스를 빌드 때 SVG로 만들며,
   관계를 더 정돈된 레이아웃과 애니메이션으로 강조할 때 선택한다
 - **이미지 확대는 [starlight-image-zoom](https://github.com/HiDeoo/starlight-image-zoom)** —
