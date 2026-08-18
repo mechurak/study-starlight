@@ -13,7 +13,7 @@
 | mermaid 펜스 렌더 | `astro-mermaid` 통합 (**starlight보다 먼저**) | `astro.config.mjs` |
 | 검색 결과에 덱 이름 표시 | `MarkdownContent` 컴포넌트 override | `src/components/layout/MarkdownContent.astro` |
 | 덱 index 별칭 검색 | manifest의 `aliases`를 본문 앞에 표시 | `src/data/decks.mjs` · `MarkdownContent.astro` |
-| 랜딩 덱 최종 수정일 | Starlight의 Git 이력 API로 덱 문서의 최신 커밋일 계산 | `src/components/docs/DeckCatalog.astro` |
+| 랜딩 덱 최종 수정일 | 빌드 전 전체 Git 이력 확보 + Starlight API로 덱 문서의 최신 커밋일 계산 | `scripts/prepare-git-history.mjs` · `src/components/docs/DeckCatalog.astro` |
 | 본문 폰트 Pretendard | `customCss` (dynamic subset) | `astro.config.mjs` |
 | 본문 폭 45→55rem | `--sl-content-width` | `src/styles/custom.css` |
 | mermaid 가로 스크롤 | `.mermaid` overflow | `src/styles/custom.css` |
@@ -77,6 +77,9 @@ Pagefind JS API(`debouncedSearch` → `result.data()` → meta로 그룹핑)로 
 
 - dev에서는 파일별 `git log`, build에서는 Starlight가 빌드 시작 시 한 번 수집해 인라인한 Git
   이력을 사용한다
+- Cloudflare Pages의 얇은 checkout은 모든 문서를 HEAD에서 추가된 것처럼 보이게 한다.
+  `pnpm build`의 `prebuild`가 `CF_PAGES=1`이고 저장소가 얇은 경우에만 `git fetch --unshallow`로
+  전체 이력을 확보한 뒤 Starlight 빌드를 시작한다
 - 아직 커밋되지 않아 이력이 없는 새 문서는 계산에서 제외하고, 덱 전체에 이력이 없으면 날짜를
   표시하지 않는다
 - Starlight 업그레이드 시 `virtual:starlight/git-info`와 `getNewestCommitDate(filePath)`가 유지되는지

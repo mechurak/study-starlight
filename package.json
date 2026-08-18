@@ -11,6 +11,7 @@
     "start": "astro dev",
     "check:content": "node scripts/check-content.mjs",
     "check": "pnpm run check:content && astro build",
+    "prebuild": "node scripts/prepare-git-history.mjs",
     "build": "astro build",
     "preview": "astro preview",
     "astro": "astro"

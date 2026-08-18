@@ -32,6 +32,20 @@ Git 연결은 OAuth 승인이 필요해서 **대시보드에서만** 할 수 있
    |---|---|
    | `PNPM_VERSION` | `11.20.0` |
 
+`pnpm build`의 `prebuild`는 Cloudflare Pages가 넣은 `CF_PAGES=1`을 확인하고,
+얇은 Git checkout이면 `git fetch --unshallow` 후 Astro 빌드를 시작한다.
+대시보드의 Build command는 `pnpm build`로 그대로 둔다.
+
+## 왜 빌드 전에 Git 이력을 받나
+
+랜딩 카드의 **마지막 수정**은 덱 폴더 안 문서들의 최신 커밋일이다.
+Cloudflare Pages의 얇은 checkout에서는 HEAD가 실질적인 root commit으로 보여
+모든 문서가 HEAD에서 추가된 것처럼 보이고, 모든 덱이 같은 날짜를 갖게 된다.
+
+`scripts/prepare-git-history.mjs`는 Cloudflare Pages 빌드이고 실제로 얇은 저장소인 경우에만
+전체 이력을 받는다. 로컬 빌드와 이미 전체 이력이 있는 checkout에서는 아무 작업도 하지 않는다.
+이 fetch가 실패하면 잘못된 수정일을 배포하지 않도록 빌드도 실패한다.
+
 ## 왜 `PNPM_VERSION`을 박아야 하나
 
 - `pnpm-workspace.yaml`의 **`allowBuilds`는 pnpm 10.26.0에서 들어온 문법**인데
