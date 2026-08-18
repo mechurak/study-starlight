@@ -92,6 +92,7 @@ lifecycle을 맡는다. GPU Operator는 이 모든 Pod가 GPU를 받을 수 있�
 | [2](/gpu-platform/02-gpu-foundation/) | GPU Operator가 driver부터 device plugin·metric까지 **node contract**를 만든다 |
 | [3](/gpu-platform/03-kserve/) | **Standard InferenceService가 기본**, LLMInferenceService는 고급 topology다 |
 | [4](/gpu-platform/04-serving/) | LiteLLM은 사용자를, KServe는 model revision과 replica를 안다 |
+| [4A](/gpu-platform/04a-serving-operations/) | GPU utilization보다 **queue·TTFT·ITL·KV cache와 이용자 SLO**를 먼저 본다 |
 | [5](/gpu-platform/05-kueue/) | 온프렘 GPU에는 autoscaling보다 먼저 **queue와 fair sharing**이 필요하다 |
 | [6](/gpu-platform/06-distributed/) | 여러 GPU 요청과 **여러 Pod의 atomic lifecycle**을 구분한다 |
 | [7](/gpu-platform/07-interactive/) | Backend.AI는 제품이 아니라 **사용자 여정별 기능**으로 대체한다 |
@@ -107,13 +108,14 @@ lifecycle을 맡는다. GPU Operator는 이 모든 Pod가 GPU를 받을 수 있�
 3. **GPU 기반** — driver·toolkit·CDI·device plugin·MIG·DCGM을 실제 CUDA Pod로 검증했다.
 4. **runtime catalog** — Spark·A100·B300용 image digest와 model·CUDA·driver matrix를 만들었다.
 5. **Standard serving** — vLLM·embedding·FastAPI를 InferenceService와 LiteLLM으로 연결했다.
-6. **admission** — Kueue flavor·quota·borrowing·priority와 pending reason을 시험했다.
-7. **distributed lifecycle** — JobSet·Trainer·LWS의 gang start·failure·checkpoint를 검증했다.
-8. **interactive parity** — Notebook·workspace·storage·idle·portal·usage 경로를 대표 사용자와 확인했다.
-9. **data와 network** — cold start budget·cache·checkpoint·RDMA·Gateway 경계를 측정했다.
-10. **rollback** — model endpoint와 A100 node 하나를 실제로 기존 환경으로 되돌렸다.
-11. **B300 준비** — 도착 전 driver·image·full-node·fabric·burn-in 기준을 승인했다.
-12. **Backend.AI 종료 gate** — active session·data·사용자·audit가 남지 않았음을 확인했다.
+6. **serving 안전선** — 실제 prompt·output 분포로 SLO·안전 동시성·queue 상한·timeout budget을 정했다.
+7. **admission** — Kueue flavor·quota·borrowing·priority와 pending reason을 시험했다.
+8. **distributed lifecycle** — JobSet·Trainer·LWS의 gang start·failure·checkpoint를 검증했다.
+9. **interactive parity** — Notebook·workspace·storage·idle·portal·usage 경로를 대표 사용자와 확인했다.
+10. **data와 network** — cold start budget·cache·checkpoint·RDMA·Gateway 경계를 측정했다.
+11. **rollback** — model endpoint와 A100 node 하나를 실제로 기존 환경으로 되돌렸다.
+12. **B300 준비** — 도착 전 driver·image·full-node·fabric·burn-in 기준을 승인했다.
+13. **Backend.AI 종료 gate** — active session·data·사용자·audit가 남지 않았음을 확인했다.
 
 </Steps>
 
@@ -131,6 +133,13 @@ KServe controller보다 Service endpoint·DNS·TLS를 확인한다.
 InferenceService condition과 revision·Pod event를 본다.
 
 image architecture·model fetch·readiness·OOM을 순서대로 확인한다.
+</Card>
+<Card title="느려지고 timeout이 난다" icon="warning">
+이용자 오류율과 vLLM waiting·queue time을 먼저 맞춘다.
+
+TTFT·ITL·KV cache·preemption으로 prefill과 decode를 나눈다.
+
+포화면 긴 요청과 retry부터 줄이고 deadline만 늘리지 않는다.
 </Card>
 <Card title="job이 계속 기다린다" icon="warning">
 Kueue workload의 admission condition을 본다.

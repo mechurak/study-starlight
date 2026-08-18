@@ -347,7 +347,7 @@ export const deckDefinitions = [
 		groups: [
 			['시작', ['gpu-platform/00-decision', 'gpu-platform/01-fleet']],
 			['GPU 기반', ['gpu-platform/02-gpu-foundation']],
-			['추론 평면', ['gpu-platform/03-kserve', 'gpu-platform/04-serving']],
+			['추론 평면', ['gpu-platform/03-kserve', 'gpu-platform/04-serving', 'gpu-platform/04a-serving-operations']],
 			['작업 관리', ['gpu-platform/05-kueue', 'gpu-platform/06-distributed', 'gpu-platform/07-interactive']],
 			['데이터와 연결', ['gpu-platform/08-data-network']],
 			['전환', ['gpu-platform/09-migration']],

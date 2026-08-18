@@ -104,6 +104,9 @@ InferenceService를 유지한다. 기존 Gateway를 무심코 교체하지 않�
 request_id → model alias → InferenceService revision → Pod → node → GPU UUID/MIG instance
 ```
 
+서빙 SLO·queue 진단·알림 기준은 [4A장](/gpu-platform/04a-serving-operations/)에서 다룬다. 여기서는
+data·network 병목까지 같은 요청에 연결하는 데 필요한 신호만 다시 모은다.
+
 최소 지표는 다음과 같다.
 
 - LiteLLM request rate·error·latency·token usage
