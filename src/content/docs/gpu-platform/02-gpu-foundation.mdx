@@ -1,118 +1,205 @@
 ---
-title: "2. GPU가 Pod 자원이 되기까지"
-description: "GPU Operator의 driver·toolkit·device plugin·NFD/GFD·MIG·DCGM과 이기종 node 운영"
+title: "2. GPU Operator 이해하기"
+description: "NVIDIA driver·Container Toolkit·device plugin·GFD·MIG·DCGM이 GPU를 Pod 자원으로 만드는 과정"
 reviewedAt: 2026-08-18
 status: review
 ---
 
-import { Steps, LinkCard } from '@astrojs/starlight/components';
+import { Card, CardGrid, Steps, LinkCard } from '@astrojs/starlight/components';
 import TermIntro from '../../../components/docs/TermIntro.astro';
+import SourceFigure from '../../../components/docs/SourceFigure.astro';
 
-> `nvidia-smi`가 된다는 사실과 **Kubernetes Pod가 GPU를 받을 수 있다는 사실은 다르다**
+> GPU Operator는 GPU를 나눠 주는 scheduler가 아니라 **GPU node의 software stack을 맞추는 자동화**다
 
 <TermIntro
   terms={[
-    ['device plugin', '', 'kubelet에 GPU 개수와 health를 알리고 선택된 장치를 Pod에 전달하는 벤더 plugin이다.'],
-    ['CDI', 'Container Device Interface', 'container runtime이 GPU 같은 복합 장치를 표준화된 명세로 container에 넣는 방식이다.'],
-    ['NFD · GFD', 'Node/GPU Feature Discovery', 'PCI 장치·GPU 제품·기능을 node label로 만드는 발견 계층이다.'],
-    ['MIG', 'Multi-Instance GPU', '한 물리 GPU를 메모리와 연산 자원이 격리된 여러 GPU instance로 나누는 기능이다.'],
+    ['operand', '피연산 구성요소', 'Operator가 설치하고 상태를 관리하는 driver·toolkit·device plugin 같은 실제 component다.'],
+    ['device plugin', '', 'kubelet에 GPU 개수와 health를 알리고 선택된 장치를 Pod에 전달하는 vendor plugin이다.'],
+    ['CDI', 'Container Device Interface', 'container runtime이 GPU 같은 복합 장치를 container에 주입하는 표준 명세다.'],
+    ['GFD', 'GPU Feature Discovery', 'GPU 제품·memory·MIG capability 같은 정보를 node label로 만드는 component다.'],
+    ['MIG', 'Multi-Instance GPU', '한 물리 GPU를 memory와 연산 자원이 격리된 여러 GPU instance로 나누는 기능이다.'],
   ]}
 />
 
-## GPU Operator가 채우는 사슬
+## 전체에서 GPU Operator의 자리
 
 ```mermaid
-flowchart LR
-    FW["firmware · host OS"] --> DRV["NVIDIA driver"]
-    DRV --> CTK["Container Toolkit · CDI"]
-    CTK --> DP["NVIDIA device plugin"]
-    DP --> RES["node allocatable<br/>nvidia.com/gpu"]
-    NFD["NFD · GFD"] --> LABEL["GPU family · capability label"]
-    MIG["MIG Manager"] --> RES
-    DCGM["DCGM Exporter"] --> OBS["Prometheus"]
-    RES --> POD["KServe · Job Pod"]
-    LABEL --> POD
+flowchart TB
+    ISVC["KServe InferenceService"] --> POD["model Pod<br/>limits: nvidia.com/gpu: 1"]
+    K8S["Kubernetes scheduler · kubelet"] --> POD
+    subgraph node["GPU node · GPU Operator가 준비하는 영역"]
+        DP["device plugin<br/>GPU resource 광고"]
+        CTK["Container Toolkit · CDI<br/>장치를 container에 연결"]
+        DRV["NVIDIA driver<br/>OS가 GPU와 통신"]
+        GPU["물리 GPU · MIG instance"]
+        DRV --> GPU
+        CTK --> DRV
+        DP --> CTK
+    end
+    DP -. "Allocatable" .-> K8S
+    POD --> CTK
+    GFD["GFD<br/>GPU label"] -.-> K8S
+    DCGM["DCGM Exporter<br/>health · metric"] -.-> OBS["Prometheus"]
 
+    classDef key fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
+    classDef zone fill:#ede9fe,stroke:#7c3aed,color:#4c1d95
+    classDef ok fill:#dcfce7,stroke:#16a34a,color:#14532d
     classDef warn fill:#fef3c7,stroke:#d97706,color:#78350f
-    classDef key  fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
-    classDef ok   fill:#dcfce7,stroke:#16a34a,color:#14532d
-    class FW,DRV,CTK warn
-    class DP,RES,NFD,LABEL,MIG,DCGM key
+    class ISVC,K8S key
+    class DP,CTK,GFD,DCGM zone
     class POD,OBS ok
+    class DRV,GPU warn
 ```
 
-GPU Operator는 이 조각을 같은 release matrix로 관리한다. 제품을 쓰지 않더라도 이 기능은 하나씩
-직접 설치해야 하므로 이 환경에서는 Operator가 기본값이다.
+위에서 `InferenceService`가 GPU 한 장을 요구해도 아래 사슬이 준비되지 않으면 Pod는 실행되지 않는다.
+GPU Operator는 이 사슬을 node마다 같은 정책으로 설치·검증·업그레이드한다.
 
-## preinstalled driver를 함부로 덮지 않는다
+<SourceFigure
+  src="/images/gpu-platform/nvidia-gpu-operator-components.jpg"
+  alt="Linux와 container engine, Kubernetes가 놓인 기반 위에 GPU Operator가 GPU software stack을 관리하는 계층 구조"
+  width={1260}
+  height={709}
+  caption="NVIDIA 공식 그림은 GPU Operator가 Kubernetes 아래를 대체하는 제품이 아니라, 기존 Linux·container engine·Kubernetes 위에서 GPU software stack을 자동화하는 층임을 보여 준다."
+  sourceHref="https://docs.nvidia.com/datacenter/cloud-native/gpu-operator/latest/"
+  sourceLabel="NVIDIA 공식 문서 — GPU Operator"
+/>
 
-DGX 계열은 OS image에 driver와 toolkit이 들어 있는 경우가 많다. 운영 방식은 둘 중 하나로 고정한다.
+## Operator와 실제 component를 구분한다
 
-| 방식 | 설정 방향 | 주의 |
+`gpu-operator` controller Pod 하나가 모든 일을 직접 처리하는 것은 아니다. `ClusterPolicy` 같은 원하는
+상태를 읽고, 각 node에 필요한 DaemonSet·Deployment를 만든다.
+
+| component | 어디에서 무엇을 하나 | 없거나 깨지면 보이는 증상 |
 |---|---|---|
-| host가 driver 소유 | `driver.enabled=false` | DGX OS update와 Kubernetes drain을 함께 운영 |
-| Operator가 driver 소유 | driver container·CRD | 해당 시스템·kernel·driver 조합이 지원되는지 확인 |
+| NVIDIA driver | host kernel과 GPU 사이 | host `nvidia-smi` 실패, CUDA 초기화 실패 |
+| Container Toolkit·CDI | containerd가 GPU device·library를 container에 연결 | Pod는 떠도 GPU가 안 보이거나 runtime 생성 실패 |
+| NVIDIA device plugin | GPU를 kubelet의 extended resource로 광고 | `nvidia.com/gpu`가 `Allocatable`에 없음 |
+| Node Feature Discovery | CPU architecture·PCI 같은 일반 hardware label 생성 | node 선택 정책의 기반 label 누락 |
+| GPU Feature Discovery | GPU 제품·capability·MIG label 생성 | A100·B300·MIG placement 구분 불가 |
+| MIG Manager | node의 MIG geometry를 원하는 profile로 맞춤 | MIG resource 이름·개수가 기대와 다름 |
+| DCGM Exporter | GPU health·memory·activity metric 노출 | Prometheus에서 GPU 상태를 볼 수 없음 |
+| validator | driver·toolkit·device plugin 경로를 시험 | 설치는 Running인데 실제 CUDA가 안 되는 상태를 놓침 |
 
-Toolkit도 같은 판단이 필요하다. Spark에서 Docker GPU container가 실행되어도 Kubernetes가 쓰는
-containerd의 CDI/runtime 설정은 다를 수 있다. 이미 CRI까지 검증됐을 때만 `toolkit.enabled=false`로 둔다.
-
-:::caution[cluster 전체에 한 값을 바로 적용하지 않는다]
-Spark·A100·B300의 OS와 driver 주인이 다를 수 있다. node label과 `NVIDIADriver` CR을 사용하거나,
-실행 cluster를 나누어 한 세대의 변경이 다른 세대를 동시에 재부팅하지 않게 한다.
+:::tip[핵심 구분]
+GFD의 label은 **이 node가 어떤 GPU인지** 알려 주고, device plugin의 resource는 **Pod가 GPU를 몇 개 요청하고
+할당받게** 한다. label만 있어도 GPU를 받을 수 없고, resource만 있어도 A100과 B300을 안전하게 고르기 어렵다.
 :::
 
-## MIG와 full GPU는 서로 다른 상품이다
+## Pod가 GPU를 받는 순간
 
-A100은 MIG를 지원한다. 같은 node에서 작은 serving과 8-GPU 학습을 모두 받고 싶어도 MIG geometry를
-바꾸는 순간 실행 중 workload와 GPU reset 조건이 얽힌다.
+```mermaid
+sequenceDiagram
+    participant DP as Device Plugin
+    participant KL as kubelet
+    participant SC as Scheduler
+    participant CRI as containerd · CDI
+    participant P as Model Pod
 
-권장 pool은 다음처럼 분리한다.
-
-```text
-a100-full     → 학습·대형 inference, nvidia.com/gpu
-a100-mig-1g   → 작은 serving·개발, 고정 MIG resource
-a100-mig-3g   → 중형 serving, 고정 MIG resource
+    DP->>KL: 이 node에 nvidia.com/gpu가 N개 있음
+    KL->>SC: Capacity · Allocatable 갱신
+    P->>SC: nvidia.com/gpu: 1 + nodeSelector 요청
+    SC->>KL: label과 빈 GPU가 맞는 node에 bind
+    KL->>DP: 선택한 GPU를 Allocate 요청
+    DP-->>KL: CDI device와 환경 정보 반환
+    KL->>CRI: GPU device를 포함해 container 생성
+    CRI-->>P: CUDA가 선택된 GPU를 볼 수 있음
 ```
 
-MIG profile을 job마다 동적으로 바꾸는 것은 나중 문제다. 초기에는 node별 geometry를 고정하고
-변경을 maintenance로 취급한다. time-slicing은 memory·fault isolation이 없으므로 Backend.AI의 fractional
-GPU와 같은 것으로 간주하지 않는다.
+여기서 GPU Operator는 scheduler를 대신하지 않는다. scheduler는 device plugin이 광고한 **개수**와 node
+label·taint를 보고 node를 고른다. model의 실제 memory 요구나 tensor parallel 효율은 이해하지 못한다.
 
-## node contract를 검증한다
+## 설치 전에 ownership부터 정한다
+
+DGX 계열은 host image에 driver와 toolkit이 이미 있을 수 있다. 무조건 Operator가 다시 설치하면 kernel·
+driver·CRI 설정의 주인이 둘이 된다.
+
+<CardGrid>
+<Card title="Host가 driver 소유" icon="server">
+`driver.enabled=false`를 사용한다.
+
+DGX OS update와 Kubernetes drain·reboot 순서를 함께 운영한다.
+</Card>
+<Card title="Operator가 driver 소유" icon="setting">
+driver container 또는 `NVIDIADriver` CR을 사용한다.
+
+node pool별 kernel·driver 지원과 upgrade policy를 고정한다.
+</Card>
+<Card title="Toolkit도 별도 결정" icon="puzzle">
+Docker에서 GPU가 보이는 것과 Kubernetes의 containerd·CDI가 준비된 것은 다르다.
+
+CRI 경로를 실제 Pod로 확인한 뒤에만 `toolkit.enabled=false`로 둔다.
+</Card>
+</CardGrid>
+
+Spark·A100·B300의 driver 주인이 다르면 한 `ClusterPolicy` 값으로 억지로 통일하지 않는다. node selector가
+있는 `NVIDIADriver` CR을 쓰거나 실행 cluster를 분리해 한 세대의 upgrade가 다른 세대를 재부팅하지 않게 한다.
+
+## MIG는 설치 기능이 아니라 자원 상품 설계다
+
+A100의 MIG를 켜면 device plugin이 `nvidia.com/gpu` 대신 strategy에 따른 MIG extended resource를 광고한다.
+중요한 결정은 “MIG 기능을 켰는가”가 아니라 **사용자에게 어떤 고정 크기의 GPU 상품을 약속하는가**다.
+
+```text
+a100-full     → 큰 LLM, 전체 GPU memory와 fault domain
+a100-mig-1g   → 작은 embedding·reranker, 고정된 작은 instance
+a100-mig-3g   → 중형 model, 더 큰 memory profile
+```
+
+MIG geometry를 바꾸면 실행 중 workload와 GPU reset 조건이 얽힌다. 초기에는 node별 geometry를 고정하고
+변경을 maintenance로 취급한다. time-slicing은 memory·fault isolation이 없으므로 MIG와 같은 상품으로
+설명하지 않는다.
+
+## node contract를 일곱 단계로 검증한다
 
 <Steps>
 
-1. **host** — firmware·OS·kernel·driver와 `nvidia-smi` 결과를 기록한다.
-2. **runtime** — containerd/CDI로 CUDA sample container가 실행되는지 본다.
-3. **Kubernetes resource** — node의 `Capacity`와 `Allocatable`에 GPU·MIG resource가 나타나는지 확인한다.
-4. **label** — architecture·GPU product·MIG strategy와 운영 label이 예상대로 붙었는지 본다.
-5. **placement** — 잘못된 architecture·pool에는 Pod가 배치되지 않는지 negative test를 한다.
-6. **telemetry** — DCGM metric과 node·Pod label이 연결되는지 확인한다.
-7. **maintenance** — cordon·drain·driver update·reboot·uncordon 순서를 rehearsal한다.
+1. **host** — firmware·OS·kernel·driver version과 host `nvidia-smi` 결과를 기록한다.
+2. **runtime** — containerd·CDI로 CUDA sample container가 실행되는지 본다.
+3. **resource** — node `Capacity`와 `Allocatable`에 GPU·MIG resource가 정확히 나타나는지 확인한다.
+4. **label** — architecture·GPU product·MIG strategy와 `accelerator.*` 운영 label을 비교한다.
+5. **positive placement** — 검증된 image가 의도한 pool에서 실제 CUDA 계산을 수행한다.
+6. **negative placement** — ARM64 image가 amd64 node로 가는 등 잘못된 조합은 Pending 또는 policy 거부가 된다.
+7. **operations** — DCGM metric, cordon·drain, driver update, reboot, uncordon을 한 흐름으로 리허설한다.
 
 </Steps>
 
-## 최소 확인 명령
+## 장애는 위에서 아래가 아니라 사슬로 찾는다
+
+```text
+host driver
+  → Container Toolkit · CDI
+    → device plugin · Allocatable
+      → scheduler placement
+        → container의 CUDA
+          → DCGM health
+```
+
+| 증상 | 첫 확인 |
+|---|---|
+| Pod가 `Pending` | resource request, `Allocatable`, label·taint·affinity |
+| container 생성 실패 | containerd event, CDI spec, toolkit validator |
+| Pod는 Running인데 CUDA 실패 | 할당된 device, image의 CUDA compatibility, driver |
+| GPU 개수·MIG profile이 이상함 | device plugin strategy, MIG Manager state·label |
+| 간헐적 오류·restart | DCGM XID·ECC·temperature, kubelet·driver log |
+
+최소 확인 명령은 다음 네 개로 시작한다.
 
 ```bash
-kubectl get nodes -L kubernetes.io/arch,nvidia.com/gpu.product,accelerator.pool
+kubectl get nodes -L kubernetes.io/arch,nvidia.com/gpu.product,nvidia.com/mig.strategy,accelerator.pool
 kubectl describe node a100-01
 kubectl -n gpu-operator get pods -o wide
 kubectl get runtimeclass
 ```
 
-합격은 DaemonSet이 `Running`인 것이 아니다. 올바른 image가 올바른 node에서 실제 CUDA 계산을 하고,
-잘못된 Pod는 `Pending` 또는 admission 거부가 되는 상태다.
-
 ## 참고 자료
 
-- [GPU Operator 개요](https://docs.nvidia.com/datacenter/cloud-native/gpu-operator/latest/) — 관리하는 software component 전체.
+- [GPU Operator 개요](https://docs.nvidia.com/datacenter/cloud-native/gpu-operator/latest/) — 관리하는 software component와 공식 구조도.
 - [GPU Operator 설치](https://docs.nvidia.com/datacenter/cloud-native/gpu-operator/latest/getting-started.html) — preinstalled driver·toolkit 구성.
 - [NVIDIA Driver CRD](https://docs.nvidia.com/datacenter/cloud-native/gpu-operator/latest/gpu-driver-configuration.html) — node별 driver version·type.
 - [GPU Operator MIG](https://docs.nvidia.com/datacenter/cloud-native/gpu-operator/latest/gpu-operator-mig.html) — MIG Manager와 strategy.
 
 <LinkCard
-  title="3. KServe는 어디까지 맡는가"
-  description="Standard InferenceService를 기본으로 두고 LLMInferenceService를 필요한 곳에만 붙인다."
+  title="3. KServe 이해하기"
+  description="InferenceService 한 줄의 선언이 Deployment·Service·model Pod로 바뀌는 과정을 따라간다."
   href="/gpu-platform/03-kserve/"
 />

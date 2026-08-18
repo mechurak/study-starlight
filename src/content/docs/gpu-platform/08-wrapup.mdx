@@ -1,0 +1,187 @@
+---
+title: "8. 마무리"
+description: "GPU Operator·KServe·LiteLLM 추론 플랫폼의 전체 지도, 선택표, 도입·장애 대응 카드"
+reviewedAt: 2026-08-18
+status: review
+---
+
+import { Card, CardGrid, Steps, LinkCard } from '@astrojs/starlight/components';
+import TermIntro from '../../../components/docs/TermIntro.astro';
+
+> 전체를 기억할 때는 **노드를 준비하는 흐름, 모델을 배포하는 흐름, 요청이 지나가는 흐름** 세 줄이면 된다
+
+<TermIntro
+  title="이 장의 사용법"
+  terms={[
+    ['전체 지도', '', 'GPU node 준비부터 API 요청까지 세 흐름을 한 그림에서 본다.'],
+    ['선택표', '', 'Standard InferenceService와 LLMInferenceService 중 어디에서 시작할지 고른다.'],
+    ['도입 체크리스트', '', 'Spark·A100·B300 serving을 열기 전 빠뜨리지 않을 gate다.'],
+    ['장애 대응 카드', '', 'endpoint·model Pod·GPU 기반 장애의 첫 확인 순서를 모았다.'],
+  ]}
+/>
+
+## 전체 지도
+
+```mermaid
+flowchart TB
+    subgraph prepare["A · 노드를 준비한다"]
+        OP["GPU Operator"] --> STACK["driver · toolkit · device plugin<br/>GFD · MIG · DCGM"]
+        STACK --> GPU["Spark · A100 · B300 node"]
+    end
+    subgraph deploy["B · 모델을 배포한다"]
+        GIT["Git"] --> ISVC["InferenceService"] --> KS["KServe controller"]
+        RT["ServingRuntime"] --> KS
+        KS --> KOBJ["Deployment · Service · HTTPRoute"]
+        KOBJ --> POD["vLLM · FastAPI Pod"]
+    end
+    subgraph request["C · 요청이 지나간다"]
+        APP["사내 앱"] --> LITE["LiteLLM"] --> GW["Gateway · Service"] --> POD
+        POD --> GPU
+    end
+
+    classDef key fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
+    classDef zone fill:#ede9fe,stroke:#7c3aed,color:#4c1d95
+    classDef ok fill:#dcfce7,stroke:#16a34a,color:#14532d
+    classDef warn fill:#fef3c7,stroke:#d97706,color:#78350f
+    class GIT,RT,APP,LITE key
+    class ISVC,KS,GW zone
+    class KOBJ,POD ok
+    class OP,STACK,GPU warn
+```
+
+- A가 깨지면 Pod가 GPU를 요청하지 못하거나 CUDA가 실패한다.
+- B가 깨지면 model replica·Service·Ready 상태가 원하는 대로 만들어지지 않는다.
+- C가 깨지면 모델 Pod가 건강해도 이용자 요청이 도달하지 않거나 stream이 중간에서 끊긴다.
+
+이 세 줄을 섞지 않으면 장애 범위를 빨리 좁힐 수 있다.
+
+## GPU Operator와 KServe를 비교하면
+
+| 질문 | GPU Operator | KServe |
+|---|---|---|
+| 관리 대상 | GPU node software stack | model serving workload |
+| 대표 원하는 상태 | `ClusterPolicy`·`NVIDIADriver`·MIG config | `InferenceService`·`ServingRuntime`·`LLMInferenceService` |
+| 주로 만드는 것 | driver·toolkit·device plugin·GFD·DCGM Pod | Deployment·Service·route·model Pod |
+| 성공 결과 | GPU resource·label·metric이 node에 보임 | model endpoint와 Ready 상태가 유지됨 |
+| 하지 않는 일 | model replica·API route 관리 | driver 설치·GPU 자동 추천 |
+| 첫 장애 확인 | validator·Allocatable·CDI·DCGM | InferenceService condition·Deployment·Pod event |
+
+GPU Operator가 **아래에서 실행 가능성을 만들고**, KServe가 **위에서 model server의 생명주기를 관리한다**.
+둘은 경쟁 제품이 아니라 서로 다른 층이다.
+
+## KServe 선택표
+
+```mermaid
+flowchart TD
+    START["새 model serving"] --> FIT{"한 Pod · 한 node에<br/>model이 들어가는가?"}
+    FIT -->|"예"| STD["Standard InferenceService"]
+    FIT -->|"아니오"| MULTI["LLMInferenceService<br/>LeaderWorkerSet 검토"]
+    STD --> SLO{"실제 부하에서<br/>SLO를 만족하는가?"}
+    SLO -->|"예"| KEEP["Standard 유지"]
+    SLO -->|"아니오 · routing 병목"| EPP["Inference Extension · EPP 검토"]
+    SLO -->|"아니오 · prefill 간섭"| PD["prefill · decode 분리 검토"]
+
+    classDef ok fill:#dcfce7,stroke:#16a34a,color:#14532d
+    classDef warn fill:#fef3c7,stroke:#d97706,color:#78350f
+    classDef zone fill:#ede9fe,stroke:#7c3aed,color:#4c1d95
+    class START,STD,KEEP ok
+    class FIT,SLO warn
+    class MULTI,EPP,PD zone
+```
+
+| serving 요구 | 기본 객체·방식 | GPU 단위 |
+|---|---|---|
+| Spark single-node LLM | Standard `InferenceService` | Spark node 1대 |
+| A100·B300 single-node LLM | Standard `InferenceService` | full GPU 1·2·4·8 preset |
+| embedding·reranker | Standard `InferenceService` | 고정 MIG 또는 full GPU profile |
+| custom FastAPI model | custom predictor | CPU·MIG·full GPU |
+| model이 한 node에 안 들어감 | `LLMInferenceService` + LWS | 고정 topology·RDMA 검증 pool |
+| prefix·load-aware routing | `LLMInferenceService` + Inference Extension | 여러 replica pool |
+| prefill이 decode를 방해 | `LLMInferenceService` P/D 분리 | prefill·decode 전용 pool |
+
+## 장별 한 문장
+
+| 장 | 한 문장 |
+|---|---|
+| [0](/gpu-platform/00-decision/) | 요청의 길과 운영의 길을 나누면 제품 역할이 보인다 |
+| [1](/gpu-platform/01-fleet/) | Spark·A100·B300은 같은 GPU 수가 아니라 서로 다른 자원 섬이다 |
+| [2](/gpu-platform/02-gpu-foundation/) | GPU Operator는 driver부터 resource·label·metric까지 node contract를 만든다 |
+| [3](/gpu-platform/03-kserve/) | KServe는 상위 model 선언을 하위 Kubernetes 객체로 바꾸고 계속 맞춘다 |
+| [4](/gpu-platform/04-serving/) | LiteLLM은 이용자를, KServe는 model replica와 endpoint를 안다 |
+| [5](/gpu-platform/05-serving-operations/) | GPU 사용률보다 queue·TTFT·ITL·KV cache와 이용자 SLO를 먼저 본다 |
+| [6](/gpu-platform/06-data-network/) | image·model·Gateway·다중 노드 연결이 빠른 GPU를 굶길 수 있다 |
+| [7](/gpu-platform/07-migration/) | endpoint와 node ownership을 나눠 Spark부터 검증하고 A100은 한 대씩 옮긴다 |
+
+## 도입 체크리스트
+
+<Steps>
+
+1. **scope** — 상시 inference만 대상이며 batch·학습·Notebook은 별도 범위임을 합의했다.
+2. **cluster 경계** — Spark와 datacenter GPU를 한 운영 모델·독립 가능한 실행 장애 영역으로 정했다.
+3. **node contract** — architecture·GPU family·partition·network label과 taint를 고정했다.
+4. **GPU 기반** — driver·toolkit·CDI·device plugin·GFD·MIG·DCGM을 실제 CUDA Pod로 검증했다.
+5. **runtime catalog** — Spark·A100·B300용 image digest와 model·CUDA·driver matrix를 만들었다.
+6. **Standard serving** — vLLM·embedding·FastAPI를 `InferenceService`와 LiteLLM으로 연결했다.
+7. **serving 안전선** — 실제 prompt·output 분포로 SLO·동시성·queue·timeout budget을 정했다.
+8. **data·network** — cold start budget·cache·streaming·Gateway·필요 시 RDMA 기준을 측정했다.
+9. **고급 KServe gate** — Standard로 풀 수 없는 병목이 측정될 때만 LLMInferenceService 의존성을 설치한다.
+10. **rollback** — model endpoint와 A100 node 하나를 실제로 기존 환경으로 되돌렸다.
+11. **B300 준비** — 도착 전 driver·image·full-node·fabric·burn-in 기준을 승인했다.
+
+</Steps>
+
+## 장애 대응 카드
+
+<CardGrid>
+<Card title="모든 inference가 안 된다" icon="warning">
+LiteLLM과 Gateway health를 먼저 나눈다.
+
+여러 Service endpoint·DNS·TLS와 model Pod Ready를 비교한다.
+</Card>
+<Card title="모델 하나만 안 된다" icon="warning">
+InferenceService condition → Deployment → Pod event 순서로 내려간다.
+
+image architecture·model fetch·readiness·OOM을 본다.
+</Card>
+<Card title="Pod가 Pending이다" icon="warning">
+GPU request와 node `Allocatable`을 비교한다.
+
+label·taint·affinity·MIG resource 이름을 확인한다.
+</Card>
+<Card title="Pod는 떠도 GPU가 안 보인다" icon="warning">
+toolkit·CDI → device plugin Allocate → container CUDA 순서로 본다.
+
+GPU Operator validator와 containerd event를 확인한다.
+</Card>
+<Card title="느려지고 timeout이 난다" icon="warning">
+waiting·queue time·TTFT·ITL을 먼저 맞춘다.
+
+KV cache·preemption·Gateway timeout과 request cancel을 본다.
+</Card>
+<Card title="GPU 오류가 반복된다" icon="warning">
+DCGM XID·ECC·temperature·link와 Pod restart 시점을 맞춘다.
+
+route에서 제외하고 event를 보존한 뒤 node를 drain한다.
+</Card>
+</CardGrid>
+
+## 마지막 결정
+
+첫 구현은 단순하다. GPU Operator로 node contract를 만들고, Standard `InferenceService`로 single-node
+serving을 안정화하고, LiteLLM에 그 endpoint를 연결한다. 여기까지가 기본 경로다.
+
+그 다음은 기능 목록이 아니라 측정에서 출발한다. model이 한 node에 들어가지 않거나 prefix·부하를 고려한
+routing, prefill/decode 분리가 실제 SLO를 개선할 때만 `LLMInferenceService`로 확장한다. 고급 기능을 쓰지
+않는 것이 미완성이 아니라, 필요한 복잡도만 운영하는 것이다.
+
+## 참고 자료
+
+- [NVIDIA GPU Operator](https://docs.nvidia.com/datacenter/cloud-native/gpu-operator/latest/) — GPU node software stack.
+- [KServe Concepts](https://kserve.github.io/website/docs/concepts) — control plane·data plane과 CRD.
+- [KServe LLMInferenceService](https://kserve.github.io/website/docs/model-serving/generative-inference/llmisvc/llmisvc-overview) — 고급 LLM serving topology.
+
+<LinkCard
+  title="온프렘 GPU 플랫폼 개요로 돌아가기"
+  description="덱의 구성과 전체 추론 경로를 다시 본다."
+  href="/gpu-platform/"
+/>

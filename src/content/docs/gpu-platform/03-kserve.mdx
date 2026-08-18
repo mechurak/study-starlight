@@ -1,119 +1,218 @@
 ---
-title: "3. KServe는 어디까지 맡는가"
-description: "InferenceService·ServingRuntime·LLMInferenceService의 역할과 Standard-first 도입 원칙"
+title: "3. KServe 이해하기"
+description: "InferenceService·ServingRuntime·controller가 모델 서버를 만들고 유지하는 과정과 LLMInferenceService의 경계"
 reviewedAt: 2026-08-18
 status: review
 ---
 
-import { Card, CardGrid, LinkCard } from '@astrojs/starlight/components';
+import { Card, CardGrid, Steps, LinkCard } from '@astrojs/starlight/components';
 import TermIntro from '../../../components/docs/TermIntro.astro';
+import SourceFigure from '../../../components/docs/SourceFigure.astro';
 
-> KServe의 첫 역할은 똑똑한 LLM scheduler가 아니라 **모델 server를 Kubernetes 객체로 만드는 것**이다
+> KServe는 모델을 계산하는 엔진이 아니라 **모델 서버의 생명주기를 관리하는 Kubernetes control plane**이다
 
 <TermIntro
   terms={[
-    ['InferenceService', '', 'predictor·transformer·explainer와 runtime·resource를 선언하는 KServe의 기본 serving 객체다.'],
+    ['CRD', 'Custom Resource Definition', 'Kubernetes에 `InferenceService` 같은 새 객체 종류를 추가하는 schema다.'],
+    ['reconcile', '상태 맞추기', 'controller가 원하는 상태와 실제 상태의 차이를 반복해서 줄이는 동작이다.'],
+    ['InferenceService', '', 'model·runtime·resource·replica를 선언하는 KServe의 기본 serving 객체다.'],
     ['ServingRuntime', '', '어떤 container image와 command가 어떤 model format을 실행하는지 정한 재사용 template다.'],
-    ['LLMInferenceService', '', '분산 LLM·지능형 routing·prefill/decode 같은 topology를 위한 별도 CRD다.'],
-    ['Standard mode', '', 'Knative 없이 Kubernetes Deployment·Service를 직접 사용하는 KServe 실행 방식이다.'],
+    ['LLMInferenceService', '', '지능형 routing·다중 노드·prefill/decode 같은 고급 LLM topology를 위한 별도 CRD다.'],
   ]}
 />
 
-## 기본 객체는 InferenceService다
+## 전체에서 KServe의 자리
 
 ```mermaid
 flowchart LR
-    GIT["Git"] --> ISVC["InferenceService"]
-    RUNTIME["ServingRuntime"] --> ISVC
-    ISVC --> DEPLOY["Deployment"]
-    ISVC --> SVC["Service"]
-    ISVC --> ROUTE["HTTPRoute · ingress"]
-    DEPLOY --> POD["vLLM · FastAPI Pod"]
-    MODEL["HF · S3 · PVC · local cache"] --> POD
+    OP["운영자"] --> ISVC["InferenceService<br/>원하는 상태"]
+    RT["ServingRuntime<br/>실행 방법"] --> KS["KServe controller"]
+    ISVC --> KS
+    KS --> DEP["Deployment<br/>replica · rollout"]
+    KS --> SVC["Service · HTTPRoute<br/>안정된 endpoint"]
+    DEP --> POD["vLLM · FastAPI Pod<br/>실제 추론"]
+    MODEL["model artifact"] --> POD
+    USER["LiteLLM · 앱"] --> SVC --> POD
 
-    classDef key  fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
+    classDef key fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
     classDef zone fill:#ede9fe,stroke:#7c3aed,color:#4c1d95
-    classDef ok   fill:#dcfce7,stroke:#16a34a,color:#14532d
-    class GIT,MODEL key
-    class ISVC,RUNTIME zone
-    class DEPLOY,SVC,ROUTE,POD ok
+    classDef ok fill:#dcfce7,stroke:#16a34a,color:#14532d
+    class OP,MODEL,USER key
+    class ISVC,RT,KS zone
+    class DEP,SVC,POD ok
 ```
 
-운영자는 model source·runtime·resource·replica를 선언한다. KServe controller가 일반 Kubernetes 객체를
-만들고 상태를 다시 `InferenceService.status`에 모은다. Argo CD가 추적할 원본은 상위 CR이다.
+KServe가 request를 받아 직접 추론하지 않는다. controller는 운영 경로에 있고, 실제 request는 이미 만들어진
+Service를 지나 vLLM·FastAPI 같은 model server로 간다. 그래서 controller가 잠시 재시작돼도 기존 Pod와
+Service가 살아 있다면 serving data plane은 계속 동작할 수 있다.
 
-## Standard mode부터 시작한다
+## 세 객체만 먼저 잡는다
 
 <CardGrid>
-<Card title="Standard InferenceService" icon="approve-check">
-Spark single-node vLLM.
+<Card title="InferenceService · 무엇을" icon="open-book">
+어떤 model을 어떤 resource·replica로 서비스할지 선언한다.
 
-A100 full GPU·MIG serving.
-
-embedding·reranker·FastAPI.
-
-명시적인 replica와 resource control.
+운영자가 주로 만들고 Git에서 version control할 객체다.
 </Card>
-<Card title="LLMInferenceService" icon="puzzle">
-prefix/KV-cache-aware routing.
+<Card title="ServingRuntime · 어떻게" icon="puzzle">
+model format을 실행할 image·command·port·protocol template다.
 
-LeaderWorkerSet multi-node inference.
+platform team이 검증해 여러 서비스가 재사용한다.
+</Card>
+<Card title="KServe controller · 계속 맞춘다" icon="setting">
+두 선언을 읽어 Deployment·Service·route를 만들고 상태를 관찰한다.
 
-prefill·decode 분리.
-
-Gateway API inference extension.
+drift나 장애가 생기면 원하는 상태로 되돌린다.
 </Card>
 </CardGrid>
 
-처음부터 오른쪽을 설치하면 Gateway·scheduler·LeaderWorkerSet·CRD까지 동시에 디버깅하게 된다.
-먼저 Standard mode에서 image·GPU·model artifact·streaming을 합격시키고, 실제 병목이 확인된 모델만
-`LLMInferenceService`로 옮긴다.
+한 문장으로는 `InferenceService = model 배포 인스턴스`, `ServingRuntime = 검증된 실행 방법`이다.
 
-## Knative는 기본값이 아니다
+## 선언 하나가 실제 서버가 되는 과정
 
-LLM은 크고 시작이 느리며 streaming 요청이 길다. 온프렘 GPU는 cloud처럼 즉시 늘어나지도 않는다.
-따라서 기본은 raw Kubernetes Deployment를 쓰는 Standard mode다.
+```yaml
+kind: InferenceService
+metadata:
+  name: corp-chat
+spec:
+  predictor:
+    model:
+      runtime: vllm-a100
+      storageUri: hf://org/model
+      resources:
+        limits:
+          nvidia.com/gpu: "1"
+      nodeSelector:
+        accelerator.pool: a100-serving
+```
 
-| 요구 | 선택 |
+<Steps>
+
+1. **API server가 저장한다** — CRD schema로 검증한 `InferenceService`를 etcd에 저장한다.
+2. **KServe controller가 감지한다** — 새 객체나 spec 변경을 보고 reconcile을 시작한다.
+3. **runtime을 합성한다** — `vllm-a100`의 image·command template에 model URI와 resource를 넣는다.
+4. **Kubernetes 객체를 만든다** — Standard mode에서는 Deployment·Service와 선택한 network route를 만든다.
+5. **Kubernetes가 Pod를 띄운다** — scheduler가 A100 pool과 빈 GPU를 보고 node를 정한다.
+6. **model server가 준비된다** — image pull·model fetch·load·warm-up 뒤 readiness가 성공한다.
+7. **상태를 되돌려 준다** — KServe가 하위 상태를 모아 `InferenceService.status`와 Ready condition을 갱신한다.
+
+</Steps>
+
+spec을 바꾸면 이 흐름이 다시 돈다. Pod를 직접 고쳐도 controller의 원본은 `InferenceService`이므로 다음
+reconcile에서 되돌아간다. 이것이 “선언형”의 실무적 의미다.
+
+## Standard mode가 기본이다
+
+Standard mode는 일반 Kubernetes Deployment·Service를 사용한다. 상시 LLM은 model이 크고 cold start가
+길며 stream이 오래 이어지므로 온프렘 환경에서는 가장 예측 가능한 출발점이다.
+
+| 질문 | Standard `InferenceService`가 주는 답 |
 |---|---|
-| 상시 LLM·embedding | Standard mode |
-| 예측형 CPU 모델의 scale-to-zero | Knative mode 검토 |
-| 대형 LLM 고급 topology | LLMInferenceService |
+| replica를 몇 개 유지할까 | Deployment replica·autoscaling policy |
+| 죽은 model server는 누가 복구할까 | Kubernetes controller와 KServe 상태 관리 |
+| endpoint를 어떻게 유지할까 | Service와 Gateway API·Ingress |
+| image·model을 어떻게 바꿀까 | spec 변경과 rollout |
+| 서로 다른 model runtime을 어떻게 표준화할까 | `ServingRuntime` catalog |
 
-scale-to-zero로 GPU 비용을 줄이려다 수분짜리 model load를 첫 사용자에게 넘기지 않는다.
+Knative mode는 CPU 예측 모델의 scale-to-zero처럼 명확한 이유가 있을 때 검토한다. GPU LLM에서
+scale-to-zero는 수분짜리 model load를 첫 사용자 요청에 떠넘길 수 있다.
 
-## runtime catalog가 제품 UI를 대신한다
+## runtime catalog가 플랫폼의 안전장치다
 
-다음 template를 platform team이 검증·배포한다.
+| runtime | 대상과 고정할 계약 |
+|---|---|
+| `vllm-spark` | GB10 · ARM64 image·Spark driver/CUDA·한 node |
+| `vllm-a100` | A100 full · x86_64 image·vLLM·GPU preset |
+| `vllm-a100-mig` | A100 MIG · model 크기·MIG resource·memory 여유 |
+| `vllm-b300` | B300 · driver/CUDA·kernel·full-node 기준선 |
+| `fastapi-cuda` | custom model · port·readiness·SIGTERM·metric |
 
-| runtime | 대상 | image 조건 |
-|---|---|---|
-| `vllm-spark` | GB10 single-node | ARM64·Spark driver/CUDA 검증 |
-| `vllm-a100` | A100 full·MIG | x86_64·A100 benchmark 통과 |
-| `vllm-b300` | B300 | B300 driver/CUDA·kernel 검증 |
-| `fastapi-cuda` | classification·custom embedding | health·SIGTERM·metric contract |
-| `fastapi-cpu` | 작은 예측형 모델 | GPU resource를 요구하지 않음 |
+`latest` image나 범용 runtime 하나로 모든 GPU를 받지 않는다. runtime name이 architecture·가속기 계약을
+드러내고, policy가 잘못된 image·nodeSelector·resource 조합을 거부해야 한다.
 
-`latest` image나 범용 runtime 하나로 세 pool을 모두 받지 않는다. runtime name이 architecture·가속기
-계약을 드러내고, admission policy가 맞지 않는 조합을 거부해야 한다.
+## LLMInferenceService는 언제 필요한가
 
-## KServe가 맡지 않는 것
+Standard path가 model Pod의 배포와 endpoint를 푼다면, `LLMInferenceService`는 **큰 LLM을 여러 Pod와
+지능형 router로 운영하는 topology**를 푼다.
 
-- 최종 이용자의 API key와 quota — LiteLLM
-- batch job queue와 fair sharing — Kueue
-- 학습 job의 worker lifecycle — JobSet·Trainer
-- GPU driver와 device discovery — GPU Operator
-- 모델 품질 평가와 승인 — 별도 CI·registry workflow
-- model memory에 맞는 GPU 자동 추천 — platform preset·benchmark
+<SourceFigure
+  src="/images/gpu-platform/kserve-llmisvc-architecture.png"
+  alt="사용자 요청이 Gateway API와 inference scheduler를 지나 decode·prefill vLLM workload로 전달되고 LLMInferenceService controller가 이를 관리하는 구조"
+  width={1091}
+  height={1678}
+  caption="위에서 아래로 요청을 따라간다. Gateway API가 입구를 만들고 EPP scheduler가 KV cache·부하를 보고 endpoint를 고른다. 아래의 LLMInferenceService controller는 이 data plane을 생성·관리한다."
+  sourceHref="https://kserve.github.io/website/docs/concepts/architecture/control-plane-llmisvc"
+  sourceLabel="KServe 공식 문서 — Architecture"
+/>
+
+| 필요한 기능 | 추가되는 핵심 조각 |
+|---|---|
+| replica의 단순 round-robin보다 나은 routing | Gateway API Inference Extension의 `InferencePool`·EPP scheduler |
+| 여러 node가 한 replica를 구성 | LeaderWorkerSet가 leader·worker를 한 단위로 관리 |
+| 긴 prompt와 token 생성을 다른 pool로 분리 | prefill·decode workload와 그 사이의 KV 전달 |
+| prefix cache·부하를 고려한 endpoint 선택 | scheduler plugin과 pod metric |
+
+```mermaid
+flowchart LR
+    NEED{"Standard로<br/>SLO를 만족하는가?"}
+    NEED -->|"예"| STANDARD["InferenceService 유지"]
+    NEED -->|"아니오"| WHY{"어떤 병목인가?"}
+    WHY -->|"prefix · replica 부하"| ROUTE["Inference Extension · EPP"]
+    WHY -->|"model이 한 node에 안 들어감"| LWS["LeaderWorkerSet 다중 노드 추론"]
+    WHY -->|"prefill이 decode를 방해"| PD["prefill · decode 분리"]
+    ROUTE --> LLMISVC["LLMInferenceService"]
+    LWS --> LLMISVC
+    PD --> LLMISVC
+
+    classDef ok fill:#dcfce7,stroke:#16a34a,color:#14532d
+    classDef warn fill:#fef3c7,stroke:#d97706,color:#78350f
+    classDef zone fill:#ede9fe,stroke:#7c3aed,color:#4c1d95
+    class STANDARD ok
+    class NEED,WHY warn
+    class ROUTE,LWS,PD,LLMISVC zone
+```
+
+고급 경로에는 Gateway API CRD·Inference Extension·Gateway provider·LeaderWorkerSet 같은 의존성이
+추가된다. 기능 이름이 매력적이라는 이유로 처음부터 설치하지 않는다. Standard에서 image·GPU·artifact·
+streaming을 먼저 합격시키고, 측정된 병목이 있을 때 이동한다.
+
+## KServe가 하지 않는 일
+
+- 최종 이용자의 API key·team quota·공개 alias — LiteLLM
+- GPU driver·device discovery·MIG·DCGM — GPU Operator
+- model memory에 맞는 GPU 자동 추천 — platform preset과 benchmark
+- model 품질 평가·승인 — 별도 CI·registry workflow
+- batch queue·학습 lifecycle·Notebook — 이 덱의 범위 밖
+
+:::caution[자주 생기는 오해]
+`InferenceService`에 `nvidia.com/gpu: 8`을 썼다는 사실은 GPU 여덟 장을 요청한다는 뜻일 뿐이다. model이
+몇 GB인지, 어떤 tensor parallel 값이 빠른지, B300이 A100보다 적합한지는 KServe나 scheduler가 자동으로
+판단하지 않는다.
+:::
+
+## 상태를 읽는 순서
+
+```text
+InferenceService Ready condition
+  → KServe controller event
+    → Deployment desired / available
+      → Pod event · readiness
+        → model server log
+          → GPU Operator와 node 상태
+```
+
+상위 상태부터 내려가면 “KServe가 문제인지, 일반 Kubernetes 배치가 문제인지, model process가 문제인지,
+GPU 기반이 문제인지”를 빠르게 나눌 수 있다.
 
 ## 참고 자료
 
-- [KServe Administrator Guide](https://kserve.github.io/website/docs/next/admin-guide/overview) — Standard·Knative·LLMInferenceService 선택.
-- [KServe 설치 개념](https://kserve.github.io/website/docs/install/overview) — component와 CRD 관계.
-- [KServe runtime overview](https://kserve.github.io/website/docs/model-serving/generative-inference/overview) — vLLM·Hugging Face runtime.
+- [KServe Control Plane](https://kserve.github.io/website/docs/concepts/architecture/control-plane) — Standard mode의 controller와 하위 resource.
+- [KServe Concepts](https://kserve.github.io/website/docs/concepts) — `InferenceService`·`ServingRuntime`·storage·cache 객체 지도.
+- [LLMInferenceService 개요](https://kserve.github.io/website/docs/model-serving/generative-inference/llmisvc/llmisvc-overview) — 고급 LLM serving 기능과 Standard 경계.
+- [LLMInferenceService 설치](https://kserve.github.io/website/docs/install/llmisvc-install) — Gateway·Inference Extension·LWS 등 의존성.
 
 <LinkCard
   title="4. LiteLLM에서 모델 Pod까지"
-  description="이용자 정책과 실행 상태를 분리하고 Spark·A100·B300에 같은 API 계약을 건다."
+  description="이제 실제 요청이 어떤 endpoint를 지나며 각 계층이 무엇을 소유하는지 따라간다."
   href="/gpu-platform/04-serving/"
 />

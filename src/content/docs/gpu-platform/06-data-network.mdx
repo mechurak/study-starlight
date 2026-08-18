@@ -1,0 +1,153 @@
+---
+title: "6. GPU를 굶기지 않는 데이터와 연결"
+description: "model artifact·node cache·Gateway·다중 노드 추론 network와 관측의 운영 경계"
+reviewedAt: 2026-08-18
+status: review
+---
+
+import { Card, CardGrid, LinkCard } from '@astrojs/starlight/components';
+import TermIntro from '../../../components/docs/TermIntro.astro';
+
+> GPU가 빨라도 model이 늦게 도착하거나 요청 길이 막히면 **비싼 장비가 기다린다**
+
+<TermIntro
+  terms={[
+    ['cold start', '콜드 스타트', '빈 node에서 image·model을 받고 초기화·compile·warm-up해 Ready가 되는 시간이다.'],
+    ['local cache', '로컬 캐시', '다시 받을 수 있는 model·compile 결과를 node NVMe에 보관해 다음 시작을 줄이는 층이다.'],
+    ['RDMA', 'Remote Direct Memory Access', 'CPU copy 부담을 줄여 node 사이 memory 전송 지연을 낮추는 network 방식이다.'],
+    ['east-west', '동서 트래픽', 'cluster 안의 model Pod·cache·다중 노드 worker 사이를 흐르는 통신이다.'],
+  ]}
+/>
+
+## 추론 Pod에는 두 가지가 들어온다
+
+```mermaid
+flowchart LR
+    REG["사내 image registry"] --> IC["node image cache"] --> POD["vLLM · FastAPI Pod"]
+    OBJ["model object store · HF mirror"] --> MC["node model cache"] --> POD
+    USER["LiteLLM · Gateway"] -->|"API 요청"| POD
+    POD --> GPU["GPU"]
+    POD --> METRIC["metric · log · trace"]
+
+    classDef key fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
+    classDef zone fill:#ede9fe,stroke:#7c3aed,color:#4c1d95
+    classDef ok fill:#dcfce7,stroke:#16a34a,color:#14532d
+    class REG,OBJ,USER key
+    class IC,MC zone
+    class POD,GPU,METRIC ok
+```
+
+왼쪽 두 줄은 **서버를 준비하는 길**이고, 아래 한 줄은 **준비된 서버를 호출하는 길**이다. model download가
+느리면 Ready가 늦고, Gateway가 stream을 buffer하면 Ready인 서버도 사용자에게 느리게 보인다.
+
+## cold start budget을 분해한다
+
+```text
+Ready 시간 = image pull + model fetch + model load + kernel compile + warm-up · health stabilization
+```
+
+| 줄일 대상 | 수단 | 함정 |
+|---|---|---|
+| image pull | 사내 registry·node pre-pull | ARM64·amd64 image를 같은 tag로 덮음 |
+| model fetch | object mirror·local cache | mutable model name·checksum 누락 |
+| model load | quantization·memory headroom | load 성공 뒤 실제 traffic OOM을 놓침 |
+| compile | persistent compile cache | runtime·driver 변경 뒤 stale cache |
+| readiness | 실제 warm-up request | 단순 TCP open을 Ready로 오인 |
+
+`Pod Ready 12분` 하나만 기록하면 registry가 느린지 model load가 느린지 알 수 없다. 각 단계를 event·metric으로
+분리하고 image digest·model revision을 함께 남긴다.
+
+KServe의 `LocalModelCache` 지원 범위는 release와 serving API에 따라 달라질 수 있다. 선택한 version에서
+Standard `InferenceService`와 `LLMInferenceService`의 지원을 따로 확인한다. 맞지 않으면 generic prefetch
+DaemonSet이나 node image를 이용한다.
+
+## network도 세 길로 나눈다
+
+<CardGrid>
+<Card title="이용자 요청" icon="rocket">
+LiteLLM → Gateway → KServe Service.
+
+TLS·streaming·timeout·connection cancel이 핵심이다.
+</Card>
+<Card title="다중 노드 추론" icon="random">
+한 model replica의 leader·worker와 GPU 사이.
+
+NIC·MTU·RDMA·topology·collective 통신이 핵심이다.
+</Card>
+<Card title="artifact 입출력" icon="open-book">
+registry·model store → node cache.
+
+throughput·checksum·cache hit·장애 격리가 핵심이다.
+</Card>
+</CardGrid>
+
+RDMA와 Network Operator는 모든 serving의 필수 구성요소가 아니다. single-node Standard `InferenceService`는
+먼저 일반 Pod network로 합격시킨다. model이 한 node에 들어가지 않아 LeaderWorkerSet 다중 노드 추론을
+쓸 때 NIC driver·RDMA device·network attachment와 topology를 별도 기준선으로 올린다.
+
+## 다중 노드 추론은 node 수보다 연결이 중요하다
+
+```mermaid
+flowchart LR
+    GW["Inference route"] --> LEADER["leader Pod<br/>request coordination"]
+    LEADER <-->|"NCCL · RDMA"| WORKER["worker Pod"]
+    LEADER --> G1["GPU group · node A"]
+    WORKER --> G2["GPU group · node B"]
+    CACHE["model cache"] --> LEADER
+    CACHE --> WORKER
+
+    classDef key fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
+    classDef zone fill:#ede9fe,stroke:#7c3aed,color:#4c1d95
+    classDef ok fill:#dcfce7,stroke:#16a34a,color:#14532d
+    class GW,CACHE key
+    class LEADER,WORKER zone
+    class G1,G2 ok
+```
+
+두 node의 GPU 개수만 맞아도 통신 topology·NIC·MTU·RDMA resource가 다르면 시작 실패나 낮은 처리량이 난다.
+그래서 multi-node runtime은 GPU resource뿐 아니라 network label·resource와 model cache 준비 상태를 함께
+계약해야 한다.
+
+## Gateway 역할을 겹치지 않는다
+
+| 계층 | 맡길 것 |
+|---|---|
+| 사내 Gateway API | TLS·host·path·기본 network policy |
+| KServe route | model service·revision·inference pool 연결 |
+| LiteLLM | 최종 이용자 key·quota·alias·provider fallback |
+
+`LLMInferenceService`의 고급 router는 Envoy Gateway·Envoy AI Gateway·Gateway API Inference Extension을
+사용한다. 사내 기본 Gateway가 다른 구현이라면 별도 `GatewayClass`로 격리하거나 Standard path를 유지한다.
+기존 입구를 무심코 교체하지 않는다.
+
+## 관측은 한 요청과 한 replica를 연결한다
+
+```text
+request ID → LiteLLM model alias → InferenceService revision → Pod → node → GPU UUID · MIG instance
+```
+
+최소 신호는 다음과 같다.
+
+- LiteLLM request rate·error·latency·token usage
+- Gateway upstream error·stream duration·disconnect
+- KServe desired·ready replica와 revision
+- vLLM TTFT·ITL·queue·KV cache·input/output tokens
+- Pod restart·OOM·node pressure
+- DCGM memory·activity·temperature·XID·ECC·link
+- registry·model fetch throughput·cache hit·checksum failure
+
+GPU utilization이 낮으면서 vLLM queue가 길다면 model server CPU·network·process health를 먼저 본다. replica가
+Ready가 되기까지 오래 걸리면 image·model·load·compile 단계로 나눈다.
+
+## 참고 자료
+
+- [KServe Storage Containers](https://kserve.github.io/website/docs/model-serving/storage/storage-containers) — model URI와 storage container.
+- [KServe LocalModelCache](https://kserve.github.io/website/docs/model-serving/models/localmodel) — node local model cache.
+- [GPU Operator GPUDirect RDMA](https://docs.nvidia.com/datacenter/cloud-native/gpu-operator/latest/gpudirect-rdma.html) — RDMA 구성의 software 경계.
+- [LLMInferenceService Architecture](https://kserve.github.io/website/docs/concepts/architecture/control-plane-llmisvc) — Gateway·scheduler·workload layer.
+
+<LinkCard
+  title="7. 서비스 중단 없이 옮기기"
+  description="Spark에서 serving path를 검증하고 B300과 A100을 node·endpoint 단위로 전환한다."
+  href="/gpu-platform/07-migration/"
+/>

@@ -1,6 +1,6 @@
 ---
 title: "1. 세 종류의 GPU를 자원 섬으로 보기"
-description: "DGX Spark·A100 8-GPU·B300의 architecture, topology, 배치 단위와 cluster 경계"
+description: "DGX Spark·A100 8-GPU·B300의 architecture, topology, 추론 배치 단위와 cluster 경계"
 reviewedAt: 2026-08-18
 status: review
 ---
@@ -27,7 +27,7 @@ import TermIntro from '../../../components/docs/TermIntro.astro';
 | 기본 성격 | 개인형·소형 inference cell | datacenter multi-GPU | 최신 datacenter multi-GPU |
 | GPU 배치 | 한 장 전체 | full GPU·MIG·여러 GPU | full GPU·full-node부터 검증 |
 | node 내부 연결 | 단일 GPU | NVSwitch 구성 가능 | DGX는 NVSwitch |
-| 기본 workload | LLM·embedding serving | 개발·학습·batch·serving | 대형 학습·대형 serving |
+| 기본 workload | LLM·embedding serving | MIG·multi-GPU serving | 대형 model serving |
 | 가장 큰 함정 | ARM64 image·unified memory | MIG와 full GPU 혼용 | 새 driver·CUDA·runtime 성숙도 |
 
 B300의 정확한 GPU 수·NIC·OS는 발주한 시스템 사양으로 다시 고정한다. 이 덱은 `B300 두 대`를
@@ -44,7 +44,7 @@ accelerator.arch: arm64
 accelerator.gpu-family: gb10
 
 # 운영자가 정한 계약
-accelerator.pool: inference
+accelerator.pool: spark-serving
 accelerator.partition: full
 accelerator.network: ethernet
 ```
@@ -57,9 +57,9 @@ A100·B300도 같은 key에 다른 값을 준다.
 | `accelerator.gpu-family` | `gb10` | `a100` | `b300` |
 | `accelerator.partition` | `full` | `full` 또는 `mig-*` | 검증 후 `full`·지원 profile |
 | `accelerator.network` | `ethernet`·`rdma` | `nvlink-rdma` 등 | 실제 fabric 값 |
-| `accelerator.pool` | `inference` | `shared`·`training` | `training`·`large-serving` |
+| `accelerator.pool` | `spark-serving` | `a100-serving` | `b300-serving` |
 
-runtime catalog와 Kueue `ResourceFlavor`는 이 label을 가리킨다. 사용자가 임의 node 이름을 고르게 하지 않는다.
+KServe runtime catalog와 admission policy는 이 label을 가리킨다. 사용자가 임의 node 이름을 고르게 하지 않는다.
 
 ## taint로 기본 거부한다
 
@@ -71,7 +71,7 @@ kubectl taint node a100-01 dedicated=gpu-a100:NoSchedule
 kubectl taint node b300-01 dedicated=gpu-b300:NoSchedule
 ```
 
-KServe runtime·학습 template가 맞는 toleration을 가진다. 이 장치는 CPU 앱이 실수로 B300의 CPU와
+KServe runtime template가 맞는 toleration을 가진다. 이 장치는 CPU 앱이 실수로 B300의 CPU와
 메모리를 차지하거나 ARM64에 amd64 image를 배치하는 사고를 줄인다.
 
 ## 하나의 운영 모델, 두 실행 cluster
@@ -99,24 +99,24 @@ flowchart TB
 cluster 안에서 reconcile하고, Argo CD가 같은 base와 cluster별 overlay를 배포한다. LiteLLM은 두 endpoint를
 하나의 공개 model catalog로 합친다.
 
-한 cluster로 시작해야 한다면 적어도 node pool·driver policy·runtime catalog·Kueue flavor를 분리하고,
+한 cluster로 시작해야 한다면 적어도 node pool·driver policy·runtime catalog를 분리하고,
 B300 upgrade가 Spark serving까지 drain하지 않는지 확인한다.
 
-## 배치 단위를 먼저 고정한다
+## 모델 서버의 GPU 단위를 먼저 고정한다
 
 | workload | 기본 배치 단위 | 이유 |
 |---|---|---|
 | Spark LLM | node 1대 | 단일 GPU와 unified memory가 하나의 장애 단위 |
 | Spark 대형 LLM | 고정 pair | 용량 확장이지 HA가 아님 |
-| A100 소형 serving | full GPU 또는 고정 MIG profile | isolation 수준을 명시 |
-| A100 학습 | 1·2·4·8 GPU preset | NVSwitch topology를 예측 가능하게 유지 |
-| B300 대형 학습 | full GPU·full-node 우선 | 초기에는 변수를 줄이고 성능 기준선을 만듦 |
+| A100 소형 serving | 고정 MIG profile | memory·fault isolation 수준을 명시 |
+| A100 중대형 serving | full GPU 1·2·4·8장 preset | NVSwitch topology와 tensor parallel 단위를 고정 |
+| B300 대형 serving | full GPU·full-node 우선 | 초기에는 변수를 줄이고 성능 기준선을 만듦 |
 
 ## 참고 자료
 
 - [GPU Operator 지원 플랫폼](https://docs.nvidia.com/datacenter/cloud-native/gpu-operator/latest/platform-support.html) — Spark·A100·B300 지원 범위.
 - [DGX B300 User Guide](https://docs.nvidia.com/dgx/dgxb300-user-guide/) — 실제 DGX B300 hardware·network 사양.
-- [Kueue ResourceFlavor](https://kueue.sigs.k8s.io/docs/concepts/resource_flavor/) — node label을 quota 가능한 자원 종류로 표현하는 객체.
+- [Kubernetes GPU scheduling](https://kubernetes.io/docs/tasks/manage-gpus/scheduling-gpus/) — device plugin resource와 node label을 이용한 placement.
 
 <LinkCard
   title="2. GPU가 Pod 자원이 되기까지"

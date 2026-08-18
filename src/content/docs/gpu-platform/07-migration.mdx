@@ -1,0 +1,123 @@
+---
+title: "7. 서비스 중단 없이 옮기기"
+description: "KServe PoC, Spark inference, B300 greenfield, A100 한 대씩 전환과 endpoint·node rollback"
+reviewedAt: 2026-08-18
+status: review
+---
+
+import { Steps, LinkCard } from '@astrojs/starlight/components';
+import TermIntro from '../../../components/docs/TermIntro.astro';
+
+> 마지막 장비를 옮길 때가 아니라 **첫 endpoint와 node를 되돌릴 수 있을 때** migration이 시작된다
+
+<TermIntro
+  terms={[
+    ['greenfield', '신규 환경', '기존 workload와 data 이전 부담 없이 새 운영 표준으로 처음부터 구성하는 대상이다.'],
+    ['cutover', '전환', '사용자 traffic을 기존 endpoint에서 새 endpoint로 바꾸는 시점이다.'],
+    ['rollback', '되돌리기', '합격 조건을 만족하지 못했을 때 기존 endpoint·node로 복귀하는 절차다.'],
+    ['shadow traffic', '그림자 트래픽', '사용자 응답에는 쓰지 않고 같은 요청을 새 backend에도 보내 비교하는 방식이다.'],
+  ]}
+/>
+
+## 전환할 것은 두 가지다
+
+```mermaid
+flowchart TB
+    subgraph traffic["endpoint 전환"]
+        LITE["LiteLLM alias"] --> OLD["기존 inference endpoint"]
+        LITE -. "weight 증가" .-> NEW["KServe endpoint"]
+    end
+    subgraph node["node ownership 전환"]
+        BA["기존 GPU manager"] -->|"drain · stop"| FREE["소유자 없는 검증 구간"]
+        FREE -->|"GPU Operator 합격"| K8S["Kubernetes GPU node"]
+    end
+
+    classDef key fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
+    classDef warn fill:#fef3c7,stroke:#d97706,color:#78350f
+    classDef ok fill:#dcfce7,stroke:#16a34a,color:#14532d
+    class LITE key
+    class OLD,BA,FREE warn
+    class NEW,K8S ok
+```
+
+traffic과 node를 한 번에 넘기지 않는다. 먼저 여유 GPU에 같은 model contract를 배포해 endpoint를 검증한다.
+그 다음 node 한 대의 ownership을 옮기고, 마지막에 LiteLLM weight를 바꾼다.
+
+## 순서는 hardware보다 위험을 따른다
+
+<Steps>
+
+1. **기반 PoC** — CPU infra node에 KServe controller를 두고 GPU Operator·registry·CA·Gateway·관측을 연결한다.
+2. **Spark single serving** — ARM64 vLLM 하나와 FastAPI 하나를 Standard `InferenceService`로 띄운다.
+3. **LiteLLM end-to-end** — streaming·cancel·timeout·alias·fallback·request ID·rollout drain을 검증한다.
+4. **Spark pool 확대** — replica·node reboot·model cache·잘못된 architecture 배치를 시험한 뒤 열 대로 넓힌다.
+5. **B300 greenfield** — full GPU·full-node runtime과 driver upgrade 기준선을 처음부터 Kubernetes로 만든다.
+6. **A100 serving endpoint 복제** — 기존 endpoint와 같은 model·tokenizer·generation default를 KServe에 배포한다.
+7. **A100 한 대 이전** — 두 서버 중 한 대만 drain해 Kubernetes에 편입하고 다른 한 대는 rollback 자원으로 둔다.
+8. **traffic 점진 전환** — shadow·내부 사용자·소량 weight를 거쳐 SLO·품질을 통과하면 비중을 높인다.
+
+</Steps>
+
+:::caution[범위를 넓히지 않는다]
+기존 Backend.AI를 학습이나 interactive workspace에도 쓰고 있다면 그 기능은 이 계획 밖에서 그대로 유지한다.
+KServe inference가 성공했다는 이유로 Backend.AI 전체를 종료하지 않는다.
+:::
+
+## 같은 GPU에 두 제어자를 두지 않는다
+
+A100 한 node를 기존 GPU manager와 Kubernetes kubelet이 동시에 소유하게 하지 않는다. 둘 다 container와
+GPU allocation을 제어하면 resource accounting과 장애 책임이 깨진다.
+
+```text
+backendai-a100-01  → inference drain → agent stop → GPU baseline 확인 → kubelet join → k8s-a100-01
+backendai-a100-02  → 기존 inference와 rollback 유지
+```
+
+node 단위 cutover가 가장 명확하다. MIG geometry·driver·local model cache도 ownership과 함께 넘긴다.
+
+## PoC 합격표
+
+| 영역 | 합격 질문 |
+|---|---|
+| GPU 기반 | 빈 node에서 driver·CDI·device plugin·GFD·DCGM이 실제 CUDA Pod까지 이어지는가 |
+| 재현성 | image digest·model revision으로 같은 `InferenceService`를 다시 만들 수 있는가 |
+| placement | ARM64 image와 amd64 image, A100과 B300 runtime이 잘못 섞이지 않는가 |
+| serving | streaming·cancel·timeout·readiness·rollout·fallback이 LiteLLM까지 동작하는가 |
+| 장애 | Pod kill·node reboot·Gateway 단절에서 영향과 복구 시간이 측정되는가 |
+| cold start | image·model fetch·load·compile·warm-up 시간이 분리돼 보이는가 |
+| 관측 | request ID에서 revision·Pod·node·GPU event까지 이동할 수 있는가 |
+| rollback | model endpoint와 A100 node 하나를 기존 환경으로 되돌릴 수 있는가 |
+
+## traffic은 model contract 단위로 옮긴다
+
+1. 같은 model·tokenizer·generation default를 새 KServe service에 배포한다.
+2. golden prompt·embedding vector·classification fixture로 결과를 비교한다.
+3. shadow 또는 내부 사용자 traffic으로 TTFT·ITL·error·memory를 측정한다.
+4. LiteLLM weight 일부만 새 endpoint로 보낸다.
+5. 품질과 SLO를 통과하면 단계적으로 weight를 높인다.
+6. rollback window 동안 기존 endpoint·image·model artifact를 유지한다.
+
+GPU 세대가 바뀌면 quantization·kernel·floating-point 결과도 달라질 수 있다. HTTP 200만으로 같은 model
+contract라고 판단하지 않는다.
+
+## B300 도입 전에 고정할 것
+
+- cluster·node pool·driver ownership
+- full GPU·full-node serving profile
+- image·CUDA·vLLM·model compatibility matrix
+- model load와 warm-up 시간 기준
+- 다중 노드가 필요하면 NIC·RDMA·topology 기준
+- KServe Standard serving sample과 SLO 부하 시험
+- burn-in·XID·ECC·link alert
+- firmware·driver·Kubernetes·runtime upgrade 순서
+
+## 참고 자료
+
+- [GPU Operator driver upgrade](https://docs.nvidia.com/datacenter/cloud-native/gpu-operator/latest/gpu-driver-upgrades.html) — drain과 rolling upgrade 상태.
+- [KServe canary rollout](https://kserve.github.io/website/docs/model-serving/predictive-inference/rollout-strategies/canary-example) — revision traffic 전환 pattern.
+
+<LinkCard
+  title="8. 마무리"
+  description="GPU Operator와 KServe의 전체 지도, 도입 순서와 장애 대응 카드를 한 장으로 모은다."
+  href="/gpu-platform/08-wrapup/"
+/>

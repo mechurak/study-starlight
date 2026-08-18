@@ -54,7 +54,7 @@ LiteLLM에는 KServe service endpoint와 내부 model name을 등록한다. Pod 
 |---|---|---|
 | LiteLLM | 이용자 key·team quota·공개 alias·provider fallback | node·Pod·GPU placement |
 | Gateway API | TLS·host·path·network route | 이용자별 token budget |
-| KServe | runtime·model revision·replica·health·service | driver·batch queue |
+| KServe | runtime·model revision·replica·health·service | driver·최종 이용자 quota |
 | vLLM | continuous batching·KV cache·OpenAI API | 조직·namespace·fleet |
 | FastAPI | 전처리·schema·custom inference | GPU cluster 정책 |
 
@@ -149,7 +149,7 @@ GPU 세대 이동을 공개 이름 변경으로 만들지 않는다. Spark에서
 - [LiteLLM 문서](https://docs.litellm.ai/) — gateway·virtual key·routing 범위.
 
 <LinkCard
-  title="4A. LLM 서빙 용량·SLO·타임아웃 운영"
-  description="Backend.AI·vLLM·GPU metric을 같은 시간 축에 놓고, 포화와 timeout에 먼저 대응한다."
-  href="/gpu-platform/04a-serving-operations/"
+  title="5. LLM 서빙 용량·SLO·타임아웃 운영"
+  description="Gateway·KServe·vLLM·GPU metric을 같은 시간 축에 놓고, 포화와 timeout에 먼저 대응한다."
+  href="/gpu-platform/05-serving-operations/"
 />
