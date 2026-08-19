@@ -61,9 +61,9 @@ OpenTelemetry Collector, Prometheus, Loki, Tempo, Grafana가 함께 돌고 데�
 
 ## 사전 준비
 
-Docker·kind·kubectl을 처음 준비하거나 macOS와 Ubuntu의 차이를 확인해야 한다면
-[실습 환경의 kind 장](/lab-environment/01-kind/)을 먼저 본다. 그 장의 예시 `study` 클러스터를
-미리 만들 필요는 없다. 여기서는 `make up`이 전용 `observability-lab` 클러스터를 만든다.
+Docker·kind·kubectl을 처음 준비한다면 운영체제에 맞춰 [macOS의 kind 장](/lab-environment/01-kind-macos/)
+또는 [Ubuntu의 kind 장](/lab-environment/02-kind-ubuntu/)을 먼저 본다. 그 장의 예시 `study`
+클러스터를 미리 만들 필요는 없다. 여기서는 `make up`이 전용 `observability-lab` 클러스터를 만든다.
 
 이 실습은 Docker 런타임에 **CPU 4개 · 메모리 6 GiB 이상**을 할당한다. 이미지와 클러스터를 합쳐
 디스크 여유 공간도 약 10 GiB가 필요하다. `make up`은 메모리가 6 GiB보다 작으면 시작 전에 멈춘다.
@@ -169,7 +169,8 @@ first-investigation/
 
 - [Grafana `docker-otel-lgtm`](https://github.com/grafana/docker-otel-lgtm) — 이미지의 목적, 포함된 백엔드, Kubernetes 실행과 OTLP 기본값
 - [kind Quick Start](https://kind.sigs.k8s.io/docs/user/quick-start/) — 클러스터 생성, 로컬 이미지 적재, 삭제
-- [실습 환경 — kind](/lab-environment/01-kind/) — macOS·Ubuntu 공통 준비와 클러스터 수명주기
+- [실습 환경 — kind on macOS](/lab-environment/01-kind-macos/) — Colima 또는 Docker Desktop에서 준비와 정리
+- [실습 환경 — kind on Ubuntu](/lab-environment/02-kind-ubuntu/) — Docker Engine에서 준비와 정리
 - [OpenTelemetry OTLP exporter 설정](https://opentelemetry.io/docs/specs/otel/protocol/exporter/) — 한 endpoint에서 신호별 `/v1/*` 경로를 만드는 규칙
 
 <LinkCard

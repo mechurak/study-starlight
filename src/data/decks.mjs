@@ -90,11 +90,10 @@ export const deckDefinitions = [
 		title: '실습 환경',
 		icon: 'setting',
 		aliases: ['Lab environment', '로컬 실습', '개발 환경 준비', 'kind 설치'],
-		description: '만들기 전에 경계를 정하고 끝난 뒤 안전하게 닫는다 — 여러 덱이 공유하는 실습 환경 수명주기.',
+		description: '여러 덱에서 다시 쓰는 로컬 환경 준비와 정리 — 운영체제별 공식 설치 경로부터 cleanup까지.',
 		category: 'platform',
 		groups: [
-			['공통 원칙', ['lab-environment/00-lifecycle']],
-			['Kubernetes', ['lab-environment/01-kind']],
+			['Kubernetes', ['lab-environment/01-kind-macos', 'lab-environment/02-kind-ubuntu']],
 		],
 	},
 	{
