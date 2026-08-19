@@ -1,6 +1,6 @@
 ---
-title: "10. 두 Agent로 시작하기"
-description: 기본 runtime을 정하고 read-only·write Agent로 공통 계약과 두 adapter의 도입 가정을 검증한다
+title: "11. 두 Agent로 시작하기"
+description: 기본 runtime을 정하고 read-only·write Agent로 공통 계약과 runtime adapter의 도입 가정을 검증한다
 ---
 
 import { LinkCard, Steps } from '@astrojs/starlight/components';
@@ -18,9 +18,10 @@ import TermIntro from '../../../components/docs/TermIntro.astro';
 
 ## 기본 target 하나를 먼저 정한다
 
-두 adapter를 처음부터 같은 깊이로 만들면 platform core보다 provider 차이를 맞추는 데 시간이 든다.
+여러 adapter를 처음부터 같은 깊이로 만들면 platform core보다 provider 차이를 맞추는 데 시간이 든다.
 
 - AWS가 승인된 실행·data 경계이고 managed 운영이 우선이면 AgentCore를 default로 둔다.
+- 장기 실행·승인 대기·event-driven code형 Agent가 핵심이고 Dapr 기반이 이미 있다면 Dapr Agents를 default로 둔다.
 - 실행과 data가 온프렘에 남아야 하거나 Kubernetes 기반이 이미 강하면 kagent를 default로 둔다.
 - 다른 target은 hard constraint가 있는 Agent부터 지원한다.
 
@@ -55,7 +56,7 @@ human approval을 검증하지 못한다.
 
    digest, SBOM, scan, signature, tool/data approval과 immutable version을 강제한다.
 
-5. **두 번째 adapter를 contract test로 추가한다**
+5. **다음 adapter를 contract test로 추가한다**
 
    첫 adapter code를 복사하지 않고 같은 port와 fixture를 구현한다. capability 차이는 명시한다.
 
@@ -87,6 +88,15 @@ human approval을 검증하지 못한다.
 - portal ACL을 우회하는 controller endpoint가 노출되지 않는지
 - cluster·model capacity가 noisy Agent를 격리하는지
 
+## Dapr Agents PoC에서 볼 것
+
+- 일반 Deployment·Dapr sidecar·state store를 하나의 배포 단위로 재현하는지
+- Pod와 sidecar 재시작 뒤 같은 workflow instance가 이어지는지
+- LLM·tool activity의 retry와 idempotency key가 side effect를 중복시키지 않는지
+- App ID identity와 MCP access policy가 허용되지 않은 tool 호출을 차단하는지
+- `before_tool_call` hook과 HITL 승인 상태가 재시작 뒤에도 유지되는지
+- workflow history·conversation memory·업무 audit의 보존 기간을 분리했는지
+
 ## AgentCore PoC에서 볼 것
 
 - ARM64 image build와 protocol contract
@@ -105,7 +115,7 @@ PoC 결과는 "기능 있음" 표보다 운영 증거로 남긴다.
 |---|---|
 | default target | acceptance 통과율, 운영 인력, data boundary, 비용 model |
 | secondary target | 필요한 hard constraint와 추가 운영비 |
-| portable 범위 | 두 adapter contract test가 실제로 공통인 항목 |
+| portable 범위 | adapter contract test에서 실제로 공통인 항목 |
 | provider extension | 어느 Agent가 왜 lock-in을 수용하는지 |
 | GA 전 의존성 | Preview 기능 제거 시 fallback path |
 
@@ -117,7 +127,7 @@ PoC 결과는 "기능 있음" 표보다 운영 증거로 남긴다.
 자유로운 업로드보다 빠른 feedback이 중요하다. 거부 reason과 고칠 방법을 creator에게 자동으로 돌려줘야 안전한
 경로를 우회하지 않는다.
 
-## 10장 요약
+## 11장 요약
 
 - 기본 target 하나로 end-to-end walking skeleton을 먼저 만든다.
 - read-only와 write Agent 두 개가 권한·action·audit 차이를 드러낸다.
@@ -125,7 +135,7 @@ PoC 결과는 "기능 있음" 표보다 운영 증거로 남긴다.
 - 구성형 → 코드형 → write action → secondary target 순으로 위험을 연다.
 
 <LinkCard
-  title="11. 마무리"
+  title="12. 마무리"
   description="전체 구조와 production 준비 체크리스트를 한 장으로 다시 묶는다."
-  href="/agent-platform/11-wrapup/"
+  href="/agent-platform/12-wrapup/"
 />

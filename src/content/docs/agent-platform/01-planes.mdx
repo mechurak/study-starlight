@@ -31,6 +31,7 @@ flowchart TB
     end
     subgraph run["Runtime plane"]
         KAG["kagent · Kubernetes"]
+        DAPR["Dapr Agents · Workflow"]
         ACR["AgentCore Runtime"]
     end
     subgraph base["Foundation plane"]
@@ -44,14 +45,18 @@ flowchart TB
     MARKET --> CATALOG
     CATALOG --> POLICY --> RECON
     RECON --> KAG
+    RECON --> DAPR
     RECON --> ACR
     IDP --> CREATOR
     IDP --> MARKET
     KAG --> MODEL
+    DAPR --> MODEL
     ACR --> MODEL
     KAG --> TOOLS
+    DAPR --> TOOLS
     ACR --> TOOLS
     KAG --> OBS
+    DAPR --> OBS
     ACR --> OBS
 
     classDef key fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
@@ -60,7 +65,7 @@ flowchart TB
     classDef warn fill:#fef3c7,stroke:#d97706,color:#78350f
     class CREATOR,MARKET key
     class CATALOG,POLICY,RECON zone
-    class KAG,ACR ok
+    class KAG,DAPR,ACR ok
     class IDP,MODEL,TOOLS,OBS warn
 ```
 
@@ -96,10 +101,11 @@ runtime은 image나 선언형 spec을 실제 process로 만들고 다음을 담�
 - runtime identity와 secret 주입
 - provider-native log·metric·trace
 
-kagent에서는 Kubernetes와 controller가 이 일을 나눠 맡고, AgentCore에서는 AWS 관리형 runtime이 session별
-microVM과 version endpoint를 맡는다. 공통 interface는 같아도 격리 단위와 scale 의미는 다르다.
+kagent에서는 Kubernetes와 controller가 Agent resource를 workload로 맞춘다. Dapr Agents에서는 일반 app Pod와
+sidecar·Workflow·state store가 step 단위 복구를 맡는다. AgentCore에서는 AWS 관리형 runtime이 session별
+microVM과 version endpoint를 맡는다. 공통 interface는 같아도 lifecycle·복구·격리 단위의 의미는 다르다.
 
-## Foundation plane — 두 runtime이 공유한다
+## Foundation plane — 여러 runtime이 공유한다
 
 모델, identity, tool, network와 관측을 runtime마다 별도로 만들면 교체 비용이 커진다. 가능한 것은 공통 기반으로 둔다.
 

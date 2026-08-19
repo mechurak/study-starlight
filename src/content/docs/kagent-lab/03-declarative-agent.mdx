@@ -24,19 +24,33 @@ import TermIntro from '../../../components/docs/TermIntro.astro';
 demo profile이 만든 기본 model과 tool server 이름을 확인한다.
 
 ```bash
-kubectl --context kind-kagent-lab -n kagent get modelconfig default-model-config
-kubectl --context kind-kagent-lab -n kagent get remotemcpserver kagent-tool-server
+kubectl -n kagent get modelconfig default-model-config
+kubectl -n kagent get remotemcpserver kagent-tool-server
+```
+
+1장에서 `default-model-config` 자체를 LiteLLM으로 바꿨다면 기존 sample Agent와 이번 `lab-reader`가 함께
+전환된다. 별도 `litellm-default`를 만들었다면 아래 Agent manifest의 `modelConfig`도 그 이름으로 바꾼다.
+
+```bash
+kubectl -n kagent get agents \
+  -o custom-columns='AGENT:.metadata.name,MODEL_CONFIG:.spec.declarative.modelConfig'
 ```
 
 둘 중 하나가 없다면 아래 manifest를 적용하지 않는다. 설치 version에서 이름이 바뀌었는지 실제 목록과 release
 notes를 확인한다.
+
+:::tip[ModelConfig가 model 전환 단위다]
+Agent마다 key와 URL을 복제하지 않는다. 한 `ModelConfig`를 여러 Agent가 참조하면 model·gateway 변경을 한 곳에서
+적용할 수 있다. 반대로 blast radius를 줄이려면 새 `ModelConfig`를 만든 뒤 Agent 하나에서 invoke까지 검증하고
+나머지 reference를 옮긴다.
+:::
 
 ## Agent 만들기
 
 다음 Agent는 Kubernetes 조회 tool 둘만 참조한다. 변경 tool을 prompt로 금지하는 데 그치지 않고 allowlist에서 뺀다.
 
 ```bash
-kubectl --context kind-kagent-lab apply -f - <<'EOF'
+kubectl apply -f - <<'EOF'
 apiVersion: kagent.dev/v1alpha2
 kind: Agent
 metadata:
@@ -75,22 +89,22 @@ EOF
 1. resource가 생겼는지 본다.
 
    ```bash
-   kubectl --context kind-kagent-lab -n kagent get agent lab-reader
+   kubectl -n kagent get agent lab-reader
    ```
 
 2. condition 두 개를 기다린다.
 
    ```bash
-   kubectl --context kind-kagent-lab -n kagent wait \
+   kubectl -n kagent wait \
      --for=condition=Accepted agent/lab-reader --timeout=2m
-   kubectl --context kind-kagent-lab -n kagent wait \
+   kubectl -n kagent wait \
      --for=condition=Ready agent/lab-reader --timeout=3m
    ```
 
 3. 최종 spec과 status를 함께 읽는다.
 
    ```bash
-   kubectl --context kind-kagent-lab -n kagent get agent lab-reader -o yaml
+   kubectl -n kagent get agent lab-reader -o yaml
    ```
 
 </Steps>
@@ -103,7 +117,7 @@ EOF
 controller port-forward가 없다면 별도 terminal에서 다시 연다.
 
 ```bash
-kubectl --context kind-kagent-lab -n kagent port-forward svc/kagent-controller 8083:8083
+kubectl -n kagent port-forward svc/kagent-controller 8083:8083
 ```
 
 먼저 허용된 질문을 보낸다.
@@ -152,4 +166,3 @@ Agent spec에 delete tool 자체가 없다는 사실이다. 실제 Pod 수가 �
   description="새 MCPServer를 배포하고 한 tool만 allowlist에 넣어 Agent의 능력이 어디서 생기는지 본다."
   href="/kagent-lab/04-mcp-tool/"
 />
-

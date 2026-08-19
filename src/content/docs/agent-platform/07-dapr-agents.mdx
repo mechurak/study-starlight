@@ -1,0 +1,156 @@
+---
+title: "7. Dapr Agents adapter"
+description: Dapr Agents의 durable workflow·state·workload identity를 코드형 Agent 배포 계약에 매핑한다
+reviewedAt: 2026-08-19
+status: review
+---
+
+import { LinkCard } from '@astrojs/starlight/components';
+import TermIntro from '../../../components/docs/TermIntro.astro';
+
+> Dapr Agents는 Agent 전용 배포 control plane보다 **코드형 Agent의 실행을 중단 지점부터 이어 주는 durable substrate**에 가깝다
+
+<TermIntro
+  terms={[
+    ['Dapr Agents', 'Dapr Agents', 'LLM·tool 호출을 Dapr Workflow와 state store 위에서 실행하는 Python Agent framework다.'],
+    ['durable execution', 'Durable Execution', 'process가 재시작돼도 기록된 workflow history에서 실행을 이어 가는 방식이다.'],
+    ['activity', 'Workflow Activity', 'LLM·tool·외부 API처럼 비결정적 작업을 workflow가 예약하고 결과를 기록하는 실행 단위다.'],
+    ['App ID', 'Dapr Application ID', 'Dapr service invocation과 workload identity·access policy가 사용하는 application 식별자다.'],
+  ]}
+/>
+
+## 전체 중 Dapr Agents의 자리
+
+```mermaid
+flowchart LR
+    PORTAL["Platform Core"] --> ADAPTER["DaprKubernetesAdapter"]
+    ADAPTER --> K8S["Deployment · Dapr resources"]
+    K8S --> APP["Python DurableAgent app"]
+    K8S --> SIDECAR["Dapr sidecar"]
+    APP --> SIDECAR
+    SIDECAR --> WF["Workflow · Scheduler"]
+    SIDECAR --> STATE["workflow state · memory"]
+    SIDECAR --> MCP["MCP · internal service"]
+    K8S --> STATUS["Pod · sidecar · workflow health"]
+    STATUS --> ADAPTER
+
+    classDef key fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
+    classDef zone fill:#ede9fe,stroke:#7c3aed,color:#4c1d95
+    classDef ok fill:#dcfce7,stroke:#16a34a,color:#14532d
+    classDef warn fill:#fef3c7,stroke:#d97706,color:#78350f
+    class PORTAL key
+    class ADAPTER,K8S,STATUS zone
+    class APP,SIDECAR,WF,STATE ok
+    class MCP warn
+```
+
+Dapr Agents v1.0은 `DurableAgent`를 권장 실행 모델로 둔다. Agent의 LLM 판단과 tool 호출을 Dapr Workflow로
+기록해 app이나 sidecar가 재시작돼도 같은 workflow instance를 이어 간다. HTTP, pub/sub 또는 다른 workflow에서
+실행을 시작할 수 있어 장기 업무와 event-driven Agent에 잘 맞는다.
+
+## kagent와 같은 층만 비교하지 않는다
+
+| 질문 | kagent | Dapr Agents |
+|---|---|---|
+| Agent를 무엇으로 선언하는가 | `Agent`·`SandboxAgent` CR | Python `DurableAgent` code |
+| 누가 workload를 만드는가 | kagent controller | Kubernetes Deployment·CI/CD |
+| 표준 호출 표면 | controller의 A2A endpoint | `AgentRunner` HTTP·pub/sub·embedded 호출 |
+| 가장 강한 기능 | 선언형 lifecycle·GitOps·UI/CLI·sandbox | workflow 재개·retry·event orchestration |
+| 운영해야 할 기반 | controller·runtime·DB·cluster | Dapr control plane·sidecar·Scheduler·state store |
+
+따라서 구성형 Agent self-service가 중심이면 kagent가 더 직접적이다. Dapr Agents는 승인된 code형 image가 있고
+그 안의 여러 단계가 실패 뒤에도 이어져야 할 때 runtime adapter 후보가 된다. 사내 catalog·승인·사용자별 invoke
+ACL은 어느 쪽도 대신 소유하지 않는다.
+
+## Durable execution 계약
+
+`DurableAgent`는 LLM 호출과 tool 실행을 activity 경계로 기록한다. 완료된 step은 replay 때 결과를 재사용하고,
+아직 끝나지 않았거나 retry 대상인 step만 다시 실행한다. deterministic workflow와 LLM이 다음 행동을 고르는
+autonomous loop도 같은 Dapr Workflow 기반에서 조합할 수 있다.
+
+:::caution[At-least-once를 exactly-once로 읽지 않는다]
+Dapr Workflow activity는 적어도 한 번 실행된다. worker가 side effect를 끝낸 직후 완료 보고 전에 죽으면 같은
+activity가 다시 실행될 수 있다. 결제·승인·삭제 tool에는 `workflowInstanceId + activityId` 기반 idempotency key와
+업무 system의 중복 방지가 필요하다.
+:::
+
+workflow history와 대화 memory도 구분한다. 전자는 실행 복구를 위한 상태이고 후자는 LLM context를 위한 data다.
+각각 store, 암호화, retention, purge와 열람 권한을 따로 정한다.
+
+## 공통 객체 매핑
+
+| 공통 객체 | Dapr Agents·Kubernetes 표현 |
+|---|---|
+| `AgentVersion` | signed image digest + Python dependency lock + Agent config snapshot |
+| `DeploymentTarget` | cluster·namespace·ServiceAccount·Dapr config·state component preset |
+| `Deployment` | Kubernetes Deployment·Service와 Dapr resource 묶음 |
+| `providerRef` | cluster ID + namespace + Deployment UID + Dapr App ID |
+| `ToolBinding` | MCP endpoint 또는 `MCPServer`·service invocation policy |
+| runtime identity | Kubernetes ServiceAccount + Dapr App ID의 SPIFFE workload identity |
+
+adapter는 image만 배포하지 않는다. 같은 release 단위에 Pod의 Dapr annotation, `Configuration`, state `Component`,
+필요한 `MCPServer`와 secret reference를 함께 plan한다. 특정 state store 이름이나 Redis 주소를 공통
+`AgentVersion`에 넣지 않고 target preset에서 번역한다.
+
+## 세 권한에 매핑한다
+
+Dapr의 App ID와 SPIFFE mTLS는 **Agent workload가 누구인가**를 증명한다. 이것을 로그인한 임직원의 identity로
+해석하지 않는다.
+
+1. creator의 edit·deploy 권한은 portal과 Kubernetes admission/RBAC가 검사한다.
+2. consumer의 `agent:invoke`는 portal gateway가 `Grant`와 session ownership으로 검사한다.
+3. Agent의 tool action은 Dapr App ID access policy, MCP middleware, `before_tool_call` hook과 HITL로 제한한다.
+
+세 번째 문에서는 Dapr가 강한 재료를 제공한다. MCP server 도달 여부를 workload별 deny-default policy로 막고,
+argument 수준 판단이나 승인 대기는 workflow hook으로 둔다. 다만 portal을 우회해 app Service를 직접 호출할 수
+있다면 두 번째 문은 사라지므로 ingress와 NetworkPolicy도 company gateway만 허용해야 한다.
+
+## 배포·상태·격리
+
+Kubernetes에서는 annotation이 있는 Pod에 `daprd` sidecar가 주입된다. Dapr Agents 자체가 `Agent` CR을
+reconcile하지는 않으므로 adapter가 다음 상태를 합쳐야 한다.
+
+- Deployment rollout과 app readiness
+- sidecar health와 Dapr control plane 연결
+- workflow state store·Scheduler 접근
+- model·MCP까지 통과하는 synthetic invoke
+- workflow instance 조회와 purge 가능 여부
+
+기본 격리 단위도 일반 Pod다. Dapr의 workload identity와 service access control은 network authorization에는
+도움이 되지만 code 실행 sandbox를 만들지는 않는다. 사용자 제출 code는 별도 namespace·RuntimeClass·seccomp·
+NetworkPolicy와 admission policy를 적용한다.
+
+## kagent와 조합할 때
+
+kagent BYO deployment는 Pod annotation을 받을 수 있으므로 Dapr sidecar injection 자체는 가능하다. 그러나 kagent는
+BYO image가 A2A endpoint를 제공한다고 기대하고, Dapr Agents의 기본 runner contract와 lifecycle은 별개다.
+조합하려면 A2A wrapper, Dapr state resource, 두 controller의 readiness·rollback 책임을 명시해야 한다.
+
+두 제품을 겹치는 것이 기본안은 아니다. **kagent의 선언형 lifecycle과 Dapr의 durable workflow가 같은 Agent에 모두
+필요하다는 acceptance test가 있을 때만** 조합한다.
+
+## 잘 맞는 경우와 불리한 경우
+
+**잘 맞는다:** 승인·외부 event를 오래 기다리거나 여러 업무 system을 거치는 코드형 Agent, 실패 뒤 step 단위
+복구가 필요한 업무, Dapr 운영 기반과 state/pub-sub component가 이미 표준인 조직.
+
+**불리하다:** prompt·model·tool만 조합하는 선언형 self-service가 우선이거나, Python runtime을 표준화할 수 없거나,
+단순 대화 Agent 때문에 Dapr control plane·sidecar·state store 운영을 새로 도입해야 하는 경우. session별 강한
+sandbox가 요구되면 별도 격리 계층도 필요하다.
+
+## 참고 자료
+
+- [Dapr Agents 소개](https://docs.dapr.io/developing-ai/dapr-agents/dapr-agents-introduction/) — v1.0 상태와 durable execution·identity·배포 성격.
+- [Dapr Agents core concepts](https://docs.dapr.io/developing-ai/dapr-agents/dapr-agents-core-concepts/) — `DurableAgent`, workflow와 HTTP·pub/sub 실행 모델.
+- [Dapr Agents 시작하기](https://docs.dapr.io/developing-ai/dapr-agents/dapr-agents-getting-started/) — workflow state store와 재시작 뒤 instance 복구.
+- [Workflow activity](https://docs.dapr.io/developing-applications/building-blocks/workflow/workflow-features-concepts/) — at-least-once와 idempotency 요구.
+- [MCP 보안 경계](https://docs.dapr.io/developing-ai/mcp/mcp-security/) — SPIFFE identity, App ID access control과 남는 책임.
+- [MCPServer resource](https://docs.dapr.io/developing-ai/mcp/mcp-server-resource/) — durable tool call과 middleware hook.
+- [Dapr sidecar](https://docs.dapr.io/concepts/dapr-services/sidecar/) — Kubernetes annotation 기반 sidecar injection.
+- [kagent API reference](https://kagent.dev/docs/kagent/resources/api-ref/) — BYO의 A2A 계약과 Pod annotation.
+
+<LinkCard
+  title="8. AgentCore adapter"
+  description="같은 계약을 AWS 관리형 session runtime과 VPC·PrivateLink·JWT 경계로 번역한다."
+  href="/agent-platform/08-agentcore/"
+/>

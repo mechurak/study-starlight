@@ -38,22 +38,22 @@ port-forward와 dashboard terminal은 각각 `Ctrl+C`로 종료한다. 로컬 tu
 1. **정확한 대상이 있는지 확인한다**
 
    ```bash
-   kubectl --context kind-kagent-lab -n kagent get \
+   kubectl -n kagent get \
      agent/lab-reader agent/simple-fetch-agent mcpserver/mcp-website-fetcher
    ```
 
 2. **이 덱에서 만든 셋만 지운다**
 
    ```bash
-   kubectl --context kind-kagent-lab -n kagent delete \
+   kubectl -n kagent delete \
      agent/lab-reader agent/simple-fetch-agent mcpserver/mcp-website-fetcher
    ```
 
 3. **sample과 control plane이 남았는지 확인한다**
 
    ```bash
-   kubectl --context kind-kagent-lab -n kagent get agents
-   kubectl --context kind-kagent-lab -n kagent get pods
+   kubectl -n kagent get agents
+   kubectl -n kagent get pods
    ```
 
 </Steps>
@@ -88,7 +88,7 @@ port-forward와 dashboard terminal은 각각 `Ctrl+C`로 종료한다. 로컬 tu
 4. **현재 shell의 API key를 해제한다**
 
    ```bash
-   unset OPENAI_API_KEY
+   unset OPENAI_API_KEY LITELLM_API_KEY LITELLM_BASE_URL LITELLM_MODEL
    ```
 
 </Steps>
@@ -130,4 +130,3 @@ Agent와 tool까지 포함할 수 있다. 이 덱은 애초에 전용 kind clust
   description="전체 흐름과 완료 기준을 다시 보고 필요한 장만 반복한다."
   href="/kagent-lab/"
 />
-

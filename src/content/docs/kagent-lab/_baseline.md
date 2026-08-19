@@ -25,7 +25,10 @@ Docker·kind·kubectl·Helm의 설치 명령은 복제하지 않는다. `lab-env
 - 확인 당시 공식 설치 문서의 기본 CLI release는 `0.9.9`다. 독자는 실행 전에 `kagent version`을 기록한다.
 - Agent API는 `kagent.dev/v1alpha2`, kmcp의 `MCPServer` 예시는 `kagent.dev/v1alpha1`이다.
 - 실습 클러스터 이름은 `kagent-lab`, context는 `kind-kagent-lab`, namespace는 `kagent`로 고정한다.
-- 기본 모델 연결은 quickstart와 같은 OpenAI provider를 사용한다. 다른 provider는 공식 설치 문서로 연결한다.
+- 기본 모델 연결은 quickstart와 같은 OpenAI provider를 사용하되, OpenAI-compatible 사내 LiteLLM gateway를
+  `openAI.baseUrl`로 연결하는 선택 경로도 1장에서 함께 검증한다.
+- `kagent install`은 Helm CLI로 `kagent-crds`와 `kagent` release를 `upgrade --install`한다. `demo` profile은
+  내장 values로 sample Agent와 tool을 추가한다.
 
 API가 alpha이고 설치 경로가 빠르게 바뀌므로 모든 본문 페이지는 `status: review`로 둔다. 명령·CRD schema를
 바꿀 때는 quickstart, API reference, release notes를 함께 다시 확인한다.
@@ -34,7 +37,12 @@ API가 alpha이고 설치 경로가 빠르게 바뀌므로 모든 본문 페이�
 
 - 다른 Kubernetes cluster에서 실행하지 않는다. kagent 설치 전 `kubectl config current-context`가
   정확히 `kind-kagent-lab`인지 확인한다.
-- API key 값을 문서·Git·매니페스트에 직접 적지 않는다. 환경 변수에서 설치 과정이 만드는 Secret으로 넘긴다.
+- 1장에서 `kubectl config use-context kind-kagent-lab`으로 context를 고정한다. 이후 `kubectl` 예시는
+  현재 context를 전제로 하며 명령마다 `--context`를 반복하지 않는다.
+- API key 값을 문서·Git·매니페스트에 직접 적지 않는다. 환경 변수에서 Kubernetes Secret으로 넘긴다.
+  사내 gateway에는 provider key가 아니라 workload 범위의 LiteLLM virtual key를 사용한다.
+- Helm이 만든 `default-model-config`를 직접 수정하면 다음 `kagent install`이나 Helm upgrade에서 되돌아갈 수 있다.
+  실습의 빠른 전환과 운영에서 별도 `ModelConfig`를 선언적으로 관리하는 방식을 구분한다.
 - 원격 kagent installer는 파일로 받은 뒤 내용을 확인하고 실행하며 checksum 검증을 끄지 않는다.
 - 처음 만드는 Agent에는 조회 tool만 준다. apply·delete 같은 변경 tool은 별도 승인 없이는 붙이지 않는다.
 - MCP server와 BYO image는 code 실행 경계다. community image·package를 운영 cluster에서 그대로 실행하지 않는다.

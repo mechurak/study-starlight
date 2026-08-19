@@ -45,7 +45,7 @@ package 공급망을 먼저 고정한다.
 확인 당시 kmcp `MCPServer` API는 `kagent.dev/v1alpha1`이다. Agent의 v1alpha2와 번호가 다른 것이 오타가 아니다.
 
 ```bash
-kubectl --context kind-kagent-lab apply -f - <<'EOF'
+kubectl apply -f - <<'EOF'
 apiVersion: kagent.dev/v1alpha1
 kind: MCPServer
 metadata:
@@ -65,8 +65,8 @@ EOF
 생성된 resource와 workload를 함께 본다.
 
 ```bash
-kubectl --context kind-kagent-lab -n kagent get mcpserver mcp-website-fetcher -o yaml
-kubectl --context kind-kagent-lab -n kagent get pods
+kubectl -n kagent get mcpserver mcp-website-fetcher -o yaml
+kubectl -n kagent get pods
 ```
 
 Pod가 바로 ready가 되지 않으면 MCPServer status와 새 Pod의 Events·log를 읽는다. resource 이름과 생성된
@@ -75,7 +75,7 @@ workload 이름이 완전히 같다고 가정하지 말고 creation timestamp와
 ## fetch Agent 만들기
 
 ```bash
-kubectl --context kind-kagent-lab apply -f - <<'EOF'
+kubectl apply -f - <<'EOF'
 apiVersion: kagent.dev/v1alpha2
 kind: Agent
 metadata:
@@ -102,7 +102,7 @@ EOF
 ```
 
 ```bash
-kubectl --context kind-kagent-lab -n kagent wait \
+kubectl -n kagent wait \
   --for=condition=Ready agent/simple-fetch-agent --timeout=3m
 ```
 
@@ -157,4 +157,3 @@ DNS·URL allowlist 같은 서버 측 통제가 필요하다. 이 실습에서는
   description="호출 UI를 벗어나 Agent card와 protocol endpoint를 직접 확인한다."
   href="/kagent-lab/05-a2a-invoke/"
 />
-

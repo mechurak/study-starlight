@@ -1,6 +1,6 @@
 ---
 title: "2. 제품 밖의 domain model"
-description: Agent의 정체성·버전·권한·배포를 kagent CRD와 AWS ARN 밖에 정의한다
+description: Agent의 분류 축과 정체성·버전·trigger·권한·배포를 kagent CRD와 AWS ARN 밖에 정의한다
 ---
 
 import { LinkCard } from '@astrojs/starlight/components';
@@ -14,6 +14,7 @@ import TermIntro from '../../../components/docs/TermIntro.astro';
     ['immutable version', 'Immutable Version', '한번 승인·배포되면 내용을 바꾸지 않는 snapshot. 변경은 다음 version으로 만든다.'],
     ['providerRef', 'Provider Reference', 'kagent resource name이나 AgentCore ARN처럼 provider에서만 의미 있는 식별자다.'],
     ['desired state', 'Desired State', 'control plane이 기대하는 배포 상태. adapter가 provider의 실제 상태를 이 값에 맞춘다.'],
+    ['trigger', 'Invocation Trigger', '사람의 요청·schedule·event처럼 Agent 실행을 시작시키는 계기와 실행 정책이다.'],
   ]}
 />
 
@@ -24,18 +25,103 @@ flowchart LR
     AG["Agent<br/>정체성 · owner"] --> VER["AgentVersion<br/>immutable artifact"]
     AG --> GRANT["Grant<br/>principal · role"]
     AG --> PUB["Publication<br/>공개 상태"]
+    AG --> TRG["Trigger<br/>request · schedule · event"]
     VER --> DEP["Deployment<br/>version × target"]
     TARGET["DeploymentTarget<br/>zone · capabilities"] --> DEP
     DEP --> PREF["providerRef<br/>namespace/name 또는 ARN"]
     VER --> TOOL["ToolBinding<br/>scope · auth mode"]
+    PUB --> DEP
+    TRG --> PUB
 
     classDef key fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
     classDef zone fill:#ede9fe,stroke:#7c3aed,color:#4c1d95
     classDef ok fill:#dcfce7,stroke:#16a34a,color:#14532d
     class AG,VER key
-    class GRANT,PUB,TOOL zone
+    class GRANT,PUB,TRG,TOOL zone
     class DEP,TARGET,PREF ok
 ```
+
+## Agent를 하나의 enum으로 나누지 않는다
+
+`Declarative`·`BYO`나 `chatbot`·`batch agent`처럼 한 단어로 Agent 종류를 정하면 서로 다른 질문이 섞인다.
+예를 들어 매일 보고서를 만드는 Agent는 코드형일 수도 구성형일 수도 있고, 매번 새 process에서 실행할 수도
+상주 service를 `CronJob`이 호출할 수도 있다. 플랫폼은 최소한 다음 축을 독립적으로 기록해야 한다.
+
+| 분류 축 | 답할 질문 | 대표 값 |
+|---|---|---|
+| 작성 방식 | 실행 logic을 누가 공급하나 | `CONFIGURED`, `CODE` |
+| 활성화 방식 | 무엇이 실행을 시작하나 | `REQUEST`, `SCHEDULE`, `EVENT` |
+| 상주 방식 | 요청이 없을 때 process가 남나 | `RESIDENT`, `SUSPENDABLE`, `EPHEMERAL` |
+| 상태·복구 | 중단 뒤 어디서 이어가나 | `TURN`, `SESSION`, `DURABLE_WORKFLOW`, `WORKSPACE` |
+| 격리 | 무엇과 failure·filesystem 경계를 공유하나 | `SHARED`, `POD`, `SANDBOX`, `MICROVM` |
+| 행위 위험 | 어떤 권한과 data를 다루나 | `READ`, `WRITE`, `DESTRUCTIVE`, `CODE_EXEC` |
+
+### 활성화와 상주를 분리한다
+
+`SCHEDULE`은 언제 호출할지를 말하고 `EPHEMERAL`은 호출할 때 만든 process가 끝나면 종료되는지를 말한다.
+둘을 합치면 다음 두 설계를 구분하지 못한다.
+
+```mermaid
+flowchart LR
+    subgraph resident["주기 호출 · 상주 runtime"]
+        CRON1["CronJob"] -->|"A2A invoke"| SERVICE["Agent service<br/>계속 Ready"]
+    end
+    subgraph ephemeral["주기 호출 · 일회성 runtime"]
+        CRON2["CronJob"] --> JOB["Agent Job<br/>실행 후 종료"]
+    end
+
+    classDef key fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
+    classDef ok fill:#dcfce7,stroke:#16a34a,color:#14532d
+    classDef warn fill:#fef3c7,stroke:#d97706,color:#78350f
+    class CRON1,CRON2 key
+    class SERVICE ok
+    class JOB warn
+```
+
+첫 방식은 cold start가 적고 여러 trigger가 같은 endpoint를 공유하기 쉽다. 대신 idle replica 비용이 든다.
+두 번째는 실행하지 않을 때 compute를 쓰지 않지만 시작 지연, image pull, 실행별 secret·trace 수집과 재시도 정책을
+직접 다뤄야 한다. `SUSPENDABLE`은 둘 사이에 있다. 논리적 Agent와 state는 남기고 idle process만 snapshot하거나
+scale-to-zero한 뒤 요청 때 복구한다.
+
+### 상태 수명은 process 수명과 다르다
+
+Pod가 재시작돼도 workflow state가 저장돼 있으면 긴 작업을 이어갈 수 있다. 반대로 Pod가 계속 떠 있어도 state를
+memory에만 두면 재시작 한 번에 session이 사라진다.
+
+| 상태 모델 | 보존해야 할 것 | 대표 용도 |
+|---|---|---|
+| `TURN` | 단일 요청의 입력·출력 | 번역·요약 같은 독립 호출 |
+| `SESSION` | 대화 history·memory reference | chat·질의응답 |
+| `DURABLE_WORKFLOW` | step·retry·timer·approval 대기 | 장애 조치·장기 업무 자동화 |
+| `WORKSPACE` | filesystem·process·terminal context | coding Agent·조사 sandbox |
+
+따라서 health check의 `Ready`만으로 복구 가능성을 판단하지 않는다. version contract에는 state backend,
+checkpoint 단위, retry 시 side effect의 idempotency, session retention을 함께 둔다.
+
+### 분류 조합으로 운영 정책을 고른다
+
+| 예 | 작성 | 활성화 | 상주 | 상태 | 주요 policy |
+|---|---|---|---|---|---|
+| 사내 문서 질의 | 구성형 | 요청 | 상주 또는 suspend | session | read-only tool·session retention |
+| 매일 비용 보고서 | 구성형 또는 코드형 | schedule | 상주 호출 또는 ephemeral | turn | timezone·중복 실행·catch-up |
+| 장애 자동 조치 | 코드형 | event | 상주 | durable workflow | approval·idempotency·재시도 상한 |
+| coding Agent | 코드형 | 요청 | suspend | workspace | 강한 sandbox·egress·filesystem quota |
+
+제품 이름은 이 조합을 결정한 뒤 고른다. `kagent Declarative/BYO`는 작성 방식에 주로 답하고,
+`SandboxAgent`는 상주·격리 방식에 답한다. Dapr Workflow는 상태·복구, AgentCore session microVM은 격리 단위에
+강점이 있다. 어느 하나도 여섯 축 전체를 대신하지 않는다.
+
+### Domain 객체에는 축별로 나눠 담는다
+
+- `Agent`: 업무 정체성, owner, data classification과 기본 risk tier
+- `AgentVersion`: 작성 방식, artifact, protocol, state·recovery contract
+- `Trigger`: request·schedule·event source, 실행 principal, task template, timeout·retry·concurrency policy
+- `DeploymentTarget`: 가능한 isolation·residency·network·state capability
+- `Deployment`: 선택된 target에서 실제 적용한 replica·sandbox·provider reference
+
+schedule 문자열을 image 환경 변수에 숨기거나 `Agent.type`에 `CRON_CODE_AGENT` 같은 조합값을 늘리지 않는다.
+trigger를 별도 객체로 두면 같은 승인된 version을 사용자 요청과 야간 schedule에서 함께 호출하되 principal·quota·
+timeout은 다르게 적용할 수 있다.
 
 ## Agent와 AgentVersion
 
@@ -43,13 +129,39 @@ flowchart LR
 
 - 회사 내 고유 `agentId`
 - 표시 이름, 설명, owner principal
-- 구성형·코드형 risk tier
+- 업무 data와 tool action 기준의 기본 risk tier
 - 업무 domain과 data classification
 - 생성·폐기 상태
 
-실행 결과를 바꿀 수 있는 값은 `AgentVersion`으로 내린다. image digest, prompt bundle, model policy,
+실행 결과를 바꿀 수 있는 값은 `AgentVersion`으로 내린다. 작성 방식, image digest, prompt bundle, model policy,
 tool binding, runtime contract와 resource hint가 여기에 포함된다. `latest` tag나 mutable Git branch를 승인된
 version의 근거로 쓰지 않는다.
+
+## Trigger는 Agent process가 아니다
+
+사람이 portal에서 누르는 invoke는 즉시 trigger이고, scheduler와 event bus는 비대화형 trigger다. trigger가
+실행됐다고 새 Agent process를 반드시 만드는 것은 아니다. placement policy가 상주 endpoint 호출, sandbox 복원,
+일회성 Job 생성 중 target이 지원하는 방식을 고른다.
+
+```yaml
+triggerId: trg_daily_finance
+agentId: agt_finance_report
+publication: production
+type: SCHEDULE
+schedule:
+  cron: "0 8 * * 1-5"
+  timezone: Asia/Seoul
+principalRef: svc_finance_reporter
+taskTemplate: "전 영업일 비용 보고서를 생성한다."
+concurrencyPolicy: FORBID
+timeout: 15m
+retry:
+  maxAttempts: 2
+```
+
+schedule에는 timezone, missed run 처리, 동시 실행 정책이 필요하다. event trigger에는 source, event schema,
+deduplication key와 acknowledgment policy가 필요하다. 둘 다 호출 사용자의 권한을 빌리지 않고 명시적인 service
+principal로 실행하며, 시작한 trigger ID를 trace와 audit event에 남긴다.
 
 ## Grant와 Publication
 
@@ -119,7 +231,7 @@ tool을 URL만으로 연결하면 실행 권한의 의미가 사라진다. bindi
 모든 trace와 audit event에는 최소 다음 correlation field가 있어야 한다.
 
 ```text
-agentId · versionId · deploymentId · targetId · principalId · sessionId · traceId
+agentId · versionId · deploymentId · targetId · triggerId · principalId · sessionId · traceId
 ```
 
 ## 지켜야 할 불변조건
@@ -134,6 +246,7 @@ agentId · versionId · deploymentId · targetId · principalId · sessionId · 
 ## 2장 요약
 
 - Agent는 정체성, Version은 실행 가능한 불변 snapshot, Deployment는 target별 실행 결과다.
+- 작성·활성화·상주·상태·격리·위험을 독립 축으로 두고, schedule과 event는 `Trigger`로 표현한다.
 - Grant와 Publication을 provider resource 밖에 두어 호출 권한과 공개 상태를 유지한다.
 - provider-specific ID·URL·secret은 공통 객체의 중심으로 들어오지 않는다.
 

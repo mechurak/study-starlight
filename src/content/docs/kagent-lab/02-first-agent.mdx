@@ -23,13 +23,13 @@ import TermIntro from '../../../components/docs/TermIntro.astro';
 dashboard를 열지 않은 terminal에서 sample Agent를 찾는다.
 
 ```bash
-kubectl --context kind-kagent-lab -n kagent get agents
+kubectl -n kagent get agents
 ```
 
 CLI는 기본적으로 로컬 controller endpoint를 보므로 port-forward가 필요하다. 별도 terminal에서 실행하고 유지한다.
 
 ```bash
-kubectl --context kind-kagent-lab -n kagent port-forward svc/kagent-controller 8083:8083
+kubectl -n kagent port-forward svc/kagent-controller 8083:8083
 ```
 
 이제 다른 terminal에서 kagent가 보는 Agent 목록을 비교한다.
@@ -58,7 +58,7 @@ Kubernetes API의 resource 목록과 kagent API의 Agent 목록에 같은 이름
 4. tool 이름이 Kubernetes 조회 계열인지, namespace 인자가 `kagent`인지, result의 Pod가 실제 목록과 맞는지 비교한다.
 
    ```bash
-   kubectl --context kind-kagent-lab -n kagent get pods
+   kubectl -n kagent get pods
    ```
 
 </Steps>
@@ -129,4 +129,3 @@ Agent가 “정상”이라고 말해도 실제 Pod 상태가 다르면 cluster�
   description="sample을 쓰는 데서 벗어나 model·prompt·tool allowlist를 직접 선언한다."
   href="/kagent-lab/03-declarative-agent/"
 />
-

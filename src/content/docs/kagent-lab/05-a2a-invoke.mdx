@@ -32,7 +32,7 @@ A2A는 Agent를 **호출되는 서비스**로 만든다. MCP는 그 Agent가 바
 이미 port-forward 중이면 하나만 유지한다.
 
 ```bash
-kubectl --context kind-kagent-lab -n kagent port-forward svc/kagent-controller 8083:8083
+kubectl -n kagent port-forward svc/kagent-controller 8083:8083
 ```
 
 이 tunnel은 로컬 `8083`을 cluster의 controller service `8083`으로 연결한다. terminal을 점유하는 것이 정상이다.
@@ -121,4 +121,3 @@ CLI가 URL 구성과 A2A message 형식을 대신 만들지만, 앞에서 읽은
   description="일부러 잘못된 model reference를 만들고 condition에서 controller log까지 좁혀 간다."
   href="/kagent-lab/06-observe-debug/"
 />
-

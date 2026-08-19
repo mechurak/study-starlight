@@ -59,14 +59,48 @@ labbyo/
 
 실제 생성 결과가 이 목록과 다르면 설치된 CLI version의 README를 원본으로 삼는다.
 
+### 사내 LiteLLM을 쓰면 generated code도 바꾼다
+
+선언형 Agent의 `ModelConfig`는 BYO image 안의 model client에 자동 적용되지 않는다. v0.9.9의 OpenAI template은
+`LiteLlm(model="openai/<이름>")`과 `OPENAI_API_KEY`만 생성하므로 그대로 실행하면 public OpenAI endpoint를
+향한다. OpenAI API를 직접 쓸 수 없다면 `labbyo/agent.py`의 `create_model()`을 명시적으로 바꾼다.
+
+```python
+import os
+
+from google.adk.models.lite_llm import LiteLlm
+
+
+def create_model():
+    return LiteLlm(
+        model=f"openai/{os.environ['LITELLM_MODEL']}",
+        api_base=os.environ["LITELLM_BASE_URL"],
+        api_key=os.environ["LITELLM_API_KEY"],
+    )
+```
+
+generated `docker-compose.yaml`의 Agent service에도 세 변수를 전달한다.
+
+```yaml
+environment:
+  - LITELLM_MODEL=${LITELLM_MODEL}
+  - LITELLM_BASE_URL=${LITELLM_BASE_URL}
+  - LITELLM_API_KEY=${LITELLM_API_KEY}
+```
+
+이 변경은 `ModelConfig` 재사용이 아니라 BYO application code의 model client 설정이다. build 전에 diff를 읽고,
+LiteLLM alias가 tool calling을 지원하는지도 다시 확인한다.
+
 ## build와 local run
 
 <Steps>
 
-1. **API key가 현재 shell에 있는지 확인한다**
+1. **선택한 model credential이 현재 shell에 있는지 확인한다**
 
    ```bash
-   test -n "$OPENAI_API_KEY" && echo "OPENAI_API_KEY is set"
+   if test -n "$OPENAI_API_KEY" || test -n "$LITELLM_API_KEY"; then
+     echo "model API key is set"
+   fi
    ```
 
 2. **project image를 만든다**
@@ -126,11 +160,15 @@ spec:
     deployment:
       image: registry.example/lab-byo@sha256:<digest>
       env:
-        - name: OPENAI_API_KEY
+        - name: LITELLM_MODEL
+          value: company-model-alias
+        - name: LITELLM_BASE_URL
+          value: https://litellm.company.example/v1
+        - name: LITELLM_API_KEY
           valueFrom:
             secretKeyRef:
               name: lab-byo-model
-              key: OPENAI_API_KEY
+              key: LITELLM_API_KEY
 ```
 
 kagent가 image를 실행해 주더라도 Agent logic·dependency·secret 사용·A2A implementation은 image 제작자의
@@ -140,6 +178,7 @@ kagent가 image를 실행해 주더라도 Agent logic·dependency·secret 사용
 
 - generated project의 code·`kagent.yaml`·compose 역할을 구분한다.
 - `kagent build`와 `kagent run`으로 local loop를 한 번 돌았다.
+- LiteLLM을 선택했다면 BYO code와 runtime에 model·`api_base`·credential을 별도로 전달했다.
 - 로컬 성공과 cluster 배포 성공이 다른 검증이라는 것을 설명한다.
 - registry와 Secret이 준비되지 않았다면 deploy 명령을 실행하지 않았다.
 
@@ -147,6 +186,7 @@ kagent가 image를 실행해 주더라도 Agent logic·dependency·secret 사용
 
 - [kagent local development](https://kagent.dev/docs/kagent/getting-started/local-development) — `init`·`build`·`run`·MCP 추가·deploy 흐름
 - [BYO ADK Agent](https://kagent.dev/docs/kagent/examples/a2a-byo) — image·Secret·A2A endpoint 계약
+- [Google ADK `LiteLlm`](https://github.com/google/adk-python/blob/main/src/google/adk/models/lite_llm.py) — `api_base`·`api_key`를 completion 인자로 전달하는 wrapper
 - [`kagent init`](https://kagent.dev/docs/kagent/resources/cli/kagent-init) — 지원 framework·language·model flag
 - [Agent 배포 플랫폼 — kagent 격리와 공급망](/agent-platform/06-kagent/#격리와-공급망) — production target에서 더할 통제
 

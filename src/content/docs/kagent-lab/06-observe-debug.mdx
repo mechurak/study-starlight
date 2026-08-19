@@ -24,9 +24,9 @@ import TermIntro from '../../../components/docs/TermIntro.astro';
 먼저 정상인 `lab-reader`를 기준선으로 기록한다.
 
 ```bash
-kubectl --context kind-kagent-lab -n kagent get agent lab-reader -o yaml
-kubectl --context kind-kagent-lab -n kagent get pods
-kubectl --context kind-kagent-lab -n kagent get events --sort-by=.lastTimestamp
+kubectl -n kagent get agent lab-reader -o yaml
+kubectl -n kagent get pods
+kubectl -n kagent get events --sort-by=.lastTimestamp
 ```
 
 Agent YAML에서는 `metadata.generation`, `status.observedGeneration`, `status.conditions`를 함께 본다.
@@ -37,7 +37,7 @@ Agent YAML에서는 `metadata.generation`, `status.observedGeneration`, `status.
 정상 Agent를 망가뜨리지 않고 별도 resource로 실패를 만든다. 존재하지 않는 `ModelConfig`를 참조한다.
 
 ```bash
-kubectl --context kind-kagent-lab apply -f - <<'EOF'
+kubectl apply -f - <<'EOF'
 apiVersion: kagent.dev/v1alpha2
 kind: Agent
 metadata:
@@ -59,7 +59,7 @@ EOF
 1. **resource status를 읽는다**
 
    ```bash
-   kubectl --context kind-kagent-lab -n kagent \
+   kubectl -n kagent \
      get agent broken-model-agent -o yaml
    ```
 
@@ -69,28 +69,28 @@ EOF
 2. **describe로 Events까지 합쳐 본다**
 
    ```bash
-   kubectl --context kind-kagent-lab -n kagent \
+   kubectl -n kagent \
      describe agent broken-model-agent
    ```
 
 3. **controller가 같은 이름을 어떻게 기록했는지 찾는다**
 
    ```bash
-   kubectl --context kind-kagent-lab -n kagent \
+   kubectl -n kagent \
      logs deployment/kagent-controller --since=10m | grep broken-model-agent
    ```
 
    이름이 log에 없으면 filter를 빼고 최근 100줄을 읽는다.
 
    ```bash
-   kubectl --context kind-kagent-lab -n kagent \
+   kubectl -n kagent \
      logs deployment/kagent-controller --tail=100
    ```
 
 4. **실패 resource만 지운다**
 
    ```bash
-   kubectl --context kind-kagent-lab -n kagent \
+   kubectl -n kagent \
      delete agent broken-model-agent
    ```
 
@@ -150,4 +150,3 @@ kagent bug-report
   description="code형 Agent를 생성·빌드·로컬 실행하고 cluster 배포 전에 추가되는 책임을 확인한다."
   href="/kagent-lab/07-byo-agent/"
 />
-
