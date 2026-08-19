@@ -8,31 +8,24 @@ import DeckMap from '../../../components/docs/DeckMap.astro';
 
 > 여러 덱에서 반복하는 **실습 환경 준비와 정리 방법을 운영체제별로 한곳에 모은다**
 
-실습마다 Docker·kind 같은 도구의 설치법을 다시 적으면 명령이 금방 낡고, macOS와 Ubuntu의 차이가
-한 장 안에서 뒤섞인다. 이 덱은 환경마다 **설치할 공식 문서 → 실행 준비 → 생성 → 확인 → 정리**를
-운영체제별 준비 장과 공통 사용 장으로 나눠 제공한다. 개별 기술 덱에는 그 실습의 자원 요구량과
-실행 시나리오만 남긴다.
+실습마다 Docker·kind 같은 도구의 설치법을 다시 적으면 명령이 금방 낡는다. 이 덱은 환경마다
+**설치할 공식 문서 → 실행 준비 → 생성 → 확인 → 정리**를 한 흐름으로 제공하고, macOS와 Ubuntu의
+차이는 각 소제목의 탭에서 나란히 보여 준다. 개별 기술 덱에는 그 실습의 자원 요구량과 실행 시나리오만 남긴다.
 
 현재는 첫 환경으로 **kind를 이용한 로컬 Kubernetes 실습**을 다룬다. 덱 이름을 Kubernetes에
 가두지 않은 이유는 앞으로 데이터베이스, 메시징, AI 같은 다른 실습 환경도 이곳에 모으기 위해서다.
 
-<LinkButton href="/lab-environment/01-kind-macos/" icon="right-arrow">macOS에서 시작하기</LinkButton>
+<LinkButton href="/lab-environment/01-kind/" icon="right-arrow">kind 환경 준비하기</LinkButton>
 
 ## 구성
 
 <DeckMap
   steps={[
-    { label: '1-a', href: '/lab-environment/01-kind-macos/', title: 'kind 준비 — macOS', tone: 'key',
-      desc: 'Colima 또는 Docker Desktop · 공식 설치 문서 · runtime 시작과 중단',
-      note: 'macOS에서 로컬 Kubernetes를 어떻게 준비하나' },
-    { label: '1-b', href: '/lab-environment/02-kind-ubuntu/', title: 'kind 준비 — Ubuntu', tone: 'ok',
-      desc: 'Docker Engine · 공식 설치 문서 · 서비스 시작과 중단',
-      note: 'Ubuntu에서 로컬 Kubernetes를 어떻게 준비하나' },
-    { label: '2장', href: '/lab-environment/03-kind-common/', title: 'kind — 공통', tone: 'zone',
-      desc: '클러스터 생성 · 확인 · 멀티노드 · 삭제 · 트러블슈팅',
-      note: '준비한 환경에서 같은 방식으로 kind를 어떻게 사용하나' },
-    { label: '3장', href: '/lab-environment/04-helm/', title: 'Helm CLI 준비', tone: 'warn',
-      desc: 'macOS Homebrew · Ubuntu 공식 installer · version · context 연결',
+    { label: '1장', href: '/lab-environment/01-kind/', title: 'kind 실습 환경', tone: 'key',
+      desc: 'macOS·Ubuntu 탭 · 공식 설치 문서 · 생성 · 확인 · 중단 · 삭제',
+      note: '운영체제별 차이와 공통 kind 사용법을 한 흐름에서 어떻게 준비하나' },
+    { label: '2장', href: '/lab-environment/02-helm/', title: 'Helm CLI 준비', tone: 'warn',
+      desc: '운영체제별 공식 설치 페이지 · version · context 연결',
       note: '여러 Kubernetes 실습이 공유하는 chart client를 어떻게 준비하나' },
   ]}
 />
@@ -43,12 +36,12 @@ import DeckMap from '../../../components/docs/DeckMap.astro';
 [관측 8장](/observability/08-lab-setup/)에서 LGTM 스택과 계측 앱을 올린다. CKA에서 kind로
 연습할 수 있는 범위와 시험용 환경의 차이는 [CKA 0장](/cka/00-intro/)이 판단한다.
 
-kagent를 연습할 때도 이 덱에서 Docker·kind·kubectl과 [Helm CLI](/lab-environment/04-helm/)를 준비한 뒤
+kagent를 연습할 때도 이 덱에서 Docker·kind·kubectl과 [Helm CLI](/lab-environment/02-helm/)를 준비한 뒤
 [kagent 실습 1장](/kagent-lab/01-install/)으로 넘어간다. kagent CLI와 전용 cluster 이름·설치·Agent
 시나리오·cleanup은 그 덱이 맡는다.
 
 <LinkCard
-  title="1-a. kind 준비 — macOS"
-  description="Colima 또는 Docker Desktop과 kind CLI를 준비한다."
-  href="/lab-environment/01-kind-macos/"
+  title="1. kind 실습 환경"
+  description="운영체제에 맞는 runtime과 CLI를 준비하고 kind 클러스터를 만든다."
+  href="/lab-environment/01-kind/"
 />

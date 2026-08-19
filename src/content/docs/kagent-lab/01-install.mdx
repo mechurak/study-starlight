@@ -21,9 +21,8 @@ import TermIntro from '../../../components/docs/TermIntro.astro';
 
 ## 사전 준비
 
-Docker·kind·kubectl은 운영체제에 맞는 [macOS 준비](/lab-environment/01-kind-macos/) 또는
-[Ubuntu 준비](/lab-environment/02-kind-ubuntu/)를 먼저 따른다. 이어서 공통 도구인
-[Helm CLI](/lab-environment/04-helm/)를 준비한다. 이 장은 kagent 전용인 CLI 설치부터 맡는다.
+Docker·kind·kubectl은 [kind 실습 환경](/lab-environment/01-kind/)의 운영체제별 탭을 먼저 따른다.
+이어서 공통 도구인 [Helm CLI](/lab-environment/02-helm/)를 준비한다. 이 장은 kagent 전용인 CLI 설치부터 맡는다.
 
 ```bash
 docker info
@@ -114,7 +113,13 @@ release와 네트워크 경로를 확인한 뒤 다시 시도한다.
    kubectl config use-context kind-kagent-lab
    ```
 
-3. **선택한 API key가 현재 shell에 있는지만 확인한다**
+3. **사내 TLS 검사 프록시를 쓴다면 kind 노드에 CA trust를 먼저 설정한다**
+
+   이미지 pull에서 `x509: certificate signed by unknown authority`가 발생하는 환경은
+   [사내 프록시의 CA를 신뢰시키는 절차](/lab-environment/01-kind/#사내-프록시의-ca를-신뢰해야-할-때)를
+   모든 노드에 적용한다. 클러스터 생성 후, kagent workload를 설치하기 전인 지금 실행한다.
+
+4. **선택한 API key가 현재 shell에 있는지만 확인한다**
 
    OpenAI 직접 연결은 `OPENAI_API_KEY`를 그대로 쓴다. LiteLLM 경로에서는 kagent installer의 provider 입력
    계약을 통과하도록 virtual key를 설치 순간에만 같은 이름으로 연결한다. 이것만으로 endpoint가 바뀌지는 않으며,
@@ -127,7 +132,7 @@ release와 네트워크 경로를 확인한 뒤 다시 시도한다.
    test -n "$OPENAI_API_KEY" && echo "OPENAI_API_KEY is set"
    ```
 
-4. **학습용 demo profile을 설치한다**
+5. **학습용 demo profile을 설치한다**
 
    ```bash
    kagent install --profile demo

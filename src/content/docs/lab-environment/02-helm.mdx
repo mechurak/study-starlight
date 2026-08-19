@@ -1,11 +1,12 @@
 ---
-title: "3. Helm CLI 준비"
+title: "2. Helm CLI 준비"
 description: macOS와 Ubuntu에 Helm CLI를 설치하고 kind cluster 연결·version·기본 동작을 확인한다
 reviewedAt: 2026-08-19
 status: review
 ---
 
 import { LinkCard, Tabs, TabItem } from '@astrojs/starlight/components';
+import ExternalLink from '../../../components/docs/ExternalLink.astro';
 import TermIntro from '../../../components/docs/TermIntro.astro';
 
 > Helm은 별도 서버를 띄우는 제품이 아니라 **로컬에서 chart를 읽어 Kubernetes API에 release를 만드는 CLI**다
@@ -18,7 +19,7 @@ import TermIntro from '../../../components/docs/TermIntro.astro';
   ]}
 />
 
-Docker·kind·kubectl은 [운영체제별 kind 준비](/lab-environment/)에서 먼저 설치한다. Helm은 여러 기술 덱이
+Docker·kind·kubectl은 [kind 실습 환경](/lab-environment/01-kind/)에서 먼저 준비한다. Helm은 여러 기술 덱이
 chart 설치에 공통으로 쓰므로 개별 실습에서 반복하지 않고 이 장에서 한 번 준비한다.
 
 ## 전체에서 Helm의 자리
@@ -30,59 +31,33 @@ chart 설치에 공통으로 쓰므로 개별 실습에서 반복하지 않고 �
 Helm CLI는 현재 `kubectl`과 같은 kubeconfig·context를 사용한다. 그래서 설치 확인은 `helm version`만으로
 끝나지 않는다. 명령을 실행할 cluster가 맞는지 먼저 확인해야 한다.
 
-## 설치하기
+## 공식 문서에서 설치하기
+
+설치 명령이나 installer script는 이 문서에 복제하지 않는다. Helm 공식 설치 페이지에서 현재 major와
+운영체제별 방법을 확인하고, 선택한 방법의 안내를 그대로 따른다.
 
 <Tabs>
-<TabItem label="macOS — Homebrew">
+<TabItem label="macOS">
 
-Helm 공식 설치 문서가 안내하는 Homebrew formula를 사용한다. 이 formula는 Helm project가 아니라 Homebrew
-community가 유지한다는 경계도 함께 기억한다.
-
-```bash
-brew install helm
-helm version
-```
-
-이미 설치되어 있다면 다음 명령으로 갱신하고 version을 다시 기록한다.
-
-```bash
-brew upgrade helm
-helm version
-```
+<ExternalLink href="https://helm.sh/docs/intro/install/">Helm 공식 문서 — Installing Helm</ExternalLink>에서
+**From Homebrew (macOS)** 또는 공식 binary 경로를 선택해 설치한다. Homebrew formula는 Helm project가
+아니라 Homebrew community가 유지한다는 문서의 경계도 함께 확인한다.
 
 </TabItem>
-<TabItem label="Ubuntu — 공식 installer">
+<TabItem label="Ubuntu">
 
-Helm project의 installer를 파일로 내려받고 내용을 확인한 뒤 실행한다. 공식 문서의 pipe 축약형처럼 다운로드와
-실행을 한 줄로 합치지 않는다.
-
-```bash
-sudo apt-get update
-sudo apt-get install -y curl openssl tar
-curl -fsSL -o /tmp/get-helm-4 \
-  https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-4
-```
-
-`/tmp/get-helm-4`를 editor로 열어 download URL, checksum 검증, 설치 위치를 확인한다. 기본 설치 위치는
-`/usr/local/bin/helm`이고 필요하면 `sudo`를 요청한다.
-
-```bash
-chmod 700 /tmp/get-helm-4
-/tmp/get-helm-4
-helm version
-```
-
-설치가 끝나고 더 확인할 필요가 없을 때만 내려받은 installer를 지운다.
-
-```bash
-rm /tmp/get-helm-4
-```
+<ExternalLink href="https://helm.sh/docs/intro/install/">Helm 공식 문서 — Installing Helm</ExternalLink>에서
+공식 binary·installer 또는 **From Apt (Debian/Ubuntu)** 중 환경 정책에 맞는 경로를 선택한다. 오래된 글의
+installer 이름이나 URL을 복사하지 말고, 실행 시점에 공식 페이지가 안내하는 현재 major를 따른다.
 
 </TabItem>
 </Tabs>
 
-확인 당시 공식 installer 이름은 `get-helm-4`다. 오래된 글의 `get-helm-3`을 그대로 복사하지 말고 실행할
-시점에 [Helm 설치 문서](https://helm.sh/docs/intro/install/)의 현재 major와 installer 경로를 다시 확인한다.
+설치가 끝나면 terminal을 새로 열고 CLI가 실행되는지 확인한다.
+
+```bash
+helm version
+```
 
 ## kind cluster와 연결 확인
 
@@ -136,4 +111,3 @@ version과 [version skew 정책](https://helm.sh/docs/topics/version_skew/)을 �
   description="Helm 준비가 끝났다면 kagent CLI를 설치하고 전용 kind cluster에 demo profile을 올린다."
   href="/kagent-lab/01-install/"
 />
-

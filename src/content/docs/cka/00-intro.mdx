@@ -139,8 +139,8 @@ YAML은 시험에서 그대로 쓸 수 있게 **축약 없이** 적었다.
 | 시험 직전 모의고사 | **killer.sh** | 시험 등록 시 2세션 포함. 실제보다 어렵다 |
 
 macOS와 Ubuntu에서 Docker·kind·kubectl을 설치하고 클러스터를 만들고 정리하는 절차는
-[macOS의 kind 장](/lab-environment/01-kind-macos/) 또는 [Ubuntu의 kind 장](/lab-environment/02-kind-ubuntu/)을
-따른다. 이 장은 도구 설치법 대신 **어떤 연습에 어떤 환경을 고를지**만 구분한다.
+[kind 실습 환경](/lab-environment/01-kind/)의 운영체제별 탭을 따른다. 이 장은 도구 설치법 대신
+**어떤 연습에 어떤 환경을 고를지**만 구분한다.
 
 ```mermaid
 flowchart LR
@@ -182,7 +182,7 @@ kind는 `kubeadm upgrade` 연습에 부적합하다.
 - CKA는 **실기**다 — 개념 모델과 손 속도가 **둘 다** 필요하다
 - 덱은 커리큘럼 5개 도메인 순서로 배치했고, 트러블슈팅(30%)이 마지막인 건 **앞의 전부가 재료**라서다
 - 모든 장을 관통하는 축: **"선언된 상태 ↔ 실제 상태를 좁히는 루프"**
-- 읽기만 하면 안 된다. kind 환경([macOS](/lab-environment/01-kind-macos/) · [Ubuntu](/lab-environment/02-kind-ubuntu/)) + killercoda를 옆에 띄워두고 볼 것
+- 읽기만 하면 안 된다. [kind 환경](/lab-environment/01-kind/) + killercoda를 옆에 띄워두고 볼 것
 
 <LinkCard
   title="1. CKA 시험 해부"
