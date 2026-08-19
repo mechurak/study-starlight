@@ -61,32 +61,27 @@ OpenTelemetry Collector, Prometheus, Loki, Tempo, Grafana가 함께 돌고 데�
 
 ## 사전 준비
 
-Docker 런타임에 **CPU 4개 · 메모리 6 GiB 이상**을 할당한다. 이미지와 클러스터를 합쳐
+Docker·kind·kubectl을 처음 준비하거나 macOS와 Ubuntu의 차이를 확인해야 한다면
+[실습 환경의 kind 장](/lab-environment/01-kind/)을 먼저 본다. 그 장의 예시 `study` 클러스터를
+미리 만들 필요는 없다. 여기서는 `make up`이 전용 `observability-lab` 클러스터를 만든다.
+
+이 실습은 Docker 런타임에 **CPU 4개 · 메모리 6 GiB 이상**을 할당한다. 이미지와 클러스터를 합쳐
 디스크 여유 공간도 약 10 GiB가 필요하다. `make up`은 메모리가 6 GiB보다 작으면 시작 전에 멈춘다.
 
 필요한 명령은 셋이다.
 
 ```bash
-docker version
+docker info
 kind version
 kubectl version --client
 ```
 
-macOS에서 아직 없다면:
+Colima와 Docker Desktop은 런타임에 메모리를 명시해 배정하고, Ubuntu의 Docker Engine은 호스트
+자원을 쓴다. 어느 환경이든 다음 값에서 메모리가 6 GiB 이상인지 확인한다.
 
 ```bash
-brew install kind kubectl
-```
-
-Colima를 쓴다면 메모리를 늘린 뒤 시작한다. 이미 작은 설정으로 실행 중이면 먼저 `colima stop`한다.
-
-```bash
-colima start --cpu 4 --memory 8 --disk 60 --kubernetes=false
 docker info --format 'CPUs={{.NCPU}} Memory={{.MemTotal}}'
 ```
-
-Docker Desktop은 **Settings → Resources**에서 CPU와 메모리를 조정한다. Linux의 Docker Engine은
-호스트 자원을 쓰므로 `docker info`로 보이는 메모리가 6 GiB 이상인지 확인한다.
 
 ## 실습 파일 받기
 
@@ -174,6 +169,7 @@ first-investigation/
 
 - [Grafana `docker-otel-lgtm`](https://github.com/grafana/docker-otel-lgtm) — 이미지의 목적, 포함된 백엔드, Kubernetes 실행과 OTLP 기본값
 - [kind Quick Start](https://kind.sigs.k8s.io/docs/user/quick-start/) — 클러스터 생성, 로컬 이미지 적재, 삭제
+- [실습 환경 — kind](/lab-environment/01-kind/) — macOS·Ubuntu 공통 준비와 클러스터 수명주기
 - [OpenTelemetry OTLP exporter 설정](https://opentelemetry.io/docs/specs/otel/protocol/exporter/) — 한 endpoint에서 신호별 `/v1/*` 경로를 만드는 규칙
 
 <LinkCard

@@ -54,6 +54,8 @@
 `실행 → 🔎 관찰 포인트 → 해석 → 스스로 해볼 과제 → cleanup` 순서로 안내한다.
 
 - 실습 파일은 `labs/observability/first-investigation/`에 둔다. MDX에 긴 매니페스트를 복제하지 않는다.
+- Docker·kind·kubectl의 공통 설치, macOS·Ubuntu 차이, 생성·보존·폐기 원칙은
+  [실습 환경 덱](/lab-environment/)이 맡는다. 이 덱에는 관측 실습만의 자원·버전·명령만 남긴다.
 - 첫 실습은 kind의 Kubernetes **v1.35.5**와 `grafana/otel-lgtm` **0.30.2**를 고정했다.
   2026-08-18에 macOS arm64 · kind v0.32.0 · Docker 메모리 8 GiB로 전체 흐름을 검증했다.
 - LGTM 이미지는 **개발·데모 전용**이다. 단일 Pod · `emptyDir` · 로컬 admin을 운영 설치법처럼

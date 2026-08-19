@@ -11,7 +11,7 @@ const categories = [
 	{
 		id: 'platform',
 		title: '인프라 · 플랫폼',
-		desc: '클러스터 위아래에서 돌아가는 것들 — 서버, 관측, 인증, 메시징',
+		desc: '실습 기반부터 클러스터 위아래에서 돌아가는 것들 — 서버, 관측, 인증, 메시징',
 		tone: 'zone',
 	},
 	{
@@ -84,8 +84,22 @@ export const deckDefinitions = [
 		],
 	},
 	{
-		slug: 'onprem',
+		slug: 'lab-environment',
 		topicOrder: 2,
+		label: '실습 환경',
+		title: '실습 환경',
+		icon: 'setting',
+		aliases: ['Lab environment', '로컬 실습', '개발 환경 준비', 'kind 설치'],
+		description: '만들기 전에 경계를 정하고 끝난 뒤 안전하게 닫는다 — 여러 덱이 공유하는 실습 환경 수명주기.',
+		category: 'platform',
+		groups: [
+			['공통 원칙', ['lab-environment/00-lifecycle']],
+			['Kubernetes', ['lab-environment/01-kind']],
+		],
+	},
+	{
+		slug: 'onprem',
+		topicOrder: 3,
 		label: '온프렘 쿠버네티스',
 		title: '온프렘 쿠버네티스',
 		icon: 'server',
@@ -105,7 +119,7 @@ export const deckDefinitions = [
 	},
 	{
 		slug: 'server',
-		topicOrder: 9,
+		topicOrder: 10,
 		label: '서버 관리 일반',
 		title: '서버 관리 일반',
 		icon: 'linux',
@@ -124,7 +138,7 @@ export const deckDefinitions = [
 	},
 	{
 		slug: 'observability',
-		topicOrder: 3,
+		topicOrder: 4,
 		label: '관측',
 		title: '관측',
 		icon: 'analytics',
@@ -141,7 +155,7 @@ export const deckDefinitions = [
 	},
 	{
 		slug: 'keycloak',
-		topicOrder: 7,
+		topicOrder: 8,
 		label: 'Keycloak',
 		title: 'Keycloak',
 		icon: 'seti:lock',
@@ -159,7 +173,7 @@ export const deckDefinitions = [
 	},
 	{
 		slug: 'kafka',
-		topicOrder: 8,
+		topicOrder: 9,
 		label: 'Kafka',
 		title: 'Kafka',
 		icon: 'random',
@@ -177,7 +191,7 @@ export const deckDefinitions = [
 	},
 	{
 		slug: 'web',
-		topicOrder: 4,
+		topicOrder: 5,
 		label: '웹 개발 일반',
 		title: '웹 개발 일반',
 		icon: 'rocket',
@@ -195,7 +209,7 @@ export const deckDefinitions = [
 	},
 	{
 		slug: 'frontend',
-		topicOrder: 5,
+		topicOrder: 6,
 		label: '프론트엔드',
 		title: '프론트엔드 실전 스택',
 		icon: 'laptop',
@@ -230,7 +244,7 @@ export const deckDefinitions = [
 	},
 	{
 		slug: 'shadcn',
-		topicOrder: 6,
+		topicOrder: 7,
 		label: 'shadcn/ui',
 		title: 'shadcn/ui',
 		icon: 'puzzle',
@@ -250,7 +264,7 @@ export const deckDefinitions = [
 	},
 	{
 		slug: 'rl',
-		topicOrder: 11,
+		topicOrder: 12,
 		label: '강화학습',
 		title: '강화학습',
 		icon: 'setting',
@@ -269,7 +283,7 @@ export const deckDefinitions = [
 	},
 	{
 		slug: 'supabase',
-		topicOrder: 10,
+		topicOrder: 11,
 		label: 'Supabase',
 		title: 'Supabase',
 		icon: 'seti:db',
@@ -303,7 +317,7 @@ export const deckDefinitions = [
 	},
 	{
 		slug: 'starlight',
-		topicOrder: 12,
+		topicOrder: 13,
 		label: 'Starlight',
 		title: 'Starlight',
 		icon: 'star',
@@ -320,7 +334,7 @@ export const deckDefinitions = [
 	},
 	{
 		slug: 'gpustack',
-		topicOrder: 13,
+		topicOrder: 14,
 		label: 'GPUStack',
 		title: 'GPUStack',
 		icon: 'server',
@@ -338,7 +352,7 @@ export const deckDefinitions = [
 	},
 	{
 		slug: 'gpu-platform',
-		topicOrder: 14,
+		topicOrder: 15,
 		label: '온프렘 GPU 플랫폼',
 		title: '온프렘 GPU 플랫폼',
 		icon: 'server',
@@ -356,7 +370,7 @@ export const deckDefinitions = [
 	},
 	{
 		slug: 'databricks',
-		topicOrder: 15,
+		topicOrder: 16,
 		label: 'Databricks',
 		title: 'Databricks on AWS',
 		icon: 'seti:db',
@@ -372,7 +386,7 @@ export const deckDefinitions = [
 	},
 	{
 		slug: 'litellm',
-		topicOrder: 16,
+		topicOrder: 17,
 		label: 'LiteLLM',
 		title: 'LiteLLM',
 		icon: 'random',
@@ -389,7 +403,7 @@ export const deckDefinitions = [
 	},
 	{
 		slug: 'langfuse',
-		topicOrder: 17,
+		topicOrder: 18,
 		label: 'Langfuse',
 		title: 'Langfuse',
 		icon: 'analytics',
@@ -407,7 +421,7 @@ export const deckDefinitions = [
 	},
 	{
 		slug: 'agent-platform',
-		topicOrder: 18,
+		topicOrder: 19,
 		label: 'Agent 배포 플랫폼',
 		title: '사내 Agent 배포 플랫폼',
 		icon: 'setting',
@@ -440,6 +454,7 @@ export const topicPageSlugs = deckDefinitions.flatMap((deck) => [
 ]);
 
 export const termIntroDeckSlugs = [
+	'lab-environment',
 	'shadcn',
 	'web',
 	'keycloak',
