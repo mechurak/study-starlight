@@ -1,0 +1,15 @@
+---
+/**
+ * 외부 문서를 새 창에서 안전하게 여는 인라인 링크.
+ *
+ * Usage:
+ *   <ExternalLink href="https://example.com/docs">공식 문서</ExternalLink>
+ */
+interface Props {
+	href: string;
+}
+
+const { href } = Astro.props;
+---
+
+<a href={href} target="_blank" rel="noopener noreferrer"><slot /></a>

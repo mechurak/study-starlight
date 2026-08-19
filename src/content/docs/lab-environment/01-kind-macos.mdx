@@ -1,11 +1,12 @@
 ---
-title: "1. kind — macOS"
-description: "macOS에서 Colima 또는 Docker Desktop과 kind를 준비하고 로컬 Kubernetes 클러스터를 생성·확인·정리한다"
+title: "1-a. kind 준비 — macOS"
+description: "macOS에서 Colima 또는 Docker Desktop과 kind·kubectl을 준비하고 runtime을 시작·중단한다"
 reviewedAt: 2026-08-19
 status: stable
 ---
 
-import { LinkCard, Steps } from '@astrojs/starlight/components';
+import { LinkCard } from '@astrojs/starlight/components';
+import ExternalLink from '../../../components/docs/ExternalLink.astro';
 import TermIntro from '../../../components/docs/TermIntro.astro';
 
 > macOS에서는 먼저 Linux VM 안에 Docker를 띄우고, 그 위에 `study` kind 클러스터를 만든다
@@ -36,8 +37,8 @@ flowchart LR
     class KIND ok
 ```
 
-kind는 워크로드·스케줄링·서비스·RBAC 실습에 알맞다. 노드가 컨테이너이므로 `kubeadm` 설치나
-노드 OS 업그레이드는 [CKA 0장](/cka/00-intro/#실습-환경은-따로-준비하자)의 다른 환경을 쓴다.
+이 장에서는 macOS에 runtime과 CLI를 준비한다. 준비가 끝나면 [2. kind — 공통](/lab-environment/03-kind-common/)에서
+클러스터를 만들고 확인하고 정리한다.
 
 ## 런타임 고르기
 
@@ -58,29 +59,18 @@ Pod가 많은 실습은 **CPU 4개·메모리 8 GiB**를 권장한다. 디스크
 
 ### Colima를 쓸 때
 
-1. Homebrew가 없다면 [Homebrew 공식 설치](https://brew.sh/)를 따른다.
-2. [Colima — Installation](https://github.com/abiosoft/colima#installation)에서 Colima를 설치한다.
-3. 같은 문서의 [Colima — Docker runtime](https://github.com/abiosoft/colima#docker)에서 Docker client를 준비한다.
-4. [kind — Installing With A Package Manager](https://kind.sigs.k8s.io/docs/user/quick-start/#installing-with-a-package-manager)의 macOS 절에서 kind를 설치한다.
-5. [kubectl — Install with Homebrew on macOS](https://kubernetes.io/docs/tasks/tools/install-kubectl-macos/#install-with-homebrew-on-macos)에서 kubectl을 설치한다.
+1. Homebrew가 없다면 <ExternalLink href="https://brew.sh/">Homebrew 공식 설치</ExternalLink>를 따른다.
+2. <ExternalLink href="https://github.com/abiosoft/colima#installation">Colima — Installation</ExternalLink>에서 Colima를 설치한다.
+3. 같은 문서의 <ExternalLink href="https://github.com/abiosoft/colima#docker">Colima — Docker runtime</ExternalLink>에서 Docker client를 준비한다.
+4. <ExternalLink href="https://kind.sigs.k8s.io/docs/user/quick-start/#installing-with-a-package-manager">kind — Installing With A Package Manager</ExternalLink>의 macOS 절에서 kind를 설치한다.
+5. <ExternalLink href="https://kubernetes.io/docs/tasks/tools/install-kubectl-macos/#install-with-homebrew-on-macos">kubectl — Install with Homebrew on macOS</ExternalLink>에서 kubectl을 설치한다.
 
 ### Docker Desktop을 쓸 때
 
-1. [Docker Desktop — Install and run on Mac](https://docs.docker.com/desktop/setup/install/mac-install/#install-and-run-docker-desktop-on-mac)을 따라 설치하고 앱을 실행한다.
-2. Homebrew가 없다면 [Homebrew 공식 설치](https://brew.sh/)를 따른다.
-3. [kind — Installing With A Package Manager](https://kind.sigs.k8s.io/docs/user/quick-start/#installing-with-a-package-manager)의 macOS 절에서 kind를 설치한다.
-4. [kubectl — Install with Homebrew on macOS](https://kubernetes.io/docs/tasks/tools/install-kubectl-macos/#install-with-homebrew-on-macos)에서 kubectl을 설치한다.
-
-설치가 끝나면 세 명령이 모두 성공하는지 확인한다.
-
-```bash
-docker info
-kind version
-kubectl version --client
-```
-
-Apple Silicon은 `arm64`다. kind 노드 이미지는 이를 지원하지만, 실습 애플리케이션 이미지가
-`linux/arm64`를 제공하지 않으면 느린 에뮬레이션을 쓰거나 실행에 실패할 수 있다.
+1. <ExternalLink href="https://docs.docker.com/desktop/setup/install/mac-install/#install-and-run-docker-desktop-on-mac">Docker Desktop — Install and run on Mac</ExternalLink>을 따라 설치하고 앱을 실행한다.
+2. Homebrew가 없다면 <ExternalLink href="https://brew.sh/">Homebrew 공식 설치</ExternalLink>를 따른다.
+3. <ExternalLink href="https://kind.sigs.k8s.io/docs/user/quick-start/#installing-with-a-package-manager">kind — Installing With A Package Manager</ExternalLink>의 macOS 절에서 kind를 설치한다.
+4. <ExternalLink href="https://kubernetes.io/docs/tasks/tools/install-kubectl-macos/#install-with-homebrew-on-macos">kubectl — Install with Homebrew on macOS</ExternalLink>에서 kubectl을 설치한다.
 
 ## Docker runtime 시작하기
 
@@ -101,66 +91,20 @@ docker info --format 'CPUs={{.NCPU}} Memory={{.MemTotal}}'
 앱을 실행하고 **Settings → Resources**에서 실습에 필요한 CPU와 메모리를 배정한다. 설정을 적용한 뒤
 `docker info`가 성공하는지 확인한다.
 
-## 클러스터 만들고 확인하기
+## 준비 확인
 
-이 장은 클러스터 이름을 `study`, kubectl context를 `kind-study`로 고정한다.
-
-<Steps>
-
-1. **단일 노드 클러스터를 만든다**
-
-   ```bash
-   kind create cluster --name study --wait 5m
-   ```
-
-2. **생성된 클러스터와 context를 확인한다**
-
-   ```bash
-   kind get clusters
-   kubectl config get-contexts
-   kubectl --context kind-study get nodes -o wide
-   kubectl --context kind-study cluster-info
-   ```
-
-   노드가 `Ready`이고 cluster-info가 control plane 주소를 보여 주면 준비가 끝났다.
-
-3. **노드가 실제 컨테이너인지 본다**
-
-   ```bash
-   docker ps --filter label=io.x-k8s.kind.cluster=study
-   ```
-
-</Steps>
-
-## 여러 노드가 필요할 때
-
-스케줄링·노드 선택·장애 실습은 control plane 1대와 worker 2대를 만든다. 아래 설정을
-`kind-study.yaml`로 저장한다.
-
-```yaml
-kind: Cluster
-apiVersion: kind.x-k8s.io/v1alpha4
-nodes:
-  - role: control-plane
-  - role: worker
-  - role: worker
-```
-
-기존 클러스터의 노드 수는 제자리에서 바꿀 수 없다. 데이터가 필요 없는지 확인한 뒤 다시 만든다.
+runtime과 CLI 준비가 끝나면 세 명령이 모두 성공하는지 확인한다.
 
 ```bash
-kind get clusters
-kind delete cluster --name study
-kind create cluster --name study --config kind-study.yaml --wait 5m
-kubectl --context kind-study get nodes
+docker info
+kind version
+kubectl version --client
 ```
 
-특정 Kubernetes 버전이 필요하면 [kind 릴리스](https://github.com/kubernetes-sigs/kind/releases)에
-나온 `kindest/node` 이미지와 SHA256을 함께 고정한다.
+Apple Silicon은 `arm64`다. kind 노드 이미지는 이를 지원하지만, 실습 애플리케이션 이미지가
+`linux/arm64`를 제공하지 않으면 느린 에뮬레이션을 쓰거나 실행에 실패할 수 있다.
 
-## 멈추기와 완전히 정리하기
-
-### 다음에 다시 쓸 때
+## 다음에 다시 쓸 때
 
 Colima는 VM을 멈추면 CPU·메모리를 회수하면서 kind 클러스터와 데이터를 보존한다.
 
@@ -174,33 +118,15 @@ kubectl --context kind-study get nodes
 
 Docker Desktop은 앱을 종료하고, 다음 실습 때 다시 실행한 뒤 노드 상태를 확인한다.
 
-### 클러스터를 다 썼을 때
-
-Pod·Secret·PVC 데이터가 모두 사라져도 되는지 확인한다. 목록에서 이름을 확인한 뒤 그 클러스터만 삭제한다.
-
-```bash
-kind get clusters
-kind delete cluster --name study
-kind get clusters
-kubectl config get-contexts
-```
-
-`kind delete clusters --all`, `docker system prune`, Colima VM 삭제는 다른 실습까지 영향을 줄 수 있으므로
-일반적인 cleanup에 사용하지 않는다.
-
-## 안 될 때 어디를 보나
+## runtime이 시작되지 않을 때
 
 | 증상 | 먼저 확인 | 흔한 원인과 다음 행동 |
 |---|---|---|
 | Docker daemon에 연결할 수 없음 | `docker context show` · `docker info` | 선택한 runtime이 꺼졌거나 Docker context가 다른 runtime을 가리킴 |
-| 클러스터 생성 timeout | `docker info`의 CPU·메모리 | VM 자원 부족, 이미지 다운로드 실패, 프록시 |
-| `kubectl`이 엉뚱한 클러스터를 봄 | `kubectl config current-context` | 명령에 `--context kind-study`를 붙여 다시 확인 |
 | Pod가 `ImagePullBackOff` | Pod Events와 이미지 아키텍처 | 네트워크·인증 문제 또는 amd64 전용 이미지 |
 
-클러스터 생성 문제는 `kind export logs --name study ./kind-logs`로 노드 로그를 모아 확인한다.
-
 <LinkCard
-  title="2. kind — Ubuntu"
-  description="Ubuntu의 Docker Engine 위에 같은 kind 실습 환경을 만들고 정리한다."
-  href="/lab-environment/02-kind-ubuntu/"
+  title="2. kind — 공통"
+  description="준비한 Docker runtime 위에 kind 클러스터를 만들고 확인하고 정리한다."
+  href="/lab-environment/03-kind-common/"
 />

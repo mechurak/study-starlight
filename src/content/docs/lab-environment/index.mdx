@@ -10,7 +10,8 @@ import DeckMap from '../../../components/docs/DeckMap.astro';
 
 실습마다 Docker·kind 같은 도구의 설치법을 다시 적으면 명령이 금방 낡고, macOS와 Ubuntu의 차이가
 한 장 안에서 뒤섞인다. 이 덱은 환경마다 **설치할 공식 문서 → 실행 준비 → 생성 → 확인 → 정리**를
-운영체제별 장으로 제공한다. 개별 기술 덱에는 그 실습의 자원 요구량과 실행 시나리오만 남긴다.
+운영체제별 준비 장과 공통 사용 장으로 나눠 제공한다. 개별 기술 덱에는 그 실습의 자원 요구량과
+실행 시나리오만 남긴다.
 
 현재는 첫 환경으로 **kind를 이용한 로컬 Kubernetes 실습**을 다룬다. 덱 이름을 Kubernetes에
 가두지 않은 이유는 앞으로 데이터베이스, 메시징, AI 같은 다른 실습 환경도 이곳에 모으기 위해서다.
@@ -21,12 +22,15 @@ import DeckMap from '../../../components/docs/DeckMap.astro';
 
 <DeckMap
   steps={[
-    { label: '1장', href: '/lab-environment/01-kind-macos/', title: 'kind — macOS', tone: 'key',
-      desc: 'Colima 또는 Docker Desktop · 공식 설치 문서 · 생성 · 중단 · 삭제',
+    { label: '1-a', href: '/lab-environment/01-kind-macos/', title: 'kind 준비 — macOS', tone: 'key',
+      desc: 'Colima 또는 Docker Desktop · 공식 설치 문서 · runtime 시작과 중단',
       note: 'macOS에서 로컬 Kubernetes를 어떻게 준비하나' },
-    { label: '2장', href: '/lab-environment/02-kind-ubuntu/', title: 'kind — Ubuntu', tone: 'ok',
-      desc: 'Docker Engine · 공식 설치 문서 · 생성 · 중단 · 삭제',
+    { label: '1-b', href: '/lab-environment/02-kind-ubuntu/', title: 'kind 준비 — Ubuntu', tone: 'ok',
+      desc: 'Docker Engine · 공식 설치 문서 · 서비스 시작과 중단',
       note: 'Ubuntu에서 로컬 Kubernetes를 어떻게 준비하나' },
+    { label: '2장', href: '/lab-environment/03-kind-common/', title: 'kind — 공통', tone: 'zone',
+      desc: '클러스터 생성 · 확인 · 멀티노드 · 삭제 · 트러블슈팅',
+      note: '준비한 환경에서 같은 방식으로 kind를 어떻게 사용하나' },
   ]}
 />
 
@@ -37,7 +41,7 @@ import DeckMap from '../../../components/docs/DeckMap.astro';
 연습할 수 있는 범위와 시험용 환경의 차이는 [CKA 0장](/cka/00-intro/)이 판단한다.
 
 <LinkCard
-  title="1. kind — macOS"
-  description="Colima 또는 Docker Desktop 위에 kind 클러스터를 만들고 정리한다."
+  title="1-a. kind 준비 — macOS"
+  description="Colima 또는 Docker Desktop과 kind CLI를 준비한다."
   href="/lab-environment/01-kind-macos/"
 />
