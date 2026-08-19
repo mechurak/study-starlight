@@ -1,0 +1,124 @@
+---
+title: "5. CLI와 A2A로 Agent 호출하기"
+description: kagent controller의 Agent card endpoint와 CLI invoke를 비교해 discovery·task·session의 A2A 호출 계약을 관찰한다
+reviewedAt: 2026-08-19
+status: review
+---
+
+import { LinkCard, Steps } from '@astrojs/starlight/components';
+import TermIntro from '../../../components/docs/TermIntro.astro';
+
+> dashboard는 한 client일 뿐이다. 이번 장은 **Agent를 발견하고 task를 보내는 바깥쪽 protocol 계약**을 직접 본다
+
+<TermIntro
+  terms={[
+    ['Agent Card', 'A2A Agent Card', 'Agent 이름·설명·URL·capability·skill을 client가 발견하도록 공개한 JSON 문서다.'],
+    ['task', 'A2A Task', 'client가 Agent에 맡긴 작업과 진행·완료·실패 상태를 묶는 단위다.'],
+    ['streaming', 'Streaming Response', '완료될 때까지 기다리지 않고 event나 text 조각을 순서대로 받는 방식이다.'],
+  ]}
+/>
+
+## MCP와 A2A를 방향으로 구분하기
+
+```text
+사용자 또는 다른 Agent ── A2A ──▶ kagent Agent ── MCP ──▶ tool server
+```
+
+A2A는 Agent를 **호출되는 서비스**로 만든다. MCP는 그 Agent가 바깥 기능을 **호출하는 client**가 되게 한다.
+둘 다 JSON 기반 protocol이라는 이유로 같은 역할로 보면 연결 방향과 권한 주체가 뒤섞인다.
+
+## controller endpoint 열기
+
+이미 port-forward 중이면 하나만 유지한다.
+
+```bash
+kubectl --context kind-kagent-lab -n kagent port-forward svc/kagent-controller 8083:8083
+```
+
+이 tunnel은 로컬 `8083`을 cluster의 controller service `8083`으로 연결한다. terminal을 점유하는 것이 정상이다.
+
+## Agent Card 읽기
+
+다른 terminal에서 `lab-reader`의 well-known endpoint를 요청한다.
+
+```bash
+curl --fail --silent --show-error \
+  http://localhost:8083/api/a2a/kagent/lab-reader/.well-known/agent.json
+```
+
+JSON에서 다음을 찾는다.
+
+| 필드 | 답하는 질문 |
+|---|---|
+| `name`, `description` | 어떤 Agent인가 |
+| `url` | task를 어디로 보내나 |
+| `capabilities.streaming` | stream을 지원하나 |
+| `defaultInputModes`, `defaultOutputModes` | 어떤 content type을 받고 내보내나 |
+| `skills` | client가 발견할 수 있게 어떤 능력을 설명했나 |
+
+card가 열린다는 것은 route와 discovery가 동작한다는 뜻이다. model과 tool 호출까지 성공했다는 뜻은 아니다.
+
+## CLI invoke와 연결하기
+
+<Steps>
+
+1. Agent 목록에서 이름을 다시 확인한다.
+
+   ```bash
+   kagent get agent -n kagent
+   ```
+
+2. streaming task를 보낸다.
+
+   ```bash
+   kagent invoke -n kagent -a lab-reader -S \
+     -t "How many Services exist in the kagent namespace? Use a tool and explain the evidence."
+   ```
+
+3. 완료 뒤 session 목록을 확인한다.
+
+   ```bash
+   kagent get session -n kagent
+   ```
+
+4. 출력된 session ID 하나를 상세 조회한다.
+
+   ```bash
+   kagent get session <session-id> -n kagent
+   ```
+
+</Steps>
+
+CLI가 URL 구성과 A2A message 형식을 대신 만들지만, 앞에서 읽은 Agent Card의 endpoint와 capability를 사용한다.
+
+## 실패 위치를 나누기
+
+| 확인 결과 | 좁혀지는 위치 |
+|---|---|
+| port-forward 자체 실패 | Service·Pod·로컬 포트 |
+| card가 404 | namespace·Agent 이름·A2A route |
+| card는 성공, task가 실패 | Agent workload·model·tool·session |
+| task는 성공, tool result 오류 | MCP server·외부 대상·RBAC |
+| tool result 성공, 답변이 부정확 | instructions·model·result 요약 |
+
+이 순서로 보면 “Agent가 안 돼요”를 한 덩어리로 controller log부터 뒤지는 일을 줄일 수 있다.
+
+## 완료 체크
+
+- `lab-reader` Agent Card를 JSON으로 읽었다.
+- discovery 성공과 실제 task 성공을 구분한다.
+- CLI invoke 뒤 session을 별도 resource로 조회했다.
+- MCP와 A2A의 연결 방향을 설명할 수 있다.
+
+## 참고 자료
+
+- [A2A Agent 예제](https://kagent.dev/docs/kagent/examples/a2a-agents) — Agent Card path와 dashboard·CLI·A2A client 호출
+- [`kagent invoke`](https://kagent.dev/docs/kagent/resources/cli/kagent-invoke) — task·file·session·stream flag
+- [A2A protocol](https://a2a-protocol.org/latest/) — Agent Card와 task의 protocol 원문
+
+<LinkCard
+  title="6. 상태와 로그로 실패 진단하기"
+  description="일부러 잘못된 model reference를 만들고 condition에서 controller log까지 좁혀 간다."
+  href="/kagent-lab/06-observe-debug/"
+/>
+

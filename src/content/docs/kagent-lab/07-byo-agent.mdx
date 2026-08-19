@@ -1,0 +1,157 @@
+---
+title: "7. BYO Agent의 local loop와 배포 경계"
+description: kagent CLI로 ADK Python Agent project를 생성·빌드·로컬 실행하고 BYO image·A2A·registry·Secret 책임을 구분한다
+reviewedAt: 2026-08-19
+status: review
+---
+
+import { LinkCard, Steps } from '@astrojs/starlight/components';
+import TermIntro from '../../../components/docs/TermIntro.astro';
+
+> 선언형 Agent가 설정을 넘기는 방식이라면 BYO Agent는 **실행 가능한 image와 A2A server 계약을 넘기는 방식**이다
+
+<TermIntro
+  terms={[
+    ['BYO Agent', 'Bring Your Own Agent', 'framework code를 담은 container image를 kagent가 Agent workload로 관리하는 방식이다.'],
+    ['ADK', 'Agent Development Kit', '이 실습의 generated project가 사용하는 Agent framework다.'],
+    ['image registry', 'Container Image Registry', 'cluster node가 pull할 수 있도록 image를 저장하고 배포하는 서비스다.'],
+    ['A2A server', 'Agent-to-Agent Server', 'BYO process가 kagent controller와 client에 제공해야 하는 Agent Card와 task endpoint다.'],
+  ]}
+/>
+
+## 책임이 어떻게 달라지나
+
+| 항목 | 선언형 Agent | BYO Agent |
+|---|---|---|
+| Agent logic | `systemMessage`와 resource 조합 | application code와 framework |
+| runtime | kagent가 표준 runtime 구성 | image 안에 포함 |
+| protocol | kagent runtime이 제공 | image가 A2A server 계약 구현 |
+| dependency | kagent release가 주로 고정 | project lockfile·image가 고정 |
+| 공급망 | CR·prompt·tool reference 검토 | code·dependency·base image·SBOM까지 검토 |
+
+이번 장의 필수 범위는 **project 생성 → image build → 로컬 실행**이다. cluster 배포는 registry와 Secret을
+준비한 뒤에만 선택한다. `localhost` image를 kind node가 자동으로 볼 수 있다고 가정하지 않는다.
+
+## project 만들기
+
+cluster와 별개인 작업 디렉터리에서 실행한다. 생성물에는 별도 Git 저장소를 만들 필요가 없다.
+
+```bash
+mkdir -p /tmp/kagent-lab-byo
+cd /tmp/kagent-lab-byo
+kagent init adk python labbyo \
+  --model-provider OpenAI \
+  --model-name gpt-4.1-mini
+cd labbyo
+```
+
+`/tmp`의 생성물은 임시 학습 파일이다. 필요한 code는 직접 검토한 뒤 별도 project로 옮기고, API key나 `.env`
+파일은 옮기지 않는다.
+
+```text
+labbyo/
+├── labbyo/              # Agent code와 Agent Card
+├── kagent.yaml          # build·run·deploy metadata
+├── pyproject.toml       # Python dependency
+├── docker-compose.yaml  # local runtime
+└── README.md
+```
+
+실제 생성 결과가 이 목록과 다르면 설치된 CLI version의 README를 원본으로 삼는다.
+
+## build와 local run
+
+<Steps>
+
+1. **API key가 현재 shell에 있는지 확인한다**
+
+   ```bash
+   test -n "$OPENAI_API_KEY" && echo "OPENAI_API_KEY is set"
+   ```
+
+2. **project image를 만든다**
+
+   ```bash
+   kagent build
+   ```
+
+3. **로컬 terminal UI에서 실행한다**
+
+   ```bash
+   kagent run
+   ```
+
+4. generated Agent의 기본 tool을 한 번 호출하고 응답을 본다. 종료는 `Ctrl+C`다.
+
+5. code나 instructions 한 줄을 바꾼 뒤 다시 `kagent build`, `kagent run`해 image build가 변경 경계임을 확인한다.
+
+</Steps>
+
+로컬 성공은 code와 model 연결을 빠르게 검증한다. Kubernetes scheduling, registry pull, ServiceAccount,
+NetworkPolicy, Secret reference, A2A route까지 검증한 것은 아니다.
+
+## cluster 배포 전 gate
+
+다음 질문에 모두 답할 수 있을 때만 cluster deploy로 넘어간다.
+
+- image 이름이 kind node가 pull할 registry를 가리키는가?
+- mutable `latest`가 아니라 digest나 immutable tag를 기록했는가?
+- `.env.production`이 Git에서 제외되고 최소 key만 가지는가?
+- generated `kagent.yaml`의 Agent 이름·namespace·port·A2A 설정을 검토했는가?
+- image를 non-root와 제한된 filesystem·resource로 실행할 수 있는가?
+
+공식 local development 흐름은 registry 준비 뒤 다음 형태로 build/push와 deploy를 연결한다.
+
+```bash
+kagent build --push
+kagent deploy --env-file .env.production
+```
+
+이 두 명령은 **registry와 production env file을 사용하도록 project를 먼저 설정한 경우에만** 실행한다.
+이 입문 덱은 특정 registry credential을 가정하지 않으므로 cluster 배포를 필수 완료 조건으로 두지 않는다.
+
+## BYO resource에서 볼 계약
+
+cluster에 배포된 BYO Agent는 개념상 다음 필드를 갖는다. placeholder image를 그대로 적용하지 않는다.
+
+```yaml
+apiVersion: kagent.dev/v1alpha2
+kind: Agent
+metadata:
+  name: lab-byo
+  namespace: kagent
+spec:
+  type: BYO
+  byo:
+    deployment:
+      image: registry.example/lab-byo@sha256:<digest>
+      env:
+        - name: OPENAI_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: lab-byo-model
+              key: OPENAI_API_KEY
+```
+
+kagent가 image를 실행해 주더라도 Agent logic·dependency·secret 사용·A2A implementation은 image 제작자의
+책임이다. 이것이 선언형에서 BYO로 넘어갈 때 넓어지는 신뢰 경계다.
+
+## 완료 체크
+
+- generated project의 code·`kagent.yaml`·compose 역할을 구분한다.
+- `kagent build`와 `kagent run`으로 local loop를 한 번 돌았다.
+- 로컬 성공과 cluster 배포 성공이 다른 검증이라는 것을 설명한다.
+- registry와 Secret이 준비되지 않았다면 deploy 명령을 실행하지 않았다.
+
+## 참고 자료
+
+- [kagent local development](https://kagent.dev/docs/kagent/getting-started/local-development) — `init`·`build`·`run`·MCP 추가·deploy 흐름
+- [BYO ADK Agent](https://kagent.dev/docs/kagent/examples/a2a-byo) — image·Secret·A2A endpoint 계약
+- [`kagent init`](https://kagent.dev/docs/kagent/resources/cli/kagent-init) — 지원 framework·language·model flag
+- [Agent 배포 플랫폼 — kagent 격리와 공급망](/agent-platform/06-kagent/#격리와-공급망) — production target에서 더할 통제
+
+<LinkCard
+  title="8. 실습 정리와 다음 단계"
+  description="exercise resource만 지우는 방법과 전용 kind cluster 전체를 지우는 방법을 구분한다."
+  href="/kagent-lab/08-cleanup/"
+/>

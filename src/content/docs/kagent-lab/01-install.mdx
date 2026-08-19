@@ -1,0 +1,138 @@
+---
+title: "1. 전용 cluster와 kagent 설치"
+description: kind-kagent-lab context를 확인하고 kagent demo profile을 설치해 CRD·controller·UI와 기본 model 연결을 검증한다
+reviewedAt: 2026-08-19
+status: review
+---
+
+import { LinkCard, Steps } from '@astrojs/starlight/components';
+import TermIntro from '../../../components/docs/TermIntro.astro';
+
+> 성공 조건은 dashboard가 한 번 열린 것이 아니라 **전용 context에서 CRD와 control plane이 준비된 상태**다
+
+<TermIntro
+  terms={[
+    ['demo profile', 'Demo Installation Profile', '학습용 sample Agent와 MCP tool을 함께 설치하는 kagent profile이다.'],
+    ['CRD', 'Custom Resource Definition', '`Agent`·`ModelConfig` 같은 새 Kubernetes resource type의 schema다.'],
+    ['context', 'kubectl Context', 'cluster·user·namespace 연결을 가리키는 kubectl 대상 이름이다.'],
+  ]}
+/>
+
+## 사전 준비
+
+Docker·kind·kubectl은 운영체제에 맞는 [macOS 준비](/lab-environment/01-kind-macos/) 또는
+[Ubuntu 준비](/lab-environment/02-kind-ubuntu/)를 먼저 따른다. 이 덱은 추가로 Helm과 kagent CLI가 필요하다.
+설치 명령은 복제하지 않고 각 공식 문서의 현재 절을 사용한다.
+
+```bash
+docker info
+kind version
+kubectl version --client
+helm version
+kagent version
+```
+
+확인 당시 kagent 공식 설치 문서의 기본 CLI release는 `0.9.9`다. 출력이 다르면 실패는 아니지만 이 덱의
+CR 예시와 맞는지 [release notes](https://kagent.dev/docs/kagent/resources/release-notes)를 먼저 본다.
+
+## 설치하기
+
+<Steps>
+
+1. **전용 kind cluster를 만든다**
+
+   ```bash
+   kind create cluster --name kagent-lab --wait 5m
+   ```
+
+2. **현재 context를 문자열로 확인한다**
+
+   ```bash
+   kubectl config current-context
+   ```
+
+   기대값은 정확히 `kind-kagent-lab`이다. 다르면 다음 명령으로 바꾼 뒤 다시 확인한다.
+
+   ```bash
+   kubectl config use-context kind-kagent-lab
+   ```
+
+3. **API key가 현재 shell에 있는지만 확인한다**
+
+   ```bash
+   test -n "$OPENAI_API_KEY" && echo "OPENAI_API_KEY is set"
+   ```
+
+4. **학습용 demo profile을 설치한다**
+
+   ```bash
+   kagent install --profile demo
+   ```
+
+   이 명령은 현재 Kubernetes context를 대상으로 한다. 실행 직전에 context를 확인한 이유다.
+
+</Steps>
+
+## control plane 확인
+
+설치 성공 문장만 믿지 않고 실제 resource를 본다.
+
+```bash
+kubectl --context kind-kagent-lab get crd | grep kagent.dev
+kubectl --context kind-kagent-lab -n kagent get pods
+kubectl --context kind-kagent-lab -n kagent get svc
+kubectl --context kind-kagent-lab -n kagent get modelconfig
+```
+
+CRD 목록에는 `agents.kagent.dev`, `modelconfigs.kagent.dev` 같은 type이 있고, `kagent` namespace의 control
+plane Pod는 시간이 지나면 `Running`·ready가 된다. `default-model-config`가 있어야 뒤 장의 Agent가 참조할 수 있다.
+
+:::tip[Pod Running과 Agent Ready는 다른 상태]
+controller와 UI가 떠도 model credential이 잘못됐거나 tool server가 준비되지 않으면 Agent 호출은 실패할 수 있다.
+설치는 control plane 확인이고, 다음 장의 실제 질문이 data plane 확인이다.
+:::
+
+## dashboard 열기
+
+```bash
+kagent dashboard
+```
+
+CLI가 port-forward를 열고 로컬 주소를 출력한다. 이 terminal을 유지한 채 dashboard에서 sample Agent와 tool
+목록을 둘러본다. 종료는 `Ctrl+C`다. 포트 번호를 외우지 말고 CLI가 이번 실행에 출력한 주소를 사용한다.
+
+## 안 될 때 먼저 볼 것
+
+| 증상 | 확인 |
+|---|---|
+| 설치가 엉뚱한 cluster를 가리킴 | 즉시 중단하고 `kubectl config current-context` 확인 |
+| Pod가 `Pending` | `kubectl --context kind-kagent-lab -n kagent describe pod <이름>`의 Events와 메모리 |
+| `ImagePullBackOff` | Pod Events, registry 접근, proxy·DNS |
+| model config가 없음 | `kagent install` 출력과 controller log |
+| dashboard가 안 열림 | `kubectl ... get svc`, UI Pod log, 로컬 포트 충돌 |
+
+설치 문제가 남으면 공식 debug 절의 첫 상태를 모은다.
+
+```bash
+kubectl --context kind-kagent-lab -n kagent logs deployment/kagent-controller --tail=100
+```
+
+## 완료 체크
+
+- `kubectl config current-context`가 `kind-kagent-lab`이다.
+- kagent CRD, control plane Pod, `default-model-config`를 확인했다.
+- dashboard에서 sample Agent를 볼 수 있다.
+- cluster는 지우지 않는다. 다음 장에서 그대로 쓴다.
+
+## 참고 자료
+
+- [kagent Quick Start](https://kagent.dev/docs/kagent/getting-started/quickstart) — prerequisite, demo profile, dashboard와 CLI
+- [kagent 설치](https://kagent.dev/docs/kagent/introduction/installation) — CLI·Helm 설치와 provider별 설정
+- [kind Quick Start](https://kind.sigs.k8s.io/docs/user/quick-start/) — 이름 있는 cluster 생성·삭제
+
+<LinkCard
+  title="2. sample Agent 첫 호출"
+  description="미리 설치된 Agent를 dashboard와 CLI에서 호출하고 tool result를 확인한다."
+  href="/kagent-lab/02-first-agent/"
+/>
+

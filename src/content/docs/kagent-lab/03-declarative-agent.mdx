@@ -1,0 +1,155 @@
+---
+title: "3. 조회 전용 선언형 Agent"
+description: Agent v1alpha2 manifest로 default model·system message·조회 MCP tool allowlist를 연결하고 Ready 상태와 호출을 검증한다
+reviewedAt: 2026-08-19
+status: review
+---
+
+import { LinkCard, Steps } from '@astrojs/starlight/components';
+import TermIntro from '../../../components/docs/TermIntro.astro';
+
+> 선언형 Agent는 prompt 파일 하나가 아니라 **model·instructions·tool reference를 묶어 원하는 상태로 만든 resource**다
+
+<TermIntro
+  terms={[
+    ['ModelConfig', 'Model Configuration', 'Agent가 사용할 model provider와 model 설정을 이름으로 참조하는 resource다.'],
+    ['systemMessage', 'System Message', 'Agent의 역할·금지 행동·응답 형식을 model에 가장 먼저 주는 instructions다.'],
+    ['tool allowlist', 'Allowed Tool Names', 'MCP server가 제공하는 기능 중 이 Agent가 실제로 쓸 이름만 고른 목록이다.'],
+    ['condition', 'Kubernetes Condition', 'controller가 판단한 Accepted·Ready 같은 상태와 이유를 담는 표준 필드다.'],
+  ]}
+/>
+
+## 연결할 resource 먼저 확인
+
+demo profile이 만든 기본 model과 tool server 이름을 확인한다.
+
+```bash
+kubectl --context kind-kagent-lab -n kagent get modelconfig default-model-config
+kubectl --context kind-kagent-lab -n kagent get remotemcpserver kagent-tool-server
+```
+
+둘 중 하나가 없다면 아래 manifest를 적용하지 않는다. 설치 version에서 이름이 바뀌었는지 실제 목록과 release
+notes를 확인한다.
+
+## Agent 만들기
+
+다음 Agent는 Kubernetes 조회 tool 둘만 참조한다. 변경 tool을 prompt로 금지하는 데 그치지 않고 allowlist에서 뺀다.
+
+```bash
+kubectl --context kind-kagent-lab apply -f - <<'EOF'
+apiVersion: kagent.dev/v1alpha2
+kind: Agent
+metadata:
+  name: lab-reader
+  namespace: kagent
+spec:
+  description: Read-only lab agent that explains resources in the kagent namespace.
+  type: Declarative
+  declarative:
+    modelConfig: default-model-config
+    systemMessage: |-
+      You are a read-only Kubernetes lab assistant.
+
+      Rules:
+      - Inspect resources only in the namespace explicitly requested by the user.
+      - Never claim that you changed, deleted, restarted, or applied a resource.
+      - Use a tool for facts about the current cluster; do not guess.
+      - If a request requires a mutation, explain that this lab agent has no mutation tool.
+      - Summarize the tool evidence before giving a conclusion.
+    tools:
+      - type: McpServer
+        mcpServer:
+          apiGroup: kagent.dev
+          kind: RemoteMCPServer
+          name: kagent-tool-server
+          toolNames:
+            - k8s_get_available_api_resources
+            - k8s_get_resources
+EOF
+```
+
+## Accepted와 Ready 기다리기
+
+<Steps>
+
+1. resource가 생겼는지 본다.
+
+   ```bash
+   kubectl --context kind-kagent-lab -n kagent get agent lab-reader
+   ```
+
+2. condition 두 개를 기다린다.
+
+   ```bash
+   kubectl --context kind-kagent-lab -n kagent wait \
+     --for=condition=Accepted agent/lab-reader --timeout=2m
+   kubectl --context kind-kagent-lab -n kagent wait \
+     --for=condition=Ready agent/lab-reader --timeout=3m
+   ```
+
+3. 최종 spec과 status를 함께 읽는다.
+
+   ```bash
+   kubectl --context kind-kagent-lab -n kagent get agent lab-reader -o yaml
+   ```
+
+</Steps>
+
+`Accepted=True`는 controller가 선언을 받아들였다는 뜻이고, `Ready=True`는 생성된 deployment가 준비됐다는
+뜻이다. 둘은 model 호출 성공까지 보장하지 않으므로 실제 invoke가 마지막 검증이다.
+
+## 조회와 거부를 각각 시험하기
+
+controller port-forward가 없다면 별도 terminal에서 다시 연다.
+
+```bash
+kubectl --context kind-kagent-lab -n kagent port-forward svc/kagent-controller 8083:8083
+```
+
+먼저 허용된 질문을 보낸다.
+
+```bash
+kagent invoke -n kagent -a lab-reader -S \
+  -t "List the Pods in the kagent namespace and cite the tool evidence."
+```
+
+다음에는 일부러 변경 요청을 보낸다.
+
+```bash
+kagent invoke -n kagent -a lab-reader -S \
+  -t "Delete one Pod in the kagent namespace."
+```
+
+두 번째 요청은 실제 삭제 tool을 호출할 수 없어야 한다. prompt의 거부 문장도 중요하지만, 더 강한 경계는
+Agent spec에 delete tool 자체가 없다는 사실이다. 실제 Pod 수가 그대로인지 `kubectl get pods`로 확인한다.
+
+## 한 필드씩 읽는 법
+
+| 필드 | 지금 고정한 것 |
+|---|---|
+| `type: Declarative` | kagent가 표준 runtime을 구성 |
+| `modelConfig` | model credential과 provider 세부를 Agent와 분리 |
+| `systemMessage` | 역할과 행동 원칙 |
+| `mcpServer` | tool을 발견할 endpoint resource |
+| `toolNames` | server 전체가 아니라 조회 기능 둘만 허용 |
+| `status.conditions` | controller가 선언을 실제 상태로 바꾼 결과 |
+
+## 완료 체크
+
+- `lab-reader`가 `Accepted=True`, `Ready=True`다.
+- 조회 요청에는 tool evidence가 있고 결과가 `kubectl`과 맞는다.
+- 삭제 요청 뒤 실제 resource가 변하지 않았다.
+- cluster와 Agent는 다음 장에서 재사용한다.
+
+## 참고 자료
+
+- [kagent Agent 개념](https://kagent.dev/docs/kagent/concepts/agents) — instructions·tool·runtime과 선언형 spec
+- [첫 MCP tool](https://kagent.dev/docs/kagent/getting-started/first-mcp-tool) — Agent v1alpha2와 RemoteMCPServer reference
+- [kagent API reference](https://kagent.dev/docs/kagent/resources/api-ref) — `Agent`, `ModelConfig`, `RemoteMCPServer` schema
+
+<LinkCard
+  title="4. MCP tool server 붙이기"
+  description="새 MCPServer를 배포하고 한 tool만 allowlist에 넣어 Agent의 능력이 어디서 생기는지 본다."
+  href="/kagent-lab/04-mcp-tool/"
+/>
+
