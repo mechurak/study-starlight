@@ -27,7 +27,7 @@ kind는 워크로드·스케줄링·서비스·RBAC 실습에 알맞다. 노드�
 
 ## 구조와 자원
 
-<Tabs>
+<Tabs syncKey="operating-system">
 <TabItem label="macOS">
 
 macOS는 Linux 컨테이너를 직접 실행하지 못하므로 Colima나 Docker Desktop이 Linux VM을 하나 둔다.
@@ -68,7 +68,7 @@ Ubuntu → Docker Engine → kind 노드 컨테이너
 설치 명령은 이 문서에 복제하지 않는다. 아래 공식 문서에서 지원 운영체제와 CPU 아키텍처, 현재 표시되는
 명령을 확인한 뒤 실행한다.
 
-<Tabs>
+<Tabs syncKey="operating-system">
 <TabItem label="macOS">
 
 **Colima를 쓸 때**
@@ -105,7 +105,7 @@ Docker 공식 문서가 경고하듯 `docker` 그룹은 사용자에게 root 수
 
 ## runtime 시작과 준비 확인
 
-<Tabs>
+<Tabs syncKey="operating-system">
 <TabItem label="macOS">
 
 Colima는 처음 VM을 만들 때 실습 자원을 지정하고, Colima 내장 Kubernetes는 끈다. 이 덱에서는 kind만 쓴다.
@@ -247,7 +247,7 @@ containerd와 workload에 필요한 `HTTP_PROXY`·`HTTPS_PROXY`·`NO_PROXY` 설�
 
 클러스터 데이터를 보존하면서 호스트 자원을 회수하는 방법은 runtime마다 다르다.
 
-<Tabs>
+<Tabs syncKey="operating-system">
 <TabItem label="macOS">
 
 Colima는 VM을 멈추면 CPU·메모리를 회수하면서 kind 클러스터와 데이터를 보존한다.
@@ -299,7 +299,7 @@ cleanup에 사용하지 않는다. kind 클러스터를 삭제해도 별도로 �
 
 runtime 자체가 시작되지 않는 문제는 운영체제별 탭에서 먼저 좁힌다.
 
-<Tabs>
+<Tabs syncKey="operating-system">
 <TabItem label="macOS">
 
 | 증상 | 먼저 확인 | 흔한 원인과 다음 행동 |
