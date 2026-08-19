@@ -1,11 +1,11 @@
 ---
-title: "12. 마무리"
+title: "13. 마무리"
 description: 제품 중립 Agent 플랫폼과 kagent·Dapr Agents·AgentCore adapter의 설계·보안·운영 체크리스트
 ---
 
 import { LinkCard } from '@astrojs/starlight/components';
 
-> 제품은 바뀌어도 **Agent의 ID·version·권한·감사 기록은 회사에 남아야 한다**
+> 제품은 바뀌어도 **Agent와 Tool의 ID·version·권한·감사 기록은 회사에 남아야 한다**
 
 ## 전체 지도
 
@@ -13,7 +13,7 @@ import { LinkCard } from '@astrojs/starlight/components';
 flowchart LR
     USER["임직원"] --> PORTAL["Portal · Catalog"]
     IDP["IdP<br/>user · group"] --> PORTAL
-    PORTAL --> CORE["Agent · Version<br/>Grant · Publication"]
+    PORTAL --> CORE["Agent · Tool · Version<br/>Grant · Publication"]
     CORE --> POLICY["Approval · Placement"]
     POLICY --> ADAPTER["RuntimeAdapter"]
     ADAPTER --> KAG["kagent<br/>온프렘 Kubernetes"]
@@ -40,21 +40,22 @@ flowchart LR
     class TOOL,OBS warn
 ```
 
-## 설계 결정 열세 가지
+## 설계 결정 열네 가지
 
 1. kagent·Dapr Agents·AgentCore는 platform 전체가 아니라 runtime/provider의 일부다.
 2. 회사 `agentId`를 provider CR name이나 ARN보다 먼저 만든다.
 3. `AgentVersion`은 immutable artifact와 실행 계약의 snapshot이다.
-4. `Grant`·`Publication`·audit는 provider 밖 control plane이 소유한다.
-5. 구성형과 코드형 Agent의 검증·승인 risk tier를 나눈다.
-6. 관리·invoke·tool action 권한을 세 경계에서 각각 검사한다.
-7. email이 아니라 IdP의 불변 principal ID에 권한을 건다.
-8. session ID와 user 관계를 portal backend가 강제한다.
-9. adapter는 idempotency·reconciliation·provider error 번역을 맡는다.
-10. capability profile로 provider 차이를 드러내고 최소 공통분모로 깎지 않는다.
-11. durable activity의 side effect에는 idempotency를 별도로 강제한다.
-12. data zone이 placement의 첫 hard constraint다.
-13. stable company endpoint 뒤에서 publication만 target deployment를 바꾼다.
+4. 사용자 MCP는 Agent 설정의 URL이 아니라 독립된 Tool lifecycle로 관리한다.
+5. `Grant`·`Publication`·audit는 provider 밖 control plane이 소유한다.
+6. 구성형과 코드형 Agent의 검증·승인 risk tier를 나눈다.
+7. 관리·invoke·tool action 권한을 세 경계에서 각각 검사한다.
+8. email이 아니라 IdP의 불변 principal ID에 권한을 건다.
+9. session ID와 user 관계를 portal backend가 강제한다.
+10. adapter는 idempotency·reconciliation·provider error 번역을 맡는다.
+11. capability profile로 provider 차이를 드러내고 최소 공통분모로 깎지 않는다.
+12. durable activity의 side effect에는 idempotency를 별도로 강제한다.
+13. data zone이 placement의 첫 hard constraint다.
+14. stable company endpoint 뒤에서 publication만 target deployment를 바꾼다.
 
 ## Runtime 선택 카드
 
@@ -72,7 +73,7 @@ hard constraint로 설명할 수 있어야 한다.
 
 ### Domain과 lifecycle
 
-- [ ] Agent·Version·Grant·DeploymentTarget·Deployment·Publication이 provider ID와 분리됐다.
+- [ ] Agent·Tool·Version·Grant·DeploymentTarget·Deployment·Publication이 provider ID와 분리됐다.
 - [ ] 승인된 version은 immutable digest를 가리킨다.
 - [ ] `READY`, `PUBLISHED`, `SUSPENDED`, `RETIRED`의 의미가 분리됐다.
 - [ ] owner 퇴사·부서 이동·오래된 Agent review 절차가 있다.
@@ -90,6 +91,8 @@ hard constraint로 설명할 수 있어야 한다.
 ### 공급망과 격리
 
 - [ ] code형 Agent는 CI build, SBOM, scan, signature, digest 고정을 거친다.
+- [ ] 사용자 MCP는 독립된 ToolVersion·ToolDeployment·ToolPublication lifecycle을 거친다.
+- [ ] discovery schema drift가 새 승인 없이 Agent binding에 노출되지 않는다.
 - [ ] runtime은 non-root, resource limit, filesystem·network 최소 권한을 강제한다.
 - [ ] tool server와 code는 portal process 밖의 격리 환경에서 실행한다.
 - [ ] egress destination과 private CA가 target별로 검증됐다.
@@ -133,8 +136,9 @@ hard constraint로 설명할 수 있어야 한다.
 - [2. 제품 밖의 domain model](/agent-platform/02-domain-model/) — DB·API schema를 설계할 때
 - [4. 권한은 세 번 검사한다](/agent-platform/04-authorization/) — Agent별 ACL과 tool 권한을 붙일 때
 - [5. Adapter contract](/agent-platform/05-adapter-contract/) — 새 runtime provider를 추가할 때
-- [6. kagent adapter](/agent-platform/06-kagent/) · [7. Dapr Agents adapter](/agent-platform/07-dapr-agents/) · [8. AgentCore adapter](/agent-platform/08-agentcore/) — target 구현을 비교할 때
-- [11. 두 Agent로 시작하기](/agent-platform/11-adoption/) — PoC acceptance test를 만들 때
+- [6. 사용자 MCP를 플랫폼에 올리기](/agent-platform/06-user-mcp/) — 사용자가 만든 MCP의 등록·검증·공개 lifecycle을 설계할 때
+- [7. kagent adapter](/agent-platform/07-kagent/) · [8. Dapr Agents adapter](/agent-platform/08-dapr-agents/) · [9. AgentCore adapter](/agent-platform/09-agentcore/) — target 구현을 비교할 때
+- [12. 두 Agent로 시작하기](/agent-platform/12-adoption/) — PoC acceptance test를 만들 때
 
 <LinkCard
   title="Agent 배포 플랫폼 개요로 돌아가기"

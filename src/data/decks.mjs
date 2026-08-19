@@ -429,10 +429,10 @@ export const deckDefinitions = [
 		category: 'platform',
 		groups: [
 			['큰 그림', ['agent-platform/00-position', 'agent-platform/01-planes']],
-			['제품 밖의 계약', ['agent-platform/02-domain-model', 'agent-platform/03-lifecycle', 'agent-platform/04-authorization']],
-			['실행 어댑터', ['agent-platform/05-adapter-contract', 'agent-platform/06-kagent', 'agent-platform/07-dapr-agents', 'agent-platform/08-agentcore']],
-			['하이브리드 운영', ['agent-platform/09-hybrid', 'agent-platform/10-operations']],
-			['도입과 마무리', ['agent-platform/11-adoption', 'agent-platform/12-wrapup']],
+			['제품 밖의 계약', ['agent-platform/02-domain-model', 'agent-platform/03-lifecycle', 'agent-platform/04-authorization', 'agent-platform/05-adapter-contract', 'agent-platform/06-user-mcp']],
+			['실행 어댑터', ['agent-platform/07-kagent', 'agent-platform/08-dapr-agents', 'agent-platform/09-agentcore']],
+			['하이브리드 운영', ['agent-platform/10-hybrid', 'agent-platform/11-operations']],
+			['도입과 마무리', ['agent-platform/12-adoption', 'agent-platform/13-wrapup']],
 		],
 	},
 	{

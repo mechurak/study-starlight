@@ -1,0 +1,223 @@
+---
+title: "6. 사용자 MCP를 플랫폼에 올리기"
+description: 사용자가 만든 MCP server를 제품 중립 Tool lifecycle로 등록·검증·배포·공개하고 Agent binding과 분리한다
+reviewedAt: 2026-08-19
+status: review
+---
+
+import { LinkCard } from '@astrojs/starlight/components';
+import TermIntro from '../../../components/docs/TermIntro.astro';
+
+> Agent가 MCP를 선택하기 전에 플랫폼은 **누가 만든 어느 version을 어떤 권한으로 실행할지** 결정해야 한다
+
+<TermIntro
+  terms={[
+    ['ToolVersion', 'Tool Version', 'MCP artifact·protocol·발견된 tool schema·권한 계약을 함께 고정한 승인 단위다.'],
+    ['ToolDeployment', 'Tool Deployment', '승인된 ToolVersion을 특정 target에서 실행하거나 기존 endpoint에 연결한 상태다.'],
+    ['tool discovery', 'Tool Discovery', 'MCP server가 제공하는 tool 이름과 입력 schema를 조회해 실제 계약을 확인하는 과정이다.'],
+    ['ToolPublication', 'Tool Publication', '준비된 ToolVersion을 어떤 creator와 Agent가 binding할 수 있는지 공개한 상태다.'],
+  ]}
+/>
+
+## ToolBinding 앞에 공급 lifecycle이 있다
+
+사용자가 만든 MCP endpoint를 form에 붙이는 것만으로 self-service 플랫폼이 되지 않는다. 그 URL이나 image가 누구
+소유인지, 어떤 code와 schema를 실행하는지, 어느 data로 나가는지, 문제가 생기면 무엇을 중지할지 알 수 없기 때문이다.
+
+```mermaid
+flowchart LR
+    CREATOR["MCP creator"] --> SUBMIT["source · image digest<br/>또는 remote endpoint 제출"]
+    SUBMIT --> CHECK["build · scan · policy<br/>소유권 · network 검증"]
+    CHECK --> VERSION["ToolVersion<br/>artifact · schema · auth"]
+    VERSION --> DEPLOY["ToolDeployment<br/>실행 또는 연결"]
+    DEPLOY --> DISCOVER["discovery · smoke test<br/>audit 확인"]
+    DISCOVER --> PUBLISH["ToolPublication<br/>catalog 공개"]
+    PUBLISH --> BIND["AgentVersion<br/>ToolBinding · allowlist"]
+
+    classDef key fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
+    classDef zone fill:#ede9fe,stroke:#7c3aed,color:#4c1d95
+    classDef ok fill:#dcfce7,stroke:#16a34a,color:#14532d
+    classDef warn fill:#fef3c7,stroke:#d97706,color:#78350f
+    class CREATOR,SUBMIT key
+    class CHECK,VERSION zone
+    class DEPLOY,DISCOVER ok
+    class PUBLISH,BIND warn
+```
+
+`ToolPublication`은 Agent catalog 공개와도 다르다. tool이 공개됐다는 것은 승인된 Agent creator가 binding 후보로
+볼 수 있다는 뜻이고, 최종 사용자가 그 tool action을 실행할 수 있다는 뜻은 아니다. 실행 때는 Agent invoke 권한과
+tool action policy를 다시 검사한다.
+
+### Tool을 Agent 밖의 객체로 둔다
+
+하나의 MCP server를 여러 Agent가 공유할 수 있고, Agent를 바꾸지 않아도 tool server는 새 version으로 교체될 수 있다.
+그래서 server code를 `AgentVersion` 안에 복사하지 않고 독립된 aggregate로 둔다.
+
+| 객체 | 소유할 값 | 바뀔 때의 의미 |
+|---|---|---|
+| `Tool` | 회사 `toolId`, 이름, owner, 업무 domain | 같은 tool의 정체성 유지 |
+| `ToolVersion` | source commit·image digest 또는 endpoint fingerprint, protocol, schema snapshot, risk·auth 계약 | 검사와 승인이 필요한 새 계약 |
+| `ToolDeployment` | target, provider reference, endpoint, observed status | 실행·연결 위치의 변화 |
+| `ToolPublication` | 공개 대상 group, 승인 상태, 사용 가능한 version | catalog와 신규 binding 허용 범위 변화 |
+| `ToolBinding` | AgentVersion이 고른 ToolVersion과 tool 이름 allowlist | 특정 Agent가 쓸 최소 능력 |
+
+`toolId`가 server 하나만 뜻한다고 가정하지 않는다. 한 server가 여러 tool을 제공할 수 있으므로 risk와 허용 범위는
+발견된 tool 단위로 기록하고, `ToolBinding`은 server 전체가 아니라 필요한 이름만 고른다.
+
+## 실행을 맡기는 경로와 기존 서버를 연결하는 경로
+
+두 경로는 같은 catalog에 보일 수 있지만 플랫폼 책임이 다르다.
+
+| 경로 | creator 제출물 | 플랫폼 책임 | creator에게 남는 책임 |
+|---|---|---|---|
+| 관리형 배포 | source repository와 build recipe 또는 승인된 registry의 immutable digest | build·scan·sign, runtime 배포, resource·network·identity preset, patch·rollback | 기능 test, dependency 수정, 업무 owner 대응 |
+| remote 연결 | HTTPS MCP endpoint, protocol, 소유권 증거, auth 요구, 허용 data zone | TLS·DNS·egress·auth 검증, discovery snapshot, health와 schema drift 감시 | server 가용성·patch·capacity·endpoint 운영 |
+
+production 관리형 경로에서 `npx package@latest`, `uvx package` 또는 mutable image tag를 그대로 실행하지 않는다.
+package resolution 결과를 build 단계에서 image digest와 SBOM으로 고정하고, 검증된 registry에서만 pull한다. remote
+경로도 URL이 있다는 이유로 신뢰하지 않는다. private address 도달 여부, redirect, 인증서, tenant 경계와 소유권을
+검증한 뒤 허용된 egress zone에서만 연결한다.
+
+## Creator가 제출하는 계약
+
+portal form과 Git 선언은 제품의 CRD를 그대로 노출하지 않고 다음 의도를 받는다.
+
+```yaml
+tool:
+  toolId: finance-cost-reader
+  owner: group:finance-platform
+  source:
+    kind: git
+    repository: company/mcp-finance-cost
+    revision: 8f6c2d1
+    buildProfile: python-mcp
+  protocol:
+    transport: streamable-http
+    path: /mcp
+  actions:
+    expected: [list_cost_centers, get_monthly_cost]
+    risk: read
+  identity:
+    inbound: workload
+    outbound: user-delegation
+  data:
+    classification: internal
+    egressProfiles: [finance-api]
+  resources:
+    cpu: 250m
+    memory: 256Mi
+```
+
+creator가 Kubernetes namespace, ServiceAccount 이름이나 AgentCore target ARN을 직접 고르지 않는다. adapter가
+`buildProfile`, data zone, identity와 resource 의도를 target의 실제 image build·namespace·role·gateway 설정으로
+번역한다. secret value도 제출물에 넣지 않고 logical reference와 필요한 scope만 선언한다.
+
+## 검사는 제출물과 실행 결과를 모두 본다
+
+정적 검사만으로 MCP 계약을 알 수 없고, discovery만으로 code 공급망을 알 수 없다. 둘을 이어서 승인한다.
+
+1. source·dependency·license와 secret 유출을 검사한다.
+2. 재현 가능한 build로 SBOM·provenance·signature가 붙은 image digest를 만든다.
+3. sandbox target에서 non-root·filesystem·resource exhaustion과 egress를 동적으로 검사한다.
+4. 임시 deployment 또는 remote endpoint에 연결해 `tools/list` 결과를 가져온다.
+5. tool 이름·입력 schema·annotation을 snapshot하고 제출한 예상 action과 비교한다.
+6. 허용·거부 credential로 tool을 호출하고 side effect·audit·redaction을 확인한다.
+7. data owner와 security policy가 승인한 뒤 production target으로 승격한다.
+
+:::caution[discovery 결과는 실시간 진실이 아니라 version 증거다]
+remote server가 같은 URL에서 tool 이름이나 schema를 바꾸면 승인된 `ToolVersion`과 실제 server가 달라진다. 주기적
+discovery에서 hash drift를 발견하면 자동으로 새 version을 승인하지 말고 신규 binding을 막거나 publication을
+suspend한 뒤 owner review를 연다.
+:::
+
+### Ready와 Published를 나눈다
+
+```mermaid
+stateDiagram-v2
+    [*] --> Draft
+    Draft --> Submitted: creator 제출
+    Submitted --> Rejected: schema·build·policy 실패
+    Submitted --> PendingApproval: 자동 검사 통과
+    PendingApproval --> Approved: owner·security 승인
+    PendingApproval --> Rejected: 반려
+    Approved --> Provisioning: 실행 또는 연결
+    Provisioning --> DeployFailed: 배포·접속 실패
+    DeployFailed --> Provisioning: 재시도
+    Provisioning --> Ready: discovery·smoke 성공
+    Ready --> Published: catalog와 binding 공개
+    Published --> Suspended: drift·취약점·운영 중지
+    Suspended --> Published: 재검증
+    Published --> Retired: 새 version 전환
+    Rejected --> Draft: 수정
+    Retired --> [*]
+```
+
+`Ready`는 endpoint에 연결되고 승인된 schema로 smoke test를 통과했다는 runtime 상태다. `Published`는 특정 group의
+creator가 그 version을 새 Agent에 binding할 수 있다는 control-plane 상태다. 취약점이나 schema drift가 생기면
+새 binding만 막을지, 기존 Agent 호출까지 차단할지 위험도와 incident policy로 구분한다.
+
+## Credential과 policy는 세 방향이다
+
+| 경계 | 묻는 질문 | 강제 지점 |
+|---|---|---|
+| Agent → MCP | 이 Agent와 사용자가 이 tool/action을 호출해도 되는가 | tool gateway, allowlist, action policy |
+| platform/gateway → MCP | 호출 workload가 server에 인증됐는가 | mTLS·SPIFFE, OAuth client, IAM, API key provider |
+| MCP → 업무 system | server가 누구의 어떤 권한으로 data와 action에 접근하는가 | OBO/token exchange 또는 좁은 workload identity |
+
+공용 admin token 하나로 세 경계를 통과하지 않는다. read action이라도 사용자별 data scope가 필요하면 OBO를 쓰고,
+schedule처럼 사용자가 없는 작업은 별도 workload principal과 제한된 scope를 쓴다. credential 원문은 ToolVersion이나
+audit payload에 저장하지 않고 target별 secret store reference로 주입한다.
+
+## Adapter는 실행과 연결의 차이를 보존한다
+
+| target | server 실행 | Agent가 보는 연결 | provider reference 예 |
+|---|---|---|---|
+| kagent + kmcp | `MCPServer`가 container workload를 관리 | `MCPServer` 또는 기존 endpoint의 `RemoteMCPServer` | cluster·namespace·name·UID |
+| Dapr on Kubernetes | 일반 Deployment·Service를 platform adapter가 관리 | Dapr `MCPServer` resource가 transport·auth·middleware를 선언 | cluster·namespace·resource name |
+| AgentCore | AgentCore Runtime 또는 별도 승인 환경에서 실행 | Gateway의 MCP server target과 capability sync | Gateway·target ARN |
+
+provider resource가 곧 회사의 `Tool`은 아니다. 같은 ToolVersion을 다른 target에 배포하면 `ToolDeployment.providerRef`만
+달라진다. 반대로 remote endpoint만 등록한 경우 adapter는 server process를 rollback할 수 없으므로 capability에
+`managedRuntime: false`를 드러내고 connection 차단과 이전 endpoint mapping 복구까지만 약속한다.
+
+## 운영과 acceptance test
+
+Tool 운영 지표는 Agent 응답 성공률에 묻히지 않게 분리한다.
+
+- approval-to-ready와 discovery 성공률
+- tool별 호출 성공·거부·지연과 side-effect 실패
+- image·dependency 취약점, 인증서·credential 만료
+- schema hash·endpoint·provider resource drift
+- Agent·부서별 concurrency, CPU·memory와 외부 API quota
+
+첫 walking skeleton은 다음을 통과해야 한다.
+
+- 같은 idempotency key로 재배포해도 ToolDeployment가 중복되지 않는다.
+- unsigned image와 mutable tag, 허용되지 않은 remote destination이 거부된다.
+- discovery snapshot에 없던 tool과 입력 field가 신규 binding에 노출되지 않는다.
+- 허용 Agent의 read action은 성공하고 금지 Agent·금지 입력은 model 밖에서 거부된다.
+- egress policy가 private·link-local·미승인 업무 endpoint를 차단한다.
+- schema drift와 credential 만료가 owner alert와 publication policy를 실행한다.
+- suspend·retire 후 신규 binding과 실제 호출 차단 범위가 audit에 남는다.
+
+## 6장 요약
+
+- 사용자가 만든 MCP는 Agent 설정의 URL이 아니라 독립된 `Tool` lifecycle로 받는다.
+- 관리형 배포와 remote 연결은 같은 catalog를 쓰더라도 플랫폼 책임과 rollback 능력이 다르다.
+- source·image 검사와 runtime discovery를 함께 통과한 immutable ToolVersion만 공개한다.
+- ToolPublication, ToolBinding, 실제 action authorization을 서로 다른 상태와 권한으로 둔다.
+- 제품별 `MCPServer`·Gateway target은 교체 가능한 ToolDeployment provider reference다.
+
+## 참고 자료
+
+- [kmcp MCP server 배포](https://kagent.dev/docs/kmcp/deploy/server/) — image·package에서 `MCPServer`와 workload를 만드는 흐름.
+- [kmcp `MCPServer` API](https://kagent.dev/docs/kmcp/reference/api-ref/) — resource·security context·ServiceAccount·status 조건.
+- [Dapr `MCPServer` resource](https://docs.dapr.io/developing-ai/mcp/mcp-server-resource/) — transport·auth·middleware와 durable tool connection.
+- [Dapr MCP security](https://docs.dapr.io/developing-ai/mcp/mcp-security/) — workload identity·access policy와 남는 신뢰 경계.
+- [AgentCore Gateway MCP server target](https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/gateway-target-MCPservers.html) — capability sync와 outbound authorization.
+
+<LinkCard
+  title="7. kagent adapter"
+  description="제품 중립 Agent·Tool 계약을 Kubernetes-native resource로 번역하고 남는 빈칸을 확인한다."
+  href="/agent-platform/07-kagent/"
+/>

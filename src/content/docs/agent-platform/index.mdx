@@ -12,7 +12,7 @@ import DeckMap from '../../../components/docs/DeckMap.astro';
 부서와 개인별 권한을 판단하고, code와 tool을 검사하고, 승인된 version만 배포하며, 호출과 action을 감사해야 한다.
 kagent, Dapr Agents, Amazon Bedrock AgentCore는 이 중 **실행 상태를 만드는 부분**을 나눠 맡지만 전체 포털은 아니다.
 
-이 덱은 먼저 제품 밖에 `Agent`·`AgentVersion`·`Trigger`·`Grant`·`DeploymentTarget` 계약을 만든다. 그다음 같은 계약을
+이 덱은 먼저 제품 밖에 `Agent`·`AgentVersion`·`ToolVersion`·`Trigger`·`Grant`·`DeploymentTarget` 계약을 만든다. 그다음 같은 계약을
 온프렘 Kubernetes의 kagent·Dapr Agents와 AWS 관리형 AgentCore에 각각 번역한다. 목표는 세 target의 모든 기능을 똑같이 만드는
 것이 아니라, **Agent의 정체성과 권한을 유지한 채 실행 위치를 바꿀 수 있게 하는 것**이다.
 
@@ -24,7 +24,7 @@ flowchart LR
     IDP["Keycloak · Entra ID<br/>user · department"] --> PORTAL
     GIT["Git · CI<br/>test · scan · sign"] --> PORTAL
 
-    PORTAL --> CORE["제품 중립 계약<br/>Agent · Version · Grant · Deployment"]
+    PORTAL --> CORE["제품 중립 계약<br/>Agent · Tool · Version · Grant · Deployment"]
     CORE --> ADAPTER["Runtime Adapter<br/>validate · deploy · status · rollback"]
     ADAPTER --> KAG["온프렘<br/>kagent · Kubernetes"]
     ADAPTER --> DAPR["온프렘<br/>Dapr Agents · Workflow"]
@@ -63,17 +63,17 @@ flowchart LR
     { label: '2~4장', href: '/agent-platform/02-domain-model/', title: '제품 밖의 계약', tone: 'zone',
       desc: '분류 축 · Agent·Version·Trigger·Grant·Deployment · 등록부터 폐기까지 · invoke와 tool action 권한',
       note: '무엇을 회사가 소유해야 provider를 바꿔도 의미가 남는가' },
-    { label: '5장', href: '/agent-platform/05-adapter-contract/', title: 'Adapter contract', tone: 'ok',
-      desc: 'validate·plan·deploy·status·rollback과 capability profile',
-      note: '여러 backend의 차이를 숨기지 않으면서 호출부를 어떻게 안정시키는가' },
-    { label: '6~8장', href: '/agent-platform/06-kagent/', title: '세 실행 adapter', tone: 'warn',
+    { label: '5~6장', href: '/agent-platform/05-adapter-contract/', title: 'Adapter와 MCP 공급 계약', tone: 'ok',
+      desc: 'runtime adapter operation · capability profile · 사용자 MCP의 등록·검증·배포·공개',
+      note: '여러 backend의 차이를 보존하면서 Agent와 Tool의 공급 계약을 어떻게 안정시키는가' },
+    { label: '7~9장', href: '/agent-platform/07-kagent/', title: '세 실행 adapter', tone: 'warn',
       desc: 'Kubernetes-native control plane · durable workflow substrate · AWS managed session runtime',
       note: '각 제품이 공통 계약의 어디까지 맡고 무엇을 남기는가' },
-    { label: '9~10장', href: '/agent-platform/09-hybrid/', title: '하이브리드 운영', tone: 'bad',
+    { label: '10~11장', href: '/agent-platform/10-hybrid/', title: '하이브리드 운영', tone: 'bad',
       desc: 'data zone별 target 선택 · network · 감사 · SLO · 장애 격리와 복구',
       note: '온프렘과 AWS를 한 control plane에서 어떻게 운영하는가' },
-    { label: '11~12장', href: '/agent-platform/11-adoption/', title: '도입과 마무리', tone: 'mute',
-      desc: '두 Agent로 검증하는 PoC · 선택 기준 · production checklist' },
+    { label: '12~13장', href: '/agent-platform/12-adoption/', title: '도입과 마무리', tone: 'mute',
+      desc: '두 Agent와 사용자 MCP로 검증하는 PoC · 선택 기준 · production checklist' },
   ]}
 />
 

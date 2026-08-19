@@ -47,6 +47,10 @@ invoke가 함께 검증되지 않으면 사용자가 호출하게 하지 않는�
 제출하고 platform CI가 image를 만든다. production에서 사용자가 임의 registry URL이나 mutable tag를 직접
 입력하게 하지 않는다.
 
+사용자가 만든 MCP도 같은 제출·검사·승인 뼈대를 쓰되 AgentVersion에 종속시키지 않는다. MCP source·image 또는
+remote endpoint를 독립된 ToolVersion으로 받고, discovery schema와 tool publication을 추가로 검증한다. 구체적인
+분기는 [사용자 MCP를 플랫폼에 올리기](/agent-platform/06-user-mcp/)에서 다룬다.
+
 공통 제출물은 다음이다.
 
 - metadata와 owner

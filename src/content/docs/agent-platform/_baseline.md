@@ -4,7 +4,7 @@
 
 ## 이 덱의 한 문장
 
-사내 Agent 플랫폼의 오래가는 자산은 특정 runtime의 CRD나 API가 아니라 **Agent·Version·Trigger·Grant·Deployment의
+사내 Agent 플랫폼의 오래가는 자산은 특정 runtime의 CRD나 API가 아니라 **Agent·Tool·Version·Trigger·Grant·Deployment의
 제품 중립 계약**이다. kagent, Dapr Agents on Kubernetes, Amazon Bedrock AgentCore는 이 계약을 실행 상태로
 바꾸는 서로 다른 배포 어댑터다.
 
@@ -22,8 +22,9 @@
 
 ## 범위 경계
 
-- **다룬다:** 포털과 runtime의 경계, 제품 중립 domain model, Agent 분류 축과 trigger, 등록·승인·배포 lifecycle, 세 단계 권한,
-  adapter contract, kagent, Dapr Agents, AgentCore, hybrid target 선택, 운영·도입 검증.
+- **다룬다:** 포털과 runtime의 경계, 제품 중립 domain model, Agent 분류 축과 trigger, Agent·사용자 제작 MCP의
+  등록·승인·배포 lifecycle, 세 단계 권한, adapter contract, kagent, Dapr Agents, AgentCore, hybrid target 선택,
+  운영·도입 검증.
 - **다루지 않는다:** Agent framework 사용법, prompt engineering, 모델 학습·평가, GPU 모델 서빙 상세,
   MCP 서버 구현 튜토리얼, Kubernetes 설치, AWS 계정·VPC 구축 절차.
 - 모델 API 입구는 [LiteLLM 덱](/litellm/), LLM trace와 평가는 [Langfuse 덱](/langfuse/),

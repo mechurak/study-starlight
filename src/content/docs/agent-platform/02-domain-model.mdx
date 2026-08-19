@@ -29,16 +29,21 @@ flowchart LR
     VER --> DEP["Deployment<br/>version × target"]
     TARGET["DeploymentTarget<br/>zone · capabilities"] --> DEP
     DEP --> PREF["providerRef<br/>namespace/name 또는 ARN"]
-    VER --> TOOL["ToolBinding<br/>scope · auth mode"]
+    T["Tool<br/>정체성 · owner"] --> TV["ToolVersion<br/>artifact · schema"]
+    TV --> TDEP["ToolDeployment<br/>실행 또는 연결"]
+    TARGET --> TDEP
+    TDEP --> PREF
+    VER --> TOOL["ToolBinding<br/>allowlist · auth mode"]
+    TOOL --> TV
     PUB --> DEP
     TRG --> PUB
 
     classDef key fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
     classDef zone fill:#ede9fe,stroke:#7c3aed,color:#4c1d95
     classDef ok fill:#dcfce7,stroke:#16a34a,color:#14532d
-    class AG,VER key
+    class AG,VER,T,TV key
     class GRANT,PUB,TRG,TOOL zone
-    class DEP,TARGET,PREF ok
+    class DEP,TDEP,TARGET,PREF ok
 ```
 
 ## Agent를 하나의 enum으로 나누지 않는다
@@ -221,7 +226,9 @@ tool을 URL만으로 연결하면 실행 권한의 의미가 사라진다. bindi
 - 허용 data zone과 egress destination
 - human approval이 필요한 action
 
-실제 cluster Service URL이나 AgentCore Gateway target ARN은 environment별 provider mapping에 둔다.
+실제 cluster Service URL이나 AgentCore Gateway target ARN은 environment별 `ToolDeployment.providerRef`에 둔다.
+사용자가 만든 MCP는 `Tool`·`ToolVersion`·`ToolDeployment`로 먼저 등록·검증한 뒤 binding한다. 이 공급 lifecycle은
+[사용자 MCP를 플랫폼에 올리기](/agent-platform/06-user-mcp/)에서 이어서 설계한다.
 
 ## 식별자와 표시값을 분리한다
 
@@ -245,7 +252,7 @@ agentId · versionId · deploymentId · targetId · triggerId · principalId · 
 
 ## 2장 요약
 
-- Agent는 정체성, Version은 실행 가능한 불변 snapshot, Deployment는 target별 실행 결과다.
+- Agent와 Tool은 정체성, Version은 실행 가능한 불변 snapshot, Deployment는 target별 실행·연결 결과다.
 - 작성·활성화·상주·상태·격리·위험을 독립 축으로 두고, schedule과 event는 `Trigger`로 표현한다.
 - Grant와 Publication을 provider resource 밖에 두어 호출 권한과 공개 상태를 유지한다.
 - provider-specific ID·URL·secret은 공통 객체의 중심으로 들어오지 않는다.
