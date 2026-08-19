@@ -11,7 +11,7 @@
 - 운영체제별 준비가 끝난 뒤 명령이 같다면 공통 장으로 빼고, 준비 장에서 공통 장으로 연결한다.
 - 개별 덱: 필요한 CPU·메모리·디스크, 고정 버전, 적용할 매니페스트, 실습 시나리오만 설명
 
-다른 덱에서 Docker·kind·kubectl의 일반 준비법을 다시 길게 쓰지 않는다. 이 덱의 운영체제별 장을
+다른 덱에서 Docker·kind·kubectl·Helm의 일반 준비법을 다시 길게 쓰지 않는다. 이 덱의 준비 장을
 링크하고 그 실습에만 필요한 차이만 남긴다. Kubernetes가 아닌 실습 환경도 앞으로 이 덱에 추가한다.
 
 ## kind 환경의 기준과 안전 경계
@@ -27,9 +27,19 @@
   `docker system prune`, Colima 전체 삭제는 일반 cleanup으로 안내하지 않는다.
 - 일시 중단과 폐기를 구분한다. `kind delete cluster`는 클러스터 데이터가 필요 없을 때만 쓴다.
 
+## Helm CLI의 기준과 안전 경계
+
+**2026년 8월** 기준이며 2026-08-19에 Helm 공식 문서와 installer를 확인했다.
+
+- macOS는 Homebrew formula, Ubuntu는 Helm project의 `get-helm-4` installer를 기본 경로로 삼는다.
+- 원격 installer를 pipe로 바로 실행하지 않는다. 파일로 받은 뒤 내용을 확인하고 실행한다.
+- installer의 checksum 검증을 끄지 않는다. checksum 불일치는 우회하지 않고 중단한다.
+- Helm 명령에는 가능한 한 `--kube-context`를 붙여 대상 cluster를 고정한다.
+- Helm CLI 삭제와 cluster의 `helm uninstall`을 구분한다. 일반 cleanup에서 다른 release를 함께 지우지 않는다.
+
 ## 서술 규칙
 
 - 각 본문 장 첫머리에 `<TermIntro>`를 둔다.
 - 절차는 덱 전체에서 **운영체제별 준비 → 공통 생성 → 확인 → 사용 → 정리 → 정리 확인** 순서로 쓴다.
 - 복사해서 실행하는 명령은 대상을 이름으로 제한한다. 광범위한 삭제와 암묵적인 current context를 피한다.
-- 외부 설치 링크를 바꿀 때는 kind·Kubernetes·Docker·Colima 공식 문서의 anchor까지 다시 확인한다.
+- 외부 설치 링크를 바꿀 때는 kind·Kubernetes·Docker·Colima·Helm 공식 문서의 anchor까지 다시 확인한다.

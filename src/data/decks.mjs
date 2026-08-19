@@ -89,13 +89,18 @@ export const deckDefinitions = [
 		label: '실습 환경',
 		title: '실습 환경',
 		icon: 'setting',
-		aliases: ['Lab environment', '로컬 실습', '개발 환경 준비', 'kind 설치'],
-		description: '여러 덱에서 다시 쓰는 로컬 환경 준비와 정리 — 운영체제별 공식 설치 경로부터 cleanup까지.',
+		aliases: ['Lab environment', '로컬 실습', '개발 환경 준비', 'kind 설치', 'Helm 설치'],
+		description: '여러 덱에서 다시 쓰는 kind·kubectl·Helm 환경 준비와 정리 — 운영체제별 설치부터 cleanup까지.',
 		category: 'platform',
 		groups: [
 			[
 				'Kubernetes',
-				['lab-environment/01-kind-macos', 'lab-environment/02-kind-ubuntu', 'lab-environment/03-kind-common'],
+				[
+					'lab-environment/01-kind-macos',
+					'lab-environment/02-kind-ubuntu',
+					'lab-environment/03-kind-common',
+					'lab-environment/04-helm',
+				],
 			],
 		],
 	},

@@ -5,7 +5,7 @@ reviewedAt: 2026-08-19
 status: review
 ---
 
-import { LinkCard, Steps } from '@astrojs/starlight/components';
+import { LinkCard, Steps, Tabs, TabItem } from '@astrojs/starlight/components';
 import TermIntro from '../../../components/docs/TermIntro.astro';
 
 > 성공 조건은 dashboard가 한 번 열린 것이 아니라 **전용 context에서 CRD와 control plane이 준비된 상태**다
@@ -21,21 +21,77 @@ import TermIntro from '../../../components/docs/TermIntro.astro';
 ## 사전 준비
 
 Docker·kind·kubectl은 운영체제에 맞는 [macOS 준비](/lab-environment/01-kind-macos/) 또는
-[Ubuntu 준비](/lab-environment/02-kind-ubuntu/)를 먼저 따른다. 이 덱은 추가로 Helm과 kagent CLI가 필요하다.
-설치 명령은 복제하지 않고 각 공식 문서의 현재 절을 사용한다.
+[Ubuntu 준비](/lab-environment/02-kind-ubuntu/)를 먼저 따른다. 이어서 공통 도구인
+[Helm CLI](/lab-environment/04-helm/)를 준비한다. 이 장은 kagent 전용인 CLI 설치부터 맡는다.
 
 ```bash
 docker info
 kind version
 kubectl version --client
 helm version
-kagent version
 ```
 
 확인 당시 kagent 공식 설치 문서의 기본 CLI release는 `0.9.9`다. 출력이 다르면 실패는 아니지만 이 덱의
 CR 예시와 맞는지 [release notes](https://kagent.dev/docs/kagent/resources/release-notes)를 먼저 본다.
 
-## 설치하기
+## kagent CLI 설치
+
+<Tabs>
+<TabItem label="macOS — Homebrew">
+
+kagent 공식 설치 문서의 Homebrew 경로를 사용한다.
+
+```bash
+brew install kagent
+kagent version
+```
+
+이미 설치되어 있다면 다음 명령으로 갱신하고 version을 다시 확인한다.
+
+```bash
+brew upgrade kagent
+kagent version
+```
+
+</TabItem>
+<TabItem label="Ubuntu — 공식 installer">
+
+공식 `get-kagent` installer는 release binary와 SHA256을 함께 받아 검증한다. installer 자체도 먼저 파일로
+내려받아 download URL, checksum 검증, 설치 위치를 확인한 뒤 실행한다.
+
+```bash
+sudo apt-get update
+sudo apt-get install -y curl git jq openssl tar
+curl -fsSL -o /tmp/get-kagent \
+  https://raw.githubusercontent.com/kagent-dev/kagent/refs/heads/main/scripts/get-kagent
+```
+
+`/tmp/get-kagent`를 editor로 열어 내용을 검토한다. 기본 설치 위치는 `/usr/local/bin/kagent`이고 실행 중
+필요하면 `sudo`를 요청한다.
+
+```bash
+chmod 700 /tmp/get-kagent
+/tmp/get-kagent
+kagent version
+```
+
+설치가 끝나고 더 확인할 필요가 없을 때 installer만 지운다.
+
+```bash
+rm /tmp/get-kagent
+```
+
+관리자 권한 없이 `$HOME/bin`에 설치하려면 installer의 `--no-sudo` 옵션과 출력되는 `PATH` 안내를 따른다.
+
+</TabItem>
+</Tabs>
+
+:::caution[checksum 오류를 우회하지 않는다]
+installer가 release binary의 checksum 불일치로 중단되면 검증을 끄지 않는다. 내려받은 파일을 지우고 공식
+release와 네트워크 경로를 확인한 뒤 다시 시도한다.
+:::
+
+## 전용 cluster에 kagent 설치
 
 <Steps>
 
@@ -127,7 +183,8 @@ kubectl --context kind-kagent-lab -n kagent logs deployment/kagent-controller --
 ## 참고 자료
 
 - [kagent Quick Start](https://kagent.dev/docs/kagent/getting-started/quickstart) — prerequisite, demo profile, dashboard와 CLI
-- [kagent 설치](https://kagent.dev/docs/kagent/introduction/installation) — CLI·Helm 설치와 provider별 설정
+- [kagent 설치](https://kagent.dev/docs/kagent/introduction/installation) — kagent CLI·Helm 설치와 provider별 설정
+- [`get-kagent` installer](https://raw.githubusercontent.com/kagent-dev/kagent/refs/heads/main/scripts/get-kagent) — 지원 OS·architecture, checksum과 설치 위치
 - [kind Quick Start](https://kind.sigs.k8s.io/docs/user/quick-start/) — 이름 있는 cluster 생성·삭제
 
 <LinkCard
@@ -135,4 +192,3 @@ kubectl --context kind-kagent-lab -n kagent logs deployment/kagent-controller --
   description="미리 설치된 Agent를 dashboard와 CLI에서 호출하고 tool result를 확인한다."
   href="/kagent-lab/02-first-agent/"
 />
-

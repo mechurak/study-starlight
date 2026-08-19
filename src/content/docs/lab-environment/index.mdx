@@ -31,6 +31,9 @@ import DeckMap from '../../../components/docs/DeckMap.astro';
     { label: '2장', href: '/lab-environment/03-kind-common/', title: 'kind — 공통', tone: 'zone',
       desc: '클러스터 생성 · 확인 · 멀티노드 · 삭제 · 트러블슈팅',
       note: '준비한 환경에서 같은 방식으로 kind를 어떻게 사용하나' },
+    { label: '3장', href: '/lab-environment/04-helm/', title: 'Helm CLI 준비', tone: 'warn',
+      desc: 'macOS Homebrew · Ubuntu 공식 installer · version · context 연결',
+      note: '여러 Kubernetes 실습이 공유하는 chart client를 어떻게 준비하나' },
   ]}
 />
 
@@ -40,8 +43,9 @@ import DeckMap from '../../../components/docs/DeckMap.astro';
 [관측 8장](/observability/08-lab-setup/)에서 LGTM 스택과 계측 앱을 올린다. CKA에서 kind로
 연습할 수 있는 범위와 시험용 환경의 차이는 [CKA 0장](/cka/00-intro/)이 판단한다.
 
-kagent를 연습할 때도 이 덱에서 Docker·kind·kubectl을 준비한 뒤 [kagent 실습 0장](/kagent-lab/00-lab-map/)으로
-넘어간다. kagent 전용 cluster 이름·설치·Agent 시나리오·cleanup은 그 덱이 맡는다.
+kagent를 연습할 때도 이 덱에서 Docker·kind·kubectl과 [Helm CLI](/lab-environment/04-helm/)를 준비한 뒤
+[kagent 실습 1장](/kagent-lab/01-install/)으로 넘어간다. kagent CLI와 전용 cluster 이름·설치·Agent
+시나리오·cleanup은 그 덱이 맡는다.
 
 <LinkCard
   title="1-a. kind 준비 — macOS"

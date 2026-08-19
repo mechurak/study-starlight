@@ -1,0 +1,139 @@
+---
+title: "3. Helm CLI 준비"
+description: macOS와 Ubuntu에 Helm CLI를 설치하고 kind cluster 연결·version·기본 동작을 확인한다
+reviewedAt: 2026-08-19
+status: review
+---
+
+import { LinkCard, Tabs, TabItem } from '@astrojs/starlight/components';
+import TermIntro from '../../../components/docs/TermIntro.astro';
+
+> Helm은 별도 서버를 띄우는 제품이 아니라 **로컬에서 chart를 읽어 Kubernetes API에 release를 만드는 CLI**다
+
+<TermIntro
+  terms={[
+    ['chart', 'Helm Chart', '서로 관련된 Kubernetes manifest와 기본 설정·metadata를 배포 단위로 묶은 package다.'],
+    ['release', 'Helm Release', 'chart를 특정 cluster와 namespace에 실제로 설치한 instance와 revision 기록이다.'],
+    ['OCI registry', 'Open Container Initiative Registry', 'container image뿐 아니라 Helm chart도 저장하고 받는 registry 규약이다.'],
+  ]}
+/>
+
+Docker·kind·kubectl은 [운영체제별 kind 준비](/lab-environment/)에서 먼저 설치한다. Helm은 여러 기술 덱이
+chart 설치에 공통으로 쓰므로 개별 실습에서 반복하지 않고 이 장에서 한 번 준비한다.
+
+## 전체에서 Helm의 자리
+
+```text
+로컬 helm CLI ── chart + values ──▶ Kubernetes API ──▶ release resource
+```
+
+Helm CLI는 현재 `kubectl`과 같은 kubeconfig·context를 사용한다. 그래서 설치 확인은 `helm version`만으로
+끝나지 않는다. 명령을 실행할 cluster가 맞는지 먼저 확인해야 한다.
+
+## 설치하기
+
+<Tabs>
+<TabItem label="macOS — Homebrew">
+
+Helm 공식 설치 문서가 안내하는 Homebrew formula를 사용한다. 이 formula는 Helm project가 아니라 Homebrew
+community가 유지한다는 경계도 함께 기억한다.
+
+```bash
+brew install helm
+helm version
+```
+
+이미 설치되어 있다면 다음 명령으로 갱신하고 version을 다시 기록한다.
+
+```bash
+brew upgrade helm
+helm version
+```
+
+</TabItem>
+<TabItem label="Ubuntu — 공식 installer">
+
+Helm project의 installer를 파일로 내려받고 내용을 확인한 뒤 실행한다. 공식 문서의 pipe 축약형처럼 다운로드와
+실행을 한 줄로 합치지 않는다.
+
+```bash
+sudo apt-get update
+sudo apt-get install -y curl openssl tar
+curl -fsSL -o /tmp/get-helm-4 \
+  https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-4
+```
+
+`/tmp/get-helm-4`를 editor로 열어 download URL, checksum 검증, 설치 위치를 확인한다. 기본 설치 위치는
+`/usr/local/bin/helm`이고 필요하면 `sudo`를 요청한다.
+
+```bash
+chmod 700 /tmp/get-helm-4
+/tmp/get-helm-4
+helm version
+```
+
+설치가 끝나고 더 확인할 필요가 없을 때만 내려받은 installer를 지운다.
+
+```bash
+rm /tmp/get-helm-4
+```
+
+</TabItem>
+</Tabs>
+
+확인 당시 공식 installer 이름은 `get-helm-4`다. 오래된 글의 `get-helm-3`을 그대로 복사하지 말고 실행할
+시점에 [Helm 설치 문서](https://helm.sh/docs/intro/install/)의 현재 major와 installer 경로를 다시 확인한다.
+
+## kind cluster와 연결 확인
+
+Helm 자체 설치와 cluster 대상 확인을 분리한다. `study` cluster를 사용하는 경우 다음 순서로 본다.
+
+```bash
+kind get clusters
+kubectl config current-context
+kubectl --context kind-study get nodes
+helm --kube-context kind-study list --all-namespaces
+```
+
+마지막 명령이 빈 표를 보여도 정상이다. 아직 release가 없다는 뜻이지 Helm이 연결되지 않았다는 뜻이 아니다.
+TLS·인증·권한 오류가 나오면 Helm을 다시 설치하지 말고 같은 context의 `kubectl` 연결부터 고친다.
+
+## 설치와 release를 구분하기
+
+| 확인 | 의미 |
+|---|---|
+| `helm version` | host에 Helm CLI가 있고 실행된다 |
+| `helm --kube-context … list -A` | 지정한 cluster API에 접속하고 release를 읽을 수 있다 |
+| `helm install` | chart를 cluster에 새 release로 만든다 |
+| `helm upgrade` | 기존 release의 chart·values revision을 바꾼다 |
+| `helm uninstall` | 지정한 release resource를 cluster에서 제거한다 |
+
+Helm CLI를 host에서 지우는 것과 `helm uninstall`로 cluster release를 지우는 것은 전혀 다른 cleanup이다.
+
+## 안 될 때 먼저 볼 것
+
+| 증상 | 확인 |
+|---|---|
+| `helm: command not found` | 설치 위치가 `PATH`에 있는지, terminal을 다시 열었는지 |
+| installer가 checksum 단계에서 중단 | 검증을 끄지 말고 다운로드를 지운 뒤 네트워크·공식 release 상태 확인 |
+| cluster connection refused | `kubectl --context <이름> cluster-info`부터 확인 |
+| release list 권한 거부 | kubeconfig user와 해당 namespace의 Kubernetes RBAC 확인 |
+| 엉뚱한 cluster의 release가 보임 | 모든 실습 명령에 `--kube-context`를 명시 |
+
+## 업데이트할 때
+
+Helm major가 바뀌면 chart 호환성과 plugin을 확인한다. 무조건 최신으로 올리기 전에 해당 실습이 요구하는 Helm
+version과 [version skew 정책](https://helm.sh/docs/topics/version_skew/)을 확인하고 `helm version` 출력을 기록한다.
+
+## 참고 자료
+
+- [Helm 설치](https://helm.sh/docs/intro/install/) — 공식 binary·installer와 Homebrew·Apt 등 package manager 경로
+- [Helm Quickstart](https://helm.sh/docs/intro/quickstart/) — Kubernetes 연결 prerequisite와 첫 chart 실행
+- [Helm version skew](https://helm.sh/docs/topics/version_skew/) — Helm과 Kubernetes가 지원하는 version 관계
+
+<LinkCard
+  title="kagent 실습 — 전용 cluster와 설치"
+  description="Helm 준비가 끝났다면 kagent CLI를 설치하고 전용 kind cluster에 demo profile을 올린다."
+  href="/kagent-lab/01-install/"
+/>
+
