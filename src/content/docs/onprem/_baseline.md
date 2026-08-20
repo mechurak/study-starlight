@@ -44,7 +44,7 @@ Loki · Tempo · Velero · CNPG 백업이 전부 S3를 쓰고, Keycloak · Grafa
 
 ## 서술 규칙
 
-각 장 첫머리의 `<TermIntro>` 상자가 의무다 — 규칙은 CLAUDE.md "덱" 절.
+각 장 첫머리의 `<TermIntro>` 상자가 의무다 — 규칙은 AGENTS.md "덱" 절.
 
 - **Keycloak 자체는 [keycloak 덱](/keycloak/)이 맡는다.** 이 덱의 5장은 "플랫폼 도구 열 개에
   로그인을 어떻게 한 곳으로 모으나"까지만 쓰고, realm·mapper·토큰 수명은 링크로 넘긴다.

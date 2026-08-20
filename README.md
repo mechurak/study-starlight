@@ -18,7 +18,8 @@ src/content/docs/
 src/components/               # layout / docs / demos 역할별 컴포넌트
 src/styles/custom.css         # 폰트·본문 폭·검색 UI 전역 커스텀
 docs/                         # 작성·검증·배포·Starlight 운영 문서
-CLAUDE.md                     # 에이전트 작업 진입점
+AGENTS.md                     # 에이전트 작업 진입점 — 공유 정본
+CLAUDE.md                     # @AGENTS.md 한 줄 어댑터 (Claude Code용)
 ```
 
 어떤 덱이 있는지는 `src/data/decks.mjs` 또는 사이트 상단의 topic 전환 메뉴를 보면 된다.
@@ -52,15 +53,15 @@ pnpm preview
 2. `src/data/decks.mjs`에 덱 메타데이터와 사이드바 그룹·slug를 추가한다
 3. `pnpm check`로 manifest와 실제 파일이 맞는지 확인한다
 
-README나 CLAUDE.md는 고칠 필요가 없다 — 덱에 특별한 규칙·기준이 생기면
-그 덱 폴더에 `_baseline.md`를 만들어 적는다 ([CLAUDE.md](CLAUDE.md)의 "덱" 절 참고.
+README나 AGENTS.md는 고칠 필요가 없다 — 덱에 특별한 규칙·기준이 생기면
+그 덱 폴더에 `_baseline.md`를 만들어 적는다 ([AGENTS.md](AGENTS.md)의 "덱" 절 참고.
 `_`로 시작하는 파일이라 빌드에는 안 잡힌다).
 
 ## 더 읽을 것
 
 | 문서 | 내용 |
 |---|---|
-| [CLAUDE.md](CLAUDE.md) | 작업 진입점, 반드시 읽을 문서와 깨뜨리면 안 되는 설정 |
+| [AGENTS.md](AGENTS.md) | 작업 진입점, 반드시 읽을 문서와 깨뜨리면 안 되는 설정 — `CLAUDE.md`는 이 파일을 import하는 어댑터 |
 | [docs/content-authoring.md](docs/content-authoring.md) | 제목 계층, 프론트매터, 컴포넌트, Mermaid·D2 작성 규칙 |
 | [docs/verification.md](docs/verification.md) | 자동 검사와 변경별 브라우저 검증 |
 | [docs/starlight-changes.md](docs/starlight-changes.md) | 기본 Starlight에서 바꾼 것 전체 목록 — 업그레이드 전에 볼 것 |

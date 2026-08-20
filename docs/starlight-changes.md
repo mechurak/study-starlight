@@ -24,7 +24,7 @@
 | 한국어 단일 로케일 | `defaultLocale: 'root'` + `ko` | `astro.config.mjs` |
 
 다이어그램 통합 순서·topics slug처럼 "깨뜨리면 안 되는" 항목은
-[CLAUDE.md](../CLAUDE.md)에 있다. 아래는 그 밖의 항목.
+[AGENTS.md](../AGENTS.md)에 있다. 아래는 그 밖의 항목.
 
 ## 다이어그램과 이미지 확대
 

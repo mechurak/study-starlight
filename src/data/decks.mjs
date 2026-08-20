@@ -451,6 +451,19 @@ export const deckDefinitions = [
 			['BYO와 정리', ['kagent-lab/07-byo-agent', 'kagent-lab/08-cleanup']],
 		],
 	},
+	{
+		slug: 'coding-agents',
+		topicOrder: 21,
+		label: 'Claude Code · Codex',
+		title: 'Claude Code · Codex 실전',
+		icon: 'pencil',
+		aliases: ['코딩 에이전트', 'Coding Agents', 'AGENTS.md', 'CLAUDE.md'],
+		description: '두 코딩 에이전트를 같은 저장소에서 쓰는 법 — 지침 계층, 컨텍스트, 작업 요청과 검증 패턴.',
+		category: 'backend',
+		groups: [
+			['프로젝트 지침', ['coding-agents/00-project-instructions']],
+		],
+	},
 ];
 
 export const topics = [...deckDefinitions].sort((a, b) => a.topicOrder - b.topicOrder).map((deck) => ({
@@ -485,6 +498,7 @@ export const termIntroDeckSlugs = [
 	'litellm',
 	'langfuse',
 	'agent-platform',
+	'coding-agents',
 ];
 
 export const deckCatalogSections = categories.map((category) => ({

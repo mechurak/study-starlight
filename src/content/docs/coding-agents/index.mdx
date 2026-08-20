@@ -1,0 +1,48 @@
+---
+title: 개요
+description: Claude Code와 Codex를 같은 저장소에서 운영하는 지침·컨텍스트·작업·검증 패턴
+aliases: [코딩 에이전트, Coding Agents, AGENTS.md, CLAUDE.md]
+reviewedAt: 2026-08-20
+status: review
+---
+
+import { LinkCard, LinkButton } from '@astrojs/starlight/components';
+import DeckMap from '../../../components/docs/DeckMap.astro';
+
+> 도구를 잘 쓰는 비결을 거대한 프롬프트 하나로 만들지 않는다 — **항상 필요한 규칙, 필요할 때 읽을 문서, 자동으로 강제할 검사**를 나눈다
+
+Claude Code와 Codex는 같은 코드를 고치지만, 저장소 지침을 찾는 방식은 같지 않다. 이 차이를 모르고
+`AGENTS.md`와 `CLAUDE.md`에 같은 규칙을 복사하면 둘은 곧 어긋난다. 반대로 한 파일만 두면 어느 한쪽이
+하위 package 규칙을 놓칠 수 있다.
+
+이 덱은 그런 경계에서 출발한다. 첫 장에서는 monorepo까지 견디는 지침 계층을 만들고, 이후 실제로
+반복해서 쓸 만한 프롬프트·컨텍스트·검증 패턴을 한 장씩 보탠다.
+
+<LinkButton href="/coding-agents/00-project-instructions/" icon="right-arrow">첫 장부터 읽기</LinkButton>
+
+## 구성
+
+<DeckMap
+  steps={[
+    { label: '0장', href: '/coding-agents/00-project-instructions/', title: '프로젝트 지침', tone: 'key',
+      desc: '`AGENTS.md`를 공유 정본으로 두고 `CLAUDE.md`를 얇은 어댑터로 만드는 monorepo 구조',
+      note: '두 도구가 같은 규칙을 읽되, 서로 다른 하위 폴더 탐색 방식도 놓치지 않게 하려면' },
+  ]}
+/>
+
+## 이 덱의 기본 관점
+
+지침 파일은 설명서가 아니라 **작업 입구의 표지판**이다. 항상 알아야 할 행동 규칙과 정확한 명령만
+짧게 두고, 아키텍처와 긴 절차는 별도 문서로 연결한다. 반드시 지켜야 하는 포맷·검사·금지는 프롬프트에만
+기대지 않고 CI나 hook으로 옮긴다.
+
+이 원칙은 OpenAI가 실제 Codex 운영에서 `AGENTS.md`를 거대한 백과사전 대신 짧은 지도처럼 쓴다는
+[harness engineering 사례](https://openai.com/index/harness-engineering/)와, Claude Code가 `CLAUDE.md`를
+200줄 아래로 유지하고 세부 절차는 path-scoped rule이나 skill로 옮기라고 하는
+[Anthropic 공식 가이드](https://code.claude.com/docs/en/memory#write-effective-instructions)에 공통으로 나타난다.
+
+<LinkCard
+  title="0. AGENTS.md와 CLAUDE.md 함께 설계하기"
+  description="탐색 방식 비교, 권장 monorepo 구조, 루트·package 템플릿과 검증 체크리스트."
+  href="/coding-agents/00-project-instructions/"
+/>
