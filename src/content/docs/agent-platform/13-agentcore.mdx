@@ -1,14 +1,13 @@
 ---
 title: "13. AgentCore adapter"
 description: Amazon Bedrock AgentCore Runtime·Identity·Gateway·Policy·Registry의 역할과 사내 플랫폼 매핑
-reviewedAt: 2026-08-18
-status: review
+reviewedAt: 2026-08-21
 ---
 
 import { LinkCard } from '@astrojs/starlight/components';
 import TermIntro from '../../../components/docs/TermIntro.astro';
 
-> AgentCore는 AWS를 사내망의 확장으로 쓸 때 강한 managed runtime이지만 **온프렘에 설치되는 제품은 아니다**
+> 결론부터 — **AgentCore는 AWS를 사내망의 확장으로 쓸 때 강한 managed runtime이지만 온프렘에 설치되는 제품은 아니다**
 
 <TermIntro
   terms={[
@@ -105,7 +104,7 @@ managed 상주 축에 답하고, 작성 방식·활성화 축은 기록할 자�
 | `DeploymentTarget` | AWS account·region·VPC subnet·SG·execution role preset |
 | `Deployment` | Runtime version + endpoint |
 | `providerRef` | Runtime ARN, version, endpoint qualifier |
-| runtime identity | execution role와 AgentCore workload identity |
+| runtime identity | execution role과 AgentCore workload identity |
 | `ToolBinding` | Gateway target, credential provider, Policy association |
 
 adapter는 ECR push 자체보다 승인된 digest가 ARM64인지, target VPC가 필요한 endpoint를 갖는지, execution role이

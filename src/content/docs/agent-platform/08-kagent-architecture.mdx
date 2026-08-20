@@ -3,13 +3,12 @@ title: "8. kagent 아키텍처"
 description: controller·engine·CLI·dashboard가 나눠 맡는 자리와 Agent·SandboxAgent·AgentHarness 세 실행 형태를 사내 플랫폼 관점에서 읽는다
 aliases: [kagent architecture, kagent controller, kagent engine, ADK runtime]
 reviewedAt: 2026-08-21
-status: review
 ---
 
 import { LinkCard } from '@astrojs/starlight/components';
 import TermIntro from '../../../components/docs/TermIntro.astro';
 
-> kagent의 진실은 dashboard가 아니라 **Kubernetes API에 저장된 resource**다. dashboard·CLI·A2A는 같은 상태를 보는 서로 다른 입구다
+> 결론부터 — **kagent의 진실은 dashboard가 아니라 Kubernetes API에 저장된 resource다. dashboard·CLI·A2A는 같은 상태를 보는 서로 다른 입구다**
 
 <TermIntro
   terms={[

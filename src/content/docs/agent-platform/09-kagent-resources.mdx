@@ -3,13 +3,12 @@ title: "9. kagent의 Agent와 tool 리소스"
 description: Declarative Agent의 instruction·model·tool·skill부터 HITL·session·memory와 MCP tool 선언까지 CRD 필드 수준으로 읽는다
 aliases: [kagent Agent CRD, RemoteMCPServer, MCP Apps, kagent skills, kagent memory]
 reviewedAt: 2026-08-21
-status: review
 ---
 
 import { LinkCard } from '@astrojs/starlight/components';
 import TermIntro from '../../../components/docs/TermIntro.astro';
 
-> 사내 포털이 사용자에게 받을 입력의 목록은 결국 **`Agent` resource의 어느 필드를 열어 줄 것인가**로 정해진다
+> 결론부터 — **사내 포털이 사용자에게 받을 입력의 목록은 결국 `Agent` resource의 어느 필드를 열어 줄 것인가로 정해진다**
 
 <TermIntro
   terms={[
@@ -22,7 +21,7 @@ import TermIntro from '../../../components/docs/TermIntro.astro';
 
 8장에서 kagent의 구성 요소를 봤다면 이 장은 그 위에 올라가는 **resource의 내용물**이다. 사내 플랫폼 관점에서
 이 장을 읽는 목적은 하나다 — 사용자가 포털에서 Agent를 만들 때 우리가 폼으로 받아야 할 값과, 사용자에게
-절대 열면 안 되는 값을 구분하는 것이다. 그 구분은 [11장 사내 플랫폼이 소유할 필드](#사내-플랫폼이-소유할-필드와-막을-필드)에서
+절대 열면 안 되는 값을 구분하는 것이다. 그 구분은 이 장 끝의 [사내 플랫폼이 소유할 필드와 막을 필드](#사내-플랫폼이-소유할-필드와-막을-필드)에서
 정리하고, 실제 연결은 [10장](/agent-platform/10-kagent-integration/)에서 다룬다.
 
 ## Agent resource 한눈에 보기

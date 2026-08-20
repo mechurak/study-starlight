@@ -3,13 +3,12 @@ title: "11. kagent adapter 운영과 경계"
 description: 공통 배포 계약을 kagent resource에 매핑하고 capability·인가 빈칸·격리·공급망으로 남는 위험을 드러낸다
 aliases: [kagent adapter, kagent capability, kagent 격리, kagent 공급망]
 reviewedAt: 2026-08-21
-status: review
 ---
 
 import { LinkCard } from '@astrojs/starlight/components';
 import TermIntro from '../../../components/docs/TermIntro.astro';
 
-> kagent는 Kubernetes 안의 Agent lifecycle을 표준화하지만 **회사의 catalog와 entitlement를 소유하지 않는다**
+> 결론부터 — **kagent는 Kubernetes 안의 Agent lifecycle을 표준화하지만 회사의 catalog와 entitlement를 소유하지 않는다**
 
 <TermIntro
   terms={[
@@ -59,7 +58,7 @@ capabilities:
 
 ## 인증과 인가의 빈칸
 
-kagent v0.9은 oauth2-proxy 기반 OIDC 인증을 지원하지만 공식 release note는 **access control이 아직 구현되지
+kagent v0.9는 oauth2-proxy 기반 OIDC 인증을 지원하지만 공식 release note는 **access control이 아직 구현되지
 않았다**고 명시한다. 로그인한 사용자의 identity를 안다는 것과 Agent별 실행·수정 권한을 판단하는 것은 다르다.
 
 Kubernetes RBAC도 직접적인 답은 아니다. 이것은 creator나 controller가 Kubernetes API의 `Agent` resource를
