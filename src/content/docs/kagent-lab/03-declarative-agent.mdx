@@ -148,6 +148,16 @@ Agent spec에 delete tool 자체가 없다는 사실이다. 실제 Pod 수가 �
 | `toolNames` | server 전체가 아니라 조회 기능 둘만 허용 |
 | `status.conditions` | controller가 선언을 실제 상태로 바꾼 결과 |
 
+## 안 될 때 먼저 볼 것
+
+| 증상 | 확인 |
+|---|---|
+| `Accepted` wait가 timeout | `kubectl -n kagent describe agent lab-reader`의 conditions·Events — `modelConfig`·`mcpServer` 이름 오타 |
+| `Accepted=True`인데 `Ready` timeout | 생성된 Deployment와 Pod Events, image pull |
+| invoke가 connection refused | controller port-forward terminal이 살아 있는지 |
+| model authentication 오류 | 참조한 `ModelConfig`와 Secret — 1장에서 LiteLLM으로 바꿨다면 그 설정 그대로인지 |
+| 조회 tool이 실행되지 않음 | `toolNames` 철자와 `kagent-tool-server` 상태 |
+
 ## 완료 체크
 
 - `lab-reader`가 `Accepted=True`, `Ready=True`다.

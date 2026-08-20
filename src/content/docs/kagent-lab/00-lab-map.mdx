@@ -21,25 +21,71 @@ import TermIntro from '../../../components/docs/TermIntro.astro';
 
 ## 이번 실습의 작은 세계
 
-```mermaid
-flowchart LR
-    USER["사용자"] --> UI["dashboard"]
-    USER --> CLI["kagent CLI"]
-    USER --> A2A["A2A endpoint"]
-    UI --> CTRL["kagent controller"]
-    CLI --> CTRL
-    A2A --> CTRL
-    CTRL --> API["Kubernetes API<br/>Agent · ModelConfig · MCPServer"]
-    API --> POD["Agent workload"]
-    POD --> MODEL["model provider"]
-    POD --> TOOL["MCP tool server"]
+```d2 layout=elk title="dashboard·CLI·A2A 세 입구가 같은 kagent controller를 거쳐 Kubernetes API의 Agent·ModelConfig·MCPServer를 읽고, Agent workload가 model provider와 MCP tool server에 닿는 구조"
+direction: right
 
-    classDef key fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
-    classDef zone fill:#ede9fe,stroke:#7c3aed,color:#4c1d95
-    classDef ok fill:#dcfce7,stroke:#16a34a,color:#14532d
-    class USER,UI,CLI,A2A key
-    class CTRL,API zone
-    class POD,MODEL,TOOL ok
+classes: {
+  key: {
+    style: {
+      fill: "#dbeafe"
+      stroke: "#2563eb"
+      font-color: "#1e3a8a"
+    }
+  }
+  zone: {
+    style: {
+      fill: "#ede9fe"
+      stroke: "#7c3aed"
+      font-color: "#4c1d95"
+    }
+  }
+  ok: {
+    style: {
+      fill: "#dcfce7"
+      stroke: "#16a34a"
+      font-color: "#14532d"
+    }
+  }
+}
+
+user: "사용자" {
+  class: key
+}
+ui: "dashboard" {
+  class: key
+}
+cli: "kagent CLI" {
+  class: key
+}
+a2a: "A2A endpoint" {
+  class: key
+}
+ctrl: "kagent controller" {
+  class: zone
+}
+api: "Kubernetes API\nAgent · ModelConfig · MCPServer" {
+  class: zone
+}
+pod: "Agent workload" {
+  class: ok
+}
+model: "model provider" {
+  class: ok
+}
+tool: "MCP tool server" {
+  class: ok
+}
+
+user -> ui
+user -> cli
+user -> a2a
+ui -> ctrl
+cli -> ctrl
+a2a -> ctrl
+ctrl -> api
+api -> pod
+pod -> model
+pod -> tool
 ```
 
 dashboard·CLI·A2A는 입구가 셋일 뿐 같은 controller와 Agent 상태를 본다. Agent가 답하려면 resource가
@@ -82,6 +128,7 @@ OpenAI-compatible 사내 LiteLLM gateway를 연결해 resource와 호출 계약�
 | kagent namespace | `kagent` | 공식 quickstart 기본값과 일치 |
 | custom Agent | `lab-reader` | sample Agent와 구분 |
 | custom MCP server | `mcp-website-fetcher` | tool workload를 따로 추적 |
+| fetch Agent | `simple-fetch-agent` | 4장의 MCP 실습 Agent를 sample·`lab-reader`와 구분 |
 
 로컬 runtime에는 CPU 4개, 메모리 8 GiB, 디스크 여유 15 GiB 이상을 권장한다. 고정된 kagent 최소
 요구량이 아니라 kind node, controller·UI·DB, sample Agent와 tool image를 함께 띄우기 위한 **학습용

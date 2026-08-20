@@ -18,6 +18,10 @@ import TermIntro from '../../../components/docs/TermIntro.astro';
   ]}
 />
 
+1장에서 `default-model-config`를 [사내 LiteLLM으로 바꿨다면](/kagent-lab/01-install/#openai-대신-사내-litellm-연결하기)
+이 장의 첫 호출이 그 전환의 마지막 검증이다. tool 호출까지 성공해야 gateway 연결, model alias, upstream의
+tool calling 지원이 모두 확인된 것이다.
+
 ## 호출 전에 상태 보기
 
 dashboard를 열지 않은 terminal에서 sample Agent를 찾는다.
@@ -111,12 +115,15 @@ Agent가 “정상”이라고 말해도 실제 Pod 상태가 다르면 cluster�
 | model authentication 오류 | key 자체를 출력하지 말고 model config와 Secret 존재·controller log 확인 |
 | Kubernetes tool이 거부됨 | 선택한 tool 이름과 kagent tool server 상태·RBAC 확인 |
 | 답변과 실제 상태가 다름 | tool result와 `kubectl get`을 먼저 비교 |
+| LiteLLM 전환 뒤 호출이 `400` | model alias 뒤 upstream의 function/tool calling·`tool_choice: auto` 지원 |
+| LiteLLM 전환 뒤 연결 오류 | `default-model-config`의 `openAI.baseUrl` 오타와 gateway `/v1/models` 재확인 |
 
 ## 완료 체크
 
 - dashboard에서 tool arguments와 result를 펼쳐 봤다.
 - CLI에서 같은 Agent를 호출했다.
 - Agent 응답, tool result, Kubernetes 실제 상태를 서로 다른 증거로 구분한다.
+- LiteLLM으로 전환했다면 tool 호출 성공으로 1장에서 미룬 전환 검증을 끝냈다.
 
 ## 참고 자료
 

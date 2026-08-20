@@ -123,7 +123,8 @@ release와 네트워크 경로를 확인한 뒤 다시 시도한다.
 
    OpenAI 직접 연결은 `OPENAI_API_KEY`를 그대로 쓴다. LiteLLM 경로에서는 kagent installer의 provider 입력
    계약을 통과하도록 virtual key를 설치 순간에만 같은 이름으로 연결한다. 이것만으로 endpoint가 바뀌지는 않으며,
-   설치 뒤 `ModelConfig`의 `baseUrl`을 반드시 바꾼다.
+   설치 뒤 아래 [OpenAI 대신 사내 LiteLLM 연결하기](#openai-대신-사내-litellm-연결하기) 절에서
+   `ModelConfig`의 Secret 참조와 `baseUrl`을 반드시 바꾼다.
 
    ```bash
    if test -n "$LITELLM_API_KEY" && test -z "$OPENAI_API_KEY"; then
@@ -131,6 +132,9 @@ release와 네트워크 경로를 확인한 뒤 다시 시도한다.
    fi
    test -n "$OPENAI_API_KEY" && echo "OPENAI_API_KEY is set"
    ```
+
+   아무 key도 없다면 [0장의 비밀과 비용 경계](/kagent-lab/00-lab-map/#비밀과-비용-경계)로 돌아가
+   두 경로 중 하나를 먼저 준비한다.
 
 5. **학습용 demo profile을 설치한다**
 
@@ -187,6 +191,12 @@ kagent dashboard
 CLI가 port-forward를 열고 로컬 주소를 출력한다. 이 terminal을 유지한 채 dashboard에서 sample Agent와 tool
 목록을 둘러본다. 종료는 `Ctrl+C`다. 포트 번호를 외우지 말고 CLI가 이번 실행에 출력한 주소를 사용한다.
 
+:::caution[LiteLLM 경로라면 아직 질문을 보내지 않는다]
+이 시점의 `default-model-config`는 여전히 public OpenAI endpoint를 향한다. 설치 때 `OPENAI_API_KEY`로 연결한
+사내 virtual key가 gateway 밖으로 전송되지 않도록, 다음 절을 마치기 전에는 sample Agent에 질문을 보내지 말고
+목록만 둘러본다.
+:::
+
 ## OpenAI 대신 사내 LiteLLM 연결하기
 
 OpenAI API를 직접 쓸 수 없다면 2장의 첫 호출 전에 이 절을 수행한다. kagent에는 LiteLLM 전용 provider를
@@ -196,42 +206,98 @@ OpenAI API를 직접 쓸 수 없다면 2장의 첫 호출 전에 이 절을 수�
 sample/custom Agent → default-model-config → 사내 LiteLLM /v1 → 허용된 upstream model
 ```
 
-먼저 별도 Secret을 만든다. 같은 명령을 다시 실행해도 해당 key만 갱신되는 형태다.
-
-```bash
-test -n "$LITELLM_API_KEY" && \
-  test -n "$LITELLM_BASE_URL" && \
-  test -n "$LITELLM_MODEL" && \
-  echo "LiteLLM inputs are set"
-kubectl -n kagent create secret generic kagent-litellm \
-  --from-literal=LITELLM_API_KEY="$LITELLM_API_KEY" \
-  --dry-run=client -o yaml | kubectl apply -f -
-```
-
 이 kind 실습에서는 demo Agent들이 공유하는 `default-model-config`를 한 번 바꿔 모두 같은 gateway를 보게 한다.
-shell 변수에는 key가 아니라 URL과 공개 model alias만 들어간다.
 
-```bash
-kubectl -n kagent patch modelconfig default-model-config --type merge \
-  -p "{\"spec\":{\"apiKeySecret\":\"kagent-litellm\",\"apiKeySecretKey\":\"LITELLM_API_KEY\",\"provider\":\"OpenAI\",\"model\":\"${LITELLM_MODEL}\",\"openAI\":{\"baseUrl\":\"${LITELLM_BASE_URL}\"}}}"
-```
+<Steps>
 
-설정값과 영향받는 Agent를 확인한다. Secret 값은 출력하지 않는다.
+1. **0장에서 준비한 세 입력이 현재 shell에 있는지 확인한다**
 
-```bash
-kubectl -n kagent get modelconfig default-model-config \
-  -o jsonpath='{.spec.provider}{"\t"}{.spec.model}{"\t"}{.spec.openAI.baseUrl}{"\n"}'
-kubectl -n kagent get agents \
-  -o custom-columns='AGENT:.metadata.name,TYPE:.spec.type,MODEL_CONFIG:.spec.declarative.modelConfig'
-```
+   ```bash
+   test -n "$LITELLM_API_KEY" || echo "missing: LITELLM_API_KEY"
+   test -n "$LITELLM_BASE_URL" || echo "missing: LITELLM_BASE_URL"
+   test -n "$LITELLM_MODEL" || echo "missing: LITELLM_MODEL"
+   ```
 
-`default-model-config`를 참조한 Agent는 모두 같은 변경의 영향을 받는다. Pod와 Agent condition이 다시 안정되는지
-확인하고 2장에서 실제 tool 호출까지 수행해야 전환이 끝난다. LiteLLM의 model alias 뒤 upstream도 function/tool
+   아무것도 출력되지 않아야 한다. `missing`이 보이면
+   [0장의 비밀과 비용 경계](/kagent-lab/00-lab-map/#비밀과-비용-경계)로 돌아가 그 변수부터 다시 설정한다.
+   새 terminal에는 이전 shell의 변수가 전달되지 않았다는 점도 함께 확인한다.
+
+2. **kagent보다 먼저 gateway 자체를 확인한다**
+
+   ```bash
+   curl --fail --silent --show-error \
+     -H "Authorization: Bearer $LITELLM_API_KEY" \
+     "$LITELLM_BASE_URL/models" | grep -o '"id":"[^"]*"'
+   ```
+
+   목록에 `$LITELLM_MODEL`과 같은 이름이 있어야 한다. 여기서 실패하면 kagent 설정 문제가 아니라
+   URL·virtual key·network 문제이므로 gateway 쪽을 먼저 해결한다.
+
+3. **virtual key를 담는 별도 Secret을 만든다**
+
+   같은 명령을 다시 실행해도 해당 key만 갱신되는 형태다.
+
+   ```bash
+   kubectl -n kagent create secret generic kagent-litellm \
+     --from-literal=LITELLM_API_KEY="$LITELLM_API_KEY" \
+     --dry-run=client -o yaml | kubectl apply -f -
+   ```
+
+4. **바꾸기 전의 `default-model-config`를 먼저 읽는다**
+
+   ```bash
+   kubectl -n kagent get modelconfig default-model-config -o yaml
+   ```
+
+   Helm이 만든 기본값은 provider `OpenAI`, 공개 OpenAI model 이름, 설치 때 `OPENAI_API_KEY` 값으로 만든
+   Secret 참조다. `openAI.baseUrl`이 없으면 public endpoint를 뜻한다. 다음 patch는 이 중 provider 골격은
+   그대로 두고 Secret 참조·model·endpoint 세 값을 바꾼다.
+
+5. **Secret 참조·model·endpoint를 한 번에 바꾼다**
+
+   shell 변수에는 key가 아니라 URL과 공개 model alias만 들어간다.
+
+   ```bash
+   kubectl -n kagent patch modelconfig default-model-config --type merge \
+     -p "{\"spec\":{\"apiKeySecret\":\"kagent-litellm\",\"apiKeySecretKey\":\"LITELLM_API_KEY\",\"provider\":\"OpenAI\",\"model\":\"${LITELLM_MODEL}\",\"openAI\":{\"baseUrl\":\"${LITELLM_BASE_URL}\"}}}"
+   ```
+
+   | 필드 | 값 | 의미 |
+   |---|---|---|
+   | `provider` | `OpenAI` 유지 | LiteLLM 전용 provider가 없어 OpenAI-compatible 계약을 그대로 쓴다 |
+   | `apiKeySecret`·`apiKeySecretKey` | `kagent-litellm`의 `LITELLM_API_KEY` | Helm이 만든 Secret 대신 방금 만든 Secret을 참조한다 |
+   | `model` | LiteLLM 공개 alias | gateway가 허용한 upstream으로 routing되는 이름이다 |
+   | `openAI.baseUrl` | 사내 `/v1` 주소 | 요청이 public OpenAI가 아니라 gateway로 가게 하는 핵심이다 |
+
+6. **설정값과 영향받는 Agent를 확인한다**
+
+   Secret 값은 출력하지 않는다.
+
+   ```bash
+   kubectl -n kagent get modelconfig default-model-config \
+     -o jsonpath='{.spec.provider}{"\t"}{.spec.model}{"\t"}{.spec.openAI.baseUrl}{"\n"}'
+   kubectl -n kagent get agents \
+     -o custom-columns='AGENT:.metadata.name,TYPE:.spec.type,MODEL_CONFIG:.spec.declarative.modelConfig'
+   kubectl -n kagent get pods
+   ```
+
+   `default-model-config`를 참조한 Agent는 모두 같은 변경의 영향을 받는다. control plane과 Agent Pod가
+   `Running`·ready로 돌아오는지 본다.
+
+</Steps>
+
+여기까지가 이 절의 검증 범위다 — 설정값과 gateway 연결까지 확인했고, model 호출을 통한 최종 검증은
+[2장의 첫 호출](/kagent-lab/02-first-agent/)이 맡는다. LiteLLM의 model alias 뒤 upstream은 function/tool
 calling과 `tool_choice: auto`를 지원해야 한다. kagent는 사용자 tool을 하나도 넣지 않아도 built-in tool을 포함한
 요청을 보낼 수 있다.
 
+설치 단계에서 `OPENAI_API_KEY`로 연결한 alias는 installer 입력용이었을 뿐이고, 이제 kagent는 `kagent-litellm`
+Secret을 읽는다. 설치 때 그 값으로 만들어진 기존 Secret에는 virtual key 사본이 남아 있지만 참조가 끊긴
+상태이므로 실습에서는 그대로 두어도 된다. shell의 alias가 더 필요 없다면 `unset OPENAI_API_KEY`로 해제한다.
+
 ### UI에서 LiteLLM model 목록 가져오기
 
+위 CLI patch를 대신하거나 추가 `ModelConfig`를 만들 때 쓰는 선택 경로다.
 dashboard의 **Models → New Model**은 `ModelConfig` 생성 화면이다. **Custom parameters**는 첫 화면에 바로
 보이는 것이 아니라 provider와 model을 모두 선택한 뒤 나타난다. OpenAI provider에서는 그 안의 `baseUrl`에
 LiteLLM `/v1` 주소를 넣는다.
@@ -263,7 +329,7 @@ kubectl -n kagent get modelproviderconfig company-litellm -o yaml
 선택하면 **Custom parameters**가 나타난다. v0.9.9 UI에서는 discovery에 쓴 endpoint와 credential을 새
 `ModelConfig`에 자동 복사하지 않으므로 API key를 다시 입력하고 `baseUrl`도 명시한다.
 
-### private CA와 Helm drift 처리
+### private CA 처리
 
 사내 TLS가 public trust store에 없다면 검증을 끄지 말고 CA bundle Secret을 `ModelConfig.spec.tls`로 참조한다.
 
@@ -307,7 +373,8 @@ kubectl -n kagent logs deployment/kagent-controller --tail=100
 
 - `kubectl config current-context`가 `kind-kagent-lab`이다.
 - kagent CRD, control plane Pod, `default-model-config`를 확인했다.
-- LiteLLM을 선택했다면 `default-model-config`의 model·`baseUrl`과 참조 Agent를 확인했다.
+- LiteLLM을 선택했다면 gateway `/models` 응답에서 model alias를 봤고, `default-model-config`의
+  model·`baseUrl`과 참조 Agent를 확인했다.
 - `kagent`와 `kagent-crds`가 Helm release라는 것을 확인했다.
 - dashboard에서 sample Agent를 볼 수 있다.
 - cluster는 지우지 않는다. 다음 장에서 그대로 쓴다.

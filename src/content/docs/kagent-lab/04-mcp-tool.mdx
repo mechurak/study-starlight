@@ -20,20 +20,66 @@ import TermIntro from '../../../components/docs/TermIntro.astro';
 
 ## 이번 실습의 연결
 
-```mermaid
-flowchart LR
-    Q["웹 문서 내용을 읽어 줘"] --> AGENT["simple-fetch-agent"]
-    AGENT -->|"allowlist: fetch"| MCP["MCPServer<br/>mcp-website-fetcher"]
-    MCP --> PROC["uvx mcp-server-fetch"]
-    PROC --> WEB["요청한 HTTPS URL"]
-    WEB --> PROC --> MCP --> AGENT --> A["요약 응답"]
+```d2 layout=elk title="질문이 simple-fetch-agent와 allowlist의 fetch tool을 거쳐 MCPServer·uvx process·외부 HTTPS URL까지 갔다가 요약 응답으로 돌아오는 흐름"
+direction: right
 
-    classDef key fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
-    classDef zone fill:#ede9fe,stroke:#7c3aed,color:#4c1d95
-    classDef warn fill:#fef3c7,stroke:#d97706,color:#78350f
-    class Q,A key
-    class AGENT,MCP zone
-    class PROC,WEB warn
+classes: {
+  key: {
+    style: {
+      fill: "#dbeafe"
+      stroke: "#2563eb"
+      font-color: "#1e3a8a"
+    }
+  }
+  zone: {
+    style: {
+      fill: "#ede9fe"
+      stroke: "#7c3aed"
+      font-color: "#4c1d95"
+    }
+  }
+  warn: {
+    style: {
+      fill: "#fef3c7"
+      stroke: "#d97706"
+      font-color: "#78350f"
+    }
+  }
+}
+
+q: "웹 문서 내용을 읽어 줘" {
+  class: key
+}
+agent: "simple-fetch-agent" {
+  class: zone
+}
+mcp: "MCPServer\nmcp-website-fetcher" {
+  class: zone
+}
+proc: "uvx mcp-server-fetch" {
+  class: warn
+}
+web: "요청한 HTTPS URL" {
+  class: warn
+}
+answer: "요약 응답" {
+  class: key
+}
+
+q -> agent
+agent -> mcp: "allowlist: fetch"
+mcp -> proc
+proc -> web
+web -> proc: {
+  style.stroke-dash: 3
+}
+proc -> mcp: {
+  style.stroke-dash: 3
+}
+mcp -> agent: {
+  style.stroke-dash: 3
+}
+agent -> answer
 ```
 
 공식 입문 예제의 fetch server는 package를 받아 code로 실행하고 외부 URL에 접근한다. **격리된 전용 cluster에서
@@ -139,6 +185,16 @@ DNS·URL allowlist 같은 서버 측 통제가 필요하다. 이 실습에서는
 
 답변만 보고 4번부터 확인하면 tool이 실패했는데 model이 추측으로 답한 경우를 놓칠 수 있다.
 
+## 안 될 때 먼저 볼 것
+
+| 증상 | 확인 |
+|---|---|
+| MCP Pod가 ready가 아님 | Pod Events와 log — `uvx`의 package 다운로드는 외부 egress·프록시가 열려 있어야 한다 |
+| discovery에 `fetch`가 없음 | `MCPServer` status와 MCP Pod log |
+| Agent가 `Ready=False` | Agent conditions의 `mcpServer` 참조 이름·kind와 MCPServer 상태 |
+| fetch 호출이 실패 | tool result의 오류 메시지, 대상 URL 접근성, cluster egress |
+| 요약은 그럴듯한데 tool event가 없음 | dashboard의 tool arguments·result — model이 추측으로 답했는지 |
+
 ## 완료 체크
 
 - `MCPServer`와 생성된 workload를 연결해 봤다.
@@ -153,7 +209,7 @@ DNS·URL allowlist 같은 서버 측 통제가 필요하다. 이 실습에서는
 - [kagent tools ecosystem](https://kagent.dev/docs/kagent/resources/tools-ecosystem) — 기본 server와 tool catalog
 
 <LinkCard
-  title="5. 같은 Agent를 CLI와 A2A로 호출하기"
+  title="5. CLI와 A2A로 Agent 호출하기"
   description="호출 UI를 벗어나 Agent card와 protocol endpoint를 직접 확인한다."
   href="/kagent-lab/05-a2a-invoke/"
 />

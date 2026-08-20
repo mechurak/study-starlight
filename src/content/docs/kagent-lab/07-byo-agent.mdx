@@ -174,6 +174,16 @@ spec:
 kagent가 image를 실행해 주더라도 Agent logic·dependency·secret 사용·A2A implementation은 image 제작자의
 책임이다. 이것이 선언형에서 BYO로 넘어갈 때 넓어지는 신뢰 경계다.
 
+## 안 될 때 먼저 볼 것
+
+| 증상 | 확인 |
+|---|---|
+| `kagent init`이 실패 | CLI version과 지원 framework·language — `kagent init --help` |
+| `kagent build`가 실패 | Docker daemon 실행 여부, base image pull과 프록시·registry 접근 |
+| `kagent run`이 바로 종료 | container log — model key 환경 변수 누락, 로컬 포트 충돌 |
+| LiteLLM인데 요청이 public OpenAI로 나감 | `create_model()`의 `api_base`와 compose의 환경 변수 전달 |
+| LiteLLM 호출이 `400` | model alias 뒤 upstream의 function/tool calling 지원 |
+
 ## 완료 체크
 
 - generated project의 code·`kagent.yaml`·compose 역할을 구분한다.
