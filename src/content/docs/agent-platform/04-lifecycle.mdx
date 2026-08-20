@@ -1,5 +1,5 @@
 ---
-title: "3. 등록부터 폐기까지"
+title: "4. 등록부터 폐기까지"
 description: Agent version의 제출·검사·승인·배포·공개·중지·폐기를 하나의 lifecycle로 설계한다
 ---
 
@@ -49,7 +49,7 @@ invoke가 함께 검증되지 않으면 사용자가 호출하게 하지 않는�
 
 사용자가 만든 MCP도 같은 제출·검사·승인 뼈대를 쓰되 AgentVersion에 종속시키지 않는다. MCP source·image 또는
 remote endpoint를 독립된 ToolVersion으로 받고, discovery schema와 tool publication을 추가로 검증한다. 구체적인
-분기는 [사용자 MCP를 플랫폼에 올리기](/agent-platform/06-user-mcp/)에서 다룬다.
+분기는 [사용자 MCP를 플랫폼에 올리기](/agent-platform/07-user-mcp/)에서 다룬다.
 
 공통 제출물은 다음이다.
 
@@ -121,7 +121,7 @@ provider의 일시적 조회 실패를 `DELETED`로 오판하지 않도록 `UNKN
 
 owner 퇴사, 취약한 dependency, 오래 사용되지 않은 Agent, 만료된 data approval은 자동 review trigger다.
 
-## 3장 요약
+## 4장 요약
 
 - immutable artifact 하나를 검사하고 environment 사이에서 승격한다.
 - 구성형과 코드형은 자동 검사와 승인 강도가 다르다.
@@ -129,7 +129,7 @@ owner 퇴사, 취약한 dependency, 오래 사용되지 않은 Agent, 만료된 
 - rollback은 이전 publication pointer로 빠르게 돌아가는 동작이다.
 
 <LinkCard
-  title="4. 권한은 세 번 검사한다"
+  title="5. 권한은 세 번 검사한다"
   description="배포 관리, Agent 호출, tool action의 서로 다른 authorization 경계를 설계한다."
-  href="/agent-platform/04-authorization/"
+  href="/agent-platform/05-authorization/"
 />

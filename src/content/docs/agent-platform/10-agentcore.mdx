@@ -1,5 +1,5 @@
 ---
-title: "9. AgentCore adapter"
+title: "10. AgentCore adapter"
 description: Amazon Bedrock AgentCore Runtime·Identity·Gateway·Policy·Registry의 역할과 사내 플랫폼 매핑
 reviewedAt: 2026-08-18
 status: review
@@ -92,7 +92,7 @@ A2A, AG-UI contract를 지원하며 version과 endpoint를 관리한다. contain
 kagent의 `Agent.spec.type`이나 Dapr Agents의 클래스처럼 Agent 종류에 이름을 붙이는 API가 AgentCore에는
 없다. Runtime은 framework를 가리지 않고 container를 받고, 구분은 두 곳에서만 나타난다 — container가
 따르는 protocol contract와 session lifecycle이다. 즉 AgentCore는
-[domain model](/agent-platform/02-domain-model/#agent를-하나의-enum으로-나누지-않는다)의 격리(`MICROVM`)와
+[Agent 종류 분류](/agent-platform/02-agent-types/#여섯-개의-분류-축)의 격리(`MICROVM`)와
 managed 상주 축에 답하고, 작성 방식·활성화 축은 기록할 자리가 없으므로 platform domain model이 소유한다.
 구성형 Agent를 이 target에 두려면 adapter가 platform 공통 runtime image에 prompt·tool binding을 주입해
 코드형과 같은 container로 번역한다. 행위 위험 축은 Gateway의 Cedar Policy라는 별도 층이 맡는다.
@@ -159,7 +159,7 @@ AWS API·ECR·ARM64 contract 종속성을 받아들이기 어렵다.
 - [Agent Registry](https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/registry.html) — catalog와 Preview 상태.
 
 <LinkCard
-  title="10. 여러 target을 함께 운영하기"
+  title="11. 여러 target을 함께 운영하기"
   description="data zone과 capability로 placement를 결정하고 endpoint·identity·관측 계약은 하나로 유지한다."
-  href="/agent-platform/10-hybrid/"
+  href="/agent-platform/11-hybrid/"
 />

@@ -1,5 +1,5 @@
 ---
-title: "7. kagent adapter"
+title: "8. kagent adapter"
 description: kagent의 Agent CRD·BYO runtime·MCP·A2A를 공통 배포 계약에 매핑하고 권한 빈칸을 확인한다
 reviewedAt: 2026-08-18
 status: review
@@ -104,7 +104,7 @@ BYO image는 kagent가 기대하는 A2A endpoint를 구현해야 한다. 이미 
 승인된 Agent의 A2A endpoint를 호출하는 구성이 기본이다. 정말 process까지 매번 종료해야 한다면 Job 안에서
 Agent code를 직접 실행할 수 있지만, 이때는 kagent `Agent`의 Ready endpoint·session 관리 모델을 재사용하지
 못한다. 이 차이는
-[adapter contract의 capability profile](/agent-platform/05-adapter-contract/#capability로-차이를-드러낸다)에
+[adapter contract의 capability profile](/agent-platform/06-adapter-contract/#capability로-차이를-드러낸다)에
 숨기지 않고 드러낸다. kagent target이라면 다음처럼 답한다.
 
 ```yaml
@@ -116,8 +116,8 @@ capabilities:
   persistentFilesystem: agent-harness
 ```
 
-제품 중립 분류와 trigger 계약은 [제품 밖의 domain model](/agent-platform/02-domain-model/#agent를-하나의-enum으로-나누지-않는다)에서
-정의한다.
+제품 중립 분류는 [Agent 종류의 여섯 축](/agent-platform/02-agent-types/#여섯-개의-분류-축)에서,
+trigger 계약은 [제품 밖의 domain model](/agent-platform/03-domain-model/#trigger는-agent-process가-아니다)에서 정의한다.
 
 ## 공통 객체 매핑
 
@@ -188,7 +188,7 @@ session별 강한 격리를 빠르게 제공해야 한다. kagent가 Kubernetes 
 - [kagent 실습 덱](/kagent-lab/) — 전용 kind cluster에서 설치·Agent·MCP·A2A·debug·cleanup을 직접 확인.
 
 <LinkCard
-  title="8. Dapr Agents adapter"
+  title="9. Dapr Agents adapter"
   description="코드형 Agent의 workflow·state·tool 호출을 재시작 뒤에도 이어지는 실행 계약으로 번역한다."
-  href="/agent-platform/08-dapr-agents/"
+  href="/agent-platform/09-dapr-agents/"
 />

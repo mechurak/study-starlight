@@ -1,0 +1,217 @@
+---
+title: "3. 제품 밖의 domain model"
+description: Agent의 정체성·버전·trigger·권한·배포 객체를 kagent CRD와 AWS ARN 밖에 정의한다
+---
+
+import { LinkCard } from '@astrojs/starlight/components';
+import TermIntro from '../../../components/docs/TermIntro.astro';
+
+> `Agent`는 서비스의 정체성이고 `Deployment`는 그 정체성을 실행한 한 복사본이다
+
+<TermIntro
+  terms={[
+    ['aggregate', 'Domain Aggregate', '함께 일관성을 지켜야 하는 객체 묶음. 여기서는 Agent가 version·grant·publication의 기준점이다.'],
+    ['immutable version', 'Immutable Version', '한번 승인·배포되면 내용을 바꾸지 않는 snapshot. 변경은 다음 version으로 만든다.'],
+    ['providerRef', 'Provider Reference', 'kagent resource name이나 AgentCore ARN처럼 provider에서만 의미 있는 식별자다.'],
+    ['desired state', 'Desired State', 'control plane이 기대하는 배포 상태. adapter가 provider의 실제 상태를 이 값에 맞춘다.'],
+    ['trigger', 'Invocation Trigger', '사람의 요청·schedule·event처럼 Agent 실행을 시작시키는 계기와 실행 정책이다.'],
+  ]}
+/>
+
+## 객체 관계
+
+```d2 layout=elk pad=40 title="Agent와 Tool의 정체성에서 Version·Grant·Publication·Trigger를 거쳐 target별 Deployment와 providerRef로 이어지는 객체 관계"
+direction: right
+
+classes: {
+  key: {
+    style: {
+      fill: "#dbeafe"
+      stroke: "#2563eb"
+      font-color: "#1e3a8a"
+    }
+  }
+  zone: {
+    style: {
+      fill: "#ede9fe"
+      stroke: "#7c3aed"
+      font-color: "#4c1d95"
+    }
+  }
+  ok: {
+    style: {
+      fill: "#dcfce7"
+      stroke: "#16a34a"
+      font-color: "#14532d"
+    }
+  }
+}
+
+agent: "Agent\n정체성 · owner" { class: key }
+ver: "AgentVersion\nimmutable artifact" { class: key }
+tool: "Tool\n정체성 · owner" { class: key }
+toolver: "ToolVersion\nartifact · schema" { class: key }
+grant: "Grant\nprincipal · role" { class: zone }
+pub: "Publication\n공개 상태" { class: zone }
+trg: "Trigger\nrequest · schedule · event" { class: zone }
+binding: "ToolBinding\nallowlist · auth mode" { class: zone }
+target: "DeploymentTarget\nzone · capabilities" { class: ok }
+dep: "Deployment\nversion × target" { class: ok }
+tdep: "ToolDeployment\n실행 또는 연결" { class: ok }
+pref: "providerRef\nnamespace/name 또는 ARN" { class: ok }
+
+agent -> ver
+agent -> grant
+agent -> pub
+agent -> trg
+ver -> dep
+target -> dep
+dep -> pref
+tool -> toolver
+toolver -> tdep
+target -> tdep
+tdep -> pref
+ver -> binding
+binding -> toolver
+pub -> dep
+trg -> pub
+```
+
+이 객체들이 담을 내용 중 Agent의 종류 — 작성·활성화·상주·상태·격리·행위 위험의 여섯 축 — 는
+[2장](/agent-platform/02-agent-types/)에서 정의했다. 이 장은 그 축 값과 권한·배포 상태를
+**어느 객체에 담고 어떤 불변조건으로 지키는지**를 설계한다.
+
+## Agent와 AgentVersion
+
+`Agent`에는 바뀌어도 정체성이 유지되는 값을 둔다.
+
+- 회사 내 고유 `agentId`
+- 표시 이름, 설명, owner principal
+- 업무 data와 tool action 기준의 기본 risk tier
+- 업무 domain과 data classification
+- 생성·폐기 상태
+
+실행 결과를 바꿀 수 있는 값은 `AgentVersion`으로 내린다. 작성 방식, image digest, prompt bundle, model policy,
+tool binding, runtime contract와 resource hint가 여기에 포함된다. `latest` tag나 mutable Git branch를 승인된
+version의 근거로 쓰지 않는다.
+
+## Trigger는 Agent process가 아니다
+
+사람이 portal에서 누르는 invoke는 즉시 trigger이고, scheduler와 event bus는 비대화형 trigger다. trigger가
+실행됐다고 새 Agent process를 반드시 만드는 것은 아니다. placement policy가 상주 endpoint 호출, sandbox 복원,
+일회성 Job 생성 중 target이 지원하는 방식을 고른다.
+
+```yaml
+triggerId: trg_daily_finance
+agentId: agt_finance_report
+publication: production
+type: SCHEDULE
+schedule:
+  cron: "0 8 * * 1-5"
+  timezone: Asia/Seoul
+principalRef: svc_finance_reporter
+taskTemplate: "전 영업일 비용 보고서를 생성한다."
+concurrencyPolicy: FORBID
+timeout: 15m
+retry:
+  maxAttempts: 2
+```
+
+schedule에는 timezone, missed run 처리, 동시 실행 정책이 필요하다. event trigger에는 source, event schema,
+deduplication key와 acknowledgment policy가 필요하다. 둘 다 호출 사용자의 권한을 빌리지 않고 명시적인 service
+principal로 실행하며, 시작한 trigger ID를 trace와 audit event에 남긴다.
+
+## Grant와 Publication
+
+`Grant`는 `(agentId, principal, role)`의 관계다. role은 처음에는 세 개면 충분하다.
+
+| role | 허용할 대표 action |
+|---|---|
+| `INVOKER` | Agent 검색·호출, 자신의 conversation 조회 |
+| `EDITOR` | 새 version 작성·제출, metadata 변경 |
+| `OWNER` | grant 변경, owner 이전, 폐기 요청 |
+
+`Publication`은 배포와 다르다. runtime에 정상 배포됐어도 보안 승인과 smoke test가 끝나기 전에는 catalog에서
+호출 가능 상태가 아니다. 반대로 새 배포가 실패해도 이전 published version은 계속 서비스할 수 있어야 한다.
+
+## DeploymentTarget과 Deployment
+
+`DeploymentTarget`은 단순 provider 이름이 아니라 placement policy가 판단할 capability 묶음이다.
+
+```yaml
+id: onprem-restricted-a
+provider: kagent
+zone: restricted
+capabilities:
+  protocols: [a2a, mcp]
+  architectures: [amd64]
+  internetEgress: false
+  sessionIsolation: pod
+  localModelAccess: true
+```
+
+`Deployment`는 특정 version을 특정 target에 실행한 결과다. 여기에서만 provider 정보를 가진다.
+
+```yaml
+deploymentId: dep_01J...
+agentId: agt_finance_report
+versionId: ver_7
+targetId: onprem-restricted-a
+desiredState: RUNNING
+observedState: READY
+providerRef:
+  namespace: agent-finance
+  name: finance-report-v7
+endpointRef: ep_01J...
+```
+
+같은 version을 AgentCore에 배포하면 `providerRef`가 runtime ARN과 endpoint qualifier로 바뀔 뿐 `agentId`,
+`versionId`, `Grant`는 그대로다.
+
+## ToolBinding은 endpoint 목록이 아니다
+
+tool을 URL만으로 연결하면 실행 권한의 의미가 사라진다. binding에는 다음을 함께 둔다.
+
+- 논리적 `toolId`와 승인된 schema version
+- read·write·destructive risk
+- 필요한 OAuth scope 또는 workload permission
+- user delegation, service identity 중 어느 auth mode인지
+- 허용 data zone과 egress destination
+- human approval이 필요한 action
+
+실제 cluster Service URL이나 AgentCore Gateway target ARN은 environment별 `ToolDeployment.providerRef`에 둔다.
+사용자가 만든 MCP는 `Tool`·`ToolVersion`·`ToolDeployment`로 먼저 등록·검증한 뒤 binding한다. 이 공급 lifecycle은
+[사용자 MCP를 플랫폼에 올리기](/agent-platform/07-user-mcp/)에서 이어서 설계한다.
+
+## 식별자와 표시값을 분리한다
+
+이메일과 부서명은 바뀐다. ACL key는 IdP의 불변 `sub`·object ID를 사용하고 화면에 현재 email과 display name을
+붙인다. Agent 이름도 rename할 수 있으므로 URL과 audit event에는 `agentId`를 쓴다.
+
+모든 trace와 audit event에는 최소 다음 correlation field가 있어야 한다.
+
+```text
+agentId · versionId · deploymentId · targetId · triggerId · principalId · sessionId · traceId
+```
+
+## 지켜야 할 불변조건
+
+1. published version은 수정하지 않는다.
+2. 하나의 production publication은 하나의 active version을 가리킨다.
+3. provider resource를 삭제해도 Agent와 audit 기록은 삭제하지 않는다.
+4. owner가 사라지기 전에 group owner 또는 successor에게 이전한다.
+5. deployment `READY`와 publication `AVAILABLE`을 같은 상태로 취급하지 않는다.
+6. secret value를 version spec과 audit payload에 넣지 않는다.
+
+## 3장 요약
+
+- Agent와 Tool은 정체성, Version은 실행 가능한 불변 snapshot, Deployment는 target별 실행·연결 결과다.
+- [2장의 여섯 분류 축](/agent-platform/02-agent-types/)은 `AgentVersion`·`Trigger`·`DeploymentTarget`에 나눠 담고, schedule과 event는 `Trigger`로 표현한다.
+- Grant와 Publication을 provider resource 밖에 두어 호출 권한과 공개 상태를 유지한다.
+- provider-specific ID·URL·secret은 공통 객체의 중심으로 들어오지 않는다.
+
+<LinkCard
+  title="4. 등록부터 폐기까지"
+  description="version이 어떤 검사를 거쳐 배포·공개되고, 실패하면 어느 상태로 돌아가는지 잇는다."
+  href="/agent-platform/04-lifecycle/"
+/>

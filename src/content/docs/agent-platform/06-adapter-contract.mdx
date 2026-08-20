@@ -1,5 +1,5 @@
 ---
-title: "5. Adapter contract"
+title: "6. Adapter contract"
 description: validate·deploy·status·rollback과 capability profile로 runtime provider 경계를 고정한다
 ---
 
@@ -149,7 +149,7 @@ secret value를 adapter DB나 provider tag에 복제하지 않는다.
 - provider resource 수동 삭제 뒤 drift 감지
 - log와 trace에 공통 correlation field 존재
 
-## 5장 요약
+## 6장 요약
 
 - platform core와 provider SDK 사이에 배포와 호출 port를 둔다.
 - 공통 spec에는 의도, target에는 실제 인프라 mapping을 둔다.
@@ -157,7 +157,7 @@ secret value를 adapter DB나 provider tag에 복제하지 않는다.
 - adapter는 idempotency, eventual consistency, provider error 번역을 책임진다.
 
 <LinkCard
-  title="6. 사용자 MCP를 플랫폼에 올리기"
+  title="7. 사용자 MCP를 플랫폼에 올리기"
   description="사용자가 만든 MCP를 독립된 Tool lifecycle로 등록·검증·배포·공개한다."
-  href="/agent-platform/06-user-mcp/"
+  href="/agent-platform/07-user-mcp/"
 />

@@ -1,5 +1,5 @@
 ---
-title: "4. 권한은 세 번 검사한다"
+title: "5. 권한은 세 번 검사한다"
 description: control plane·Agent invocation·tool action 권한과 사용자 session 소유권을 분리한다
 ---
 
@@ -116,7 +116,7 @@ reference로 선언하고 target별 secret store에서 주입한다.
 
 민감한 prompt와 tool input은 원문 보존보다 분류·redaction·retention을 먼저 정한다.
 
-## 4장 요약
+## 5장 요약
 
 - 관리·호출·tool action 권한은 서로 다른 문이다.
 - email은 표시값이고 ACL key는 IdP의 불변 ID다.
@@ -124,7 +124,7 @@ reference로 선언하고 target별 secret store에서 주입한다.
 - Agent의 판단이 아니라 gateway의 deterministic policy가 업무 action을 허용한다.
 
 <LinkCard
-  title="5. Adapter contract"
+  title="6. Adapter contract"
   description="제품 중립 version과 target을 kagent·Dapr Agents·AgentCore의 실제 resource로 번역하는 최소 interface를 만든다."
-  href="/agent-platform/05-adapter-contract/"
+  href="/agent-platform/06-adapter-contract/"
 />

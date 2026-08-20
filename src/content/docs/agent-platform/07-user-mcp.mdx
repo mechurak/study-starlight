@@ -1,5 +1,5 @@
 ---
-title: "6. 사용자 MCP를 플랫폼에 올리기"
+title: "7. 사용자 MCP를 플랫폼에 올리기"
 description: 사용자가 만든 MCP server를 제품 중립 Tool lifecycle로 등록·검증·배포·공개하고 Agent binding과 분리한다
 reviewedAt: 2026-08-19
 status: review
@@ -200,7 +200,7 @@ Tool 운영 지표는 Agent 응답 성공률에 묻히지 않게 분리한다.
 - schema drift와 credential 만료가 owner alert와 publication policy를 실행한다.
 - suspend·retire 후 신규 binding과 실제 호출 차단 범위가 audit에 남는다.
 
-## 6장 요약
+## 7장 요약
 
 - 사용자가 만든 MCP는 Agent 설정의 URL이 아니라 독립된 `Tool` lifecycle로 받는다.
 - 관리형 배포와 remote 연결은 같은 catalog를 쓰더라도 플랫폼 책임과 rollback 능력이 다르다.
@@ -217,7 +217,7 @@ Tool 운영 지표는 Agent 응답 성공률에 묻히지 않게 분리한다.
 - [AgentCore Gateway MCP server target](https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/gateway-target-MCPservers.html) — capability sync와 outbound authorization.
 
 <LinkCard
-  title="7. kagent adapter"
+  title="8. kagent adapter"
   description="제품 중립 Agent·Tool 계약을 Kubernetes-native resource로 번역하고 남는 빈칸을 확인한다."
-  href="/agent-platform/07-kagent/"
+  href="/agent-platform/08-kagent/"
 />

@@ -1,5 +1,5 @@
 ---
-title: "11. 운영과 실패 경계"
+title: "12. 운영과 실패 경계"
 description: deployment·invocation·tool action을 공통 SLO와 audit로 관측하고 provider 장애를 격리한다
 ---
 
@@ -104,7 +104,7 @@ artifact registry와 Git이 있으면 deployment는 adapter로 재생성할 수 
 복구 순서는 `IdP/ACL → catalog DB → artifact/secret reference → adapter → runtime → route → synthetic test`다.
 memory와 conversation은 data 등급·RPO에 따라 별도 복구한다.
 
-## 11장 요약
+## 12장 요약
 
 - 배포·호출·action 경로의 SLO와 실패 소유자를 분리한다.
 - 공통 correlation field로 provider trace를 연결하고 audit 원장을 별도로 둔다.
@@ -112,7 +112,7 @@ memory와 conversation은 data 등급·RPO에 따라 별도 복구한다.
 - provider별 quota와 비용 단위는 보존하되 Agent별 budget은 공통 gateway에서 제한한다.
 
 <LinkCard
-  title="12. 두 Agent로 시작하기"
+  title="13. 두 Agent로 시작하기"
   description="기본 target 하나와 검증 Agent 두 개로 adapter·ACL·rollback의 가장 위험한 가정을 시험한다."
-  href="/agent-platform/12-adoption/"
+  href="/agent-platform/13-adoption/"
 />
