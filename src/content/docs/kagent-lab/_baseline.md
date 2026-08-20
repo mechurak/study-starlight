@@ -9,7 +9,7 @@
 
 ```text
 lab-environment: Docker · kind · kubectl · Helm 준비와 클러스터 일반 사용
-kagent-lab:      kagent CLI와 cluster 설치 · Agent 실행 · MCP · A2A · debug · cleanup
+kagent-lab:      kagent CLI와 cluster 설치 · Agent 실행 · MCP · A2A · debug · cleanup · 실행 기반 개념
 agent-platform:  사내 catalog · ACL · approval · runtime adapter 설계
 ```
 
@@ -27,8 +27,12 @@ Docker·kind·kubectl·Helm의 설치 명령은 복제하지 않는다. `lab-env
 - 실습 클러스터 이름은 `kagent-lab`, context는 `kind-kagent-lab`, namespace는 `kagent`로 고정한다.
 - 기본 모델 연결은 quickstart와 같은 OpenAI provider를 사용하되, OpenAI-compatible 사내 LiteLLM gateway를
   `openAI.baseUrl`로 연결하는 선택 경로도 1장에서 함께 검증한다.
+- 사내 LiteLLM gateway는 `http` endpoint를 전제한다. TLS·private CA 절차는 본문에 두지 않고 공식 BYO 문서로
+  연결한다. LiteLLM 경로에서는 UI model 목록을 위한 `ModelProviderConfig` discovery까지가 1장의 기본 절차다.
 - `kagent install`은 Helm CLI로 `kagent-crds`와 `kagent` release를 `upgrade --install`한다. `demo` profile은
   내장 values로 sample Agent와 tool을 추가한다.
+- 9장(Agent Harness·Agent Substrate)은 cluster가 필요 없는 개념 장이다. `SandboxAgent`·`AgentHarness`는
+  gVisor worker pool과 snapshot용 object storage가 전제라 이 kind 실습에서 실행하지 않는다.
 
 API가 alpha이고 설치 경로가 빠르게 바뀌므로 모든 본문 페이지는 `status: review`로 둔다. 명령·CRD schema를
 바꿀 때는 quickstart, API reference, release notes를 함께 다시 확인한다.
@@ -60,4 +64,5 @@ API가 alpha이고 설치 경로가 빠르게 바뀌므로 모든 본문 페이�
 5. 실패했을 때 먼저 볼 상태·condition·로그
 6. 다음 장에서 환경을 재사용할지, 지금 지울지
 
-UI 절차만 쓰지 않는다. 같은 결과를 Kubernetes resource나 CLI에서 확인하는 방법을 함께 둔다.
+1장에서 dashboard가 열린 뒤의 장은 가능한 한 실제 사용자 흐름대로 UI 절차를 우선 보여준다. 다만 UI 절차만 쓰지 않고,
+같은 결과를 Kubernetes resource나 CLI에서 확인하는 방법을 함께 둔다.

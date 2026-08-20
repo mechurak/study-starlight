@@ -1,6 +1,6 @@
 ---
 title: 개요
-description: 전용 kind 클러스터에서 kagent 설치부터 선언형 Agent·MCP·A2A·debug·BYO·cleanup까지 따라 하는 실습
+description: 전용 kind 클러스터에서 kagent 설치부터 Declarative Agent·MCP·A2A·debug·BYO·cleanup까지 따라 하는 실습
 ---
 
 import { LinkCard, LinkButton } from '@astrojs/starlight/components';
@@ -23,7 +23,7 @@ Docker·kind·kubectl의 일반 준비는 [실습 환경 덱](/lab-environment/)
 ```mermaid
 flowchart LR
     HOST["로컬 runtime<br/>Docker · kind"] --> INSTALL["kagent 설치<br/>demo profile"]
-    INSTALL --> AGENT["선언형 Agent<br/>model · prompt"]
+    INSTALL --> AGENT["Declarative Agent<br/>model · prompt"]
     AGENT --> MCP["MCP tool<br/>조회 · fetch"]
     MCP --> CALL["호출<br/>dashboard · CLI · A2A"]
     CALL --> DEBUG["관찰과 실패 진단<br/>condition · log"]
@@ -47,7 +47,7 @@ flowchart LR
     { label: '0~1장', href: '/kagent-lab/00-lab-map/', title: '경계 고정과 설치', tone: 'key',
       desc: 'Helm·kagent CLI · 전용 context · API key · demo profile · dashboard',
       note: '다른 cluster를 건드리지 않고 재현 가능한 시작점을 어떻게 만드나' },
-    { label: '2~3장', href: '/kagent-lab/02-first-agent/', title: '첫 호출과 선언형 Agent', tone: 'ok',
+    { label: '2~3장', href: '/kagent-lab/02-first-agent/', title: '첫 호출과 Declarative Agent', tone: 'ok',
       desc: 'sample Agent 관찰 · 조회 전용 custom Agent · model·prompt·tool의 연결',
       note: '응답 뒤에서 어떤 Kubernetes resource가 실제 상태를 만드는가' },
     { label: '4~5장', href: '/kagent-lab/04-mcp-tool/', title: 'MCP와 A2A', tone: 'zone',
@@ -58,7 +58,10 @@ flowchart LR
       note: '화면에 안 보이는 Agent를 어디서부터 추적하나' },
     { label: '7~8장', href: '/kagent-lab/07-byo-agent/', title: 'BYO 경계와 정리', tone: 'bad',
       desc: 'code형 Agent의 local loop · A2A image 계약 · resource와 cluster cleanup',
-      note: '선언형 설정을 넘어갈 때 책임이 어떻게 달라지고 무엇을 지워야 하나' },
+      note: 'Declarative 설정을 넘어갈 때 책임이 어떻게 달라지고 무엇을 지워야 하나' },
+    { label: '9장', href: '/kagent-lab/09-harness-substrate/', title: 'Agent Harness와 Agent Substrate', tone: 'mute',
+      desc: 'SandboxAgent · AgentHarness · worker pool과 snapshot — cluster 없이 읽는 개념 장',
+      note: '상주 Deployment로 부족해지는 순간 인프라는 무엇을 준비해야 하나' },
   ]}
 />
 
@@ -69,7 +72,7 @@ flowchart LR
 - 조회 전용 Agent가 실제 cluster resource를 MCP tool로 읽는다.
 - 같은 Agent의 card를 A2A endpoint에서 읽고 CLI로 호출한다.
 - 잘못된 `modelConfig`를 condition과 controller log로 설명한다.
-- 선언형 Agent와 BYO Agent의 책임 경계를 설명하고 전용 cluster를 삭제한다.
+- Declarative Agent와 BYO Agent의 책임 경계를 설명하고 전용 cluster를 삭제한다.
 
 <LinkCard
   title="0. 실습 지도와 안전 경계"

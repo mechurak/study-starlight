@@ -442,13 +442,14 @@ export const deckDefinitions = [
 		title: 'kagent 실습',
 		icon: 'pencil',
 		aliases: ['kagent lab', 'kagent hands-on', 'AI Agent Kubernetes 실습', 'kmcp 실습'],
-		description: '전용 kind 클러스터에서 설치부터 선언형 Agent·MCP·A2A·debug·BYO·cleanup까지 한 번에 따라 한다.',
+		description: '전용 kind 클러스터에서 설치부터 Declarative Agent·MCP·A2A·debug·BYO·cleanup까지 한 번에 따라 한다.',
 		category: 'platform',
 		groups: [
 			['준비와 설치', ['kagent-lab/00-lab-map', 'kagent-lab/01-install']],
 			['Agent와 tool', ['kagent-lab/02-first-agent', 'kagent-lab/03-declarative-agent', 'kagent-lab/04-mcp-tool']],
 			['호출과 진단', ['kagent-lab/05-a2a-invoke', 'kagent-lab/06-observe-debug']],
 			['BYO와 정리', ['kagent-lab/07-byo-agent', 'kagent-lab/08-cleanup']],
+			['더 나아가기', ['kagent-lab/09-harness-substrate']],
 		],
 	},
 	{
