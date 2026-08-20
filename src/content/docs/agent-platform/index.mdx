@@ -12,46 +12,87 @@ import DeckMap from '../../../components/docs/DeckMap.astro';
 부서와 개인별 권한을 판단하고, code와 tool을 검사하고, 승인된 version만 배포하며, 호출과 action을 감사해야 한다.
 kagent, Dapr Agents, Amazon Bedrock AgentCore는 이 중 **실행 상태를 만드는 부분**을 나눠 맡지만 전체 포털은 아니다.
 
-이 덱은 먼저 제품 밖에 `Agent`·`AgentVersion`·`ToolVersion`·`Trigger`·`Grant`·`DeploymentTarget` 계약을 만든다. 그다음 같은 계약을
+이 덱은 먼저 특정 runtime 제품에 속하지 않는 `Agent`·`Tool`·`Version`·`Trigger`·`Grant`·`Deployment` 계약을 만든다
+(객체별 정확한 분해는 [3장 domain model](/agent-platform/03-domain-model/)에 있다). 그다음 같은 계약을
 온프렘 Kubernetes의 kagent·Dapr Agents와 AWS 관리형 AgentCore에 각각 번역한다. 목표는 세 target의 모든 기능을 똑같이 만드는
 것이 아니라, **Agent의 정체성과 권한을 유지한 채 실행 위치를 바꿀 수 있게 하는 것**이다.
 
 ## 전체 지도
 
-```mermaid
-flowchart LR
-    USER["임직원<br/>creator · consumer"] --> PORTAL["사내 Agent Portal<br/>catalog · ACL · approval"]
-    IDP["Keycloak · Entra ID<br/>user · department"] --> PORTAL
-    GIT["Git · CI<br/>test · scan · sign"] --> PORTAL
+```d2 layout=elk pad=40 title="임직원의 배포 흐름은 portal과 제품 중립 계약을 거쳐 adapter가 세 runtime에 번역하고, 요청 흐름은 gateway의 authorization을 거쳐 runtime과 승인된 tool에 닿는 전체 구조"
+direction: right
 
-    PORTAL --> CORE["제품 중립 계약<br/>Agent · Tool · Version · Grant · Deployment"]
-    CORE --> ADAPTER["Runtime Adapter<br/>validate · deploy · status · rollback"]
-    ADAPTER --> KAG["온프렘<br/>kagent · Kubernetes"]
-    ADAPTER --> DAPR["온프렘<br/>Dapr Agents · Workflow"]
-    ADAPTER --> AWS["AWS<br/>AgentCore Runtime"]
+classes: {
+  key: {
+    style: {
+      fill: "#dbeafe"
+      stroke: "#2563eb"
+      font-color: "#1e3a8a"
+    }
+  }
+  zone: {
+    style: {
+      fill: "#ede9fe"
+      stroke: "#7c3aed"
+      font-color: "#4c1d95"
+    }
+  }
+  ok: {
+    style: {
+      fill: "#dcfce7"
+      stroke: "#16a34a"
+      font-color: "#14532d"
+    }
+  }
+  warn: {
+    style: {
+      fill: "#fef3c7"
+      stroke: "#d97706"
+      font-color: "#78350f"
+    }
+  }
+}
 
-    USER -->|"invoke"| EDGE["Portal API · Gateway<br/>authorization"]
-    EDGE --> KAG
-    EDGE --> DAPR
-    EDGE --> AWS
-    KAG --> TOOL["승인된 MCP · 사내 API"]
-    DAPR --> TOOL
-    AWS --> TOOL
+user: "임직원\ncreator · consumer" { class: key }
+idp: "Keycloak · Entra ID\nuser · department" { class: key }
+git: "Git · CI\ntest · scan · sign" { class: key }
+portal: "사내 Agent Portal\ncatalog · ACL · approval" { class: zone }
+core: "제품 중립 계약\nAgent · Tool · Version · Grant · Deployment" { class: zone }
+adapter: "Runtime Adapter\nvalidate · deploy · status · rollback" { class: ok }
+gw: "Portal API · Gateway\nauthorization" { class: key }
 
-    classDef key fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
-    classDef zone fill:#ede9fe,stroke:#7c3aed,color:#4c1d95
-    classDef ok fill:#dcfce7,stroke:#16a34a,color:#14532d
-    classDef warn fill:#fef3c7,stroke:#d97706,color:#78350f
-    class USER,IDP,GIT,EDGE key
-    class PORTAL,CORE zone
-    class ADAPTER,KAG,DAPR,AWS ok
-    class TOOL warn
+runtimes: "Runtime target" {
+  kag: "온프렘\nkagent · Kubernetes" { class: ok }
+  dapr: "온프렘\nDapr Agents · Workflow" { class: ok }
+  aws: "AWS\nAgentCore Runtime" { class: ok }
+}
+
+tool: "승인된 MCP · 사내 API" { class: warn }
+
+user -> portal: "만들고 공유한다"
+idp -> portal
+git -> portal
+portal -> core
+core -> adapter
+adapter -> runtimes: "배포 번역"
+
+user -> gw: "invoke"
+gw -> runtimes: "승인된 endpoint 호출"
+runtimes -> tool: "tool action"
 ```
 
-위쪽의 배포 흐름은 `Git → Portal → Adapter → Runtime`이다. 아래쪽의 요청 흐름은
-`사용자 → Gateway → Runtime → Tool`이다. 둘은 같은 Agent ID를 쓰지만 권한과 실패 방식이 다르다.
+배포 흐름은 `임직원 → Portal → 제품 중립 계약 → Adapter → Runtime`이고, 요청 흐름은
+`임직원 → Gateway → Runtime → Tool`이다. 둘은 같은 Agent ID를 쓰지만 권한과 실패 방식이 다르다.
+Runtime target 상자로 드나드는 화살표는 상자 전체에 걸린다 — 어느 runtime을 고르든
+배포·호출·tool의 계약이 같다는 뜻이고, 그래서 target 선택을 나중에 바꿀 수 있다.
 
 <LinkButton href="/agent-platform/00-position/" icon="right-arrow">첫 장부터 읽기</LinkButton>
+
+:::tip[runtime 마련이 당장의 관심사라면]
+어느 runtime을 어떻게 마련할지가 급하면 [8~10장 세 실행 adapter](/agent-platform/08-kagent/)와
+[11장 하이브리드 target 선택](/agent-platform/11-hybrid/)부터 읽어도 된다. 다만 그 선택을 나중에
+되돌릴 수 있게 만드는 근거가 제품 중립 계약이므로, [0장](/agent-platform/00-position/) 하나는 먼저 읽는다.
+:::
 
 ## 구성
 

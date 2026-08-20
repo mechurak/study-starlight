@@ -18,56 +18,80 @@ import TermIntro from '../../../components/docs/TermIntro.astro';
 
 ## 네 plane의 전체 지도
 
-```mermaid
-flowchart TB
-    subgraph exp["Experience plane"]
-        CREATOR["Creator Portal"]
-        MARKET["Catalog · Chat · API"]
-    end
-    subgraph ctrl["Control plane"]
-        CATALOG["Agent · Version · Grant DB"]
-        POLICY["Approval · Placement Policy"]
-        RECON["Deployment Reconciler"]
-    end
-    subgraph run["Runtime plane"]
-        KAG["kagent · Kubernetes"]
-        DAPR["Dapr Agents · Workflow"]
-        ACR["AgentCore Runtime"]
-    end
-    subgraph base["Foundation plane"]
-        IDP["Keycloak · Entra"]
-        MODEL["LiteLLM · Model Serving"]
-        TOOLS["MCP · Internal API"]
-        OBS["OTel · Langfuse · SIEM"]
-    end
+```d2 layout=elk pad=40 title="experience·control·runtime·foundation 네 plane이 위에서 아래로 쌓이고, 사람의 요청은 control의 catalog를 거쳐 runtime으로 내려가며, 세 runtime이 foundation의 identity·모델·tool·관측을 공유하는 지도"
+direction: down
 
-    CREATOR --> CATALOG
-    MARKET --> CATALOG
-    CATALOG --> POLICY --> RECON
-    RECON --> KAG
-    RECON --> DAPR
-    RECON --> ACR
-    IDP --> CREATOR
-    IDP --> MARKET
-    KAG --> MODEL
-    DAPR --> MODEL
-    ACR --> MODEL
-    KAG --> TOOLS
-    DAPR --> TOOLS
-    ACR --> TOOLS
-    KAG --> OBS
-    DAPR --> OBS
-    ACR --> OBS
+classes: {
+  key: {
+    style: {
+      fill: "#dbeafe"
+      stroke: "#2563eb"
+      font-color: "#1e3a8a"
+    }
+  }
+  zone: {
+    style: {
+      fill: "#ede9fe"
+      stroke: "#7c3aed"
+      font-color: "#4c1d95"
+    }
+  }
+  ok: {
+    style: {
+      fill: "#dcfce7"
+      stroke: "#16a34a"
+      font-color: "#14532d"
+    }
+  }
+  warn: {
+    style: {
+      fill: "#fef3c7"
+      stroke: "#d97706"
+      font-color: "#78350f"
+    }
+  }
+}
 
-    classDef key fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
-    classDef zone fill:#ede9fe,stroke:#7c3aed,color:#4c1d95
-    classDef ok fill:#dcfce7,stroke:#16a34a,color:#14532d
-    classDef warn fill:#fef3c7,stroke:#d97706,color:#78350f
-    class CREATOR,MARKET key
-    class CATALOG,POLICY,RECON zone
-    class KAG,DAPR,ACR ok
-    class IDP,MODEL,TOOLS,OBS warn
+exp: "Experience plane — 사람이 보는 경험" {
+  creator: "Creator Portal" { class: key }
+  market: "Catalog · Chat · API" { class: key }
+}
+
+ctrl: "Control plane — 회사 의미의 단일 원본" {
+  catalog: "Agent · Version · Grant DB" { class: zone }
+  policy: "Approval · Placement Policy" { class: zone }
+  recon: "Deployment Reconciler" { class: zone }
+  catalog -> policy -> recon
+}
+
+run: "Runtime plane — 실행 backend" {
+  kag: "kagent · Kubernetes" { class: ok }
+  dapr: "Dapr Agents · Workflow" { class: ok }
+  acr: "AgentCore Runtime" { class: ok }
+}
+
+base: "Foundation plane — 모든 runtime이 공유" {
+  idp: "Keycloak · Entra" { class: warn }
+  model: "LiteLLM · Model Serving" { class: warn }
+  tools: "MCP · Internal API" { class: warn }
+  obs: "OTel · Langfuse · SIEM" { class: warn }
+}
+
+exp.creator -> ctrl.catalog: "등록 · version 제출"
+exp.market -> ctrl.catalog: "검색 · 호출"
+ctrl.recon -> run.kag
+ctrl.recon -> run.dapr
+ctrl.recon -> run.acr
+exp -> base.idp: "로그인 · group claim"
+run -> base.model: "모델 호출"
+run -> base.tools: "tool action"
+run -> base.obs: "trace · log"
 ```
+
+읽는 법은 두 가지다. 위에서 아래로는 **사람의 의도가 실행이 되는 경로**다 — 모든 진입이 control plane의
+catalog를 거친 뒤에야 runtime에 닿는다. 모델·tool·관측으로 가는 화살표는 개별 runtime이 아니라
+**Runtime plane 상자 전체에서 나간다** — 어느 runtime을 고르든 같은 foundation 계약을 쓴다는 뜻이다.
+그래서 runtime 하나를 바꿔도 그 위(경험과 회사 의미)와 아래(공통 기반)는 그대로 남는다.
 
 ## Experience plane — 사람이 보는 약속
 
@@ -119,27 +143,33 @@ microVM과 version endpoint를 맡는다. 공통 interface는 같아도 lifecycl
 
 ## 배포 흐름과 요청 흐름
 
-```mermaid
-sequenceDiagram
-    actor Dev as Creator
-    participant P as Portal
-    participant CI as CI · Review
-    participant A as Adapter
-    participant R as Runtime
-    actor User as Consumer
+```d2 pad=40 title="creator가 version을 제출해 CI와 adapter를 거쳐 배포되는 흐름과, consumer가 grant 검사를 거쳐 호출하는 흐름이 같은 portal을 지나지만 서로 다른 principal로 분리되는 시퀀스"
+shape: sequence_diagram
 
-    Dev->>P: 새 version 제출
-    P->>CI: build · test · scan · sign
-    CI-->>P: 승인 가능한 artifact
-    P->>A: Deploy(version, target)
-    A->>R: provider resource 생성·갱신
-    R-->>A: providerRef · endpoint · status
-    A-->>P: normalized Deployment
-    P-->>Dev: published
-    User->>P: Invoke(agentId, sessionId)
-    P->>P: Grant와 session ownership 검사
-    P->>R: provider endpoint 호출
-    R-->>User: stream response
+dev: Creator
+portal: Portal
+ci: "CI · Review"
+adapter: Adapter
+runtime: Runtime
+consumer: Consumer
+
+배포 흐름 — creator의 권한: {
+  dev -> portal: "새 version 제출"
+  portal -> ci: "build · test · scan · sign"
+  ci -> portal: "승인 가능한 artifact" { style.stroke-dash: 3 }
+  portal -> adapter: "Deploy(version, target)"
+  adapter -> runtime: "provider resource 생성·갱신"
+  runtime -> adapter: "providerRef · endpoint · status" { style.stroke-dash: 3 }
+  adapter -> portal: "normalized Deployment" { style.stroke-dash: 3 }
+  portal -> dev: "published" { style.stroke-dash: 3 }
+}
+
+요청 흐름 — consumer의 권한: {
+  consumer -> portal: "Invoke(agentId, sessionId)"
+  portal -> portal: "Grant와 session ownership 검사"
+  portal -> runtime: "provider endpoint 호출"
+  runtime -> consumer: "stream response" { style.stroke-dash: 3 }
+}
 ```
 
 배포 권한이 있는 creator와 invoke 권한이 있는 consumer는 다른 principal이다. 운영자는 provider resource를
