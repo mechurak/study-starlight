@@ -184,12 +184,34 @@ controller와 UI가 떠도 model credential이 잘못됐거나 tool server가 �
 
 ## dashboard 열기
 
+<Tabs syncKey="operating-system">
+<TabItem label="macOS">
+
 ```bash
 kagent dashboard
 ```
 
-CLI가 port-forward를 열고 로컬 주소를 출력한다. 이 terminal을 유지한 채 dashboard에서 sample Agent와 tool
-목록을 둘러본다. 종료는 `Ctrl+C`다. 포트 번호를 외우지 말고 CLI가 이번 실행에 출력한 주소를 사용한다.
+CLI가 port-forward를 열고 로컬 주소를 출력한다. 포트 번호를 외우지 말고 CLI가 이번 실행에 출력한
+주소를 사용한다.
+
+</TabItem>
+<TabItem label="Ubuntu">
+
+Ubuntu에서 `kagent dashboard`는 `Dashboard is not available on this platform`을 출력하고, 대신
+직접 실행할 port-forward 명령을 안내한다. 안내대로 UI service를 로컬 포트에 연결한다.
+
+```bash
+kubectl port-forward -n kagent service/kagent-ui 8082:8080
+```
+
+브라우저에서 `http://localhost:8082`를 연다. 로컬 `8082`가 이미 사용 중이면 앞쪽 포트 번호만
+다른 값으로 바꾼다.
+
+</TabItem>
+</Tabs>
+
+어느 경로든 port-forward가 실행 중인 terminal을 유지한 채 dashboard에서 sample Agent와 tool
+목록을 둘러본다. 종료는 `Ctrl+C`다.
 
 :::caution[LiteLLM 경로라면 아직 질문을 보내지 않는다]
 이 시점의 `default-model-config`는 여전히 public OpenAI endpoint를 향한다. 설치 때 `OPENAI_API_KEY`로 연결한
@@ -297,12 +319,13 @@ Secret을 읽는다. 설치 때 그 값으로 만들어진 기존 Secret에는 v
 
 ### UI에서 LiteLLM model 목록 가져오기
 
-위 CLI patch를 대신하거나 추가 `ModelConfig`를 만들 때 쓰는 선택 경로다.
+LiteLLM 경로라면 이 절까지가 기본 절차다. 이후 장은 dashboard에서 실제 사용자 흐름을 따라가는데,
+UI의 model 입력은 목록 선택이어서 discovery를 준비해 두지 않으면 UI에서 새 `ModelConfig`를 만들 수 없다.
 dashboard의 **Models → New Model**은 `ModelConfig` 생성 화면이다. **Custom parameters**는 첫 화면에 바로
 보이는 것이 아니라 provider와 model을 모두 선택한 뒤 나타난다. OpenAI provider에서는 그 안의 `baseUrl`에
 LiteLLM `/v1` 주소를 넣는다.
 
-model 입력은 자유 text가 아니라 목록 선택이다. LiteLLM의 `/v1/models`를 목록으로 쓰려면 provider discovery를
+LiteLLM의 `/v1/models`를 그 목록으로 쓰려면 provider discovery를
 한 번 bootstrap한다. `ModelProviderConfig`의 Secret은 정확히 data key 하나만 가져야 하므로 앞의
 `kagent-litellm` Secret을 그대로 참조할 수 있다.
 
@@ -329,20 +352,9 @@ kubectl -n kagent get modelproviderconfig company-litellm -o yaml
 선택하면 **Custom parameters**가 나타난다. v0.9.9 UI에서는 discovery에 쓴 endpoint와 credential을 새
 `ModelConfig`에 자동 복사하지 않으므로 API key를 다시 입력하고 `baseUrl`도 명시한다.
 
-### private CA 처리
-
-사내 TLS가 public trust store에 없다면 검증을 끄지 말고 CA bundle Secret을 `ModelConfig.spec.tls`로 참조한다.
-
-```bash
-kubectl -n kagent create secret generic llm-certs \
-  --from-file=ca.crt=company-ca.crt
-kubectl -n kagent patch modelconfig default-model-config --type merge \
-  -p '{"spec":{"tls":{"caCertSecretRef":"llm-certs","caCertSecretKey":"ca.crt"}}}'
-```
-
-이 TLS 설정은 Agent runtime의 model 호출에 적용된다. `ModelProviderConfig`의 model discovery에도 같은 사내 CA가
-필요하지만 해당 resource에는 별도 TLS 필드가 없다. controller가 그 CA를 신뢰하도록 배포 설정을 관리할 수 없다면
-UI의 **Fetch Models**는 건너뛰고 위처럼 `ModelConfig`를 YAML·patch로 직접 설정한다.
+이 덱의 사내 gateway는 `http` endpoint를 전제한다. `https`에 사내 CA를 쓰는 환경이라면 TLS 검증을 끄는 대신
+`ModelConfig.spec.tls`의 CA bundle 참조를 쓴다 —
+[공식 BYO OpenAI-compatible 문서](https://kagent.dev/docs/kagent/supported-providers/byo-openai)에 절차가 있다.
 
 :::caution[빠른 일괄 전환과 선언적 운영을 구분한다]
 `default-model-config`는 Helm chart가 만든 resource다. 위 patch는 실습에는 간단하지만 다음
@@ -359,7 +371,7 @@ UI의 **Fetch Models**는 건너뛰고 위처럼 `ModelConfig`를 YAML·patch로
 | Pod가 `Pending` | `kubectl -n kagent describe pod <이름>`의 Events와 메모리 |
 | `ImagePullBackOff` | Pod Events, registry 접근, proxy·DNS |
 | model config가 없음 | `kagent install` 출력과 controller log |
-| LiteLLM model 목록이 비어 있음 | `ModelProviderConfig` condition, `/v1/models`, key scope와 DNS·TLS |
+| LiteLLM model 목록이 비어 있음 | `ModelProviderConfig` condition, `/v1/models`, key scope와 DNS |
 | LiteLLM 호출이 `400` | 공개 model alias와 upstream의 tool calling 지원 |
 | dashboard가 안 열림 | `kubectl ... get svc`, UI Pod log, 로컬 포트 충돌 |
 
@@ -375,6 +387,7 @@ kubectl -n kagent logs deployment/kagent-controller --tail=100
 - kagent CRD, control plane Pod, `default-model-config`를 확인했다.
 - LiteLLM을 선택했다면 gateway `/models` 응답에서 model alias를 봤고, `default-model-config`의
   model·`baseUrl`과 참조 Agent를 확인했다.
+- LiteLLM을 선택했다면 `ModelProviderConfig`를 만들었고 UI **Fetch Models**에서 model 목록을 봤다.
 - `kagent`와 `kagent-crds`가 Helm release라는 것을 확인했다.
 - dashboard에서 sample Agent를 볼 수 있다.
 - cluster는 지우지 않는다. 다음 장에서 그대로 쓴다.
