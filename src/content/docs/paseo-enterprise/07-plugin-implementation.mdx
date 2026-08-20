@@ -1,0 +1,203 @@
+---
+title: "7. plugin 구현 골격"
+description: Paseo surface와 daemon-side RPC handler를 로그인·카탈로그·resolve 기능으로 나누는 TypeScript 구조
+reviewedAt: 2026-08-21
+status: review
+---
+
+import { FileTree, LinkCard, Steps } from '@astrojs/starlight/components';
+import TermIntro from '../../../components/docs/TermIntro.astro';
+
+> 결론부터 — **UI component보다 RPC contract와 token boundary를 먼저 고정하면 인증 방식이나 backend endpoint가 바뀌어도 surface를 유지할 수 있다**
+
+<TermIntro
+  terms={[
+    ['contract', 'RPC contract', 'client와 handler가 공유하는 Zod input·output schema와 안정적인 RPC name이다.'],
+    ['query key', 'TanStack Query cache key', '사용자·filter·catalog revision이 다른 결과를 같은 cache로 섞지 않게 구분하는 key다.'],
+    ['credential store', 'Operating system credential store', 'refresh token을 일반 JSON 파일 대신 OS 계정 경계 안에 보관하는 저장소다.'],
+    ['receipt', 'Installation receipt', '설치된 item의 version·hash·대상 위치를 기록해 update와 drift를 비교하는 local 기록이다.'],
+  ]}
+ />
+
+## 내부를 역할별로 나눈다
+
+Paseo가 생성하는 entry point는 `index.tsx` 하나지만 회사 코드는 작은 module로 나누는 편이 테스트와
+보안 review에 유리하다.
+
+<FileTree>
+- company-catalog/
+  - **index.tsx** — contribution 등록만 담당
+  - src/
+    - contracts.ts — Zod RPC와 catalog schema
+    - surface.tsx — React Native UI와 TanStack Query
+    - auth/
+      - device-flow.ts — begin·poll·refresh·revoke
+      - credential-store.ts — OS별 secure storage adapter
+    - api/
+      - catalog-client.ts — Bearer 요청과 error mapping
+    - installers/
+      - prompt.ts
+      - skill.ts
+      - tool.ts
+      - dashboard.ts
+    - receipts.ts — 설치 결과와 drift
+  - paseo-plugin.json
+  - paseo-plugin.d.ts
+  - package.json
+  - tsconfig.json
+</FileTree>
+
+client bundle에 들어갈 module과 daemon-only module의 import graph를 분리한다. credential store와 filesystem
+dependency가 surface에서 import되면 compile은 되어도 client runtime에서 실패하거나 비밀이 bundle에
+섞일 수 있다.
+
+## contract부터 쓴다
+
+```tsx
+import { defineRpc } from '@paseo/plugin';
+import { z } from 'zod';
+
+const catalogItem = z.object({
+  id: z.string(),
+  type: z.enum(['prompt', 'skill', 'tool', 'dashboard']),
+  title: z.string(),
+  version: z.string(),
+  allowedActions: z.array(
+    z.enum(['view', 'resolve', 'install', 'execute']),
+  ),
+});
+
+export const authBegin = defineRpc({
+  name: 'catalog.auth.begin',
+  input: z.object({}),
+  output: z.object({
+    verificationUri: z.string().url(),
+    verificationUriComplete: z.string().url().optional(),
+    userCode: z.string(),
+    expiresAt: z.string().datetime(),
+  }),
+});
+
+export const authPoll = defineRpc({
+  name: 'catalog.auth.poll',
+  input: z.object({}),
+  output: z.discriminatedUnion('status', [
+    z.object({ status: z.literal('pending') }),
+    z.object({
+      status: z.literal('authenticated'),
+      displayName: z.string(),
+    }),
+    z.object({ status: z.literal('expired') }),
+  ]),
+});
+
+export const catalogList = defineRpc({
+  name: 'catalog.items.list',
+  input: z.object({
+    query: z.string().max(200),
+    types: z.array(catalogItem.shape.type).max(4),
+  }),
+  output: z.object({
+    revision: z.string(),
+    items: z.array(catalogItem),
+  }),
+});
+```
+
+RPC input과 output을 모두 검증하면 잘못된 backend 응답이 surface state를 오염시키기 전에 실패한다.
+하지만 schema validation은 authorization을 대신하지 않는다.
+
+## handler가 token을 소유한다
+
+```tsx
+export default function contribute(plugin: PluginContext) {
+  const auth = createDeviceAuth({
+    issuer: requiredEnv('CATALOG_OIDC_ISSUER'),
+    clientId: requiredEnv('CATALOG_OIDC_CLIENT_ID'),
+    credentialStore: createCredentialStore(),
+  });
+  const catalog = createCatalogClient({
+    baseUrl: requiredEnv('CATALOG_API_URL'),
+    getAccessToken: () => auth.getValidAccessToken(),
+  });
+
+  plugin.handle(authBegin, () => auth.begin());
+  plugin.handle(authPoll, () => auth.poll());
+  plugin.handle(catalogList, (input) => catalog.list(input));
+
+  plugin.addSurface('main', CatalogSurface);
+  plugin.addSidebarItem({
+    id: 'main',
+    title: 'Company Catalog',
+    icon: 'Blocks',
+    surface: 'main',
+  });
+
+  return async () => {
+    await auth.stopPendingPoll();
+  };
+}
+```
+
+위 코드는 구조를 보여 주는 skeleton이다. `createDeviceAuth`, secure storage, HTTP timeout·retry와 error
+mapping은 회사 구현이며 production에서 빠뜨리면 안 된다. access token 자체는 surface output에 포함하지 않는다.
+
+## surface는 상태를 그린다
+
+```tsx
+function CatalogSurface() {
+  const listItems = useRpc(catalogList);
+  const query = useQuery({
+    queryKey: ['company-catalog', 'all'],
+    queryFn: () => listItems({ query: '', types: [] }),
+    staleTime: 60_000,
+  });
+
+  if (query.isPending) return <Text>카탈로그를 불러오는 중…</Text>;
+  if (query.isError) return <CatalogError error={query.error} />;
+
+  return (
+    <View>
+      {query.data.items.map((item) => (
+        <CatalogRow key={item.id} item={item} />
+      ))}
+    </View>
+  );
+}
+```
+
+401은 일반 network error와 구분해 다시 로그인 action을 보여 주고, 403은 권한이 없다는 의미를
+숨기지 않는다. 429와 5xx는 retry 가능 상태지만 설치 mutation을 자동 반복하면 중복 효과가 생길 수 있다.
+
+## resolve와 install을 분리한다
+
+<Steps>
+1. 사용자가 item 상세와 capability를 확인한다.
+2. surface가 `resolve` RPC를 호출한다.
+3. handler가 최신 token으로 Catalog API의 resolve endpoint를 호출한다.
+4. handler가 version·media type·hash·signature·allowed action을 검증한다.
+5. install confirmation 뒤 provider adapter가 명시적 대상에 반영한다.
+6. receipt를 기록하고 실제 파일·config를 다시 읽어 결과를 검증한다.
+7. UI는 성공 message가 아니라 설치된 version과 target을 보여 준다.
+</Steps>
+
+prompt로 agent를 시작하거나 tool을 session에 붙이는 동작도 resolve 결과와 SDK 실행을 분리한다.
+그래야 authorization failure와 local execution failure를 다른 원인으로 관측할 수 있다.
+
+## 테스트 경계
+
+- Zod schema: 허용되지 않은 type·action·URL·과도한 배열 거부
+- Device Flow: pending·slow_down·expired·denied·refresh rotation
+- API client: 401 재로그인, 403 표시, timeout, CA 오류
+- installer: path traversal, hash 불일치, 기존 파일 충돌, rollback
+- surface: loading·empty·error·권한별 action과 compact layout
+- lifecycle: reload 중 pending polling과 socket 정리
+
+`npm run typecheck` 뒤 `paseo plugin reload <id>`를 실행하고 status와 log를 확인하는 흐름은
+[Paseo Plugin quickstart](https://paseo.sh/docs/plugins)에 맞춘다.
+
+<LinkCard
+  title="8. 배포·회수·운영"
+  description="개인 PC에 trusted code를 배포하고 token·artifact·version을 운영하는 방법을 정리한다."
+  href="/paseo-enterprise/08-operations/"
+/>

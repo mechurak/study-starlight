@@ -1,0 +1,142 @@
+---
+title: "2. 개인 PC와 온프렘 K8s의 경계"
+description: 임직원별 Paseo daemon과 온프렘 Catalog API 사이의 요청·신뢰·artifact 경계
+reviewedAt: 2026-08-21
+status: review
+---
+
+import { Card, CardGrid, LinkCard } from '@astrojs/starlight/components';
+import TermIntro from '../../../components/docs/TermIntro.astro';
+
+> 결론부터 — **PC에는 사용자 session과 설치 결과를 두고, 카탈로그 정책·조직 권한·원본 artifact는 온프렘 backend가 소유한다**
+
+<TermIntro
+  terms={[
+    ['control plane', 'Control plane', '누가 무엇을 발견·설치·실행할 수 있는지 정책과 metadata를 관리하는 중앙 부분이다.'],
+    ['artifact', 'Catalog artifact', 'skill 파일, prompt template, tool 설정처럼 version·hash를 가진 설치 또는 실행 재료다.'],
+    ['trust boundary', 'Trust boundary', '경계를 넘는 입력을 검증하지 않으면 안 되는 보안 구간이다. PC와 Kubernetes ingress 사이가 대표적이다.'],
+  ]}
+ />
+
+## 전체 요청 경로
+
+직원마다 daemon이 따로 있으므로 Paseo 자체에 중앙 사용자 계정을 억지로 넣을 필요가 없다.
+대신 plugin이 Keycloak에서 그 PC 사용자의 token을 얻고, 같은 token으로 Catalog API를 호출한다.
+
+```d2 layout=elk pad=40 title="임직원 PC와 온프렘 Kubernetes 카탈로그의 인증·인가·artifact 경로"
+direction: right
+
+pc: "임직원 PC · 신뢰하지 않는 client 경계" {
+  ui: "Paseo surface\n검색 · 선택 · 상태"
+  bff: "plugin handler\nOIDC · API · 설치"
+  cred: "OS credential store\nrefresh token"
+  local: "local agent config\nskill · MCP"
+
+  ui -> bff: "typed RPC"
+  bff -> cred: "보관 · 갱신"
+  bff -> local: "명시적 설치"
+}
+
+keycloak: "Keycloak" {
+  ad: "AD federation"
+  oidc: "OIDC endpoints"
+  ad -> oidc: "identity · group"
+}
+
+k8s: "온프렘 Kubernetes" {
+  ingress: "Ingress"
+  proxy: "oauth2-proxy\ncookie + Bearer 검증"
+  api: "Catalog API\nentitlement 계산"
+  db: "Catalog DB\nmetadata · ACL"
+  artifacts: "Artifact store\nversion · hash · signature"
+
+  ingress -> proxy
+  proxy -> api: "검증된 identity"
+  api -> db
+  api -> artifacts: "허용된 artifact만 resolve"
+}
+
+pc.bff -> keycloak.oidc: "Device Flow · refresh" {
+  style.animated: true
+}
+pc.bff -> k8s.ingress: "Bearer access token" {
+  style.animated: true
+}
+keycloak.oidc -> k8s.proxy: "issuer · JWKS"
+k8s.api -> pc.bff: "filtered catalog · signed artifact" {
+  style.animated: true
+}
+```
+
+## 세 종류의 상태
+
+| 상태 | 두는 곳 | 이유 |
+|---|---|---|
+| OIDC access·refresh token | 개인 PC의 daemon-side credential store | 사용자마다 다르고 surface에 노출할 필요가 없음 |
+| catalog metadata·entitlement | Catalog DB와 backend | 조직 변경과 권한 회수의 정본 |
+| 설치된 skill·tool 설정 | 개인 PC의 provider/Paseo 영역 | agent CLI가 로컬에서 실제로 사용 |
+
+PC에 설치된 artifact는 중앙 권한이 바뀌어도 자동으로 사라지지 않는다. 따라서 **local 존재 여부와
+현재 사용 가능 여부를 분리**한다. prompt처럼 정보 자체가 민감한 항목은 내려받는 순간 복제가
+가능하다는 전제도 필요하다.
+
+## control plane과 실행 경로
+
+<CardGrid>
+<Card title="Catalog control plane" icon="setting">
+목록과 상세 metadata를 제공한다.
+
+사용자·부서 entitlement를 계산한다.
+
+version·hash·signature와 폐기 상태를 관리한다.
+
+설치 이력과 resolve 이력을 감사한다.
+</Card>
+<Card title="Runtime data plane" icon="server">
+dashboard API가 실제 데이터를 반환한다.
+
+MCP server가 tool 호출을 실행한다.
+
+agent provider가 prompt와 skill을 소비한다.
+
+민감한 요청을 실행 시점에 다시 인가한다.
+</Card>
+</CardGrid>
+
+catalog에서 tool을 볼 수 있다는 사실만으로 tool server 호출 권한이 생기면 안 된다. Catalog API는
+발견과 설정을 돕고, tool server는 같은 사용자 token 또는 짧은 실행 credential로 다시 확인한다.
+
+## 필요한 네트워크 경로
+
+| 출발 | 목적지 | 용도 |
+|---|---|---|
+| 임직원 PC | Keycloak HTTPS | Device Flow, token refresh, logout·revocation |
+| 임직원 PC | Catalog ingress HTTPS | catalog 조회, artifact resolve·download |
+| oauth2-proxy | Keycloak issuer·JWKS | OIDC discovery와 JWT 서명 검증 |
+| Catalog API | 조직·entitlement 저장소 | 사용자별 허용 범위 계산 |
+| Catalog API | artifact store | 승인된 version 제공 |
+
+사내 CA를 쓰면 browser만 아니라 Paseo daemon의 Node runtime도 CA chain을 신뢰해야 한다. VPN·DNS가
+browser에는 되고 daemon subprocess에는 안 되는 경우도 있으므로 PC 기준 connectivity test를 따로 둔다.
+
+:::caution[함정]
+Ingress가 외부에서 받은 `X-Forwarded-User`, `X-Forwarded-Groups`, `X-Forwarded-Access-Token`을
+그대로 backend에 전달하면 header 위조가 가능하다. 외부 입력을 제거하고 oauth2-proxy가 검증 후
+생성한 값만 전달하며, backend Pod는 해당 경로 밖에서 직접 접근할 수 없게 한다.
+:::
+
+## 장애가 난 위치를 구분한다
+
+- Keycloak 장애: 새 로그인·refresh가 실패하지만 아직 유효한 access token 요청은 정책에 따라 동작할 수 있다.
+- oauth2-proxy 장애: browser와 Paseo API 진입이 함께 막힌다.
+- Catalog API 장애: 기존 local skill은 남지만 새 목록·권한·version 확인은 실패한다.
+- artifact store 장애: metadata는 보여도 설치·update가 실패한다.
+- 개인 daemon/plugin 장애: 해당 직원만 영향을 받고 중앙 서비스는 정상이다.
+
+이 분리가 관측 dashboard와 runbook의 기준이 된다.
+
+<LinkCard
+  title="3. Keycloak에서 개인 로그인을 받기"
+  description="oauth2-proxy client와 Paseo public client를 분리하고 Device Flow를 따라간다."
+  href="/paseo-enterprise/03-keycloak-login/"
+/>

@@ -1,0 +1,156 @@
+---
+title: "1. Paseo plugin의 실행 모델"
+description: surface·sidebar·RPC·attachment source·Paseo SDK와 trusted subprocess의 생명주기
+reviewedAt: 2026-08-21
+status: review
+---
+
+import { FileTree, LinkCard } from '@astrojs/starlight/components';
+import TermIntro from '../../../components/docs/TermIntro.astro';
+
+> 결론부터 — **하나의 plugin source 안에 client surface와 daemon-side handler가 함께 있지만, 실행 위치와 맡길 비밀은 다르다**
+
+<TermIntro
+  terms={[
+    ['contribution', 'Plugin contribution', 'plugin이 Paseo에 surface·sidebar item·RPC handler·attachment source를 등록하는 단위다.'],
+    ['RPC', 'Remote Procedure Call', 'surface가 daemon의 plugin handler를 schema가 검증하는 함수처럼 호출하는 통신이다.'],
+    ['attachment source', 'Composer attachment source', '외부 자료를 검색하고 선택한 text snapshot을 agent prompt에 첨부하는 확장 지점이다.'],
+    ['cleanup', 'Lifecycle cleanup', 'reload·disable·disconnect 때 timer·socket·pending 작업을 정리하는 plugin 종료 함수다.'],
+  ]}
+ />
+
+## 큰 그림
+
+Paseo daemon에 설치된 plugin은 연결된 desktop·browser·mobile client에 surface bundle을 제공한다.
+동시에 daemon 머신에는 backend contribution을 별도 subprocess로 실행한다. 둘은 `defineRpc()`로
+선언한 Zod 계약을 사이에 두고 통신한다.
+
+```d2 layout=elk pad=40 title="Paseo plugin의 client surface와 daemon-side handler 실행 경계"
+direction: right
+
+clients: "Paseo clients" {
+  desktop: "Desktop"
+  browser: "Browser"
+  mobile: "Mobile"
+}
+
+daemon: "개인 PC의 Paseo daemon" {
+  route: "plugin route · query cache"
+  handler: "plugin subprocess\nRPC handler"
+  sdk: "Paseo API\nworkspace · agent · config"
+
+  route -> handler: "typed RPC" {
+    style.animated: true
+  }
+  handler -> sdk: "daemon session"
+}
+
+internal: "사내 API · 파일 · credential"
+
+clients.desktop -> daemon.route: "surface bundle"
+clients.browser -> daemon.route
+clients.mobile -> daemon.route
+daemon.handler -> internal: "Node.js network · OS access" {
+  style.animated: true
+}
+```
+
+[Paseo Plugin reference](https://paseo.sh/docs/plugins/reference)는 client surface가 Paseo app 안에서,
+backend contribution이 daemon 머신의 subprocess에서 실행된다고 설명한다. backend는 Node API,
+설치된 dependency, 파일·process·credential·network에 접근할 수 있다.
+
+## plugin이 제공하는 네 갈래
+
+| contribution | 이 덱에서 맡길 일 | 사용하지 않을 자리 |
+|---|---|---|
+| surface + sidebar item | 로그인 상태, catalog 검색·상세·실행 버튼 | 최종 권한 판정 |
+| RPC handler | Device Flow, token 갱신, Catalog API, artifact 설치 | 일반 Paseo agent 작업 |
+| Paseo SDK | workspace·agent 생성, prompt 전달, session MCP 설정 | 사내 Catalog API 호출 |
+| attachment source | prompt·문서 검색 결과를 composer에 text snapshot으로 첨부 | 실행 가능한 code bundle 전달 |
+
+일반 Paseo 동작은 surface에서 `usePaseo()`를 사용한다. plugin-specific backend는 `useRpc()`와
+`plugin.handle()`로 연결한다. 연결을 새로 만들지 않고 선택한 host의 기존 connection을 빌린다는 것도
+중요하다.
+
+## project의 최소 모양
+
+`paseo plugin init /absolute/path/to/plugin`은 다음 구조를 만든다. 현재 declaration은 설치된 Paseo
+CLI 버전과 맞아야 하므로 오래된 예제의 `paseo-plugin.d.ts`를 복사하지 않는다.
+
+<FileTree>
+- company-catalog/
+  - **paseo-plugin.json** — plugin ID
+  - **index.tsx** — contribution entry point
+  - **paseo-plugin.d.ts** — 현재 CLI가 생성한 type declaration
+  - package.json — local typecheck dependency와 script
+  - tsconfig.json
+</FileTree>
+
+```tsx
+import { defineRpc, type PluginContext, useRpc } from '@paseo/plugin';
+import { Text } from 'react-native';
+import { z } from 'zod';
+
+const whoAmI = defineRpc({
+  name: 'catalog.me',
+  input: z.object({}),
+  output: z.object({
+    authenticated: z.boolean(),
+    displayName: z.string().optional(),
+  }),
+});
+
+function CatalogSurface() {
+  const loadMe = useRpc(whoAmI);
+  // event 또는 TanStack Query에서 loadMe({})를 호출한다.
+  return <Text>Company Catalog</Text>;
+}
+
+export default function contribute(plugin: PluginContext) {
+  plugin.handle(whoAmI, async () => loadLocalIdentity());
+  plugin.addSurface('main', CatalogSurface);
+  plugin.addSidebarItem({
+    id: 'main',
+    title: 'Company Catalog',
+    icon: 'Blocks',
+    surface: 'main',
+  });
+  return () => undefined;
+}
+```
+
+`loadLocalIdentity()`는 이 장에서 생략한 회사 코드다. 중요한 것은 access token을 surface에 넘겨
+브라우저 storage에 두지 않고, handler가 token을 사용해 필요한 결과만 반환하는 경계다.
+
+## trusted local code라는 뜻
+
+Paseo plugin backend는 sandbox가 아니다. 회사가 서명·검증한 plugin만 배포하고 다음을 금지한다.
+
+- catalog 응답의 임의 JavaScript를 내려받아 실행
+- access token·refresh token을 `console.log()`에 출력
+- 사용자의 전체 home directory를 자동 탐색
+- 확인 없이 global Paseo config나 provider config를 변경
+- artifact hash와 publisher를 확인하지 않고 설치
+
+Paseo는 plugin log tail을 유지하고 daemon log에도 structured copy를 남긴다. 따라서 token뿐 아니라
+권한이 있는 catalog item의 원문 자체도 민감하면 로그에 넣지 않는다.
+
+## reload와 실패를 제품 동작으로 본다
+
+plugin은 reload 때 이전 instance의 cleanup을 실행하고 새 source를 compile·start한다. 새 버전이
+실패해도 이전 bundle을 자동 복원하지 않으므로 배포 쪽에 canary와 rollback 절차가 필요하다.
+
+```text
+npm run typecheck
+paseo plugin reload company-catalog
+paseo plugin ls
+paseo plugin logs company-catalog
+```
+
+명령과 lifecycle의 최신 계약은 [Plugin quickstart](https://paseo.sh/docs/plugins)에서 확인한다.
+
+<LinkCard
+  title="2. 개인 PC와 온프렘 K8s의 경계"
+  description="plugin, Keycloak, oauth2-proxy와 Catalog API를 한 요청 경로에 놓는다."
+  href="/paseo-enterprise/02-architecture/"
+/>

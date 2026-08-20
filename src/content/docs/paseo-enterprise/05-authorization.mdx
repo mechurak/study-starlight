@@ -1,0 +1,150 @@
+---
+title: "5. 로그인 정보를 권한으로 바꾸기"
+description: Keycloak subject·group·department와 entitlement를 결합한 Catalog API의 서버 측 접근 제어
+reviewedAt: 2026-08-21
+status: review
+---
+
+import { Card, CardGrid, LinkCard } from '@astrojs/starlight/components';
+import TermIntro from '../../../components/docs/TermIntro.astro';
+
+> 결론부터 — **Keycloak token은 누구인지 증명하고, Catalog API가 그 identity와 entitlement를 결합해 볼 수 있는 항목을 계산한다**
+
+<TermIntro
+  terms={[
+    ['authentication', 'Authentication', '요청자가 누구인지 Keycloak credential과 token으로 확인하는 과정이다.'],
+    ['authorization', 'Authorization', '확인된 사용자가 특정 catalog item을 보고 설치·실행할 수 있는지 판정하는 과정이다.'],
+    ['entitlement', 'Access entitlement', '사용자·그룹·부서·직무와 resource action을 연결한 사내 허용 기록이다.'],
+    ['subject', 'OIDC sub claim', 'Keycloak issuer 안에서 사용자를 안정적으로 식별하는 token claim이다.'],
+  ]}
+ />
+
+## token claim만으로 끝내지 않는다
+
+Keycloak의 group과 role만으로 모든 catalog item ACL을 표현하면 item이 늘 때 identity system이
+catalog DB처럼 변한다. 반대로 backend에 사용자 이름만 넘기면 AD 조직과 session 통제를 재사용하지
+못한다. 둘을 다음처럼 결합한다.
+
+```d2 layout=elk pad=40 title="Keycloak identity claim과 Catalog entitlement를 결합해 허용 항목을 계산하는 흐름"
+direction: right
+
+token: "검증된 token\niss · aud · exp · sub"
+claims: "identity context\ngroups · roles · department"
+ent: "entitlement DB\nsubject · group · department"
+policy: "authorization service\naction별 판정"
+rows: "허용된 catalog rows"
+audit: "decision audit\n누가 · 무엇을 · 왜"
+
+token -> claims: "claim 추출"
+claims -> policy
+ent -> policy
+policy -> rows: "server-side filter" {
+  style.animated: true
+}
+policy -> audit: "decision reason"
+```
+
+## identity key와 claim
+
+| 값 | 용도 | 주의 |
+|---|---|---|
+| `iss` + `sub` | 사용자 기본 key | realm migration 때 issuer도 함께 고려 |
+| `aud` | 이 token이 Catalog API용인지 확인 | client ID와 혼동하지 않게 계약 고정 |
+| `groups` | AD/Keycloak 조직·그룹 기반 grant | nested group path와 token 크기 확인 |
+| client/realm role | 직무·관리 기능의 coarse permission | catalog item마다 role을 만들지 않음 |
+| `department` | 부서 단위 기본 catalog | 조직 개편 후 token 갱신 지연 고려 |
+| `email` | 표시·알림 | 변경 가능하므로 기본 key로 사용하지 않음 |
+
+## 최소 권한 모델
+
+resource와 action을 분리하면 목록에 보이는 것과 설치·실행 가능한 것을 다르게 통제할 수 있다.
+
+```text
+subject_type: user | group | department | role
+subject_id:   keycloak-sub | /engineering/platform | platform
+resource_id:  prompt:incident-summary
+actions:      view | resolve | install | execute | manage
+effect:       allow | deny
+valid_until:  optional timestamp
+```
+
+초기에는 explicit allow와 좁은 deny만 두고, 여러 규칙이 겹칠 때의 precedence를 문서화한다.
+예를 들어 deny 우선, 개인 grant가 부서 기본값보다 구체적이라는 규칙을 고정한다.
+
+<CardGrid>
+<Card title="목록 조회" icon="search">
+`view` 가능한 metadata만 query 단계에서 filtering한다.
+
+금지된 row를 내려준 뒤 UI에서 숨기지 않는다.
+</Card>
+<Card title="artifact resolve" icon="download">
+`resolve` 또는 `install`을 다시 확인한 뒤 짧은 download URL과 hash를 반환한다.
+
+목록 조회 결과를 권한 증명으로 재사용하지 않는다.
+</Card>
+<Card title="tool 실행" icon="setting">
+tool server가 `execute`를 매 요청에 재검사한다.
+
+Catalog API에서 한 번 보였다는 이유로 장기 service credential을 주지 않는다.
+</Card>
+<Card title="관리" icon="edit">
+publish·deprecate·revoke는 `manage` action과 별도 admin UI/API로 제한한다.
+
+Paseo 사용자 화면과 authoring 기능을 한 surface에 섞지 않는다.
+</Card>
+</CardGrid>
+
+## API가 반환할 것
+
+```http
+GET /v1/catalog?types=prompt,skill,tool,dashboard
+Authorization: Bearer eyJ...
+Accept: application/json
+```
+
+```json
+{
+  "principal": {
+    "subject": "8d53...",
+    "displayName": "홍길동"
+  },
+  "items": [
+    {
+      "id": "prompt:incident-summary",
+      "type": "prompt",
+      "title": "장애 요약",
+      "version": "3.1.0",
+      "allowedActions": ["view", "resolve"],
+      "decisionId": "dec_01K..."
+    }
+  ],
+  "catalogRevision": "2026-08-21T09:00:00Z"
+}
+```
+
+`allowedActions`는 UI를 올바르게 그리는 힌트다. 실제 `resolve`·`execute` endpoint는 같은 권한을
+다시 검사한다. `decisionId`는 사용자가 왜 보거나 거부되었는지 audit에서 연결할 수 있게 한다.
+
+## 조직 변경과 token 지연
+
+부서 변경 직후 기존 access token에는 이전 `department`가 남을 수 있다. 요구되는 회수 속도에 따라
+다음 중 하나를 고른다.
+
+- access token lifetime을 짧게 두고 refresh 때 새 claim 반영
+- Catalog API가 `sub`로 조직정보를 실시간 또는 짧은 cache로 조회
+- 고위험 action만 별도 authorization service에서 즉시 확인
+- 긴급 deny list를 token claim보다 우선 적용
+
+모든 요청마다 Keycloak introspection을 호출하면 identity 장애가 Catalog API 전체 장애로 번질 수 있다.
+JWT local 검증과 최신 조직 lookup의 역할을 구분한다.
+
+:::caution[함정]
+권한에서 제외된 item을 목록에서 지워도 이미 PC에 설치한 skill이나 복사한 prompt는 회수되지 않는다.
+기밀정보는 artifact로 배포하지 말고 실행 시점에 권한을 검사하는 서버 API 뒤에 둔다.
+:::
+
+<LinkCard
+  title="6. 네 종류를 같은 방식으로 설치하지 않기"
+  description="skill·dashboard·prompt·tool마다 발견 뒤의 동작과 회수 가능성이 어떻게 다른지 나눈다."
+  href="/paseo-enterprise/06-catalog-types/"
+/>

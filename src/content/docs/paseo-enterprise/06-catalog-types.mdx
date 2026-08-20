@@ -1,0 +1,143 @@
+---
+title: "6. 네 종류의 카탈로그"
+description: skill·dashboard·prompt·tool의 발견·설치·실행·권한 회수 모델과 공통 manifest
+reviewedAt: 2026-08-21
+status: review
+---
+
+import { Card, CardGrid, LinkCard } from '@astrojs/starlight/components';
+import TermIntro from '../../../components/docs/TermIntro.astro';
+
+> 결론부터 — **네 종류는 같은 목록에서 찾을 수 있지만 선택한 뒤의 동작·저장 위치·회수 가능성은 서로 다르다**
+
+<TermIntro
+  terms={[
+    ['resolve', 'Catalog artifact resolution', '권한과 version을 다시 확인해 실제 content나 짧은 download URL을 얻는 동작이다.'],
+    ['publisher', 'Artifact publisher', 'catalog item을 만들고 version·서명·지원 범위를 책임지는 팀 또는 자동화 identity다.'],
+    ['capability', 'Runtime capability', '파일 쓰기·network·명령 실행처럼 item이 사용할 수 있어 사용자에게 알려야 하는 권한 범주다.'],
+    ['session-scoped MCP', 'Session-scoped Model Context Protocol server', '전역 설정이 아니라 새 agent 하나의 config에만 연결되는 MCP server 정의다.'],
+  ]}
+ />
+
+## 한 표로 먼저 구분한다
+
+| 종류 | Paseo에서의 기본 동작 | local에 남는 것 | 실행 시 재인가 |
+|---|---|---|---|
+| prompt | preview 후 agent 시작 또는 attachment | 선택적으로 최근 기록·agent 대화 | 민감 content면 resolve 때 필요 |
+| skill | provider adapter로 version 설치 | skill 파일·metadata | local-only skill은 어려움 |
+| tool | 현재 agent의 MCP 설정에 추가 | session config 또는 global config | **tool server에서 필수** |
+| dashboard | 작은 surface render 또는 browser 열기 | URL·즐겨찾기 정도 | dashboard API에서 필수 |
+
+목록 UI는 공통으로 만들되 action button과 warning은 `type`과 `allowedActions`에 따라 바꾼다.
+
+## prompt — 복사보다 snapshot
+
+prompt는 catalog의 versioned content다. 선택할 때 두 경로가 있다.
+
+- **agent 시작:** prompt를 resolve한 뒤 `usePaseo()`로 현재 workspace에 agent 생성
+- **composer attachment:** attachment source 검색 결과의 `text` snapshot을 현재 prompt에 첨부
+
+attachment는 URL pointer가 아니라 agent에게 전송되는 완전한 text snapshot이라는 점을 UI에 표시한다.
+선택한 뒤 원본 catalog가 바뀌어도 이미 생성한 agent prompt는 자동 갱신되지 않는다.
+
+## skill — provider별 adapter
+
+Paseo는 여러 coding agent CLI를 실행하고 각 provider의 기존 skill·config를 그대로 사용한다.
+따라서 "Paseo 공통 skill 디렉터리"를 가정하지 않고 provider별 installer adapter를 둔다.
+
+```text
+catalog skill
+├─ codex adapter   → Codex가 읽는 회사 승인 위치
+├─ claude adapter  → Claude Code가 읽는 회사 승인 위치
+└─ opencode adapter → OpenCode가 읽는 회사 승인 위치
+```
+
+installer는 지원 provider와 version을 확인하고, 임시 위치에 다운로드한 뒤 hash·서명을 검증해 명시적
+대상에 반영한다. 기존 사용자 파일과 충돌하면 덮어쓰지 않고 diff와 선택지를 보여 준다.
+
+## tool — 전역보다 session 우선
+
+Paseo SDK의 agent config는 `mcpServers`와 `toolPolicy`를 지원한다.
+[Providers with the SDK](https://paseo.sh/docs/sdk/providers)에서 설명하는 session-scoped 설정을 우선하면
+하나의 tool 선택이 모든 미래 agent와 repository에 퍼지는 일을 줄일 수 있다.
+
+```ts
+await workspace.agents.create({
+  config: {
+    provider: 'codex/gpt-5.5',
+    mcpServers: resolvedTool.mcpServers,
+    toolPolicy: resolvedTool.toolPolicy,
+  },
+  prompt: resolvedPrompt.text,
+});
+```
+
+tool의 장기 secret을 catalog payload에 넣지 않는다. 사용자 token 교환, device-bound credential 또는
+tool server의 OIDC 검증으로 실제 호출자를 확인한다.
+
+## dashboard — surface와 browser를 나눈다
+
+<CardGrid>
+<Card title="Paseo surface" icon="analytics">
+작은 status, 최근 배포, 개인 quota처럼 카드·목록으로 끝나는 화면에 적합하다.
+
+plugin handler가 dashboard API를 호출하고 필요한 JSON만 surface에 반환한다.
+</Card>
+<Card title="기존 web dashboard" icon="external">
+복잡한 table·chart·form은 Keycloak SSO가 적용된 browser URL을 연다.
+
+plugin 안에 임의 WebView를 embed할 수 있다고 가정하지 않는다.
+</Card>
+</CardGrid>
+
+## 공통 manifest
+
+모든 item은 최소한 identity, compatibility, integrity, authorization metadata를 가진다.
+
+```json
+{
+  "schemaVersion": 1,
+  "id": "tool:production-readonly",
+  "type": "tool",
+  "title": "Production Readonly",
+  "version": "2.4.1",
+  "publisher": "platform-team",
+  "description": "운영 상태를 읽기 전용으로 조회한다.",
+  "compatibility": {
+    "minimumPaseoVersion": "<company-supported-version>",
+    "providers": ["codex", "claude"]
+  },
+  "capabilities": ["network:internal-api", "data:production-read"],
+  "allowedActions": ["view", "resolve", "execute"],
+  "artifact": {
+    "mediaType": "application/vnd.company.mcp-config+json",
+    "sha256": "...",
+    "signature": "..."
+  },
+  "deprecated": false
+}
+```
+
+`allowedActions`는 사용자별 응답에서 붙이고, publisher·hash·capability는 version에 고정한다.
+mutable `latest`만 저장하지 않고 설치 시 선택된 정확한 version과 hash를 local receipt로 남긴다.
+
+## 설치 receipt와 reconcile
+
+```text
+item id · version · sha256 · installedAt · subject · target provider · target path
+```
+
+plugin은 catalog를 다시 열 때 receipt와 현재 catalog를 비교해 update·deprecated·revoked 상태를 보여
+준다. 자동 삭제는 사용자 작업을 망가뜨릴 수 있으므로 기본 동작으로 삼지 않는다. 고위험 tool은
+local config를 지우는 것보다 server-side execute 권한을 즉시 차단하는 것이 우선이다.
+
+:::tip[핵심 원칙]
+catalog item의 공통점은 **찾는 방법**이고 차이는 **효과가 발생하는 위치**다. UI 재사용을 위해
+설치·실행 모델까지 하나로 합치지 않는다.
+:::
+
+<LinkCard
+  title="7. plugin 구현 골격"
+  description="Zod RPC와 query를 사용해 로그인 상태·목록·resolve·실행을 연결한다."
+  href="/paseo-enterprise/07-plugin-implementation/"
+/>

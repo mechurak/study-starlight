@@ -1,0 +1,96 @@
+---
+title: 개요
+description: 개인 PC의 Paseo를 Keycloak·oauth2-proxy·사내 Catalog API에 연결하는 plugin 설계와 운영
+aliases: [Paseo plugin, Paseo enterprise catalog, 사내 AI 도구 카탈로그]
+reviewedAt: 2026-08-21
+status: review
+---
+
+import { LinkCard, LinkButton } from '@astrojs/starlight/components';
+import DeckMap from '../../../components/docs/DeckMap.astro';
+
+> 결론부터 — **Paseo plugin은 카탈로그의 로컬 프런트엔드가 되고, 사용자별 허용 범위는 사내 백엔드가 결정한다**
+
+임직원이 각자 쓰는 Paseo 안에서 회사의 skill·dashboard·prompt·tool을 찾고 실행하게 만들고 싶다.
+새 포털을 하나 더 만드는 대신 Paseo sidebar에 회사 카탈로그를 넣으면 코딩 agent를 쓰던 문맥을
+떠나지 않아도 된다. 하지만 PC의 plugin만으로는 AD 로그인, 부서별 권한, 회수와 감사가 해결되지 않는다.
+
+이 덱은 개인 PC의 Paseo와 온프렘 Kubernetes의 Catalog API 사이에 경계를 긋는다. Paseo plugin은
+화면과 로컬 BFF를 맡고, Keycloak은 AD 사용자를 인증하며, oauth2-proxy는 브라우저 cookie와 API
+Bearer token을 검증한다. Catalog API는 `sub`와 조직 entitlement를 기준으로 허용된 항목만 반환한다.
+
+**2026년 8월 21일 기준** Paseo·Keycloak·oauth2-proxy 공식 문서를 확인했다. 세 제품 모두 현재성이
+있는 영역이므로 배포 전에는 사용 중인 버전의 option과 plugin declaration을 다시 확인한다.
+
+<LinkButton href="/paseo-enterprise/00-decision/" icon="right-arrow">첫 장부터 읽기</LinkButton>
+
+## 구성
+
+<DeckMap
+  steps={[
+    { label: '0~2장', href: '/paseo-enterprise/00-decision/', title: '경계부터 긋기', tone: 'key',
+      desc: 'Paseo가 맡을 자리 · plugin 실행 모델 · 개인 PC와 온프렘 K8s 전체 구조',
+      note: '왜 별도 포털 대신 plugin이며 무엇을 PC에 두지 않는가' },
+    { label: '3~4장', href: '/paseo-enterprise/03-keycloak-login/', title: '사용자를 증명하기', tone: 'zone',
+      desc: 'Keycloak client 분리 · Device Flow · oauth2-proxy cookie와 Bearer 이중 경로',
+      note: 'localhost callback이 필요한 경우와 필요하지 않은 경우는 무엇인가' },
+    { label: '5장', href: '/paseo-enterprise/05-authorization/', title: '허용 범위 계산하기', tone: 'warn',
+      desc: '`sub` · group · department · entitlement로 항목별 접근 제어',
+      note: '로그인한 사람에게 무엇을 보여 주고 실행시킬 것인가' },
+    { label: '6~7장', href: '/paseo-enterprise/06-catalog-types/', title: '카탈로그를 동작으로 잇기', tone: 'ok',
+      desc: '네 종류의 실행 모델 · artifact 계약 · plugin RPC와 query 구현 골격',
+      note: '목록의 선택을 안전한 설치·첨부·실행으로 어떻게 바꾸는가' },
+    { label: '8~9장', href: '/paseo-enterprise/08-operations/', title: '회사 제품으로 운영하기', tone: 'bad',
+      desc: '서명 배포 · token 보관 · 관측 · 권한 회수 · 단계적 도입 체크리스트',
+      note: 'PoC 뒤에도 통제 가능한 상태를 어떻게 유지하는가' },
+  ]}
+ />
+
+## 한 장으로 보는 결론
+
+```d2 layout=elk pad=40 title="개인 PC의 Paseo에서 Keycloak 인증을 거쳐 권한이 필터링된 사내 카탈로그를 받는 구조"
+direction: right
+
+pc: "임직원 PC" {
+  paseo: "Paseo app\nplugin surface"
+  handler: "plugin handler\nlocal BFF"
+  store: "OS credential store"
+
+  paseo -> handler: "typed RPC"
+  handler -> store: "refresh token"
+}
+
+idp: "Keycloak + AD\n사용자 인증"
+proxy: "oauth2-proxy\nJWT 검증"
+api: "Catalog API\nentitlement 필터"
+items: "skill · dashboard\nprompt · tool"
+
+pc.handler -> idp: "Device Flow" {
+  style.animated: true
+}
+pc.handler -> proxy: "Bearer access token" {
+  style.animated: true
+}
+proxy -> api: "검증된 요청" {
+  style.animated: true
+}
+api -> items: "허용된 항목만" {
+  style.animated: true
+}
+```
+
+여기서 plugin은 사용자를 직접 판정하지 않는다. 토큰을 얻고 전달하며 결과를 그릴 뿐이다.
+최종 권한은 Catalog API가 서버 쪽에서 계산한다. PC에 내려간 artifact는 복사될 수 있으므로,
+민감한 tool과 dashboard는 실제 실행 요청에서도 다시 인증·인가한다.
+
+## 이 덱을 읽을 때 함께 볼 것
+
+- [Keycloak 덱](/keycloak/) — OAuth/OIDC, AD federation, session과 Kubernetes 배포의 배경.
+- [Paseo Plugin reference](https://paseo.sh/docs/plugins/reference) — 현재 plugin surface·RPC·lifecycle 계약.
+- [OAuth2 Proxy Keycloak OIDC](https://oauth2-proxy.github.io/oauth2-proxy/configuration/providers/keycloak_oidc/) — callback, audience, group·role 제한 설정.
+
+<LinkCard
+  title="0. 이 구조가 맞는 문제"
+  description="Paseo를 범용 포털로 만들지 않고, 코딩 agent 문맥의 사내 카탈로그에 한정한다."
+  href="/paseo-enterprise/00-decision/"
+/>

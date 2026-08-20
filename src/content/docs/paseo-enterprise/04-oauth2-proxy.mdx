@@ -1,0 +1,130 @@
+---
+title: "4. oauth2-proxy에서 두 경로 받기"
+description: browser cookie와 Paseo JWT Bearer token을 한 Catalog API 앞에서 검증하는 설정과 header 경계
+reviewedAt: 2026-08-21
+status: review
+---
+
+import { LinkCard, Steps } from '@astrojs/starlight/components';
+import TermIntro from '../../../components/docs/TermIntro.astro';
+
+> 결론부터 — **기존 HTTPS callback은 browser cookie flow에 남기고, Paseo 요청은 JWT Bearer 검증 경로를 추가한다**
+
+<TermIntro
+  terms={[
+    ['session cookie', 'OAuth2 Proxy session cookie', 'browser 로그인 결과를 oauth2-proxy가 기억해 다음 요청을 인증하는 cookie다.'],
+    ['Bearer token', 'OAuth 2.0 bearer access token', '소유자가 HTTP Authorization header에 넣어 API 접근 권한을 증명하는 token이다.'],
+    ['audience', 'JWT aud claim', 'token을 받아야 하는 대상 API를 나타내며 다른 서비스용 token의 재사용을 막는다.'],
+    ['JWKS', 'JSON Web Key Set', 'oauth2-proxy와 backend가 JWT 서명을 검증할 때 issuer에서 가져오는 공개 키 집합이다.'],
+  ]}
+ />
+
+## browser와 Paseo는 입구가 다르다
+
+```d2 layout=elk pad=40 title="oauth2-proxy가 browser cookie와 Paseo Bearer token을 검증하는 두 요청 경로"
+direction: right
+
+browser: "Browser"
+paseo: "Paseo plugin handler"
+proxy: "oauth2-proxy"
+keycloak: "Keycloak issuer · JWKS"
+api: "Catalog API"
+
+browser -> proxy: "session cookie"
+paseo -> proxy: "Authorization: Bearer JWT"
+proxy -> keycloak: "discovery · key refresh"
+proxy -> api: "검증 성공 요청" {
+  style.animated: true
+}
+```
+
+browser에 cookie가 없으면 oauth2-proxy가 Keycloak으로 redirect하고, 성공 후
+`https://catalog.company.com/oauth2/callback`에서 session을 만든다. 반면 Paseo는 login redirect를
+따라 cookie를 만들지 않고 이미 받은 access token을 보낸다.
+
+## 설정의 출발점
+
+배포 중인 oauth2-proxy version의 option 이름과 Helm values mapping을 반드시 다시 확인한다.
+현재 공식 문서 기준의 핵심 option은 다음과 같다.
+
+```yaml
+args:
+  - --provider=keycloak-oidc
+  - --oidc-issuer-url=https://keycloak.company.com/realms/company
+
+  # 기존 browser flow
+  - --client-id=catalog-web
+  - --client-secret-file=/secrets/client-secret
+  - --redirect-url=https://catalog.company.com/oauth2/callback
+  - --code-challenge-method=S256
+
+  # Paseo API flow
+  - --skip-jwt-bearer-tokens=true
+  - --oidc-extra-audience=catalog-api
+  - --bearer-token-login-fallback=false
+
+  # upstream identity 전달
+  - --pass-user-headers=true
+  - --pass-access-token=true
+```
+
+`skip-jwt-bearer-tokens`는 이름과 달리 인증을 생략하는 bypass가 아니다. 서명·issuer·expiry와
+허용된 audience를 검증한 Bearer token 요청이 browser login 없이 upstream으로 가게 한다.
+invalid Bearer 요청을 HTML login redirect로 바꾸지 않으려면 API에서는 fallback을 끄고 403으로
+실패시키는 편이 진단하기 쉽다. [OAuth2 Proxy configuration overview](https://oauth2-proxy.github.io/oauth2-proxy/configuration/overview/)
+
+## audience가 맞아야 한다
+
+Paseo가 받은 token의 `aud`와 oauth2-proxy가 허용하는 audience가 다르면 서명이 정상이어도 거부된다.
+
+<Steps>
+1. Keycloak에 `catalog-api` audience를 표현할 client 또는 mapper를 정한다.
+2. `paseo-catalog` access token에 `catalog-api`가 들어가게 audience mapper를 연결한다.
+3. oauth2-proxy에 같은 audience를 허용한다.
+4. Catalog API도 `iss`와 `aud=catalog-api`를 검증한다.
+5. 실제 token을 decode해 예상한 claim만 들어 있는지 확인한다. 서명 검증 없이 decode한 결과는 진단용일 뿐이다.
+</Steps>
+
+[Keycloak OIDC provider 가이드](https://oauth2-proxy.github.io/oauth2-proxy/configuration/providers/keycloak_oidc/)는
+oauth2-proxy client ID 또는 추가 audience와 token의 `aud`가 일치해야 한다고 설명한다.
+
+## upstream identity를 전달하는 두 방식
+
+| 방식 | 장점 | 필수 조건 |
+|---|---|---|
+| 검증된 access token 전달 | backend가 `sub`·claim·signature를 다시 검증 가능 | `pass-access-token`, header 전달과 audience 일치 |
+| `X-Forwarded-User/Groups` 전달 | backend 구현이 단순 | backend 직접 접근 차단, 외부 입력 header 제거, proxy만 신뢰 |
+
+권장 방식은 access token을 backend까지 전달해 Catalog API가 다시 검증하는 것이다. ingress
+`auth_request` 통합에서는 oauth2-proxy option만으로 header가 upstream까지 가지 않을 수 있으므로,
+Ingress Controller의 auth response header 설정도 확인한다.
+
+:::caution[함정]
+`pass-authorization-header`는 browser session의 ID token을 Authorization header로 넣는 동작과
+섞일 수 있다. Catalog API가 access token을 기대한다면 실제 upstream에서 어떤 header에 어떤 token이
+도착하는지 echo endpoint와 현재 oauth2-proxy version으로 확인한다.
+:::
+
+## 배포 전 검증 표
+
+| 요청 | 기대 결과 |
+|---|---|
+| browser, cookie 없음 | Keycloak redirect 후 callback과 cookie 생성 |
+| browser, 유효 cookie | Catalog UI 200 |
+| Paseo, 유효 Bearer + 올바른 `aud` | Catalog API 200 |
+| Paseo, 만료 token | 401 또는 403 JSON, login HTML로 redirect하지 않음 |
+| Paseo, 잘못된 `aud` | 403 |
+| 외부가 위조한 `X-Forwarded-Groups` | 제거되거나 무시됨 |
+| backend Service 직접 접근 | NetworkPolicy 또는 routing으로 차단 |
+
+## 1차 gate와 항목별 인가
+
+oauth2-proxy의 `allowed-group`과 `allowed-role`은 회사 직원 또는 대상 조직만 서비스에 들어오게 하는
+1차 gate에 적합하다. prompt A는 플랫폼 부서, tool B는 특정 개인처럼 항목마다 다른 규칙은
+Catalog API가 수행한다.
+
+<LinkCard
+  title="5. 로그인 정보를 권한으로 바꾸기"
+  description="token claim과 사내 entitlement를 결합해 허용된 catalog row만 반환한다."
+  href="/paseo-enterprise/05-authorization/"
+/>

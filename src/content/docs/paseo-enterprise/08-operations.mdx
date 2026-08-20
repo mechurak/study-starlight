@@ -1,0 +1,126 @@
+---
+title: "8. 배포·회수·운영"
+description: Paseo plugin과 catalog artifact의 사내 배포, token 보관, 관측, rollback과 권한 회수
+reviewedAt: 2026-08-21
+status: review
+---
+
+import { Card, CardGrid, LinkCard, Steps } from '@astrojs/starlight/components';
+import TermIntro from '../../../components/docs/TermIntro.astro';
+
+> 결론부터 — **plugin은 회사 software로, catalog item은 서명된 data로 배포하고, 권한 회수는 실행 server에서 완성한다**
+
+<TermIntro
+  terms={[
+    ['release channel', 'Software release channel', 'stable·pilot처럼 사용자 집단별로 plugin version을 나누어 배포하는 경로다.'],
+    ['canary', 'Canary rollout', '소수 PC에 먼저 배포해 로그인·API·설치 실패를 확인한 뒤 범위를 넓히는 방식이다.'],
+    ['reconcile', 'Desired versus actual reconciliation', 'catalog의 최신 정책·version과 PC에 설치된 receipt·파일 상태를 비교하는 과정이다.'],
+    ['revocation', 'Access revocation', '사용자·token·catalog item 또는 tool 실행 권한을 더 이상 사용할 수 없게 만드는 조치다.'],
+  ]}
+ />
+
+## plugin과 item의 배포를 분리한다
+
+| 대상 | 변경 빈도 | 권장 배포 | 검증 |
+|---|---:|---|---|
+| company Paseo plugin | 낮음 | MDM·Software Center·사내 package repository | publisher signature, checksum, typecheck, canary |
+| catalog metadata | 높음 | Catalog API/DB | schema, approval workflow, audit |
+| prompt·skill artifact | 중간 | immutable artifact store | version, SHA-256, signature, malware·secret scan |
+| tool connection | 중간 | resolve된 MCP manifest | endpoint allowlist, capability review, runtime auth |
+
+plugin이 catalog에서 새 JavaScript를 내려받아 실행하게 만들면 중앙 데이터 배포가 곧 PC code execution이
+된다. plugin binary/source update는 회사 software 배포 절차를 따르고, catalog는 선언적인 item data만 제공한다.
+
+## rollout 순서
+
+<Steps>
+1. 개발 PC에서 generated declaration과 맞춰 typecheck하고 local daemon에 설치한다.
+2. test realm·test Catalog API로 Device Flow와 token refresh를 검증한다.
+3. 지원 OS별 package와 signature를 만든다.
+4. pilot group에 배포해 oauth2-proxy audience·사내 CA·VPN·proxy 경로를 확인한다.
+5. dashboard에서 login success, catalog latency, RPC error, install failure를 확인한다.
+6. stable channel로 넓히고 이전 version과 rollback package를 유지한다.
+</Steps>
+
+Paseo plugin reload 실패는 이전 bundle을 자동 복원하지 않으므로 installer가 이전 package와 재설치
+절차를 가져야 한다.
+
+## credential 운영
+
+<CardGrid>
+<Card title="보관" icon="seti:lock">
+refresh token은 OS credential store에 저장한다.
+
+access token은 가능한 memory에 두고 짧게 사용한다.
+
+client secret은 PC에 배포하지 않는다.
+</Card>
+<Card title="노출 방지" icon="warning">
+token을 URL query, process argument, plugin log에 넣지 않는다.
+
+crash report와 support bundle에서 민감 field를 redact한다.
+</Card>
+<Card title="회수" icon="undo">
+logout 때 revoke와 local 삭제를 수행한다.
+
+퇴사·device 분실은 Keycloak session과 refresh token을 중앙에서 회수한다.
+</Card>
+<Card title="갱신" icon="refresh">
+refresh rotation과 reuse 오류를 처리한다.
+
+401 한 번은 갱신 후 재시도하고 반복 401은 로그인 상태로 돌린다.
+</Card>
+</CardGrid>
+
+## 관측할 네 구간
+
+```text
+login.begin/poll/refresh
+→ oauth2-proxy JWT validation
+→ Catalog API authorization decision
+→ local resolve/install/execute
+```
+
+| signal | 필요한 label | 보지 말아야 할 값 |
+|---|---|---|
+| login 결과와 latency | plugin version, OS, realm, error class | token, user code |
+| proxy 401·403 | issuer, audience result, route | raw Authorization header |
+| authorization decision | decision ID, item ID, action, policy version | 필요 이상의 개인 claim |
+| install 결과 | item ID, version, adapter, error class | artifact content와 local path 전체 |
+
+개인 `sub`가 audit에 필요하면 접근이 제한된 audit store에서만 보존하고 metric label로 쓰지 않는다.
+높은 cardinality와 개인정보 노출이 동시에 생긴다.
+
+## 회수에는 단계가 있다
+
+| 회수 대상 | 즉시 할 일 | 이후 reconcile |
+|---|---|---|
+| 사용자 계정 | Keycloak session·refresh token revoke | plugin 재로그인 차단 |
+| catalog entitlement | backend deny 반영 | UI 목록에서 제거 |
+| tool | tool server execute 차단 | local MCP config에 revoked 표시·선택적 제거 |
+| dashboard | dashboard API 차단 | 즐겨찾기와 catalog item 상태 갱신 |
+| prompt·skill | 새 resolve 차단, 위험 공지 | local receipt에 revoked 표시, 필요 시 회사 정책으로 제거 |
+| plugin version | 배포 channel 차단·rollback | 지원 최소 version 상향 |
+
+이미 공개된 prompt·skill의 지식 자체는 기술적으로 회수하기 어렵다. secret이나 실시간 production data를
+정적 artifact 안에 넣지 않는 이유다.
+
+## 실패 runbook
+
+- **모두 401:** issuer·JWKS·clock skew·audience mapper와 proxy option을 확인한다.
+- **browser만 성공:** `skip-jwt-bearer-tokens`, Ingress Authorization header 전달을 확인한다.
+- **Paseo login만 실패:** Device Grant 활성화, public client, polling interval과 PC의 Keycloak 접근을 확인한다.
+- **특정 부서만 빈 목록:** token claim과 entitlement policy version·decision ID를 비교한다.
+- **특정 OS만 설치 실패:** credential store와 path·permission adapter를 확인한다.
+- **reload 뒤 sidebar 없음:** `paseo plugin ls`와 retained plugin log를 확인한다.
+
+:::tip[운영 경계]
+oauth2-proxy가 인증에 성공했다는 사실과 Catalog API가 item action을 허용했다는 사실을 서로 다른
+audit event로 남긴다. 그래야 "로그인은 됐는데 왜 목록이 비었는가"를 추적할 수 있다.
+:::
+
+<LinkCard
+  title="9. 도입 체크리스트"
+  description="PoC부터 production까지 단계별 완료 조건과 최종 설계 결정을 한 장에 모은다."
+  href="/paseo-enterprise/09-wrapup/"
+/>

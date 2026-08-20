@@ -474,7 +474,23 @@ export const deckDefinitions = [
 			['프로젝트 지침', ['coding-agents/00-project-instructions']],
 		],
 	},
-	];
+	{
+		slug: 'paseo-enterprise',
+		topicOrder: 22,
+		label: 'Paseo 사내 연동',
+		title: 'Paseo 사내 카탈로그',
+		icon: 'puzzle',
+		aliases: ['Paseo plugin', 'Paseo enterprise catalog', '사내 AI 도구 카탈로그'],
+		description: '개인 PC의 Paseo를 사내 카탈로그 프런트엔드로 쓴다 — plugin, Keycloak, oauth2-proxy와 권한 필터링.',
+		category: 'backend',
+		groups: [
+			['큰 그림', ['paseo-enterprise/00-decision', 'paseo-enterprise/01-plugin-model', 'paseo-enterprise/02-architecture']],
+			['인증과 인가', ['paseo-enterprise/03-keycloak-login', 'paseo-enterprise/04-oauth2-proxy', 'paseo-enterprise/05-authorization']],
+			['카탈로그와 구현', ['paseo-enterprise/06-catalog-types', 'paseo-enterprise/07-plugin-implementation']],
+			['운영과 도입', ['paseo-enterprise/08-operations', 'paseo-enterprise/09-wrapup']],
+		],
+	},
+];
 
 export const topics = [...deckDefinitions].sort((a, b) => a.topicOrder - b.topicOrder).map((deck) => ({
 	label: deck.label,
@@ -509,6 +525,7 @@ export const termIntroDeckSlugs = [
 	'langfuse',
 	'agent-platform',
 	'coding-agents',
+	'paseo-enterprise',
 ];
 
 export const deckCatalogSections = categories.map((category) => ({

@@ -1,0 +1,140 @@
+---
+title: "9. 도입 체크리스트"
+description: Paseo 사내 카탈로그의 최종 구조, PoC·pilot·production 완료 조건과 보안 점검
+reviewedAt: 2026-08-21
+status: review
+---
+
+import { Card, CardGrid, LinkCard, Steps } from '@astrojs/starlight/components';
+
+> 결론부터 — **첫 production 범위는 로그인·권한 필터·prompt 실행으로 좁히고, local 설치와 tool 실행은 별도 보안 단계로 올린다**
+
+## 최종 구조
+
+```d2 layout=elk pad=40 title="Paseo 사내 카탈로그의 최종 책임과 요청 경로"
+direction: right
+
+pc: "개인 PC" {
+  surface: "Paseo surface\n탐색 · 상태 · 확인"
+  handler: "plugin handler\nDevice Flow · API · adapter"
+  secure: "OS credential store"
+  agents: "coding agents\nprompt · skill · MCP"
+
+  surface -> handler: "RPC"
+  handler -> secure: "refresh token"
+  handler -> agents: "명시적 적용"
+}
+
+identity: "Keycloak + AD\n인증 · subject · group"
+edge: "Ingress + oauth2-proxy\ncookie · Bearer 검증"
+catalog: "Catalog API\nitem authorization"
+runtime: "Dashboard · Tool server\n실행 시 재인가"
+
+pc.handler -> identity: "public client Device Flow"
+pc.handler -> edge: "Bearer access token" {
+  style.animated: true
+}
+edge -> catalog: "검증된 identity" {
+  style.animated: true
+}
+catalog -> pc.handler: "허용된 metadata · artifact" {
+  style.animated: true
+}
+pc.agents -> runtime: "사용자 실행 credential" {
+  style.animated: true
+}
+identity -> runtime: "issuer · JWKS"
+```
+
+## 바뀌지 않는 결정
+
+- 임직원별 Paseo daemon과 회사가 배포한 trusted plugin을 사용한다.
+- oauth2-proxy용 `catalog-web`과 Paseo용 `paseo-catalog` Keycloak client를 분리한다.
+- Paseo는 client secret 없는 Device Authorization Grant를 기본으로 한다.
+- oauth2-proxy의 callback은 사내 HTTPS `/oauth2/callback`이며 localhost가 아니다.
+- PKCE loopback 대안을 쓸 때만 `http://127.0.0.1`을 `paseo-catalog`에 등록한다.
+- oauth2-proxy는 browser cookie와 검증된 JWT Bearer 요청을 모두 처리한다.
+- Catalog API가 `iss + sub`와 entitlement로 item row와 action을 필터링한다.
+- local artifact 존재와 현재 실행 권한을 분리한다.
+- 민감한 dashboard·tool server는 실행 요청마다 다시 인가한다.
+
+## 세 단계로 도입한다
+
+<Steps>
+1. **PoC — 인증과 읽기**
+
+   Device Flow 로그인, `/v1/me`, 허용된 prompt 목록과 401·403 상태까지만 구현한다.
+
+2. **Pilot — Paseo 동작 연결**
+
+   prompt resolve와 현재 workspace의 agent 생성을 연결하고, pilot 부서의 entitlement와 audit을 검증한다.
+
+3. **Production — 설치와 runtime 권한**
+
+   서명 artifact, provider별 skill adapter, session MCP, tool server 재인가, MDM rollout과 rollback을 추가한다.
+</Steps>
+
+한 단계의 완료 조건이 충족되기 전에 다음 단계의 code execution 범위를 열지 않는다.
+
+## PoC 완료 조건
+
+<CardGrid>
+<Card title="Identity" icon="user">
+Keycloak AD 로그인과 MFA가 system browser에서 동작한다.
+
+`sub`, expected issuer와 `catalog-api` audience를 확인한다.
+</Card>
+<Card title="Proxy" icon="server">
+browser cookie와 Paseo Bearer 요청이 모두 성공한다.
+
+만료·잘못된 audience token은 JSON 401·403으로 거부된다.
+</Card>
+<Card title="Authorization" icon="seti:lock">
+개인·부서별로 다른 목록이 server-side filtering된다.
+
+직접 backend 접근과 forwarded header 위조가 차단된다.
+</Card>
+<Card title="Paseo UX" icon="puzzle">
+로그인·대기·만료·빈 목록·재로그인 상태가 구분된다.
+
+prompt 선택 후 agent가 정확한 workspace에 생성된다.
+</Card>
+</CardGrid>
+
+## production 보안 점검
+
+- [ ] oauth2-proxy client secret이 Kubernetes Secret 밖과 직원 PC에 존재하지 않는다.
+- [ ] refresh token은 지원 OS의 credential store에 저장되고 logout·회수된다.
+- [ ] token과 device code가 plugin·proxy·backend log에 남지 않는다.
+- [ ] audience mapper와 proxy/backend의 expected audience가 같다.
+- [ ] backend Service는 oauth2-proxy·정해진 ingress 경로에서만 접근 가능하다.
+- [ ] 외부 `X-Forwarded-*` identity header는 제거되고 검증된 값만 생성된다.
+- [ ] artifact는 immutable version·hash·signature와 publisher를 가진다.
+- [ ] installer가 path traversal·기존 파일 충돌·부분 실패를 처리한다.
+- [ ] tool과 dashboard backend가 실행 시점에 사용자 권한을 다시 확인한다.
+- [ ] plugin canary·rollback과 최소 지원 version 정책이 있다.
+
+## 마지막 판단 카드
+
+| 질문 | 답 |
+|---|---|
+| Paseo를 사내 catalog frontend처럼 쓸 수 있는가 | 가능하다. surface와 RPC가 이 역할에 맞는다. |
+| Keycloak 로그인 정보를 권한에 쓸 수 있는가 | 가능하다. token identity와 backend entitlement를 결합한다. |
+| oauth2-proxy callback을 localhost로 바꾸는가 | 아니다. 기존 HTTPS callback을 유지한다. |
+| Paseo에서 localhost callback이 꼭 필요한가 | 아니다. Device Flow에는 callback이 없다. |
+| oauth2-proxy만으로 항목별 권한이 끝나는가 | 아니다. Catalog API가 최종 action을 판정한다. |
+| 목록에서 숨기면 설치된 skill도 회수되는가 | 아니다. local artifact와 runtime permission을 따로 관리한다. |
+
+## 계속 확인할 공식 원문
+
+- [Paseo Plugin reference](https://paseo.sh/docs/plugins/reference) — surface·RPC·SDK·attachment·lifecycle의 현재 계약.
+- [Paseo SDK reference](https://paseo.sh/docs/sdk/reference) — agent config, `mcpServers`, `toolPolicy`, config API.
+- [Keycloak Server Administration](https://www.keycloak.org/docs/latest/server_admin/) — Device Authorization Grant와 client 설정.
+- [OAuth2 Proxy Keycloak OIDC](https://oauth2-proxy.github.io/oauth2-proxy/configuration/providers/keycloak_oidc/) — callback, audience와 group·role 제한.
+- [OAuth2 Proxy configuration](https://oauth2-proxy.github.io/oauth2-proxy/configuration/overview/) — Bearer validation과 upstream header option.
+
+<LinkCard
+  title="처음부터 다시 보기"
+  description="이 구조가 해결하려는 문제와 Paseo plugin의 책임 경계부터 다시 확인한다."
+  href="/paseo-enterprise/00-decision/"
+/>
