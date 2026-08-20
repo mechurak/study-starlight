@@ -43,12 +43,14 @@ kagent get agent -n kagent
 ```
 
 Kubernetes API의 resource 목록과 kagent API의 Agent 목록에 같은 이름이 보이는지가 첫 연결 확인이다.
+1장에서 열어 둔 dashboard의 Agent 목록은 같은 kagent API를 보는 세 번째 창이다.
 
 ## dashboard에서 첫 질문
 
 <Steps>
 
-1. `kagent dashboard`를 실행하고 Kubernetes 관련 sample Agent를 연다.
+1. dashboard에서 Kubernetes 관련 sample Agent를 연다. 닫았다면
+   [1장의 dashboard 열기](/kagent-lab/01-install/#dashboard-열기)의 운영체제별 방법으로 다시 연다.
 
 2. 다음처럼 **조회만 필요한 질문**을 보낸다.
 
@@ -132,7 +134,7 @@ Agent가 “정상”이라고 말해도 실제 Pod 상태가 다르면 cluster�
 - [`kagent invoke`](https://kagent.dev/docs/kagent/resources/cli/kagent-invoke) — task·stream·session flag
 
 <LinkCard
-  title="3. 조회 전용 선언형 Agent"
+  title="3. 조회 전용 Declarative Agent"
   description="sample을 쓰는 데서 벗어나 model·prompt·tool allowlist를 직접 선언한다."
   href="/kagent-lab/03-declarative-agent/"
 />

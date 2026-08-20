@@ -74,8 +74,8 @@ ServiceAccount·NetworkPolicy 같은 기존 Kubernetes 운영 모델과 가까�
 
 | 방식 | platform version에서 내려보낼 것 | 적합한 Agent |
 |---|---|---|
-| 선언형 | model config, prompt, tool binding, deployment hint | 구성형·표준 runtime Agent |
-| BYO | signed image digest, env/secret ref, resource·security context | LangGraph·CrewAI·ADK 등 코드형 |
+| `Declarative` | model config, prompt, tool binding, deployment hint | 구성형·표준 runtime Agent |
+| `BYO` | signed image digest, env/secret ref, resource·security context | LangGraph·CrewAI·ADK 등 코드형 |
 
 BYO image는 kagent가 기대하는 A2A endpoint를 구현해야 한다. 이미 HTTP API만 있는 Agent를 그대로 올리는
 범용 container platform은 아니다. adapter의 `validate`가 protocol contract와 port를 먼저 검사한다.
@@ -90,7 +90,7 @@ BYO image는 kagent가 기대하는 A2A endpoint를 구현해야 한다. 이미 
 | 원하는 실행 성격 | kagent에서의 대응 | process와 state |
 |---|---|---|
 | 항상 호출 가능한 일반 Agent | `Agent`의 `Declarative` 또는 `BYO` | Deployment replica가 A2A 요청을 기다림 |
-| idle compute를 회수하는 선언형 Agent | `SandboxAgent` + Agent Substrate | idle actor를 snapshot하고 요청 때 복원 |
+| idle compute를 회수하는 Declarative Agent | `SandboxAgent` + Agent Substrate | idle actor를 snapshot하고 요청 때 복원 |
 | 장기 coding 환경 | `AgentHarness` + Agent Substrate | filesystem·process를 가진 원격 sandbox를 ACP로 연결 |
 | 한 번의 task | `kagent invoke` 또는 A2A task | task만 끝나며 일반 Agent Deployment는 남음 |
 | 일정·event 기반 실행 | 외부 scheduler·event consumer가 A2A invoke | core `Agent` spec에는 schedule이 없음 |
@@ -178,7 +178,7 @@ session별 강한 격리를 빠르게 제공해야 한다. kagent가 Kubernetes 
 
 ## 참고 자료
 
-- [kagent Agent 개념](https://kagent.dev/docs/kagent/concepts/agents) — 선언형·BYO Agent, tool과 HITL.
+- [kagent Agent 개념](https://kagent.dev/docs/kagent/concepts/agents) — Declarative·BYO Agent, tool과 HITL.
 - [kagent API reference](https://kagent.dev/docs/kagent/resources/api-ref) — `AgentType`과 `Agent`·`SandboxAgent` schema.
 - [kagent Agent Substrate](https://kagent.dev/docs/kagent/concepts/agent-substrate) — idle actor snapshot·복원과 `SandboxAgent`.
 - [kagent Agent Harness](https://kagent.dev/docs/kagent/concepts/agent-harness/) — 장기 coding sandbox와 ACP 경계.

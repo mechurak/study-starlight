@@ -56,7 +56,13 @@ EOF
 
 <Steps>
 
-1. **resource status를 읽는다**
+1. **사용자가 보는 화면부터 확인한다**
+
+   dashboard의 Agent 목록에서 `broken-model-agent`가 어떻게 보이는지 본다. 목록에 없거나 상태 표시만
+   있을 뿐, 화면은 원인까지 말해 주지 않는다. 사용자가 실패를 처음 만나는 곳은 UI지만 진단은 여기서
+   내려간다.
+
+2. **resource status를 읽는다**
 
    ```bash
    kubectl -n kagent \
@@ -66,14 +72,14 @@ EOF
    `status.conditions`의 `type`, `status`, `reason`, `message`를 찾는다. 정확한 문구를 외우는 것이 아니라
    missing model reference를 가리키는지 본다.
 
-2. **describe로 Events까지 합쳐 본다**
+3. **describe로 Events까지 합쳐 본다**
 
    ```bash
    kubectl -n kagent \
      describe agent broken-model-agent
    ```
 
-3. **controller가 같은 이름을 어떻게 기록했는지 찾는다**
+4. **controller가 같은 이름을 어떻게 기록했는지 찾는다**
 
    ```bash
    kubectl -n kagent \
@@ -87,7 +93,7 @@ EOF
      logs deployment/kagent-controller --tail=100
    ```
 
-4. **실패 resource만 지운다**
+5. **실패 resource만 지운다**
 
    ```bash
    kubectl -n kagent \
@@ -136,7 +142,7 @@ kagent bug-report
 ## 완료 체크
 
 - 정상 Agent와 잘못된 Agent의 condition을 비교했다.
-- missing ModelConfig를 dashboard가 아니라 resource status에서 먼저 찾았다.
+- dashboard에서 보이는 실패 증상과 resource status의 원인(missing ModelConfig)을 구분했다.
 - 실패 resource만 삭제했고 `lab-reader`는 그대로 ready다.
 - 다음 장을 위해 cluster를 유지한다.
 

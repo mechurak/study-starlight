@@ -156,18 +156,21 @@ kubectl -n kagent wait \
 
 <Steps>
 
-1. controller port-forward가 살아 있는지 확인한다.
+1. dashboard의 Agent 목록에서 `simple-fetch-agent`를 열고, 작고 공개된 문서 URL 하나를 명시해 질문한다.
 
-2. 작고 공개된 문서 URL 하나를 명시해 호출한다.
+   ```text
+   https://example.com/ 을 fetch해서 페이지 제목과 목적만 요약해 줘.
+   ```
+
+2. tool arguments와 result를 펼쳐, arguments의 URL이 사용자가 준 값과 같은지와
+   실제 tool 이름이 `fetch`인지 확인한다.
+
+3. 같은 호출을 CLI로 재현한다. controller port-forward가 살아 있는지 먼저 확인한다.
 
    ```bash
    kagent invoke -n kagent -a simple-fetch-agent -S \
      -t "Fetch https://example.com/ and summarize only the page title and purpose."
    ```
-
-3. dashboard에서 같은 Agent를 열어 tool arguments와 result를 펼친다.
-
-4. arguments의 URL이 사용자가 준 값과 같은지, 실제 tool 이름이 `fetch`인지 확인한다.
 
 </Steps>
 
