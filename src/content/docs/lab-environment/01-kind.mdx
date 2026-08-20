@@ -1,7 +1,7 @@
 ---
 title: "1. kind 실습 환경"
 description: "macOS와 Ubuntu에서 Docker runtime·kind·kubectl을 준비하고 클러스터를 생성·확인·중단·삭제한다"
-reviewedAt: 2026-08-19
+reviewedAt: 2026-08-20
 status: stable
 ---
 
@@ -63,36 +63,34 @@ Ubuntu → Docker Engine → kind 노드 컨테이너
 </TabItem>
 </Tabs>
 
-## 공식 문서에서 설치하기
+## Docker
 
-설치 명령은 이 문서에 복제하지 않는다. 아래 공식 문서에서 지원 운영체제와 CPU 아키텍처, 현재 표시되는
-명령을 확인한 뒤 실행한다.
+kind 노드는 Docker 컨테이너로 실행되므로 먼저 Docker runtime과 client가 필요하다. 설치 명령은 복제하지
+않고 공식 문서에서 지원 운영체제와 CPU 아키텍처, 현재 표시되는 명령을 확인해 실행한다.
 
 <Tabs syncKey="operating-system">
 <TabItem label="macOS">
 
-**Colima를 쓸 때**
+Colima를 쓴다면 이 절에서는 건너뛰고 다음 **Colima (macOS)** 절에서 Docker client까지 함께 준비한다.
+Docker Desktop을 선택했다면
+<ExternalLink href="https://docs.docker.com/desktop/setup/install/mac-install/">Docker Desktop — Install on Mac</ExternalLink>을
+따라 설치하고 앱을 실행한다.
 
-1. Homebrew가 없다면 <ExternalLink href="https://brew.sh/">Homebrew 공식 설치</ExternalLink>를 따른다.
-2. <ExternalLink href="https://github.com/abiosoft/colima#installation">Colima — Installation</ExternalLink>에서 Colima를 설치한다.
-3. 같은 문서의 <ExternalLink href="https://github.com/abiosoft/colima#docker">Colima — Docker runtime</ExternalLink>에서 Docker client를 준비한다.
-4. <ExternalLink href="https://kind.sigs.k8s.io/docs/user/quick-start/#installing-with-a-package-manager">kind — Installing With A Package Manager</ExternalLink>의 macOS 절에서 kind를 설치한다.
-5. <ExternalLink href="https://kubernetes.io/docs/tasks/tools/install-kubectl-macos/">kubectl — Install kubectl on macOS</ExternalLink>에서 Homebrew 또는 binary 설치 경로를 선택한다.
-
-**Docker Desktop을 쓸 때**
-
-1. <ExternalLink href="https://docs.docker.com/desktop/setup/install/mac-install/">Docker Desktop — Install on Mac</ExternalLink>을 따라 설치하고 앱을 실행한다.
-2. Homebrew가 없다면 <ExternalLink href="https://brew.sh/">Homebrew 공식 설치</ExternalLink>를 따른다.
-3. <ExternalLink href="https://kind.sigs.k8s.io/docs/user/quick-start/#installing-with-a-package-manager">kind — Installing With A Package Manager</ExternalLink>의 macOS 절에서 kind를 설치한다.
-4. <ExternalLink href="https://kubernetes.io/docs/tasks/tools/install-kubectl-macos/">kubectl — Install kubectl on macOS</ExternalLink>에서 Homebrew 또는 binary 설치 경로를 선택한다.
+**Settings → Resources**에서 CPU와 메모리를 배정한 뒤 `docker info`가 성공하는지 확인한다.
 
 </TabItem>
 <TabItem label="Ubuntu">
 
 1. <ExternalLink href="https://docs.docker.com/engine/install/ubuntu/#install-using-the-apt-repository">Docker Engine — Install using the apt repository</ExternalLink>를 따라 Docker Engine을 설치한다. 기존 `docker.io`나 `containerd`가 있다면 같은 페이지의 충돌 패키지 안내를 먼저 확인한다.
 2. `sudo` 없이 Docker를 쓸 필요가 있으면 <ExternalLink href="https://docs.docker.com/engine/install/linux-postinstall/#manage-docker-as-a-non-root-user">Docker — Manage Docker as a non-root user</ExternalLink>를 따른다.
-3. <ExternalLink href="https://kind.sigs.k8s.io/docs/user/quick-start/#installing-from-release-binaries">kind — Installing From Release Binaries</ExternalLink>의 Linux 절에서 CPU 아키텍처에 맞는 kind를 설치한다.
-4. <ExternalLink href="https://kubernetes.io/docs/tasks/tools/install-kubectl-linux/">kubectl — Install kubectl on Linux</ExternalLink>에서 아키텍처에 맞는 binary와 checksum을 받아 검증한 뒤 설치한다.
+
+Docker Engine 서비스를 시작하고 상태를 확인한다. 공유 머신이라면 서비스 시작·중단이 다른 컨테이너에도
+영향을 주는지 먼저 확인한다.
+
+```bash
+sudo systemctl start docker
+systemctl status docker
+```
 
 :::caution[Docker 권한]
 Docker 공식 문서가 경고하듯 `docker` 그룹은 사용자에게 root 수준 권한을 준다. 여러 사용자가 함께 쓰는
@@ -103,12 +101,21 @@ Docker 공식 문서가 경고하듯 `docker` 그룹은 사용자에게 root 수
 </TabItem>
 </Tabs>
 
-## runtime 시작과 준비 확인
+Docker Desktop 또는 Docker Engine을 골랐다면 client가 runtime에 연결되는지 확인한다.
 
-<Tabs syncKey="operating-system">
-<TabItem label="macOS">
+```bash
+docker info
+```
 
-Colima는 처음 VM을 만들 때 실습 자원을 지정하고, Colima 내장 Kubernetes는 끈다. 이 덱에서는 kind만 쓴다.
+## Colima (macOS)
+
+Colima는 macOS에서만 선택하는 기본 경로다. Docker Desktop을 사용하고 있다면 이 절은 건너뛴다.
+
+1. Homebrew가 없다면 <ExternalLink href="https://brew.sh/">Homebrew 공식 설치</ExternalLink>를 따른다.
+2. <ExternalLink href="https://github.com/abiosoft/colima#installation">Colima — Installation</ExternalLink>에서 Colima를 설치한다.
+3. 같은 문서의 <ExternalLink href="https://github.com/abiosoft/colima#docker">Colima — Docker runtime</ExternalLink>에서 Docker client를 준비한다.
+
+처음 VM을 만들 때 실습 자원을 지정하고, Colima 내장 Kubernetes는 끈다. 이 덱에서는 kind만 쓴다.
 
 ```bash
 colima start --cpu 4 --memory 8 --disk 60 --kubernetes=false
@@ -118,35 +125,113 @@ docker info --format 'CPUs={{.NCPU}} Memory={{.MemTotal}}'
 이미 VM이 있다면 `colima list`로 현재 자원을 먼저 확인한다. 자원을 바꿀 때는 `colima stop` 후 원하는 값으로
 다시 시작한다. 디스크는 늘릴 수 있지만 줄일 수 없다.
 
-Docker Desktop을 선택했다면 앱을 실행하고 **Settings → Resources**에서 CPU와 메모리를 배정한 뒤
-`docker info`가 성공하는지 확인한다.
-
 Apple Silicon은 `arm64`다. kind 노드 이미지는 이를 지원하지만, 실습 애플리케이션 이미지가
 `linux/arm64`를 제공하지 않으면 느린 에뮬레이션을 쓰거나 실행에 실패할 수 있다.
+
+## kubectl
+
+kubectl은 클러스터를 만들지는 않고, 만들어진 Kubernetes API에 명령을 보내는 client다. 운영체제에 맞는
+공식 설치 페이지를 따라 준비한다.
+
+<Tabs syncKey="operating-system">
+<TabItem label="macOS">
+
+<ExternalLink href="https://kubernetes.io/docs/tasks/tools/install-kubectl-macos/">kubectl — Install and Set Up on macOS</ExternalLink>에서
+Homebrew 또는 binary 설치 경로를 선택한다.
 
 </TabItem>
 <TabItem label="Ubuntu">
 
-Docker Engine 서비스를 시작하고 상태를 확인한다. 공유 머신이라면 서비스 시작·중단이 다른 컨테이너에도
-영향을 주는지 먼저 확인한다.
+<ExternalLink href="https://kubernetes.io/docs/tasks/tools/install-kubectl-linux/">kubectl — Install and Set Up on Linux</ExternalLink>에서
+CPU 아키텍처에 맞는 binary와 checksum을 받아 검증한 뒤 설치한다.
+
+</TabItem>
+</Tabs>
+
+설치한 client 버전을 먼저 확인한다.
 
 ```bash
-sudo systemctl start docker
-systemctl status docker
+kubectl version --client
+```
+
+### 자동완성과 `k` alias
+
+kubectl은 하위 명령과 resource 이름이 길고 반복되므로 shell 자동완성과 `k` alias를 함께 설정하면 실습 중
+입력량을 크게 줄일 수 있다. 아래 내용을 사용하는 shell의 시작 파일에 추가한다.
+
+<Tabs>
+<TabItem label="Zsh">
+
+macOS 기본 shell인 Zsh에서는 `~/.zshrc`에 다음을 추가한다. 이미 shell framework가 completion을 초기화한다면
+앞의 `compinit` 두 줄은 중복해서 넣지 않는다.
+
+```zsh
+autoload -Uz compinit
+compinit
+source <(kubectl completion zsh)
+alias k=kubectl
+```
+
+Zsh에서는 kubectl completion을 불러온 뒤 만든 alias에도 자동완성이 적용된다.
+
+```zsh
+source ~/.zshrc
+k version --client
+```
+
+</TabItem>
+<TabItem label="Bash">
+
+Bash에서는 먼저 공식 설치 페이지의 안내대로 `bash-completion`을 준비하고, `~/.bashrc`에 다음을 추가한다.
+`k`에도 completion을 연결하는 마지막 줄까지 필요하다.
+
+```bash
+source <(kubectl completion bash)
+alias k=kubectl
+complete -o default -F __start_kubectl k
+```
+
+```bash
+source ~/.bashrc
+k version --client
 ```
 
 </TabItem>
 </Tabs>
 
-운영체제와 관계없이 다음 세 명령이 모두 성공해야 클러스터를 만들 수 있다.
+전체 shell과 Fish·PowerShell 설정은
+<ExternalLink href="https://kubernetes.io/docs/reference/kubectl/quick-reference/#kubectl-autocomplete">Kubernetes 공식 문서 — kubectl autocomplete</ExternalLink>에서
+확인한다. `k`는 대화형 입력을 줄이는 편의 기능이고, 이 문서의 명령은 대상 cluster를 드러내기 위해 계속
+`kubectl --context kind-study`를 사용한다.
+
+## kind
+
+kind는 준비된 Docker runtime에 Kubernetes 노드 컨테이너를 만든다.
+
+<Tabs syncKey="operating-system">
+<TabItem label="macOS">
+
+<ExternalLink href="https://kind.sigs.k8s.io/docs/user/quick-start/#installing-with-a-package-manager">kind — Installing With A Package Manager</ExternalLink>의
+macOS 절에서 kind를 설치한다.
+
+</TabItem>
+<TabItem label="Ubuntu">
+
+<ExternalLink href="https://kind.sigs.k8s.io/docs/user/quick-start/#installing-from-release-binaries">kind — Installing From Release Binaries</ExternalLink>의
+Linux 절에서 CPU 아키텍처에 맞는 kind를 설치한다.
+
+</TabItem>
+</Tabs>
+
+클러스터를 만들기 전에 세 도구가 모두 준비됐는지 확인한다.
 
 ```bash
 docker info
-kind version
 kubectl version --client
+kind version
 ```
 
-## 클러스터 만들고 확인하기
+### 클러스터 만들고 확인하기
 
 <Steps>
 
@@ -175,7 +260,7 @@ kubectl version --client
 
 </Steps>
 
-## 여러 노드가 필요할 때
+### 여러 노드가 필요할 때
 
 스케줄링·노드 선택·장애 실습은 control plane 1대와 worker 2대를 만든다. 아래 설정을
 `kind-study.yaml`로 저장한다.

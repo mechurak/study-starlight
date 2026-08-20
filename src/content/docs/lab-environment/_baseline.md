@@ -16,12 +16,14 @@
 
 ## kind 환경의 기준과 안전 경계
 
-**2026년 8월** 기준이며 2026-08-19에 공식 문서로 확인했다.
+**2026년 8월** 기준이며 2026-08-20에 공식 문서로 확인했다.
 
 - macOS 기본 경로는 Colima + Docker CLI다. Docker Desktop은 대안으로 함께 설명한다.
 - Ubuntu는 Docker Engine 공식 apt 저장소 설치를 기본 경로로 삼는다.
 - Docker·kind·kubectl 설치 명령을 본문에 복제하지 않는다. 공식 문서의 정확한 설치 절을 링크하고,
   독자가 현재 명령과 지원 버전을 그곳에서 확인해 실행하도록 한다.
+- kubectl shell 설정은 공식 quick reference와 운영체제별 설치 문서를 따른다. `k` alias를 소개하되,
+  문서의 cluster 조작 예시는 대상이 명확하도록 `kubectl --context kind-<name>`을 유지한다.
 - 실습 클러스터 이름은 예시에서도 반드시 명시하고, `kubectl` 예시는 `--context kind-<name>`을 붙인다.
 - 사내 CA는 클러스터 생성 직후 workload 설치 전에 kind 노드에 추가한다. 클러스터를 다시 만들면 재적용해야
   하며, CA trust와 `HTTP_PROXY`·`HTTPS_PROXY`·`NO_PROXY` 설정을 같은 문제로 설명하지 않는다.
@@ -41,6 +43,7 @@
 ## 서술 규칙
 
 - 각 본문 장 첫머리에 `<TermIntro>`를 둔다.
-- 절차는 덱 전체에서 **운영체제별 준비 탭 → 생성 → 확인 → 사용 → 운영체제별 중단 탭 → 정리 → 정리 확인** 순서로 쓴다.
+- kind 장의 목차는 **Docker → Colima(macOS) → kubectl → kind**처럼 다시 찾기 쉬운 도구 이름으로 구성하고,
+  각 도구 안에서는 설치 → 준비 확인 순서를 지킨다. 이후 생성 → 확인 → 사용 → 운영체제별 중단 탭 → 정리 → 정리 확인으로 이어 간다.
 - 복사해서 실행하는 명령은 대상을 이름으로 제한한다. 광범위한 삭제와 암묵적인 current context를 피한다.
 - 외부 설치 링크를 바꿀 때는 kind·Kubernetes·Docker·Colima·Helm 공식 문서의 anchor까지 다시 확인한다.
