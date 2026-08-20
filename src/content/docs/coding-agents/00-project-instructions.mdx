@@ -25,19 +25,61 @@ import TermIntro from '../../../components/docs/TermIntro.astro';
 
 권장 구조는 세 층이다.
 
-```mermaid
-flowchart LR
-    A["공유 행동 규칙<br/>범위별 AGENTS.md"] --> C["Codex<br/>직접 탐색"]
-    A --> B["얇은 어댑터<br/>같은 폴더의 CLAUDE.md"] --> D["Claude Code<br/>@AGENTS.md import"]
-    A -.-> E["긴 설명·절차<br/>docs/ · README"]
-    A -.-> F["기계적 강제<br/>CI · hook"]
+```d2 title="범위별 AGENTS.md 정본이 Codex에는 직접, Claude Code에는 CLAUDE.md 어댑터로 연결되고, 긴 설명은 docs로, 강제는 CI·hook으로 보내는 구조"
+direction: right
 
-    classDef key  fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
-    classDef ok   fill:#dcfce7,stroke:#16a34a,color:#14532d
-    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
-    class A key
-    class B,C,D ok
-    class E,F mute
+classes: {
+  key: {
+    style: {
+      fill: "#dbeafe"
+      stroke: "#2563eb"
+      font-color: "#1e3a8a"
+    }
+  }
+  ok: {
+    style: {
+      fill: "#dcfce7"
+      stroke: "#16a34a"
+      font-color: "#14532d"
+    }
+  }
+  mute: {
+    style: {
+      fill: "#f1f5f9"
+      stroke: "#94a3b8"
+      font-color: "#334155"
+    }
+  }
+}
+
+rules: "공유 행동 규칙\n범위별 AGENTS.md" {
+  class: key
+}
+codex: "Codex\n직접 탐색" {
+  class: ok
+}
+adapter: "얇은 어댑터\n같은 폴더의 CLAUDE.md" {
+  class: ok
+}
+claude: "Claude Code\n@AGENTS.md import" {
+  class: ok
+}
+docs: "긴 설명·절차\ndocs/ · README" {
+  class: mute
+}
+ci: "기계적 강제\nCI · hook" {
+  class: mute
+}
+
+rules -> codex
+rules -> adapter
+adapter -> claude
+rules -> docs: {
+  style.stroke-dash: 3
+}
+rules -> ci: {
+  style.stroke-dash: 3
+}
 ```
 
 ## 먼저 바로잡을 네 가지
