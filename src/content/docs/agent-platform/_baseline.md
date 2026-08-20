@@ -19,12 +19,14 @@
 - 온프렘 Kubernetes가 있고, AWS VPC를 사내망의 신뢰 가능한 확장으로 사용할 가능성이 있다.
 - Agent는 prompt·knowledge·승인된 MCP를 조합한 구성형과, 컨테이너로 배포하는 코드형을 모두 포함한다.
 - 사내 Keycloak 또는 Entra ID가 사용자와 부서 group의 단일 원본이다.
+- 사내 포털의 frontend와 backend(Node/TypeScript)가 같은 온프렘 cluster에 이미 떠 있다. 10장의 연결
+  설계는 이 스택을 전제로 쓴다. 사용자에게 kubeconfig를 주지 않는다.
 
 ## 범위 경계
 
 - **다룬다:** 포털과 runtime의 경계, 제품 중립 domain model, Agent 분류 축과 trigger, Agent·사용자 제작 MCP의
-  등록·승인·배포 lifecycle, 세 단계 권한, adapter contract, kagent, Dapr Agents, AgentCore, hybrid target 선택,
-  운영·도입 검증.
+  등록·승인·배포 lifecycle, 세 단계 권한, adapter contract, kagent(아키텍처·resource·사내 연결·adapter 4장),
+  Dapr Agents, AgentCore, hybrid target 선택, 운영·도입 검증.
 - **다루지 않는다:** Agent framework 사용법, prompt engineering, 모델 학습·평가, GPU 모델 서빙 상세,
   MCP 서버 구현 튜토리얼, Kubernetes 설치, AWS 계정·VPC 구축 절차.
 - 모델 API 입구는 [LiteLLM 덱](/litellm/), LLM trace와 평가는 [Langfuse 덱](/langfuse/),
@@ -61,6 +63,10 @@ state·격리·행위 위험도 별도 축으로 기록하고 target capability�
 | kagent 인증 | v0.9에서 oauth2-proxy 기반 OIDC 인증 추가. 공식 release note는 application access control 미구현이라고 명시 | kagent v0.9 release notes |
 | kagent BYO | 사용자 image를 배포하며 A2A server 계약을 기대 | kagent BYO Agent guide |
 | kagent 실행 형태 | 일반 `Agent`는 Deployment, `SandboxAgent`는 Agent Substrate actor, `AgentHarness`는 장기 coding sandbox | kagent API docs, Agent Substrate·Agent Harness docs |
+| kagent 구성 요소 | controller가 CRD를 조정하고 engine이 대화 loop를 실행. engine runtime은 Python ADK(기본, 약 15초)와 Go ADK(약 2초) (2026-08-21 확인) | kagent Architecture, Agents docs |
+| kagent 통합 지점 | 공식 문서가 외부 클라이언트용으로 문서화하는 것은 CRD schema다. dashboard가 쓰는 HTTP API는 문서화·version 보장 대상이 아님 (2026-08-21 확인) | kagent API reference |
+| kagent tool 선언 | `tools[].mcpServer.toolNames`가 allowlist, 자격증명은 `headersFrom`의 Secret·ConfigMap 참조, 자동 discovery는 `kagent.dev/discovery=disabled`로 제외 | kagent Tools docs |
+| kagent memory | 대화에서 자동 추출한 정보를 embedding으로 저장하고 유사도로 검색. 임의 vector store를 꽂는 plugin 구조가 아님 | kagent Agent Memory docs |
 | Dapr Agents | v1.0 GA인 Python framework. `DurableAgent`가 권장 모델이며 Dapr Workflow·state store로 실행을 복구. 동기 `Agent` 클래스는 v1.0.0-rc.1부터 deprecated, orchestrator는 `LLMOrchestrator`·`RoundRobin`·`Random` (2026-08-20 재확인) | Dapr Agents introduction, core concepts |
 | Dapr 배포 | 일반 application Pod에 sidecar를 주입한다. Agent 전용 CR/controller lifecycle은 platform adapter가 보완 | Dapr sidecar docs |
 | Dapr 권한 | App ID별 SPIFFE workload identity·mTLS와 MCP access policy 제공. 임직원 invoke ACL과는 다른 층 | Dapr MCP security docs |
@@ -75,6 +81,9 @@ state·격리·행위 위험도 별도 축으로 기록하고 target capability�
 
 - 제품 이름보다 **사용자 요청과 배포 명령의 두 흐름**을 먼저 보여준다.
 - kagent·Dapr Agents·AgentCore를 완성된 사내 포털이라고 쓰지 않는다. 사내 catalog·ACL은 별도다.
+- kagent dashboard를 최종 사용자 화면으로 쓰지 않는다. 자체 포털을 만들면 dashboard는 운영자 콘솔로 남는다.
+- backend가 kagent에 말을 거는 지점은 CRD다. dashboard의 내부 HTTP API나 CLI shell 실행을 계약으로 쓰지 않는다.
+- Kubernetes를 데이터베이스로 쓰지 않는다. 정체성·version·Grant·감사는 포털 DB가 원본이고 실행 상태만 cluster가 원본이다.
 - Dapr Agents를 kagent와 완전히 같은 제품군으로 쓰지 않는다. 전자는 code-first durable framework/substrate,
   후자는 Agent CR 중심 Kubernetes control plane이다.
 - Dapr App ID·SPIFFE identity를 임직원 identity로 설명하지 않는다. workload 간 인증·인가 경계다.

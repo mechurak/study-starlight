@@ -430,9 +430,18 @@ export const deckDefinitions = [
 		groups: [
 			['큰 그림', ['agent-platform/00-position', 'agent-platform/01-planes']],
 			['제품 밖의 계약', ['agent-platform/02-agent-types', 'agent-platform/03-domain-model', 'agent-platform/04-lifecycle', 'agent-platform/05-authorization', 'agent-platform/06-adapter-contract', 'agent-platform/07-user-mcp']],
-			['실행 어댑터', ['agent-platform/08-kagent', 'agent-platform/09-dapr-agents', 'agent-platform/10-agentcore']],
-			['하이브리드 운영', ['agent-platform/11-hybrid', 'agent-platform/12-operations']],
-			['도입과 마무리', ['agent-platform/13-adoption', 'agent-platform/14-wrapup']],
+			[
+				'kagent — 온프렘 실행 어댑터',
+				[
+					'agent-platform/08-kagent-architecture',
+					'agent-platform/09-kagent-resources',
+					'agent-platform/10-kagent-integration',
+					'agent-platform/11-kagent-adapter',
+				],
+			],
+			['다른 실행 어댑터', ['agent-platform/12-dapr-agents', 'agent-platform/13-agentcore']],
+			['하이브리드 운영', ['agent-platform/14-hybrid', 'agent-platform/15-operations']],
+			['도입과 마무리', ['agent-platform/16-adoption', 'agent-platform/17-wrapup']],
 		],
 	},
 	{
@@ -465,7 +474,7 @@ export const deckDefinitions = [
 			['프로젝트 지침', ['coding-agents/00-project-instructions']],
 		],
 	},
-];
+	];
 
 export const topics = [...deckDefinitions].sort((a, b) => a.topicOrder - b.topicOrder).map((deck) => ({
 	label: deck.label,

@@ -1,0 +1,131 @@
+---
+title: "11. kagent adapter 운영과 경계"
+description: 공통 배포 계약을 kagent resource에 매핑하고 capability·인가 빈칸·격리·공급망으로 남는 위험을 드러낸다
+aliases: [kagent adapter, kagent capability, kagent 격리, kagent 공급망]
+reviewedAt: 2026-08-21
+status: review
+---
+
+import { LinkCard } from '@astrojs/starlight/components';
+import TermIntro from '../../../components/docs/TermIntro.astro';
+
+> kagent는 Kubernetes 안의 Agent lifecycle을 표준화하지만 **회사의 catalog와 entitlement를 소유하지 않는다**
+
+<TermIntro
+  terms={[
+    ['capability profile', 'Capability Profile', 'target이 무엇을 지원하고 무엇을 지원하지 않는지 계약으로 선언한 것이다.'],
+    ['blast radius', '', '한 구성 요소가 뚫리거나 오작동했을 때 영향이 미치는 범위다.'],
+    ['admission policy', 'Admission Policy', 'resource가 cluster에 생성되기 전에 규칙 위반을 걸러 내는 검사다.'],
+  ]}
+/>
+
+8~10장이 kagent의 구조·resource·연결이었다면 이 장은 **adapter 구현자의 관점**이다.
+[6장 adapter contract](/agent-platform/06-adapter-contract/)가 정의한 operation을 kagent에서
+어떻게 채우고, 채울 수 없는 자리를 어떻게 드러낼 것인가를 정리한다.
+
+## 공통 객체 매핑
+
+| 공통 객체 | kagent/Kubernetes 표현 |
+|---|---|
+| `AgentVersion` | immutable image digest 또는 선언형 `Agent.spec` snapshot |
+| `Trigger` | 외부 scheduler·event consumer와 A2A invoke 설정 |
+| `DeploymentTarget` | cluster, namespace, ServiceAccount, node/security preset |
+| `Deployment` | namespaced `Agent` resource와 생성된 workload |
+| `providerRef` | cluster ID + namespace + Agent name + UID |
+| `ToolBinding` | MCP/ToolServer reference와 tool allowlist |
+| runtime identity | ServiceAccount와 workload credential |
+
+`Grant`와 `Publication`은 kagent resource에 억지로 넣지 않는다. portal API가 invoke 전 ACL을 검사하고,
+외부 route는 승인된 publication만 kagent A2A endpoint로 연결한다.
+
+## Capability profile
+
+[8장의 실행 수명주기 표](/agent-platform/08-kagent-architecture/#실행-수명주기는-다른-resource와-trigger로-표현한다)에서
+봤듯 kagent가 직접 표현하지 못하는 실행 성격이 있다. 이것을 최소 공통분모로 깎아 없애는 대신
+[capability](/agent-platform/06-adapter-contract/#capability로-차이를-드러낸다)로 드러낸다.
+kagent target이라면 다음처럼 답한다.
+
+```yaml
+capabilities:
+  residency: [resident, suspendable] # Agent · SandboxAgent
+  ephemeralJob: manual # Job 직접 구성은 kagent 모델 밖
+  scheduledInvoke: external # CronJob·Argo가 A2A invoke
+  durableWorkflowState: unsupported
+  persistentFilesystem: agent-harness
+```
+
+`durableWorkflowState`가 `unsupported`라는 점이 [12장 Dapr Agents](/agent-platform/12-dapr-agents/)와
+갈리는 지점이다. 승인 대기가 며칠 걸리거나 중단 지점부터 이어져야 하는 Agent라면 target 선택을 다시 본다.
+
+## 인증과 인가의 빈칸
+
+kagent v0.9은 oauth2-proxy 기반 OIDC 인증을 지원하지만 공식 release note는 **access control이 아직 구현되지
+않았다**고 명시한다. 로그인한 사용자의 identity를 안다는 것과 Agent별 실행·수정 권한을 판단하는 것은 다르다.
+
+Kubernetes RBAC도 직접적인 답은 아니다. 이것은 creator나 controller가 Kubernetes API의 `Agent` resource를
+만질 권한을 제어한다. 일반 임직원이 chat/API로 Agent를 호출할 entitlement는 portal 또는 gateway가 강제한다.
+
+두 경로를 실제로 어떻게 막는지는
+[10장 부서별 접근 통제](/agent-platform/10-kagent-integration/#부서별-접근-통제-두-경로)에 있다.
+
+## 격리와 공급망
+
+namespace 하나를 사용자마다 자동 생성하는 것만으로 격리가 끝나지 않는다. target preset에 다음을 고정한다.
+
+- non-root, seccomp, privilege escalation 금지
+- read-only root filesystem과 제한된 volume
+- ServiceAccount token 불필요 시 자동 mount 금지
+- 기본 deny NetworkPolicy와 승인된 model·MCP egress
+- ResourceQuota, LimitRange, PriorityClass
+- signed image와 admission policy
+- code 실행 Agent는 SandboxAgent 또는 별도 sandbox class 검증
+
+controller가 모든 namespace를 watch하는 기본값보다 허용 namespace 목록을 명시해 blast radius를 줄인다.
+
+공급망 입구는 image만이 아니다. [9장에서 본](/agent-platform/09-kagent-resources/#skills--자율-동작의-지침)
+container skill의 OCI·Git 참조, MCP server image, BYO image가 모두 code 실행 경계이므로 같은 검사를 받는다.
+
+## Adapter 동작
+
+1. target capability와 image architecture/A2A contract를 검증한다.
+2. `deploymentId` label과 deterministic resource name을 만든다.
+3. secret value가 아니라 namespaced reference를 준비한다.
+4. `Agent` resource를 server-side apply한다.
+5. condition과 실제 Pod·Service health를 함께 읽어 normalized status로 바꾼다.
+6. synthetic invoke와 ACL deny test 뒤 portal publication을 연다.
+7. rollback은 이전 version의 별도 resource로 route를 돌린다.
+
+CR spec을 제자리에서 덮어써 이전 version의 조사 가능성을 없애지 않는다.
+
+5번의 정규화가 특히 중요하다. `Agent` CR의 condition이 `Ready`여도 Pod가 재시작을 반복하거나 model
+endpoint에 닿지 못할 수 있다. adapter는 condition·Pod·Service를 함께 읽어 사용자에게 보여 줄 하나의
+상태로 바꾸고, 원인 문자열은 진단용으로 따로 남긴다.
+
+## 잘 맞는 경우와 불리한 경우
+
+**잘 맞는다:** 실행과 data가 온프렘에 남아야 하고, Kubernetes 운영 역량·GitOps·policy 기반이 이미 있으며,
+로컬 model·MCP에 낮은 지연으로 접근해야 한다.
+
+**불리하다:** platform team이 controller·Postgres·upgrade·capacity·sandbox를 직접 운영할 여력이 없거나,
+session별 강한 격리를 빠르게 제공해야 한다. kagent가 Kubernetes 운영 책임을 없애지는 않는다.
+
+## 11장 요약
+
+- `Grant`·`Publication`은 kagent resource에 넣지 않고 portal이 소유한다.
+- 표현하지 못하는 실행 성격은 깎지 말고 capability로 선언한다.
+- OIDC 인증이 있다는 것과 Agent별 권한 판단은 다른 문제다.
+- image·skill·MCP server가 모두 공급망 입구이므로 같은 검사를 받는다.
+- condition만으로 성공을 판정하지 않고 Pod·Service health와 함께 정규화한다.
+
+## 참고 자료
+
+- [kagent v0.9 release notes](https://kagent.dev/docs/kagent/resources/release-notes) — OIDC 인증과 access control 경계
+- [운영 고려사항](https://kagent.dev/docs/kagent/operations/operational-considerations) — HA, secret, security context
+- [kagent BYO Agent](https://kagent.dev/docs/kagent/examples/a2a-byo) — image와 A2A runtime 계약
+- [kagent 실습 덱 7장](/kagent-lab/07-byo-agent/) — BYO image를 kind cluster에 올려 보기
+
+<LinkCard
+  title="12. Dapr Agents adapter"
+  description="코드형 Agent의 workflow·state·tool 호출을 재시작 뒤에도 이어지는 실행 계약으로 번역한다."
+  href="/agent-platform/12-dapr-agents/"
+/>

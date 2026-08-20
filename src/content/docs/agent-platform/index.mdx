@@ -89,8 +89,8 @@ Runtime target 상자로 드나드는 화살표는 상자 전체에 걸린다 �
 <LinkButton href="/agent-platform/00-position/" icon="right-arrow">첫 장부터 읽기</LinkButton>
 
 :::tip[runtime 마련이 당장의 관심사라면]
-어느 runtime을 어떻게 마련할지가 급하면 [8~10장 세 실행 adapter](/agent-platform/08-kagent/)와
-[11장 하이브리드 target 선택](/agent-platform/11-hybrid/)부터 읽어도 된다. 다만 그 선택을 나중에
+어느 runtime을 어떻게 마련할지가 급하면 [8~11장 kagent](/agent-platform/08-kagent-architecture/)와
+[14장 하이브리드 target 선택](/agent-platform/14-hybrid/)부터 읽어도 된다. 다만 그 선택을 나중에
 되돌릴 수 있게 만드는 근거가 제품 중립 계약이므로, [0장](/agent-platform/00-position/) 하나는 먼저 읽는다.
 :::
 
@@ -107,13 +107,16 @@ Runtime target 상자로 드나드는 화살표는 상자 전체에 걸린다 �
     { label: '6~7장', href: '/agent-platform/06-adapter-contract/', title: 'Adapter와 MCP 공급 계약', tone: 'ok',
       desc: 'runtime adapter operation · capability profile · 사용자 MCP의 등록·검증·배포·공개',
       note: '여러 backend의 차이를 보존하면서 Agent와 Tool의 공급 계약을 어떻게 안정시키는가' },
-    { label: '8~10장', href: '/agent-platform/08-kagent/', title: '세 실행 adapter', tone: 'warn',
-      desc: 'Kubernetes-native control plane · durable workflow substrate · AWS managed session runtime',
+    { label: '8~11장', href: '/agent-platform/08-kagent-architecture/', title: 'kagent — 온프렘 실행 어댑터', tone: 'warn',
+      desc: 'controller·engine 구조 · Agent와 tool 리소스 · 사내 frontend·backend 연결 · adapter 운영과 경계',
+      note: '온프렘 Kubernetes를 Agent runtime으로 쓰려면 무엇을 우리가 만들어야 하는가' },
+    { label: '12~13장', href: '/agent-platform/12-dapr-agents/', title: '다른 실행 adapter', tone: 'warn',
+      desc: 'durable workflow substrate · AWS managed session runtime',
       note: '각 제품이 공통 계약의 어디까지 맡고 무엇을 남기는가' },
-    { label: '11~12장', href: '/agent-platform/11-hybrid/', title: '하이브리드 운영', tone: 'bad',
+    { label: '14~15장', href: '/agent-platform/14-hybrid/', title: '하이브리드 운영', tone: 'bad',
       desc: 'data zone별 target 선택 · network · 감사 · SLO · 장애 격리와 복구',
       note: '온프렘과 AWS를 한 control plane에서 어떻게 운영하는가' },
-    { label: '13~14장', href: '/agent-platform/13-adoption/', title: '도입과 마무리', tone: 'mute',
+    { label: '16~17장', href: '/agent-platform/16-adoption/', title: '도입과 마무리', tone: 'mute',
       desc: '두 Agent와 사용자 MCP로 검증하는 PoC · 선택 기준 · production checklist' },
   ]}
 />
