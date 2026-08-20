@@ -20,30 +20,61 @@ import TermIntro from '../../../components/docs/TermIntro.astro';
 
 ## 객체 관계
 
-```mermaid
-flowchart LR
-    AG["Agent<br/>정체성 · owner"] --> VER["AgentVersion<br/>immutable artifact"]
-    AG --> GRANT["Grant<br/>principal · role"]
-    AG --> PUB["Publication<br/>공개 상태"]
-    AG --> TRG["Trigger<br/>request · schedule · event"]
-    VER --> DEP["Deployment<br/>version × target"]
-    TARGET["DeploymentTarget<br/>zone · capabilities"] --> DEP
-    DEP --> PREF["providerRef<br/>namespace/name 또는 ARN"]
-    T["Tool<br/>정체성 · owner"] --> TV["ToolVersion<br/>artifact · schema"]
-    TV --> TDEP["ToolDeployment<br/>실행 또는 연결"]
-    TARGET --> TDEP
-    TDEP --> PREF
-    VER --> TOOL["ToolBinding<br/>allowlist · auth mode"]
-    TOOL --> TV
-    PUB --> DEP
-    TRG --> PUB
+```d2 layout=elk pad=40 title="Agent와 Tool의 정체성에서 Version·Grant·Publication·Trigger를 거쳐 target별 Deployment와 providerRef로 이어지는 객체 관계"
+direction: right
 
-    classDef key fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
-    classDef zone fill:#ede9fe,stroke:#7c3aed,color:#4c1d95
-    classDef ok fill:#dcfce7,stroke:#16a34a,color:#14532d
-    class AG,VER,T,TV key
-    class GRANT,PUB,TRG,TOOL zone
-    class DEP,TDEP,TARGET,PREF ok
+classes: {
+  key: {
+    style: {
+      fill: "#dbeafe"
+      stroke: "#2563eb"
+      font-color: "#1e3a8a"
+    }
+  }
+  zone: {
+    style: {
+      fill: "#ede9fe"
+      stroke: "#7c3aed"
+      font-color: "#4c1d95"
+    }
+  }
+  ok: {
+    style: {
+      fill: "#dcfce7"
+      stroke: "#16a34a"
+      font-color: "#14532d"
+    }
+  }
+}
+
+agent: "Agent\n정체성 · owner" { class: key }
+ver: "AgentVersion\nimmutable artifact" { class: key }
+tool: "Tool\n정체성 · owner" { class: key }
+toolver: "ToolVersion\nartifact · schema" { class: key }
+grant: "Grant\nprincipal · role" { class: zone }
+pub: "Publication\n공개 상태" { class: zone }
+trg: "Trigger\nrequest · schedule · event" { class: zone }
+binding: "ToolBinding\nallowlist · auth mode" { class: zone }
+target: "DeploymentTarget\nzone · capabilities" { class: ok }
+dep: "Deployment\nversion × target" { class: ok }
+tdep: "ToolDeployment\n실행 또는 연결" { class: ok }
+pref: "providerRef\nnamespace/name 또는 ARN" { class: ok }
+
+agent -> ver
+agent -> grant
+agent -> pub
+agent -> trg
+ver -> dep
+target -> dep
+dep -> pref
+tool -> toolver
+toolver -> tdep
+target -> tdep
+tdep -> pref
+ver -> binding
+binding -> toolver
+pub -> dep
+trg -> pub
 ```
 
 ## Agent를 하나의 enum으로 나누지 않는다
@@ -61,26 +92,69 @@ flowchart LR
 | 격리 | 무엇과 failure·filesystem 경계를 공유하나 | `SHARED`, `POD`, `SANDBOX`, `MICROVM` |
 | 행위 위험 | 어떤 권한과 data를 다루나 | `READ`, `WRITE`, `DESTRUCTIVE`, `CODE_EXEC` |
 
+### 밖에서 부르는 이름을 축으로 번역한다
+
+업계에서 흔히 쓰는 Agent 분류 이름은 대부분 위 축들의 특정 조합을 부르는 별칭이다. 이름은 검색과
+소통에 유용하지만 배포 계약에 그대로 넣을 단위는 아니므로, 기록은 축 값으로 한다.
+
+| 통용 이름 | 대체로 가리키는 것 | 이 덱의 축으로 번역하면 |
+|---|---|---|
+| chatbot · Q&A agent | 사람과 turn 단위로 대화한다 | 활성화 `REQUEST` · 상태 `SESSION` · 위험 `READ` 중심 |
+| copilot · assistant | 사람이 매 단계 결과를 확인하고 승인한다 | `REQUEST` + human approval — 위험 축을 낮게 유지하는 정책 |
+| autonomous agent | LLM이 도구와 순서를 스스로 정해 여러 step을 진행한다 | 특정 축 값이 아니라 행위 위험·격리 축의 상한 요구 |
+| background · ambient agent | 사람이 자리에 없을 때 실행된다 | 활성화 `SCHEDULE`·`EVENT` + service principal |
+| multi-agent | 여러 Agent가 협업한다 | 각 Agent를 독립 등록하고 orchestrator도 하나의 Agent로 취급 — 연결은 A2A·event |
+
+또 하나 자주 만나는 구분은 workflow 대 agent다.
+[Anthropic의 Building effective agents](https://www.anthropic.com/engineering/building-effective-agents)가
+널리 퍼뜨린 이 구분은 실행 경로를 code가 미리 고정하는가(workflow), LLM이 매 step 스스로 정하는가(agent)를
+나눈다. 이 구분은 위 여섯 축과 직교한다 — 경로가 고정된 workflow도 schedule로 활성화되는 ephemeral
+process일 수도, 항상 상주하는 service일 수도 있다. 그래서 이 덱은 이것을 별도 enum으로 두지 않고
+`AgentVersion`의 구현 설명과 risk 평가의 입력으로만 쓴다.
+
 ### 활성화와 상주를 분리한다
 
 `SCHEDULE`은 언제 호출할지를 말하고 `EPHEMERAL`은 호출할 때 만든 process가 끝나면 종료되는지를 말한다.
 둘을 합치면 다음 두 설계를 구분하지 못한다.
 
-```mermaid
-flowchart LR
-    subgraph resident["주기 호출 · 상주 runtime"]
-        CRON1["CronJob"] -->|"A2A invoke"| SERVICE["Agent service<br/>계속 Ready"]
-    end
-    subgraph ephemeral["주기 호출 · 일회성 runtime"]
-        CRON2["CronJob"] --> JOB["Agent Job<br/>실행 후 종료"]
-    end
+```d2 pad=40 title="같은 주기 trigger가 상주 Agent service를 A2A로 호출하는 구성과 실행 후 종료되는 Agent Job을 만드는 구성의 비교"
+direction: right
 
-    classDef key fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
-    classDef ok fill:#dcfce7,stroke:#16a34a,color:#14532d
-    classDef warn fill:#fef3c7,stroke:#d97706,color:#78350f
-    class CRON1,CRON2 key
-    class SERVICE ok
-    class JOB warn
+classes: {
+  key: {
+    style: {
+      fill: "#dbeafe"
+      stroke: "#2563eb"
+      font-color: "#1e3a8a"
+    }
+  }
+  ok: {
+    style: {
+      fill: "#dcfce7"
+      stroke: "#16a34a"
+      font-color: "#14532d"
+    }
+  }
+  warn: {
+    style: {
+      fill: "#fef3c7"
+      stroke: "#d97706"
+      font-color: "#78350f"
+    }
+  }
+}
+
+resident: "주기 호출 · 상주 runtime" {
+  cron: "CronJob" { class: key }
+  service: "Agent service\n계속 Ready" { class: ok }
+  cron -> service: "A2A invoke"
+}
+
+ephemeral: "주기 호출 · 일회성 runtime" {
+  cron: "CronJob" { class: key }
+  job: "Agent Job\n실행 후 종료" { class: warn }
+  cron -> job
+}
 ```
 
 첫 방식은 cold start가 적고 여러 trigger가 같은 endpoint를 공유하기 쉽다. 대신 idle replica 비용이 든다.
@@ -112,9 +186,20 @@ checkpoint 단위, retry 시 side effect의 idempotency, session retention을 �
 | 장애 자동 조치 | 코드형 | event | 상주 | durable workflow | approval·idempotency·재시도 상한 |
 | coding Agent | 코드형 | 요청 | suspend | workspace | 강한 sandbox·egress·filesystem quota |
 
-제품 이름은 이 조합을 결정한 뒤 고른다. `kagent Declarative/BYO`는 작성 방식에 주로 답하고,
-`SandboxAgent`는 상주·격리 방식에 답한다. Dapr Workflow는 상태·복구, AgentCore session microVM은 격리 단위에
-강점이 있다. 어느 하나도 여섯 축 전체를 대신하지 않는다.
+### 제품의 분류는 축의 부분 답이다
+
+제품 이름은 이 조합을 결정한 뒤 고른다. 세 제품이 자기 API에서 Agent를 구분하는 방식은 서로 다른
+축의 부분 답이고, 어느 하나도 여섯 축 전체를 대신하지 않는다. 특히 행위 위험 축은 세 제품 모두
+Agent 분류가 아니라 별도 policy 층(tool allowlist, Dapr access policy, Cedar)으로만 다룬다.
+
+| 제품 | 제품이 구분하는 것 | 주로 답하는 축 | 답하지 않는 축 |
+|---|---|---|---|
+| kagent | `Agent.spec.type`의 `Declarative`·`BYO`, 별도 kind인 `SandboxAgent`·`AgentHarness` | 작성 방식 · 상주(suspend)·격리 · workspace 상태 | 활성화 — core spec에 schedule이 없다 |
+| Dapr Agents | `DurableAgent` 클래스(동기 `Agent` 클래스는 deprecated), multi-agent orchestrator | 상태·복구(`DURABLE_WORKFLOW`) | 상주·격리 — 어느 클래스든 일반 Pod다 |
+| AgentCore | Agent 타입 없음 — protocol contract(HTTP·MCP·A2A·AG-UI)와 session runtime | 격리(`MICROVM`) · managed 상주 | 작성 방식·활성화 |
+
+각 제품이 왜 이렇게 답하는지는 [7장](/agent-platform/07-kagent/)·[8장](/agent-platform/08-dapr-agents/)·[9장](/agent-platform/09-agentcore/)에서
+확인한다.
 
 ### Domain 객체에는 축별로 나눠 담는다
 

@@ -21,25 +21,57 @@ import TermIntro from '../../../components/docs/TermIntro.astro';
 
 ## 전체 중 AgentCore의 자리
 
-```mermaid
-flowchart LR
-    ONPREM["사내 Portal · IdP"] --> DX["DX · VPN · TGW"]
-    DX --> VPCE["VPC Endpoint<br/>PrivateLink"]
-    VPCE --> RT["AgentCore Runtime<br/>session microVM"]
-    RT --> GW["AgentCore Gateway<br/>MCP tools"]
-    GW --> POLICY["Policy · Cedar"]
-    RT --> MEM["Memory · Observability"]
-    RT --> VPC["VPC private API · DB"]
-    VPC --> DX
+```d2 layout=elk pad=40 title="사내 Portal이 DX·PrivateLink를 거쳐 AgentCore Runtime의 session microVM에 닿고, Runtime이 Gateway·Cedar Policy와 VPC private API로 이어지는 경로"
+direction: right
 
-    classDef key fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
-    classDef zone fill:#ede9fe,stroke:#7c3aed,color:#4c1d95
-    classDef ok fill:#dcfce7,stroke:#16a34a,color:#14532d
-    classDef warn fill:#fef3c7,stroke:#d97706,color:#78350f
-    class ONPREM,DX key
-    class VPCE,VPC zone
-    class RT,MEM ok
-    class GW,POLICY warn
+classes: {
+  key: {
+    style: {
+      fill: "#dbeafe"
+      stroke: "#2563eb"
+      font-color: "#1e3a8a"
+    }
+  }
+  zone: {
+    style: {
+      fill: "#ede9fe"
+      stroke: "#7c3aed"
+      font-color: "#4c1d95"
+    }
+  }
+  ok: {
+    style: {
+      fill: "#dcfce7"
+      stroke: "#16a34a"
+      font-color: "#14532d"
+    }
+  }
+  warn: {
+    style: {
+      fill: "#fef3c7"
+      stroke: "#d97706"
+      font-color: "#78350f"
+    }
+  }
+}
+
+onprem: "사내 Portal · IdP" { class: key }
+dx: "DX · VPN · TGW" { class: key }
+vpce: "VPC Endpoint\nPrivateLink" { class: zone }
+vpc: "VPC private API · DB" { class: zone }
+rt: "AgentCore Runtime\nsession microVM" { class: ok }
+mem: "Memory · Observability" { class: ok }
+gw: "AgentCore Gateway\nMCP tools" { class: warn }
+policy: "Policy · Cedar" { class: warn }
+
+onprem -> dx
+dx -> vpce
+vpce -> rt
+rt -> gw
+gw -> policy
+rt -> mem
+rt -> vpc
+vpc -> dx
 ```
 
 private 경로를 써도 runtime control/data plane과 session compute는 AWS region에 있다. "인터넷을 안 지난다"와
@@ -54,6 +86,16 @@ A2A, AG-UI contract를 지원하며 version과 endpoint를 관리한다. contain
 각 runtime session은 전용 microVM의 compute·memory·filesystem으로 격리된다. idle timeout이나 최대 lifecycle에
 도달하면 compute는 종료되고, 필요한 상태는 Memory나 session storage로 내린다. 단, AWS도 user와 session ID의
 연결은 client backend가 관리해야 한다고 명시한다.
+
+### Agent 타입 enum이 없다
+
+kagent의 `Agent.spec.type`이나 Dapr Agents의 클래스처럼 Agent 종류에 이름을 붙이는 API가 AgentCore에는
+없다. Runtime은 framework를 가리지 않고 container를 받고, 구분은 두 곳에서만 나타난다 — container가
+따르는 protocol contract와 session lifecycle이다. 즉 AgentCore는
+[domain model](/agent-platform/02-domain-model/#agent를-하나의-enum으로-나누지-않는다)의 격리(`MICROVM`)와
+managed 상주 축에 답하고, 작성 방식·활성화 축은 기록할 자리가 없으므로 platform domain model이 소유한다.
+구성형 Agent를 이 target에 두려면 adapter가 platform 공통 runtime image에 prompt·tool binding을 주입해
+코드형과 같은 container로 번역한다. 행위 위험 축은 Gateway의 Cedar Policy라는 별도 층이 맡는다.
 
 ## 공통 객체 매핑
 

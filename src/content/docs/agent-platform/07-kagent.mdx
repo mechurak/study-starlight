@@ -21,23 +21,50 @@ import TermIntro from '../../../components/docs/TermIntro.astro';
 
 ## 전체 중 kagent의 자리
 
-```mermaid
-flowchart LR
-    PORTAL["Platform Core"] --> ADAPTER["KagentAdapter"]
-    ADAPTER --> API["Kubernetes API<br/>Agent · ModelConfig · Tool"]
-    CTRL["kagent controller"] --> API
-    CTRL --> POD["Agent Pod"]
-    POD --> MODEL["LiteLLM · Ollama · model API"]
-    POD --> MCP["MCP server · other Agent"]
-    API --> STATUS["status · conditions"]
-    STATUS --> ADAPTER
+```d2 layout=elk pad=40 title="Platform Core가 KagentAdapter를 거쳐 Kubernetes API에 Agent resource를 만들고, kagent controller가 Pod를 실행하며 status가 adapter로 돌아오는 흐름"
+direction: right
 
-    classDef key fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
-    classDef zone fill:#ede9fe,stroke:#7c3aed,color:#4c1d95
-    classDef ok fill:#dcfce7,stroke:#16a34a,color:#14532d
-    class PORTAL key
-    class ADAPTER,API,STATUS zone
-    class CTRL,POD,MODEL,MCP ok
+classes: {
+  key: {
+    style: {
+      fill: "#dbeafe"
+      stroke: "#2563eb"
+      font-color: "#1e3a8a"
+    }
+  }
+  zone: {
+    style: {
+      fill: "#ede9fe"
+      stroke: "#7c3aed"
+      font-color: "#4c1d95"
+    }
+  }
+  ok: {
+    style: {
+      fill: "#dcfce7"
+      stroke: "#16a34a"
+      font-color: "#14532d"
+    }
+  }
+}
+
+portal: "Platform Core" { class: key }
+adapter: "KagentAdapter" { class: zone }
+api: "Kubernetes API\nAgent · ModelConfig · Tool" { class: zone }
+status: "status · conditions" { class: zone }
+ctrl: "kagent controller" { class: ok }
+pod: "Agent Pod" { class: ok }
+model: "LiteLLM · Ollama · model API" { class: ok }
+mcp: "MCP server · other Agent" { class: ok }
+
+portal -> adapter
+adapter -> api
+ctrl -> api
+ctrl -> pod
+pod -> model
+pod -> mcp
+api -> status
+status -> adapter
 ```
 
 kagent는 `Agent`를 Kubernetes resource로 표현하고 model과 MCP tool 연결을 함께 관리한다. GitOps·namespace·
@@ -76,10 +103,17 @@ BYO image는 kagent가 기대하는 A2A endpoint를 구현해야 한다. 이미 
 주기 작업은 platform의 `Trigger`를 Kubernetes `CronJob`, Argo Workflows 같은 scheduler에 매핑하고, 실행 시
 승인된 Agent의 A2A endpoint를 호출하는 구성이 기본이다. 정말 process까지 매번 종료해야 한다면 Job 안에서
 Agent code를 직접 실행할 수 있지만, 이때는 kagent `Agent`의 Ready endpoint·session 관리 모델을 재사용하지
-못한다. adapter capability에는 다음 차이를 숨기지 않는다.
+못한다. 이 차이는
+[adapter contract의 capability profile](/agent-platform/05-adapter-contract/#capability로-차이를-드러낸다)에
+숨기지 않고 드러낸다. kagent target이라면 다음처럼 답한다.
 
-```text
-residentA2A · suspendableActor · ephemeralJob · scheduledInvoke · durableState · persistentWorkspace
+```yaml
+capabilities:
+  residency: [resident, suspendable] # Agent · SandboxAgent
+  ephemeralJob: manual # Job 직접 구성은 kagent 모델 밖
+  scheduledInvoke: external # CronJob·Argo가 A2A invoke
+  durableWorkflowState: unsupported
+  persistentFilesystem: agent-harness
 ```
 
 제품 중립 분류와 trigger 계약은 [제품 밖의 domain model](/agent-platform/02-domain-model/#agent를-하나의-enum으로-나누지-않는다)에서

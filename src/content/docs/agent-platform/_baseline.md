@@ -61,7 +61,7 @@ state·격리·행위 위험도 별도 축으로 기록하고 target capability�
 | kagent 인증 | v0.9에서 oauth2-proxy 기반 OIDC 인증 추가. 공식 release note는 application access control 미구현이라고 명시 | kagent v0.9 release notes |
 | kagent BYO | 사용자 image를 배포하며 A2A server 계약을 기대 | kagent BYO Agent guide |
 | kagent 실행 형태 | 일반 `Agent`는 Deployment, `SandboxAgent`는 Agent Substrate actor, `AgentHarness`는 장기 coding sandbox | kagent API docs, Agent Substrate·Agent Harness docs |
-| Dapr Agents | v1.0 GA인 Python framework. `DurableAgent`가 권장 모델이며 Dapr Workflow·state store로 실행을 복구 | Dapr Agents introduction, core concepts |
+| Dapr Agents | v1.0 GA인 Python framework. `DurableAgent`가 권장 모델이며 Dapr Workflow·state store로 실행을 복구. 동기 `Agent` 클래스는 v1.0.0-rc.1부터 deprecated, orchestrator는 `LLMOrchestrator`·`RoundRobin`·`Random` (2026-08-20 재확인) | Dapr Agents introduction, core concepts |
 | Dapr 배포 | 일반 application Pod에 sidecar를 주입한다. Agent 전용 CR/controller lifecycle은 platform adapter가 보완 | Dapr sidecar docs |
 | Dapr 권한 | App ID별 SPIFFE workload identity·mTLS와 MCP access policy 제공. 임직원 invoke ACL과는 다른 층 | Dapr MCP security docs |
 | Dapr activity | at-least-once 실행이므로 side-effect tool은 idempotency가 필요 | Dapr Workflow activity docs |
