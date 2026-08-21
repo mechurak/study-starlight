@@ -50,6 +50,10 @@ Cloudflare Pages의 얇은 checkout에서는 HEAD가 실질적인 root commit으
 전체 이력을 받는다. 로컬 빌드와 이미 전체 이력이 있는 checkout에서는 아무 작업도 하지 않는다.
 이 fetch가 실패하면 잘못된 수정일을 배포하지 않도록 빌드도 실패한다.
 
+이력이 커져서 이 fetch가 부담되면 수정일을 수동 메타데이터로 옮기지 말고, 이 스크립트의
+`--unshallow`를 `--shallow-since="1 year ago"` 같은 기간 제한 fetch로 바꾼다. 최근 수정일
+표시에는 최근 이력만 있으면 되고, 그보다 오래 안 고친 덱만 날짜가 경계값으로 뭉개진다.
+
 ## 왜 `PNPM_VERSION`을 박아야 하나
 
 아래는 **2026-08에 확인한 것**이다 — Cloudflare 빌드 이미지의 기본값은 바뀔 수 있다.
