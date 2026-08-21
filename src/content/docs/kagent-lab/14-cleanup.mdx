@@ -208,6 +208,29 @@ write 승인, 외부 client 호출, model egress 정책 순으로 확장할 수 
 | chat channel을 입구로 쓴다 | [Slack](https://kagent.dev/docs/kagent/examples/slack-a2a/)·[Discord](https://kagent.dev/docs/kagent/examples/discord-a2a/)·[Telegram](https://kagent.dev/docs/kagent/examples/telegram-bot/) 중 하나 | bot token 최소 scope, webhook·event 서명과 replay, workspace·channel·user identity를 Grant에 매핑한다. chat 입구가 controller `8083` 직접 우회가 되지 않게 한다. |
 | coding workspace가 필요하다 | [Agent Harness](https://kagent.dev/docs/kagent/examples/agent-harness/) | OpenClaw·Hermes의 shell·source credential·workspace·Slack token과 shared actor snapshot을 하나의 신뢰 경계로 본다. 장기 session의 WorkerPool slot·snapshot 보존·삭제·복원을 따로 측정한다. |
 
+:::caution[함정 — skill 예제의 local registry 주소는 그대로 동작하지 않는다]
+[Add skills to agents](https://kagent.dev/docs/kagent/examples/skills/) 예제는 registry를
+`docker run --name local-registry`로 띄우라고 안내하지만, 몇 줄 뒤 Agent manifest는
+`kind-registry:5000/...`을 참조한다. **이름이 서로 다르고**, 평범한 `docker run`이 붙는 기본 bridge
+network는 kind node가 있는 `kind` network가 아니다. 도커는 사용자 정의 network 안에서만 컨테이너
+이름과 alias를 해석하므로 node에서 `kind-registry`가 풀리지 않는다. `kind-registry`라는 이름은 kind 공식
+local registry 레시피의 관례이고, 예제는 그 레시피를 이미 돌렸다고 전제한 채 간단한 `docker run`을 준다.
+
+host에서 push할 때의 `localhost:5000`과 manifest가 참조하는 이름이 다른 것 자체는 정상이다. image를
+당기는 주체가 host가 아니라 cluster 안이기 때문이다. 이미 push한 registry를 살리려면 컨테이너를 다시
+만들지 말고 network alias로 붙인다.
+
+```bash
+docker network connect --alias kind-registry kind local-registry
+```
+
+alias는 해당 network 안에서만 통하는 추가 이름이라 다른 곳에서는 원래 이름이 그대로 남는다.
+확인할 것이 하나 더 있다. node containerd의 insecure registry 설정 없이 `skills.insecureSkipVerify`만으로
+fetch가 된다면, skill artifact는 node가 일반 image처럼 pull하는 것이 아니라 kagent가 직접 가져온다는
+뜻이다. 사내 private CA registry에서는 node에 CA를 배포하는 것만으로 부족할 수 있으므로
+[10장의 registry·CA preflight](/kagent-lab/10-onprem-staging/#온프렘-의존성-preflight)에서 두 경로를 나눠 시험한다.
+:::
+
 5장은 공식 A2A 예제의 Agent Card·controller `8083`·CLI 호출을 이미 포함하고, 11~12장은
 공식 Substrate walkthrough을 A/B 비교로 확장한다. 두 예제는 추가 실습으로 중복하지 않는다.
 
