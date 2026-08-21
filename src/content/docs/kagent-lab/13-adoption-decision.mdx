@@ -1,0 +1,171 @@
+---
+title: "13. 온프렘 도입 판정"
+description: 맨 Kubernetes·기본 kagent·kagent와 Substrate를 같은 계약·실패·운영비 기준으로 비교해 도입 범위와 보류 조건을 기록한다
+reviewedAt: 2026-08-21
+status: review
+---
+
+import { LinkCard } from '@astrojs/starlight/components';
+import TermIntro from '../../../components/docs/TermIntro.astro';
+import Thesis from '../../../components/docs/Thesis.astro';
+
+<Thesis>도입 결론은 기능 목록이 아니라 우리 backend 계약을 지키는 세 후보의 개발량·실패 회복·보안 경계·고정 운영비를 같은 증거로 비교한 기록이어야 한다</Thesis>
+
+<TermIntro
+  terms={[
+    ['baseline', '', 'kagent 없이 Deployment·Service와 표준 runner를 직접 관리하는 맨 Kubernetes 비교안이다.'],
+    ['challenger', '', 'baseline보다 순가치가 있는지 같은 fixture로 검증할 kagent 또는 Substrate 후보이다.'],
+    ['adoption gate', '', '도입·제한 도입·보류를 가르는 사전에 합의한 통과 조건이다.'],
+    ['exit criterion', '', 'PoC를 끝내고 다음 단계로 넘어가거나 중단할 수 있는 관측 가능한 조건이다.'],
+  ]}
+/>
+
+이 장은 “설치됐다”를 성공으로 판정하지 않는다. 7장의 backend walking skeleton, 8장의 인가·우회 차단,
+10장의 staging gate, 12장의 runtime A/B를 [Agent 배포 플랫폼 16장](/agent-platform/16-adoption/)의
+공통 contract와 같은 표에 넣는다.
+
+## 비교할 세 후보
+
+| 후보 | 회사가 얻는 것 | 회사가 계속 소유할 것 | 추가 고정비 |
+|---|---|---|---|
+| 맨 Kubernetes | 익숙한 Deployment·Service·policy | runner, reconcile, A2A, session, tool wiring | 회사 code와 운영 자동화 |
+| 기본 kagent | Declarative engine, Agent/MCP CRD, condition, A2A route | portal ACL, adapter, DB projection, policy, k8s 운영 | controller·engine·외부 PostgreSQL |
+| kagent + Substrate | suspend/restore, shared gVisor WorkerPool | 위 항목 + capacity·snapshot lifecycle | Substrate control/data plane·Valkey·object storage |
+
+`AgentHarness`는 coding workspace 수요가 아직 없으므로 네 번째 후보가 아니다. shell·filesystem을 가진 장기
+coding agent 요구가 승인되면 별도 보안 PoC로 연다.
+
+## hard gate부터 판정하기
+
+다음 중 하나라도 실패하면 점수 합계와 무관하게 production 도입을 보류한다.
+
+- backend의 관리 경로가 Kubernetes API의 namespaced CRD, 호출 경로가 승인 뒤 controller A2A로 분리된다.
+- `(iss, sub)` principal, Agent `Grant`, session owner를 backend가 검사하며 직접 A2A 우회가 차단된다.
+- model·MCP·PostgreSQL·snapshot data가 승인된 온프렘 network와 저장소 경계를 벗어나지 않는다.
+- image·chart·CRD version이 고정되고 upgrade·rollback rehearsal가 성공한다.
+- controller와 외부 PostgreSQL 장애 후 reconcile하며, API 응답 유실 뒤 apply를 재시도해도 resource가 하나다.
+- Secret 값·prompt/tool input·snapshot의 encryption, redaction, retention과 삭제 책임자가 정해져 있다.
+- namespace watch scope, ServiceAccount, NetworkPolicy, Pod security와 quota를 staging CNI에서 실제로 검증한다.
+
+Substrate 후보에는 다음 gate를 더한다.
+
+- gVisor를 지원하는 전용 node pool과 승인된 object storage·backup/restore 경로가 있다.
+- snapshot에 memory·credential·workspace data가 들어간다고 보고 암호화·접근·보존·삭제를 시험한다.
+- WorkerPool 포화·worker/node 손실 때 timeout·재시도·복구가 사용자 계약 안에 들어온다.
+- 기본 kagent Agent의 배포·invoke·rollback이 Substrate 설치 뒤에도 회귀하지 않는다.
+
+## 같은 fixture로 점수 매기기
+
+1점은 “지원 안 함/증거 없음”, 3점은 “수동 절차로 통과”, 5점은 “자동화된 반복 시험과 운영 owner가 있음”이다.
+가중치는 PoC 전에 정하고 결과를 본 뒤 바꾸지 않는다.
+
+| 판단 항목 | 가중치 | 맨 K8s | kagent | + Substrate | 증거 링크·측정값 |
+|---|---:|---:|---:|---:|---|
+| backend contract 구현량 | 5 | | | | code diff·인월 |
+| 구성형 Agent 변경 속도 | 4 | | | | prompt/model/tool release 시간 |
+| idempotent lifecycle·상태 번역 | 5 | | | | contract test |
+| ACL·우회 차단·audit | 5 | | | | allow/deny probe |
+| upgrade·rollback·복구 | 5 | | | | rehearsal 시간·실패 |
+| steady-state CPU·memory | 3 | | | | 24시간 관측값 |
+| idle Agent 밀도 | 3 | | | | Agent/Pod·worker 수 |
+| cold/warm/restore latency | 4 | | | | p50·p95·max·실패 |
+| 공급망·egress 통제 | 5 | | | | admission·NetworkPolicy |
+| 운영 구성 요소·on-call 부담 | 5 | | | | owner·runbook·alert 수 |
+
+점수를 곱해 합산하되 hard gate를 덮는 데 사용하지 않는다. 특히 Substrate의 idle 절감은 Valkey·RustFS 대체
+object storage·control/data plane 고정비를 포함한 뒤 계산한다.
+
+## 반드시 남길 failure evidence
+
+| 실패 주입 | 기대하는 platform 동작 | 관찰할 증거 |
+|---|---|---|
+| 같은 Agent create 응답 유실 후 재시도 | deterministic name·SSA로 하나만 존재 | UID·managedFields |
+| controller restart | desired state 유지·status 재수렴 | condition·recovery time |
+| PostgreSQL 일시 단절 | 명확한 실패·복구, data 손상 없음 | log·migration/connection alert |
+| model 429/timeout | bounded retry·사용자 오류 정규화 | trace·latency·attempt 수 |
+| MCP deny·schema drift | tool 실행 전 차단·승인 version 유지 | policy decision·discovery snapshot |
+| 금지 사용자의 직접 A2A | backend와 network 둘 다 거부 | audit·NetworkPolicy probe |
+| Substrate worker 손실 | replacement 후 복원, 일반 Agent 무영향 | actor·Pod Event·recovery time |
+| WorkerPool 포화 | bounded queue/timeout, capacity alert | burst 결과·alert |
+
+각 실패는 “나중에 운영에서 본다”가 아니라 staging exit criterion이다. kind CNI가 NetworkPolicy를 강제하지
+않는 항목과 실제 외부 PostgreSQL·object storage 장애는 10장의 온프렘 staging에서 다시 실행한다.
+
+## 결론을 세 갈래로 쓴다
+
+### 기본 kagent 채택
+
+다음이 모두 사실일 때 선택한다.
+
+- 구성형 Agent가 회사 runner를 직접 만드는 것보다 유의미하게 빠르고 적은 code로 배포된다.
+- CRD lifecycle·MCP wiring·condition이 adapter와 운영 부담을 실제로 줄인다.
+- portal ACL과 controller A2A의 빈칸을 회사 backend·gateway가 감당할 수 있다.
+- 외부 PostgreSQL·HA·upgrade·namespaced RBAC의 운영 owner가 정해졌다.
+
+BYO Agent만 쓸 예정이고 구성형 engine·MCP resource·sandbox를 쓰지 않는다면 맨 Kubernetes 기준선과 기능 차이가
+얇다. 이 경우 kagent를 통과시키기보다 baseline을 default로 두는 결론도 정상이다.
+
+### Substrate 제한 채택
+
+기본 kagent 판정과 별개로 다음이 측정됐을 때 특정 Agent class에만 연다.
+
+- 등록 수가 동시 active 수보다 충분히 커 idle 전용 Pod 비용이 실제 병목이다.
+- restore p95와 WorkerPool 포화 시 실패가 제품 SLO 안에 있다.
+- gVisor sandbox가 필요한 code/skill 실행 risk가 있고 egress allowlist가 작동한다.
+- snapshot storage·worker node·Substrate version pair를 운영할 인력이 있다.
+
+모든 Agent를 `SandboxAgent`로 바꾸지 않는다. 상주 latency가 중요한 Agent는 기본 `Agent`, idle이 길고 강한 격리가
+필요한 class만 `SandboxAgent`로 publication policy에 매핑한다.
+
+### 보류
+
+hard gate가 실패하거나 순가치가 불명확하면 실패 증거와 재개 조건을 남긴다. 예를 들면 “등록 Agent 200개 또는
+idle memory 30% 초과”, “coding workspace 승인”, “gVisor node pool 제공”처럼 측정 가능한 trigger여야 한다.
+
+## decision record template
+
+```yaml
+decision: adopt-kagent | adopt-kagent-with-limited-substrate | bare-kubernetes | defer
+date: 2026-__-__
+owners:
+  platform: ""
+  security: ""
+  application: ""
+versions:
+  kubernetes: ""
+  kagent: "0.9.9"
+  substrate: "0.0.6 or not-used"
+hardGates:
+  passed: []
+  failed: []
+evidence:
+  contractTests: ""
+  securityTests: ""
+  runtimeComparison: ""
+  upgradeRollback: ""
+  resourceAndCost: ""
+scope:
+  defaultRuntime: ""
+  sandboxEligibleAgentClasses: []
+  excludedUseCases: []
+risks: []
+revisitWhen: []
+```
+
+결정문에는 chart가 제공하는 기능보다 **우리 backend에서 실제로 유지할 code와 on-call 책임**을 적는다. 같은
+template를 [Agent 배포 플랫폼의 default target 결정](/agent-platform/16-adoption/#결정-기록)에 첨부하면 두 덱의
+PoC가 하나의 의사결정으로 이어진다.
+
+## 완료 체크
+
+- 맨 Kubernetes·기본 kagent·kagent+Substrate를 같은 fixture와 failure injection으로 비교했다.
+- hard gate와 가중 score를 분리했고 증거 없는 칸은 1점으로 처리했다.
+- 기본 runtime과 sandbox 허용 Agent class를 따로 결정했다.
+- 선택하지 않은 후보에도 재개 조건과 owner를 남겼다.
+- Agent-platform의 adapter contract·PoC decision record에 결과를 연결했다.
+
+<LinkCard
+  title="14. 실습 정리"
+  description="비교 증거를 보존한 뒤 resource-only 정리와 kind cluster 전체 삭제 중 하나를 선택한다."
+  href="/kagent-lab/14-cleanup/"
+/>

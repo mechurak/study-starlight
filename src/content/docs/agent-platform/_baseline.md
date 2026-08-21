@@ -32,7 +32,7 @@
 - **다룬다:** 포털과 runtime의 경계, 제품 중립 domain model, Agent 분류 차원과 trigger, knowledge의 버전·binding 경계,
   Agent·사용자 제작 MCP의
   등록·승인·배포 lifecycle, 세 단계 권한, adapter contract, kagent(아키텍처·resource·사내 연결·adapter 4장),
-  맨 Kubernetes 기준선, 보류한 durable execution 층(재개 조건과 Temporal·Dapr Agents 후보), AgentCore,
+  맨 Kubernetes 기준선, kagent Agent Substrate의 선택 runtime 판정, 보류한 durable execution 층(재개 조건과 Temporal·Dapr Agents 후보), AgentCore,
   hybrid target 선택, 운영·도입 검증.
 - **다루지 않는다:** Agent framework 사용법, prompt engineering, 모델 학습·평가, GPU 모델 서빙 상세,
   MCP 서버 구현 튜토리얼, Kubernetes 설치, AWS 계정·VPC 구축 절차.
@@ -78,6 +78,7 @@ workload target과 조합한다.
 |---|---|---|---|
 | 제품 중립 control plane | `ADOPTED` | 회사 ID·ACL·승인·감사와 세 lifecycle을 포털이 소유 | provider 기능을 추가해도 이 불변조건을 지킨다 |
 | 결정 A — 온프렘 workload lifecycle | `CANDIDATE` | 맨 Kubernetes가 기준선, kagent v0.9.9가 challenger | 11장 기준선 비교와 16장 PoC에서 유지 비용·남는 가치를 측정 |
+| 결정 A 확장 — kagent Agent Substrate | `CANDIDATE` | 기본 `Agent`가 기준선, Substrate v0.0.6은 suspendable·gVisor가 필요한 Agent class의 challenger | kagent-lab 11~13장에서 idle 절감·restore 지연·WorkerPool 장애·고정 운영비를 측정 |
 | 결정 A — AWS workload lifecycle | `CANDIDATE` | AWS target이 필요할 때 AgentCore를 검증 | 대상 account·region을 고정하고 private network·quota·artifact contract를 시험 |
 | 결정 B — execution durability | `DEFERRED` | `none` | 12장의 재개 조건을 실제 Agent가 충족하면 후보 평가를 시작 |
 
@@ -112,9 +113,10 @@ server·SDK·chart version을 새로 고른다. 아래 상태는 변화가 빠�
 | kagent | v0.9.9 검토 기준. `Agent` API는 `kagent.dev/v1alpha2`, 선언형과 BYO Agent 지원 | [API reference](https://kagent.dev/docs/kagent/resources/api-ref/) | 2, 8~11 |
 | kagent 인증 | v0.9에서 oauth2-proxy 기반 OIDC 인증 추가. application access control은 미구현 | [release notes](https://kagent.dev/docs/kagent/resources/release-notes/) | 5, 10~11 |
 | kagent BYO | 사용자 image를 배포하며 A2A server 계약을 기대 | [BYO Agent](https://kagent.dev/docs/kagent/examples/a2a-byo/) | 2, 8~11 |
-| kagent 실행 형태 | 일반 `Agent`는 Deployment, `SandboxAgent`는 Agent Substrate actor, `AgentHarness`는 장기 coding sandbox | [API reference](https://kagent.dev/docs/kagent/resources/api-ref/), [Agent Substrate](https://kagent.dev/docs/kagent/concepts/agent-substrate/), [Agent Harness](https://kagent.dev/docs/kagent/concepts/agent-harness/) | 2, 8~11 |
+| kagent 실행 형태 | 일반 `Agent`는 Deployment, `SandboxAgent`는 Agent Substrate actor, `AgentHarness`는 장기 coding sandbox | [API reference](https://kagent.dev/docs/kagent/resources/api-ref/), [Agent Substrate](https://kagent.dev/docs/kagent/concepts/agent-substrate/), [Agent Harness](https://kagent.dev/docs/kagent/concepts/agent-harness/) | 2, 8~11, 16 |
 | kagent engine runtime | Python ADK(문서상 기본, 약 15초)와 Go ADK(약 2초). alpha schema의 기본값 변화에 기대지 않고 `runtime`을 명시 | [Agents](https://www.kagent.dev/docs/kagent/concepts/agents/), [API reference](https://kagent.dev/docs/kagent/resources/api-ref/) | 8~10 |
-| kagent 통합 지점 | 외부 계약은 CRD schema다. dashboard 내부 HTTP API는 문서화·version 보장 대상으로 간주하지 않음 | [API reference](https://kagent.dev/docs/kagent/resources/api-ref/) | 8, 10~11 |
+| kagent 통합 지점 | 관리 계약은 Kubernetes CRD·status, 호출 계약은 controller `8083`의 `/api/a2a/{namespace}/{agent-name}/`. dashboard 내부 HTTP API와 CLI shell은 backend 계약이 아님 | [API reference](https://kagent.dev/docs/kagent/resources/api-ref/), [A2A 예제](https://kagent.dev/docs/kagent/examples/a2a-agents/) | 8, 10~11, 16 |
+| Agent Substrate 실습 pair | 공식 kind walkthrough는 kagent v0.9.9·Substrate v0.0.6, Go Declarative `SandboxAgent`, WorkerPool·snapshot/restore를 사용. sandbox outbound는 allowlist가 없으면 기본 거부 | [walkthrough](https://kagent.dev/docs/kagent/examples/agent-substrate/), [API reference](https://kagent.dev/docs/kagent/resources/api-ref/) | 8, 11, 16 |
 | kagent tool 선언 | `toolNames`가 allowlist, 자격증명은 `headersFrom` reference, 자동 discovery는 label로 제외 | [Tools](https://kagent.dev/docs/kagent/concepts/tools/) | 7, 9~11 |
 | kagent memory | 대화에서 정보를 추출해 embedding으로 저장·검색. knowledge corpus ingestion 계약과는 별개 | [Agent Memory](https://kagent.dev/docs/kagent/concepts/agent-memory/) | 3, 9 |
 | Dapr Agents | v1.0 GA Python framework. `Agent` 실행은 ephemeral이지만 memory는 persistent store를 쓸 수 있음. `DurableAgent`가 권장 | [core concepts](https://docs.dapr.io/developing-ai/dapr-agents/dapr-agents-core-concepts/) | 2, 12 |
@@ -131,7 +133,9 @@ server·SDK·chart version을 새로 고른다. 아래 상태는 변화가 빠�
 - 제품 이름보다 **사용자 요청과 배포 명령의 두 흐름**을 먼저 보여준다.
 - kagent·Dapr Agents·AgentCore를 완성된 사내 포털이라고 쓰지 않는다. 사내 catalog·ACL은 별도다.
 - kagent dashboard를 최종 사용자 화면으로 쓰지 않는다. 자체 포털을 만들면 dashboard는 운영자 콘솔로 남는다.
-- backend가 kagent에 말을 거는 지점은 CRD다. dashboard의 내부 HTTP API나 CLI shell 실행을 계약으로 쓰지 않는다.
+- backend가 kagent를 **관리**하는 지점은 Kubernetes API의 CRD·status이고, Agent를 **호출**하는 지점은
+  Grant 검사 뒤 controller의 문서화된 A2A route다. dashboard 내부 HTTP API, CLI shell, Agent Pod의 임의
+  Service를 계약으로 쓰지 않는다.
 - Kubernetes를 데이터베이스로 쓰지 않는다. 정체성·version·Grant·감사는 포털 DB가 원본이고 실행 상태만 cluster가 원본이다.
 - durable execution 층은 채택된 구성 요소가 아니라 **보류한 결정(결정 B)**으로 쓴다. kagent·AgentCore와
   나란한 세 번째 어댑터나 target으로 나열하지 않고, 별도 execution profile로 조합한다. 상세·재개 조건·후보

@@ -1,0 +1,209 @@
+---
+title: "14. 실습 정리와 다음 단계"
+description: backend·Agent·SandboxAgent·Substrate 비교 증거를 보존한 뒤 실습 resource만 지우거나 전용 kind cluster 전체를 안전하게 정리한다
+reviewedAt: 2026-08-21
+status: review
+---
+
+import { LinkCard, Steps } from '@astrojs/starlight/components';
+import TermIntro from '../../../components/docs/TermIntro.astro';
+import Thesis from '../../../components/docs/Thesis.astro';
+
+<Thesis>cleanup은 증거를 먼저 보존하고 정확한 소유 범위를 확인한 뒤 resource-only와 전용 cluster 삭제 중 하나를 선택하는 마지막 운영 실습이다</Thesis>
+
+<TermIntro
+  terms={[
+    ['resource cleanup', 'Selective Cleanup', 'kagent·Substrate 설치는 남기고 이 덱이 만든 Agent·MCP·RBAC만 지우는 정리다.'],
+    ['cluster cleanup', 'Environment Cleanup', '전용 kind cluster와 그 안의 Secret·session·snapshot·workload를 통째로 지우는 정리다.'],
+    ['evidence retention', '', '삭제 전에 측정값·version·실패 결과를 Secret 없이 decision record에 남기는 절차다.'],
+    ['uninstall', 'Product Uninstall', '공유 cluster에서 chart·CRD·상태 저장소를 의존성 순서에 맞춰 제거하는 별도 변경 작업이다.'],
+  ]}
+/>
+
+## 삭제 전에 증거부터 남기기
+
+`/tmp`의 원본에는 Helm value·내부 주소·응답이 들어갈 수 있다. 그대로 Git에 넣지 말고 13장의 decision record에
+필요한 숫자와 판정만 옮긴다.
+
+```bash
+kubectl config current-context
+helm -n kagent list
+helm -n ate-system list
+kubectl -n kagent get agent,sandboxagent,mcpserver,workerpool
+kubectl -n kagent get pods
+kubectl -n ate-system get pods
+ls -l /tmp/kagent-before-substrate-* /tmp/kagent-after-substrate-*
+```
+
+확인할 evidence는 다음과 같다.
+
+- Kubernetes·kagent·Substrate version과 Helm release revision
+- backend SSA 재실행 전후 Agent UID, Ready·A2A allow/deny 결과
+- 일반 Agent와 SandboxAgent의 Ready·invoke·restore·burst·worker failure 측정값
+- staging에서만 검증한 CNI packet deny, 외부 PostgreSQL·object storage·rollback 결과
+- 채택·제한 채택·보류 결론, owner와 재개 조건
+
+Secret value, browser token, model prompt 원문, tool input 전체, snapshot 파일은 decision record에 복사하지 않는다.
+
+## 어느 정리를 할지 선택하기
+
+| 다음 행동 | 선택 |
+|---|---|
+| backend·Agent 실습을 다시 한다 | 선택 A — 이 덱의 custom resource만 삭제 |
+| Substrate 비교를 더 한다 | 선택 A — fixture만 삭제하고 chart·WorkerPool 유지 |
+| 실습을 끝낸다 | 선택 B — 전용 `kagent-lab` kind cluster 전체 삭제 |
+| 공유 staging에서 제품을 제거한다 | 이 장의 명령을 쓰지 않고 승인된 uninstall change를 별도로 계획 |
+
+port-forward와 dashboard terminal은 각각 `Ctrl+C`로 종료한다. tunnel 종료는 Kubernetes resource 삭제가 아니다.
+
+## 선택 A — 이 덱의 resource만 지우기
+
+`--ignore-not-found`는 선택 장을 건너뛴 경우만 허용하기 위한 것이다. 다른 이름의 resource를 넓은 label이나
+namespace 전체로 지우지 않는다.
+
+<Steps>
+
+1. **대상을 먼저 조회한다**
+
+   ```bash
+   kubectl -n kagent get \
+     agent/lab-reader agent/simple-fetch-agent agent/backend-reader \
+     agent/lab-byo agent/resident-echo \
+     sandboxagent/sandbox-echo \
+     mcpserver/mcp-website-fetcher \
+     --ignore-not-found
+   kubectl -n kagent get serviceaccount,role,rolebinding,networkpolicy \
+     --ignore-not-found
+   ```
+
+2. **실습 Agent·SandboxAgent·MCP를 정확한 이름으로 지운다**
+
+   ```bash
+   kubectl -n kagent delete \
+     agent/lab-reader agent/simple-fetch-agent agent/backend-reader \
+     agent/lab-byo agent/resident-echo \
+     sandboxagent/sandbox-echo \
+     mcpserver/mcp-website-fetcher \
+     --ignore-not-found
+   ```
+
+   `SandboxAgent`를 먼저 지우고 UI의 Substrate inventory에서 관련 actor·snapshot lifecycle이 정리되는지 본다.
+   object storage의 실제 삭제·retention은 production policy와 controller 동작을 별도로 검증해야 한다.
+
+3. **backend 경계용 resource와 선택 BYO Secret을 지운다**
+
+   ```bash
+   kubectl -n kagent delete \
+     serviceaccount/agent-backend role/agent-backend rolebinding/agent-backend \
+     networkpolicy/controller-approved-callers secret/lab-byo-model \
+     --ignore-not-found
+   ```
+
+4. **demo control plane과 Substrate를 남겼는지 확인한다**
+
+   ```bash
+   kubectl -n kagent get agents,sandboxagents,mcpservers,workerpools
+   kubectl -n kagent get pods
+   kubectl -n ate-system get pods
+   ```
+
+</Steps>
+
+`broken-model-agent`는 6장에서 이미 삭제했어야 한다. 남아 있다면 `kubectl -n kagent get agent
+broken-model-agent`로 정확히 확인한 뒤 그 이름만 삭제한다. `default-model-config`나 chart가 만든 sample Agent는
+선택 A에서 지우지 않는다.
+
+선택 A는 Substrate chart·CRD·Valkey·RustFS와 `kagent-default` WorkerPool을 남긴다. 제품 자체를 제거하려고
+chart와 CRD를 수동으로 섞어 지우지 않는다.
+
+## 선택 B — 전용 kind cluster 전체 지우기
+
+실습 종료의 기본 경로다. cluster 안의 kagent resource·Secret·session·database·Substrate snapshot이 함께
+사라지며 복구할 수 없다. 13장의 판정 증거를 보존한 뒤 실행한다.
+
+<Steps>
+
+1. **현재 context와 정확한 cluster 이름을 확인한다**
+
+   ```bash
+   kubectl config current-context
+   kind get clusters
+   ```
+
+   기대값은 context `kind-kagent-lab`, cluster 이름 `kagent-lab`이다.
+
+2. **그 전용 cluster만 삭제한다**
+
+   ```bash
+   kind delete cluster --name kagent-lab
+   ```
+
+3. **목록과 context에서 사라졌는지 확인한다**
+
+   ```bash
+   kind get clusters
+   kubectl config get-contexts
+   ```
+
+4. **현재 shell의 model credential을 해제한다**
+
+   ```bash
+   unset OPENAI_API_KEY LITELLM_API_KEY LITELLM_BASE_URL LITELLM_MODEL
+   ```
+
+</Steps>
+
+kind node image와 container는 cluster 삭제로 정리되지만 host의 kagent·kind·kubectl CLI와 Docker cache는
+남는다. 여러 실습이 공유할 수 있으므로 이 장에서 자동 삭제하지 않는다.
+
+`/tmp/kagent-backend-probe`와 `/tmp/kagent-lab-byo`도 자동으로 지우지 않는다. 필요한 code를 옮기고
+credential file이 없음을 확인한 뒤, 더 필요 없을 때만 그 두 **정확한 경로**를 로컬에서 삭제한다.
+
+## 공유 staging에서 uninstall은 별도 변경이다
+
+공유 cluster의 uninstall은 다음 의존성을 가진다.
+
+```text
+publication 차단
+→ Agent·SandboxAgent·actor 정리와 snapshot retention 확인
+→ kagent의 Substrate integration·WorkerPool 정리
+→ kagent·Substrate chart 제거
+→ 남은 CR·finalizer·PVC·외부 PostgreSQL/object storage 확인
+→ 마지막에만 CRD 제거 여부 결정
+```
+
+chart version에 따라 finalizer와 generated resource가 달라질 수 있다. 그래서 이 덱은 `helm uninstall`·CRD 삭제
+명령을 복사 가능한 한 줄로 제공하지 않는다. 현재 pinned version의 공식 uninstall, Helm release ownership,
+backup·rollback과 다른 tenant 영향까지 검토한 승인 change로 수행한다.
+
+## 이번 실습에서 얻은 판단 기준
+
+1. backend의 관리 port는 Kubernetes CRD, invocation port는 controller A2A다.
+2. dashboard·CLI는 탐색 도구이고 production backend 계약이 아니다.
+3. model·prompt·tool allowlist·runtime은 서로 다른 변경·권한 경계다.
+4. MCP는 Agent가 tool을 부르는 안쪽 계약이고 A2A는 client가 Agent를 부르는 바깥쪽 계약이다.
+5. `Accepted`, `Ready`, Agent Card, invoke 성공은 각각 다른 checkpoint다.
+6. Kubernetes RBAC, 사용자 Grant, session ownership, tool action policy는 서로 대체하지 않는다.
+7. BYO는 image·dependency·protocol·Secret·공급망 책임을 application team으로 넓힌다.
+8. kind 성공은 외부 PostgreSQL·HA·CNI policy·사내 CA·registry·rollback의 staging 증거가 아니다.
+9. Substrate는 필수가 아니라 idle 밀도·gVisor 요구가 restore 지연과 새 운영비보다 클 때 고르는 runtime이다.
+10. AgentHarness는 coding workspace 요구가 생길 때 별도 신뢰 경계로 검토한다.
+
+## 다음에 이어갈 길
+
+- 실제 사내 platform decision: [Agent 배포 플랫폼 — 단계적 도입](/agent-platform/16-adoption/)
+- 온프렘 배포 기반: [온프렘 Kubernetes](/onprem/)
+- model gateway와 비용·권한: [LiteLLM](/litellm/)
+- LLM trace와 평가: [Langfuse](/langfuse/)
+
+## 참고 자료
+
+- [kagent uninstall](https://kagent.dev/docs/kagent/operations/uninstall) — release별 제거 순서와 전체 resource 삭제 경고
+- [kagent Agent Substrate walkthrough](https://kagent.dev/docs/kagent/examples/agent-substrate/) — 전용 kind 실습의 cluster cleanup
+- [kind Quick Start](https://kind.sigs.k8s.io/docs/user/quick-start/) — 이름 있는 cluster 삭제
+
+<LinkCard
+  title="Agent 배포 플랫폼 — 단계적 도입"
+  description="이 덱의 backend·보안·Substrate 측정값을 default target의 공통 acceptance test와 decision record로 가져간다."
+  href="/agent-platform/16-adoption/"
+/>

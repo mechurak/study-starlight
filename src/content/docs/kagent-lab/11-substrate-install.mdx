@@ -1,0 +1,289 @@
+---
+title: "11. 같은 클러스터에 Agent Substrate 추가하기"
+description: 기본 kagent 실습을 마친 같은 kind cluster에 pinned Substrate control/data plane과 WorkerPool을 설치하고 기존 Agent 경로가 유지되는지 확인한다
+reviewedAt: 2026-08-21
+status: review
+---
+
+import { LinkCard, Steps } from '@astrojs/starlight/components';
+import TermIntro from '../../../components/docs/TermIntro.astro';
+import Thesis from '../../../components/docs/Thesis.astro';
+
+<Thesis>Substrate는 별도 클러스터의 필수 기능이 아니라 선택 runtime이므로, 기본 Agent와 backend 경로를 먼저 통과한 같은 kind cluster에 추가해 공존 비용을 드러낸다</Thesis>
+
+<TermIntro
+  terms={[
+    ['Agent Substrate', '', 'Agent 수명주기를 Pod에서 분리하고 idle actor를 snapshot·restore하는 Kubernetes-native runtime이다.'],
+    ['WorkerPool', '', '미리 준비한 gVisor worker Pod의 수와 template을 선언하는 Substrate CRD다.'],
+    ['actor', '', 'Substrate worker 안에서 격리된 상태로 실행되는 Agent instance다.'],
+    ['golden snapshot', '', 'SandboxAgent session을 빠르게 시작하기 위해 처음 만들어 두는 실행 환경 checkpoint다.'],
+  ]}
+/>
+
+이 장은 7~8장의 backend 경로와 일반 `Agent`가 정상인 상태에서 시작한다. 새 cluster를 만드는 대신 기존
+`kind-kagent-lab`에 Substrate를 추가한다. 그래야 설치 전후의 Pod 수·controller 설정·호출 경로를 같은 환경에서
+비교할 수 있다. 공식 walkthrough도 별도 kind 설정이나 feature gate가 없는 vanilla kind를 지원한다.
+
+## 이번에 추가되는 것
+
+```d2 layout=elk pad=40 title="기존 kagent cluster에 Substrate의 control plane·data plane·snapshot storage와 WorkerPool이 추가되고 controller가 둘 중 일반 Deployment와 actor runtime을 선택하는 구조"
+direction: down
+
+classes: {
+  key: {
+    style: {
+      fill: "#dbeafe"
+      stroke: "#2563eb"
+      font-color: "#1e3a8a"
+    }
+  }
+  zone: {
+    style: {
+      fill: "#ede9fe"
+      stroke: "#7c3aed"
+      font-color: "#4c1d95"
+    }
+  }
+  ok: {
+    style: {
+      fill: "#dcfce7"
+      stroke: "#16a34a"
+      font-color: "#14532d"
+    }
+  }
+  warn: {
+    style: {
+      fill: "#fef3c7"
+      stroke: "#d97706"
+      font-color: "#78350f"
+    }
+  }
+}
+
+kagent: "기존 kagent" {
+  class: key
+  controller: "kagent controller"
+  regular: "Agent → Deployment"
+}
+
+substrate: "추가되는 Agent Substrate" {
+  class: zone
+  control: "ateapi · atecontroller\nValkey"
+  data: "atenet · atelet · ateom"
+  pool: "WorkerPool\ngVisor worker"
+  storage: "RustFS\nlab snapshot storage"
+}
+
+sandbox: "SandboxAgent → actor" { class: ok }
+cost: "추가 운영 표면\nCRD · Pod · storage · version pair" { class: warn }
+
+kagent.controller -> kagent.regular
+kagent.controller -> substrate.control
+substrate.control -> substrate.pool
+substrate.pool -> sandbox
+sandbox -> substrate.storage: "suspend snapshot" { style.animated: true }
+substrate.storage -> sandbox: "restore" { style.animated: true }
+substrate -> cost
+```
+
+Substrate는 control plane의 `ateapi`·`atecontroller`, data plane의 `atenet`·node별 `atelet`·worker supervisor,
+Valkey와 snapshot object storage를 추가한다. 별도 cluster가 필요해서가 아니라 **추가 구성 요소의 blast radius와
+cleanup을 감수할 가치가 있는지**가 이번 실험의 질문이다.
+
+## 성공 조건
+
+- 설치 전후의 Helm values·Pod·CRD·WorkerPool 증거를 남긴다.
+- Substrate `0.0.6`과 kagent `0.9.9`를 독립적인 `latest`가 아닌 호환 pair로 설치한다.
+- 기존 demo values와 `Agent` resource를 잃지 않고 kagent controller의 Substrate 연동을 켠다.
+- `ate-system` component와 `kagent-default` WorkerPool이 ready다.
+- 기존 `backend-reader` invoke가 설치 뒤에도 성공한다.
+
+## 설치 전 기준선과 여유 확인
+
+현재 context와 release를 다시 확인한다.
+
+```bash
+kubectl config current-context
+kagent version
+helm -n kagent list
+kubectl -n kagent get agent backend-reader
+```
+
+기대 context는 `kind-kagent-lab`, kagent chart는 `0.9.9`다. 다르면 이 장의 command를 그대로 실행하지 않고
+공식 compatibility와 실제 chart values부터 다시 확인한다.
+
+설치 전 상태를 `/tmp`에 남긴다. values에는 Secret reference와 내부 주소가 있을 수 있으므로 Git에 넣지 않는다.
+
+```bash
+helm -n kagent get values kagent --all > /tmp/kagent-before-substrate-values.yaml
+kubectl -n kagent get modelconfig default-model-config -o yaml \
+  > /tmp/kagent-before-substrate-modelconfig.yaml
+kubectl get pods -A -o wide > /tmp/kagent-before-substrate-pods.txt
+kubectl get crd > /tmp/kagent-before-substrate-crds.txt
+kubectl get nodes
+```
+
+Substrate 선택 경로의 학습용 출발값은 host CPU 6개, memory 12 GiB, 디스크 25 GiB다. 고정 최소 요구량은
+아니므로 설치 중 `Pending`이면 scheduler Event와 실제 request를 보고 host 자원을 조정한다.
+
+## Pinned Substrate 설치
+
+공식 walkthrough의 순서대로 CRD chart를 먼저 설치하고 control/data plane chart를 적용한다.
+
+```bash
+export SUBSTRATE_VERSION="0.0.6"
+
+helm upgrade --install substrate-crds \
+  oci://ghcr.io/kagent-dev/substrate/helm/substrate-crds \
+  --version "$SUBSTRATE_VERSION" \
+  --namespace ate-system --create-namespace --wait
+
+helm upgrade --install substrate \
+  oci://ghcr.io/kagent-dev/substrate/helm/substrate \
+  --version "$SUBSTRATE_VERSION" \
+  --namespace ate-system --wait --timeout 10m
+```
+
+```bash
+helm -n ate-system list
+kubectl -n ate-system get pods
+kubectl -n ate-system get svc
+```
+
+공식 `0.0.6` walkthrough에서는 `ate-api-server`, `ate-controller`, `atelet`, `atenet-router`, Valkey와 RustFS
+workload가 준비된다. 정확한 Pod suffix보다 각 역할이 ready인지와 restart·Event를 본다. RustFS는 이 kind 실습의
+bundled snapshot storage이며 온프렘 production 선택이 아니다.
+
+## 기존 kagent release에 연동 켜기
+
+새 kagent release를 만들지 않고 `kagent` release를 같은 `0.9.9` chart로 upgrade한다. `--reuse-values`는 1장에서
+설치한 **Helm release values**를 보존한다. 1장에서 `default-model-config`를 `kubectl patch`로 LiteLLM에 바꾼 것은
+Helm value가 아니므로 upgrade가 원래 manifest로 되돌릴 수 있다. 그래서 release values와 실제 ModelConfig를
+각각 저장했다.
+
+```bash
+export KAGENT_VERSION="0.9.9"
+
+helm upgrade kagent \
+  oci://ghcr.io/kagent-dev/kagent/helm/kagent \
+  --version "$KAGENT_VERSION" \
+  --namespace kagent \
+  --reuse-values \
+  --set controller.substrate.enabled=true \
+  --set controller.substrate.ateApiEndpoint=dns:///api.ate-system.svc:443 \
+  --set controller.substrate.ateApiInsecure=true \
+  --set substrateWorkerPool.create=true \
+  --set substrateWorkerPool.replicas=1 \
+  --set substrateWorkerPool.ateomImage=ghcr.io/kagent-dev/substrate/ateom-gvisor:v0.0.6 \
+  --wait --timeout 10m
+```
+
+`controller.substrate.*`와 `substrateWorkerPool.*`은 kagent `0.9.7` 이전 chart에서는 무시될 수 있다. 그래서
+version을 먼저 확인하고 설치 뒤 **실제 rendered values와 WorkerPool**을 함께 본다.
+
+```bash
+helm -n kagent get values kagent --all > /tmp/kagent-after-substrate-values.yaml
+diff -u /tmp/kagent-before-substrate-values.yaml /tmp/kagent-after-substrate-values.yaml
+kubectl -n kagent get modelconfig default-model-config -o yaml \
+  > /tmp/kagent-after-substrate-modelconfig.yaml
+diff -u /tmp/kagent-before-substrate-modelconfig.yaml \
+  /tmp/kagent-after-substrate-modelconfig.yaml
+kubectl -n kagent get deploy kagent-controller
+kubectl -n kagent get workerpool
+kubectl -n kagent get pods
+```
+
+values diff에는 의도한 Substrate 연동과 WorkerPool 값만 추가되어야 한다. ModelConfig diff에서 LiteLLM
+`baseUrl`·Secret reference·TLS CA가 원래 Helm 값으로 돌아갔다면 다음 장로 진행하지 않는다. 1장의 실습 patch를
+검토해 다시 적용하거나, 운영형 별도 `ModelConfig`를 선언하고 두 fixture가 그 이름을 참조하게 바꾼 뒤 기존
+`backend-reader` invoke부터 재검증한다.
+
+:::caution[`ateApiInsecure=true`의 범위]
+이 값은 공식 kind walkthrough의 학습용 연결이다. 온프렘 staging에서는 Substrate service identity와 trust
+bundle을 포함한 현재 chart의 secure 연결 절차를 검증하고, kind 값을 그대로 복사하지 않는다.
+:::
+
+## WorkerPool capacity 확인
+
+한 worker는 순차적인 Declarative session 실습에 충분하다. session actor가 snapshot으로 내려가면 slot을
+반납하기 때문이다. 동시 호출이나 장기 `AgentHarness`는 slot을 더 오래 점유한다.
+
+```bash
+kubectl -n kagent get workerpool kagent-default -o yaml
+kubectl -n kagent get pods -o wide
+kubectl -n ate-system get pods -o wide
+```
+
+replica를 바꿀 때 세 경로의 수명을 구분한다.
+
+```text
+kubectl scale workerpool ...       → 즉시 시험, 다음 Helm upgrade 때 되돌아갈 수 있음
+helm upgrade --reuse-values ...    → release에 남는 실습 변경
+values file + GitOps               → staging의 승인된 desired state
+```
+
+이번 장에서는 replica 1을 유지한다. 12장에서 동시 호출로 capacity 부족을 관찰한 뒤에만 숫자를 바꾼다.
+
+## 기존 경로 regression 확인
+
+Substrate를 설치했다고 일반 `Agent`가 actor로 자동 이동하지 않는다. `backend-reader`는 여전히 Deployment이고
+controller A2A route도 같다.
+
+```bash
+kubectl -n kagent get agent backend-reader
+kubectl -n kagent get deploy
+kagent invoke -n kagent -a backend-reader -S \
+  -t "List the Services in the kagent namespace. Use a tool."
+```
+
+7장의 Node probe도 다시 실행한다.
+
+```bash
+cd /tmp/kagent-backend-probe
+KAGENT_A2A_URL="http://localhost:8083/api/a2a/kagent/backend-reader/" \
+  npx tsx probe.ts
+```
+
+설치 뒤 기존 호출이 깨졌다면 Substrate 가치 비교 전에 regression으로 기록한다. 새 기능 성공으로 기존 경로 실패를
+상쇄하지 않는다.
+
+## AgentHarness는 이번 hands-on에서 제외한다
+
+`AgentHarness`는 OpenClaw·Hermes 같은 coding agent에 장기 filesystem·process 환경을 주고 ACP로 연결하는
+별도 사용 사례다. shared actor가 WorkerPool slot을 계속 점유할 수 있고, source credential·workspace data·shell
+실행의 신뢰 경계도 훨씬 넓다.
+
+이번에는 Go Declarative `SandboxAgent`만 실행한다. coding workspace에 대한 실제 사용자 요구와 보안 정책이
+생기면 [Agent Harness 공식 개념](https://kagent.dev/docs/kagent/concepts/agent-harness/)을 별도 PoC로 연다.
+
+## 안 될 때 먼저 볼 것
+
+| 증상 | 확인 |
+|---|---|
+| Substrate Helm timeout | `ate-system` Pod Events·image pull·host memory와 disk |
+| controller가 반복 재시작 | Substrate endpoint·certificate projection·PostgreSQL 준비 순서 |
+| WorkerPool이 없음 | kagent chart version, `substrateWorkerPool.create`, Helm rendered values |
+| worker Pod `Pending` | resource request·node selector·taint·sandbox runtime Event |
+| 기존 Agent가 사라짐 | `--reuse-values` 전후 diff와 Helm release history |
+| 기존 invoke만 실패 | controller log·port-forward·A2A route regression |
+
+## 완료 체크
+
+- 같은 `kind-kagent-lab`에 Substrate를 추가한 이유를 A/B 비교와 공존 검증으로 설명한다.
+- kagent `0.9.9`·Substrate `0.0.6` compatibility pair와 설치 전후 values를 기록했다.
+- `ate-system` control/data plane과 `kagent-default` WorkerPool이 ready다.
+- 기존 `Agent`·Node backend probe가 설치 뒤에도 성공한다.
+- AgentHarness는 coding workspace 수요가 생길 때 여는 별도 gate로 남겼다.
+
+## 참고 자료
+
+- [kagent Agent Substrate walkthrough](https://kagent.dev/docs/kagent/examples/agent-substrate/) — vanilla kind, pinned chart와 WorkerPool 설치 절차
+- [kagent Agent Substrate 개념](https://kagent.dev/docs/kagent/concepts/agent-substrate/) — actor·snapshot·control/data plane 구조
+- [kagent Helm reference](https://kagent.dev/docs/kagent/resources/helm/) — controller 연동과 WorkerPool values
+- [Agent Substrate topology](https://learn.agentsubstrate.dev/) — resume flow와 각 runtime component의 역할
+
+<LinkCard
+  title="12. SandboxAgent suspend·restore 비교"
+  description="일반 Agent와 같은 model·instructions·tool을 가진 SandboxAgent를 만들고 backend 호출·snapshot·restore·capacity를 비교한다."
+  href="/kagent-lab/12-substrate-compare/"
+/>

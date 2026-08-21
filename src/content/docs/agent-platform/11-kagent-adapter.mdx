@@ -68,10 +68,12 @@ kagent challenger는 같은 fixture로 다음 차이만 증명한다.
 | model·tool wiring | 회사 manifest와 client 구현 | ModelConfig·MCP reference 제공 | kagent schema와 controller 의존 |
 | lifecycle | adapter가 workload 직접 reconcile | Agent condition과 controller 제공 | condition 정규화와 controller 장애 대응 |
 | 코드형 Agent | Deployment·Service 생성 | BYO A2A template·일관된 resource 제공 | 기준선과 기능 격차가 작을 수 있음 |
-| suspend·workspace | 별도 sandbox control plane | SandboxAgent·AgentHarness 제공 | Agent Substrate·snapshot 인프라 |
+| suspend·workspace | 별도 sandbox control plane | SandboxAgent·AgentHarness 제공 | Agent Substrate control/data plane·WorkerPool·snapshot storage |
 
 PoC decision record에는 기능 유무가 아니라 개발·운영 시간, upgrade rehearsal, 장애 복구와 실제 사용 Agent 수를
-남긴다. 구성형 engine이나 suspend/workspace를 사용하지 않는다면 kagent를 유지할 근거가 약하다.
+남긴다. 구성형 engine이나 suspend/workspace를 사용하지 않는다면 kagent를 유지할 근거가 약하다. Substrate도
+별도 제품 점수로 더하지 않고 기본 `Agent` 대비 idle 절감·restore 지연·shared worker failure·고정 운영비를
+[같은 A2A fixture](/kagent-lab/12-substrate-compare/)로 측정한다.
 
 ## Capability profile
 
@@ -168,7 +170,8 @@ engine과 선언형 lifecycle이고, 이 가치가 실제로 쓰이는지는
 - [kagent v0.9 release notes](https://kagent.dev/docs/kagent/resources/release-notes) — OIDC 인증과 access control 경계
 - [운영 고려사항](https://kagent.dev/docs/kagent/operations/operational-considerations) — HA, secret, security context
 - [kagent BYO Agent](https://kagent.dev/docs/kagent/examples/a2a-byo) — image와 A2A runtime 계약
-- [kagent 실습 덱 7장](/kagent-lab/07-byo-agent/) — BYO image를 kind cluster에 올려 보기
+- [kagent 실습 덱 9장](/kagent-lab/09-byo-agent/) — BYO image를 kind cluster에 올려 보기
+- [kagent 실습 덱 11~13장](/kagent-lab/11-substrate-install/) — 같은 cluster에서 Substrate를 추가하고 일반 Agent와 비교해 도입 판정하기
 - [Kubernetes Deployments](https://kubernetes.io/docs/concepts/workloads/controllers/deployment/) — 기준선 adapter가 직접 만드는 workload lifecycle.
 - [Kubernetes Server-Side Apply](https://kubernetes.io/docs/reference/using-api/server-side-apply/) — 기준선과 kagent adapter가 공유하는 idempotent apply 기반.
 

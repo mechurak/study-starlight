@@ -9,7 +9,7 @@ import { LinkCard } from '@astrojs/starlight/components';
 import TermIntro from '../../../components/docs/TermIntro.astro';
 import Thesis from '../../../components/docs/Thesis.astro';
 
-<Thesis>kagent의 진실은 dashboard가 아니라 Kubernetes API에 저장된 resource다. dashboard·CLI·A2A는 같은 상태를 보는 서로 다른 입구다</Thesis>
+<Thesis>kagent 연동은 resource를 선언·관찰하는 Kubernetes 관리 경로와 task를 보내는 controller A2A 호출 경로를 분리하고, dashboard·CLI는 운영 도구로만 남겨야 한다</Thesis>
 
 <TermIntro
   terms={[
@@ -27,7 +27,7 @@ adapter 구현과 권한 경계는 [11장](/agent-platform/11-kagent-adapter/)�
 
 ## 전체 중 kagent의 자리
 
-```d2 layout=elk pad=40 title="Platform Core가 KagentAdapter를 거쳐 Kubernetes API에 Agent resource를 만들고, kagent controller가 Pod를 실행하며 status가 adapter로 돌아오는 흐름"
+```d2 layout=elk pad=40 title="Portal Backend의 관리 adapter는 Kubernetes API에 resource를 선언하고 invocation adapter는 kagent controller 8083의 A2A route를 호출하는 두 경로"
 direction: right
 
 classes: {
@@ -61,23 +61,26 @@ classes: {
   }
 }
 
-portal: "Platform Core" { class: key }
-adapter: "KagentAdapter" { class: zone }
-api: "Kubernetes API\nAgent · ModelConfig · RemoteMCPServer" { class: zone }
+portal: "Portal Backend" { class: key }
+adapter: "management adapter" { class: zone }
+invoker: "invocation adapter" { class: zone }
+api: "Kubernetes API\nAgent · SandboxAgent · ModelConfig · MCP" { class: zone }
 status: "status · conditions" { class: zone }
-ctrl: "kagent controller" { class: ok }
-pod: "Agent Pod\nkagent engine 또는 BYO image" { class: ok }
+ctrl: "kagent controller\n:8083 · /api/a2a/..." { class: ok }
+runtime: "Agent Pod 또는\nSubstrate actor" { class: ok }
 model: "LiteLLM · Ollama · model API" { class: ok }
 mcp: "MCP server · other Agent" { class: ok }
-ui: "kagent dashboard · CLI\n운영자용 입구" { class: mute }
+ops: "kagent dashboard · CLI\n내부 API를 쓰는 운영 도구" { class: mute }
 
 portal -> adapter
 adapter -> api
-ui -> api: "같은 resource를 본다" { style.stroke-dash: 3 }
+portal -> invoker
+invoker -> ctrl: "A2A message/send"
+ops -> ctrl: "운영 UI · invoke" { style.stroke-dash: 3 }
 ctrl -> api
-ctrl -> pod
-pod -> model
-pod -> mcp
+ctrl -> runtime: "reconcile · route"
+runtime -> model
+runtime -> mcp
 api -> status
 status -> adapter
 ```
@@ -85,16 +88,17 @@ status -> adapter
 kagent는 `Agent`를 Kubernetes resource로 표현하고 model과 MCP tool 연결을 함께 관리한다. GitOps·namespace·
 ServiceAccount·NetworkPolicy 같은 기존 Kubernetes 운영 모델과 가까운 것이 장점이다.
 
-그림에서 dashboard가 점선인 이유는 중요하다. dashboard는 **Kubernetes API의 같은 resource를 보는 또 하나의
-클라이언트**일 뿐 별도 진실을 갖지 않는다. 사내 포털을 따로 만들면 dashboard는 최종 사용자 화면이 아니라
-플랫폼 팀의 운영 콘솔로 남는다. 이 경계는 [10장](/agent-platform/10-kagent-integration/)에서 다시 다룬다.
+그림에서 dashboard·CLI가 점선인 이유는 중요하다. 이 도구는 controller의 내부 API와 설치·진단 command를
+사용해 resource-derived 상태와 chat을 보여 주지만, 사내 backend가 의존할 versioned 계약은 아니다. 사내 포털을
+따로 만들면 dashboard는 최종 사용자 화면이 아니라 플랫폼 팀의 운영 콘솔로 남는다. 이 경계는
+[10장](/agent-platform/10-kagent-integration/)에서 다시 다룬다.
 
 ## 구성 요소
 
 | 구성 요소 | 하는 일 | 사내 플랫폼에서의 취급 |
 |---|---|---|
-| controller | CRD를 watch해 Deployment·Service를 만들고 status를 되돌려 쓴다 | adapter가 대화하는 유일한 control plane |
-| engine (app) | Agent의 대화 loop를 실행한다. model 호출, tool 호출, session 관리 | Agent Pod 안에서 돈다. 직접 조작하지 않는다 |
+| controller | CRD를 watch해 workload와 status를 조정하고 `8083` A2A route를 Agent runtime으로 중계한다 | 관리 adapter는 Kubernetes API, invocation adapter는 controller A2A로 나누어 대화한다 |
+| engine (app) | Agent의 대화 loop를 실행한다. model 호출, tool 호출, session 관리 | 일반 Agent Pod 또는 Substrate actor 안에서 돈다. 직접 조작하지 않는다 |
 | dashboard | 웹 UI. Agent 생성·대화·상태 확인 | 운영자 콘솔. 최종 사용자에게 열지 않는다 |
 | CLI | `kagent install`, `kagent invoke` 등 또 하나의 입구 | 설치·진단용. 서버 코드에서 shell로 부르지 않는다 |
 | kmcp | MCP server 개발·배포용 하위 프로젝트. 기본 설치에 포함 | 사용자 MCP 배포 경로 후보 |
@@ -103,9 +107,10 @@ ServiceAccount·NetworkPolicy 같은 기존 Kubernetes 운영 모델과 가까�
 Kubernetes controller로, engine을 "Agent의 대화 loop를 실행하는 핵심 구성 요소"로 설명한다.
 
 :::caution[함정]
-"kagent를 붙인다"를 dashboard가 쓰는 내부 HTTP API에 붙이는 것으로 오해하기 쉽다. 공식 문서가 외부
-클라이언트용으로 문서화하고 version을 약속하는 것은 **CRD schema**다(2026년 8월 21일 확인).
-통합 지점 선택은 [10장](/agent-platform/10-kagent-integration/#통합-지점을-무엇으로-잡을-것인가)에서 정한다.
+"kagent를 붙인다"를 dashboard가 쓰는 내부 HTTP API에 붙이는 것으로 오해하기 쉽다. 관리에는 공식 **CRD
+schema**, 호출에는 controller `8083`의 공식 **A2A route**를 쓴다(2026년 8월 21일 확인). 둘을 하나의 내부
+REST client로 뭉치지 않는다. 통합 지점 선택은
+[10장](/agent-platform/10-kagent-integration/#통합-지점을-무엇으로-잡을-것인가)에서 정한다.
 :::
 
 ## 두 engine runtime
@@ -117,7 +122,7 @@ Declarative Agent는 `runtime` 필드로 engine 구현을 고른다. 공식 Agen
 | 명시할 runtime | 문서상 시작 시간 | 특징 |
 |---|---|---|
 | Python ADK | 약 15초 | LangGraph·CrewAI·OpenAI 통합을 함께 쓸 수 있다 |
-| Go ADK | 약 2초 | 자원 사용이 적다. `SandboxAgent`는 이 runtime만 쓴다 |
+| Go ADK | 약 2초 | 자원 사용이 적다. pinned Substrate hands-on은 이 runtime으로 검증한다 |
 
 Agent 수가 많아지면 시작 시간과 idle resource가 비용이 된다. 사내에서 Agent를 수백 개 등록받을 계획이라면
 runtime 선택 기준과 지원 feature를 platform policy로 고정하고, upgrade 때 두 runtime의 contract test를 다시 돈다.
@@ -132,7 +137,7 @@ runtime 선택 기준과 지원 feature를 platform policy로 고정하고, upgr
 |---|---|---|---|
 | 실행 위치 | Deployment Pod | Agent Substrate actor | Agent Substrate actor |
 | 상주 방식 | 항상 떠 있음 | idle이면 snapshot으로 내려감 | 장기 세션 유지 |
-| 안의 내용 | kagent engine 또는 BYO image | Go ADK 기반 선언형 Agent | OpenClaw·Hermes 같은 외부 coding agent |
+| 안의 내용 | kagent engine 또는 BYO image | API는 Declarative·BYO를 표현하며, pinned 실습은 Go Declarative | OpenClaw·Hermes 같은 외부 coding agent |
 | 푸는 문제 | 항상 호출 가능한 Agent | idle compute 회수 | coding agent workspace lifecycle |
 | 전제 인프라 | 없음 | gVisor node·object storage | gVisor node·object storage |
 
@@ -141,9 +146,10 @@ runtime 선택 기준과 지원 feature를 platform policy로 고정하고, upgr
 주기 실행, 항상 상주 같은 호출·process 수명주기 분류가 아니다.
 :::
 
-Agent Substrate의 worker pool·snapshot 구조는 [kagent 실습 덱 9장](/kagent-lab/09-harness-substrate/)에
-인프라 관점으로 정리해 두었다. 이 덱에서는 "언제 검토 대상이 되는가"만 기억하면 된다 — 등록된 Agent 수가
-동시 활성 수를 크게 웃돌 때, 또는 사용자에게 coding agent 세션을 제공할 때다.
+Agent Substrate의 설치·worker pool·snapshot A/B는
+[kagent 실습 덱 11~13장](/kagent-lab/11-substrate-install/)에서 같은 cluster의 일반 Agent와 직접 비교한다.
+이 덱에서는 "언제 검토 대상이 되는가"만 기억하면 된다 — 등록된 Agent 수가 동시 활성 수를 크게 웃돌거나,
+gVisor 격리가 필요한 실행 class가 생겼을 때다. coding workspace는 `AgentHarness`라는 더 넓은 별도 신뢰 경계다.
 
 ## 실행 수명주기는 다른 resource와 trigger로 표현한다
 
@@ -173,8 +179,8 @@ trigger 계약은 [제품 밖의 domain model](/agent-platform/03-domain-model/#
 
 ## 8장 요약
 
-- kagent의 진실은 Kubernetes API의 resource이고 dashboard·CLI는 그것을 보는 입구다.
-- controller는 resource를 조정하고 engine은 Agent Pod 안에서 대화 loop를 돌린다.
+- kagent의 관리 진실은 Kubernetes API의 resource이고 dashboard·CLI는 backend 계약이 아닌 운영 도구다.
+- controller는 resource를 조정하고 `8083` A2A route를 Agent Pod 또는 Substrate actor로 중계한다.
 - engine runtime은 Python ADK(문서상 약 15초)와 Go ADK(약 2초) 중에서 고르고 manifest에 명시한다.
 - `Declarative`/`BYO`는 공급 주체 축, `Agent`/`SandboxAgent`/`AgentHarness`는 상주 방식 축이다.
 - 일정·event 실행은 kagent 밖의 scheduler가 A2A로 invoke하는 형태로 번역한다.
@@ -182,9 +188,10 @@ trigger 계약은 [제품 밖의 domain model](/agent-platform/03-domain-model/#
 ## 참고 자료
 
 - [kagent Architecture](https://kagent.dev/docs/kagent/concepts/architecture) — controller·engine·CLI·dashboard의 역할 구분
+- [kagent A2A 예제](https://kagent.dev/docs/kagent/examples/a2a-agents/) — controller `8083`의 Agent Card·task route
 - [kagent API reference](https://kagent.dev/docs/kagent/resources/api-ref) — `Agent`·`SandboxAgent`·`AgentHarness` schema와 API version
 - [kagent Agent Substrate](https://kagent.dev/docs/kagent/concepts/agent-substrate) — worker pool·actor·snapshot 구조
-- [kagent 실습 덱](/kagent-lab/) — 전용 kind cluster에서 설치·Agent·MCP·A2A·debug를 직접 확인
+- [kagent 실습 덱](/kagent-lab/) — 전용 kind cluster에서 설치·backend CRD/A2A·보안·온프렘·Substrate를 직접 확인
 
 <LinkCard
   title="9. kagent의 Agent와 tool 리소스"

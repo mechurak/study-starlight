@@ -1,14 +1,15 @@
 ---
-title: "7. BYO Agent의 local loop와 배포 경계"
-description: kagent CLI로 ADK Python Agent project를 생성·빌드·로컬 실행하고 BYO image·A2A·registry·Secret 책임을 구분한다
-reviewedAt: 2026-08-19
+title: "9. BYO Agent를 kind에 배포하기"
+description: kagent CLI로 ADK Python Agent를 생성·로컬 검증한 뒤 image를 kind node에 적재하고 BYO Agent의 Ready·A2A까지 완주한다
+reviewedAt: 2026-08-21
 status: review
 ---
 
-import { LinkCard, Steps } from '@astrojs/starlight/components';
+import { LinkCard, Steps, Tabs, TabItem } from '@astrojs/starlight/components';
 import TermIntro from '../../../components/docs/TermIntro.astro';
+import Thesis from '../../../components/docs/Thesis.astro';
 
-> Declarative Agent가 설정을 넘기는 방식이라면 BYO Agent는 **실행 가능한 image와 A2A server 계약을 넘기는 방식**이다
+<Thesis>BYO Agent 실습은 local run에서 끝나지 않으며 같은 image를 kind에 올려 Ready와 controller A2A route까지 검증해야 Declarative Agent와의 책임 차이가 드러난다</Thesis>
 
 <TermIntro
   terms={[
@@ -29,8 +30,8 @@ import TermIntro from '../../../components/docs/TermIntro.astro';
 | dependency | kagent release가 주로 고정 | project lockfile·image가 고정 |
 | 공급망 | CR·prompt·tool reference 검토 | code·dependency·base image·SBOM까지 검토 |
 
-이번 장의 필수 범위는 **project 생성 → image build → 로컬 실행**이다. cluster 배포는 registry와 Secret을
-준비한 뒤에만 선택한다. `localhost` image를 kind node가 자동으로 볼 수 있다고 가정하지 않는다.
+이 장 자체는 선택 실습이지만 시작했다면 **project 생성 → image build → 로컬 실행 → kind 적재 → BYO resource
+→ A2A invoke**까지가 완료 범위다. `localhost` image를 kind node가 자동으로 볼 수 있다고 가정하지 않는다.
 
 ## project 만들기
 
@@ -106,7 +107,7 @@ LiteLLM alias가 tool calling을 지원하는지도 다시 확인한다.
 2. **project image를 만든다**
 
    ```bash
-   kagent build
+   kagent build --image lab-byo:lab
    ```
 
 3. **로컬 terminal UI에서 실행한다**
@@ -117,38 +118,87 @@ LiteLLM alias가 tool calling을 지원하는지도 다시 확인한다.
 
 4. generated Agent의 기본 tool을 한 번 호출하고 응답을 본다. 종료는 `Ctrl+C`다.
 
-5. code나 instructions 한 줄을 바꾼 뒤 다시 `kagent build`, `kagent run`해 image build가 변경 경계임을 확인한다.
+5. code나 instructions 한 줄을 바꾼 뒤 다시 `kagent build --image lab-byo:lab`, `kagent run`해 image build가
+   변경 경계임을 확인한다.
 
 </Steps>
 
 로컬 성공은 code와 model 연결을 빠르게 검증한다. Kubernetes scheduling, registry pull, ServiceAccount,
 NetworkPolicy, Secret reference, A2A route까지 검증한 것은 아니다.
 
-## cluster 배포 전 gate
+## 배포 manifest를 먼저 검사하기
 
 다음 질문에 모두 답할 수 있을 때만 cluster deploy로 넘어간다.
 
-- image 이름이 kind node가 pull할 registry를 가리키는가?
-- mutable `latest`가 아니라 digest나 immutable tag를 기록했는가?
-- `.env.production`이 Git에서 제외되고 최소 key만 가지는가?
+- image 이름과 실제 build 결과가 같은가?
+- kind에서는 `kind load`와 `IfNotPresent`를 쓰고, 온프렘에서는 registry digest로 바꿀 계획이 있는가?
+- deploy CLI를 쓸 경우 임시 env file을 조직의 secret 도구로 만들고 Git에서 제외할 계획이 있는가?
 - generated `kagent.yaml`의 Agent 이름·namespace·port·A2A 설정을 검토했는가?
 - image를 non-root와 제한된 filesystem·resource로 실행할 수 있는가?
 
-공식 local development 흐름은 registry 준비 뒤 다음 형태로 build/push와 deploy를 연결한다.
+먼저 credential 없이 볼 수 있는 source와 CLI contract를 검사한다.
 
 ```bash
-kagent build --push
-kagent deploy --env-file .env.production
+sed -n '1,240p' kagent.yaml
+sed -n '1,240p' Dockerfile
+kagent deploy --help
 ```
 
-이 두 명령은 **registry와 production env file을 사용하도록 project를 먼저 설정한 경우에만** 실행한다.
-이 입문 덱은 특정 registry credential을 가정하지 않으므로 cluster 배포를 필수 완료 조건으로 두지 않는다.
+설치한 CLI가 `--dry-run`을 지원하고 조직의 secret 도구로 임시 env file을 준비했다면 apply 전에 rendered
+resource도 검사한다. dry-run 출력에는 Secret data가 포함될 수 있으므로 terminal history·공유 문서·Git에
+저장하지 않는다. 존재하지 않는 `.env.production`을 예제 때문에 새 평문 파일로 만들지는 않는다.
 
-## BYO resource에서 볼 계약
+공식 흐름은 registry를 준비해 `kagent build --push`와 `kagent deploy`를 사용한다. 이 kind 실습은 외부 registry
+credential을 전제하지 않기 위해 image를 node에 직접 적재하고, 검토한 BYO resource를 명시적으로 적용한다.
 
-cluster에 배포된 BYO Agent는 개념상 다음 필드를 갖는다. placeholder image를 그대로 적용하지 않는다.
+## kind node에 image와 Secret 준비하기
 
-```yaml
+host Docker의 image를 kind node container runtime으로 복사한다.
+
+```bash
+docker image inspect lab-byo:lab
+kind load docker-image lab-byo:lab --name kagent-lab
+docker exec kagent-lab-control-plane crictl images | grep lab-byo
+```
+
+선택한 model 경로 하나만 실행한다. Secret 값은 출력하지 않는다.
+
+<Tabs>
+<TabItem label="OpenAI">
+
+```bash
+kubectl -n kagent create secret generic lab-byo-model \
+  --from-literal=OPENAI_API_KEY="$OPENAI_API_KEY" \
+  --dry-run=client -o yaml | kubectl apply -f -
+```
+
+</TabItem>
+<TabItem label="LiteLLM">
+
+```bash
+kubectl -n kagent create secret generic lab-byo-model \
+  --from-literal=LITELLM_MODEL="$LITELLM_MODEL" \
+  --from-literal=LITELLM_BASE_URL="$LITELLM_BASE_URL" \
+  --from-literal=LITELLM_API_KEY="$LITELLM_API_KEY" \
+  --dry-run=client -o yaml | kubectl apply -f -
+```
+
+</TabItem>
+</Tabs>
+
+Secret의 key 이름만 확인한다. `-o yaml`로 값을 출력하지 않는다.
+
+```bash
+kubectl -n kagent describe secret lab-byo-model
+```
+
+## BYO resource를 배포하기
+
+`imagePullPolicy: IfNotPresent`가 있어야 node에 적재한 local image를 registry에서 다시 받으려 하지 않는다.
+이 값은 kind 전용이며 온프렘 manifest에는 registry digest와 조직의 pull policy를 사용한다.
+
+```bash
+kubectl apply -f - <<'EOF'
 apiVersion: kagent.dev/v1alpha2
 kind: Agent
 metadata:
@@ -158,21 +208,55 @@ spec:
   type: BYO
   byo:
     deployment:
-      image: registry.example/lab-byo@sha256:<digest>
-      env:
-        - name: LITELLM_MODEL
-          value: company-model-alias
-        - name: LITELLM_BASE_URL
-          value: https://litellm.company.example/v1
-        - name: LITELLM_API_KEY
-          valueFrom:
-            secretKeyRef:
-              name: lab-byo-model
-              key: LITELLM_API_KEY
+      image: lab-byo:lab
+      imagePullPolicy: IfNotPresent
+      envFrom:
+        - secretRef:
+            name: lab-byo-model
+      resources:
+        requests:
+          cpu: 100m
+          memory: 256Mi
+        limits:
+          cpu: "1"
+          memory: 1Gi
+EOF
 ```
 
 kagent가 image를 실행해 주더라도 Agent logic·dependency·secret 사용·A2A implementation은 image 제작자의
 책임이다. 이것이 Declarative에서 BYO로 넘어갈 때 넓어지는 신뢰 경계다.
+
+## Ready와 A2A까지 확인하기
+
+<Steps>
+
+1. BYO Agent condition과 생성된 workload를 기다린다.
+
+   ```bash
+   kubectl -n kagent wait --for=condition=Accepted agent/lab-byo --timeout=2m
+   kubectl -n kagent wait --for=condition=Ready agent/lab-byo --timeout=5m
+   kubectl -n kagent get agent lab-byo -o yaml
+   kubectl -n kagent get pods
+   ```
+
+2. 7장의 controller port-forward가 없으면 다시 연다.
+
+   ```bash
+   kubectl -n kagent port-forward svc/kagent-controller 8083:8083
+   ```
+
+3. Agent Card를 읽고 task를 호출한다.
+
+   ```bash
+   curl --fail --silent --show-error \
+     http://localhost:8083/api/a2a/kagent/lab-byo/.well-known/agent.json
+   kagent invoke -n kagent -a lab-byo -S \
+     -t "Roll a six-sided die and tell me whether the result is prime."
+   ```
+
+</Steps>
+
+로컬 `kagent run`과 cluster invoke가 모두 성공해야 code·image·Secret·scheduling·A2A route가 연결된 것이다.
 
 ## 안 될 때 먼저 볼 것
 
@@ -181,6 +265,8 @@ kagent가 image를 실행해 주더라도 Agent logic·dependency·secret 사용
 | `kagent init`이 실패 | CLI version과 지원 framework·language — `kagent init --help` |
 | `kagent build`가 실패 | Docker daemon 실행 여부, base image pull과 프록시·registry 접근 |
 | `kagent run`이 바로 종료 | container log — model key 환경 변수 누락, 로컬 포트 충돌 |
+| Pod가 `ImagePullBackOff` | `kind load` 대상 cluster·image 이름, `imagePullPolicy: IfNotPresent` |
+| `Ready=False` | Agent condition과 Pod log — A2A server가 port 8080에서 준비되는지 |
 | LiteLLM인데 요청이 public OpenAI로 나감 | `create_model()`의 `api_base`와 compose의 환경 변수 전달 |
 | LiteLLM 호출이 `400` | model alias 뒤 upstream의 function/tool calling 지원 |
 
@@ -189,8 +275,9 @@ kagent가 image를 실행해 주더라도 Agent logic·dependency·secret 사용
 - generated project의 code·`kagent.yaml`·compose 역할을 구분한다.
 - `kagent build`와 `kagent run`으로 local loop를 한 번 돌았다.
 - LiteLLM을 선택했다면 BYO code와 runtime에 model·`api_base`·credential을 별도로 전달했다.
-- 로컬 성공과 cluster 배포 성공이 다른 검증이라는 것을 설명한다.
-- registry와 Secret이 준비되지 않았다면 deploy 명령을 실행하지 않았다.
+- `lab-byo:lab` image를 kind node에 적재하고 `lab-byo`가 `Ready=True`가 됐다.
+- controller의 BYO Agent Card와 A2A invoke가 성공했다.
+- kind의 local tag·`IfNotPresent`와 온프렘의 immutable registry digest를 구분한다.
 
 ## 참고 자료
 
@@ -201,7 +288,7 @@ kagent가 image를 실행해 주더라도 Agent logic·dependency·secret 사용
 - [Agent 배포 플랫폼 — kagent 격리와 공급망](/agent-platform/11-kagent-adapter/#격리와-공급망) — production target에서 더할 통제
 
 <LinkCard
-  title="8. 실습 정리와 다음 단계"
-  description="exercise resource만 지우는 방법과 전용 kind cluster 전체를 지우는 방법을 구분한다."
-  href="/kagent-lab/08-cleanup/"
+  title="10. 온프렘 staging으로 승격하기"
+  description="kind의 demo values를 external PostgreSQL·HA·namespace scope·사내 CA·registry·rollback이 있는 비운영 구성으로 바꾼다."
+  href="/kagent-lab/10-onprem-staging/"
 />

@@ -1,14 +1,15 @@
 ---
 title: "4. MCP tool server 붙이기"
 description: kmcp MCPServer로 학습용 fetch tool을 배포하고 tool discovery·allowlist·Agent 호출과 외부 code 실행 경계를 확인한다
-reviewedAt: 2026-08-19
+reviewedAt: 2026-08-21
 status: review
 ---
 
 import { LinkCard, Steps } from '@astrojs/starlight/components';
 import TermIntro from '../../../components/docs/TermIntro.astro';
+import Thesis from '../../../components/docs/Thesis.astro';
 
-> Agent의 능력은 model 이름만으로 생기지 않는다. **MCP server가 기능을 제공하고 Agent가 그중 일부를 허용한다**
+<Thesis>Agent의 능력은 model 이름이 아니라 MCP server가 제공한 기능과 Agent가 명시적으로 허용한 tool의 교집합에서 생긴다</Thesis>
 
 <TermIntro
   terms={[
@@ -131,6 +132,7 @@ spec:
   description: Fetch one explicitly supplied HTTPS page and summarize it.
   type: Declarative
   declarative:
+    runtime: go
     modelConfig: default-model-config
     systemMessage: |-
       You summarize a webpage only after calling the fetch tool.

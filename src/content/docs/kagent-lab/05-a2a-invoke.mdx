@@ -1,14 +1,15 @@
 ---
 title: "5. CLI와 A2A로 Agent 호출하기"
 description: kagent controller의 Agent card endpoint와 CLI invoke를 비교해 discovery·task·session의 A2A 호출 계약을 관찰한다
-reviewedAt: 2026-08-19
+reviewedAt: 2026-08-21
 status: review
 ---
 
 import { LinkCard, Steps } from '@astrojs/starlight/components';
 import TermIntro from '../../../components/docs/TermIntro.astro';
+import Thesis from '../../../components/docs/Thesis.astro';
 
-> dashboard는 한 client일 뿐이다. 이번 장은 **Agent를 발견하고 task를 보내는 바깥쪽 protocol 계약**을 직접 본다
+<Thesis>dashboard는 한 client일 뿐이며 외부 호출 계약은 kagent controller가 제공하는 Agent Card와 A2A task endpoint다</Thesis>
 
 <TermIntro
   terms={[

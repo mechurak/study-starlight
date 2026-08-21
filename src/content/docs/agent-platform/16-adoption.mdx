@@ -1,6 +1,7 @@
 ---
 title: "16. 두 Agent로 시작하기"
-description: 기본 runtime을 정하고 read-only·write Agent로 공통 계약과 runtime adapter의 도입 가정을 검증한다
+description: 기본 runtime을 정하고 read-only·write Agent와 선택적 Substrate challenger로 공통 계약·보안·운영 가정을 검증한다
+reviewedAt: 2026-08-21
 ---
 
 import { LinkCard, Steps } from '@astrojs/starlight/components';
@@ -115,6 +116,23 @@ resource, upgrade rehearsal과 장애 복구 시간을 함께 잰다. 숫자 없
 - portal ACL을 우회하는 controller endpoint가 노출되지 않는지
 - cluster·model capacity가 noisy Agent를 격리하는지
 
+### Agent Substrate는 kagent 통과 뒤 따로 판정한다
+
+Substrate는 kagent 채택의 필수 조건이나 별도 target adapter가 아니다. 기본 `Agent`가 통과한 같은 cluster에
+선택 runtime으로 추가하고, 일반 Agent와 `SandboxAgent`를 같은 model·instructions·controller A2A client로
+비교한다. 그래야 adapter contract는 그대로 둔 채 workload placement만 달라지는지 확인할 수 있다.
+
+- golden snapshot 준비 시간과 `Suspended`→restore p50·p95·max·실패 수
+- idle 전용 Pod·memory 절감에서 Substrate control/data plane·Valkey·object storage 고정비를 뺀 순효과
+- WorkerPool replica 1·2의 burst, worker/node 손실, snapshot storage 장애와 복구
+- sandbox egress 기본 거부와 model·MCP host allowlist, snapshot encryption·retention·삭제
+- 기존 일반 Agent의 deploy/status/A2A/rollback 회귀 여부
+- gVisor node pool·외부 object storage·version pair upgrade의 운영 owner
+
+restore SLO와 idle 절감이 고정비를 이기고 강한 sandbox가 필요한 Agent class가 있을 때만 제한적으로 채택한다.
+상주 latency가 중요한 Agent는 기본 `Agent`에 남기고, coding workspace는 `AgentHarness` 별도 보안 PoC로 연다.
+실행 절차와 판정표는 [kagent-lab 11~13장](/kagent-lab/11-substrate-install/)에서 그대로 재사용한다.
+
 ## AgentCore PoC에서 볼 것
 
 - OCI와 CodeZip 중 허용할 artifact policy, digest·provenance와 ARM64 native dependency
@@ -135,6 +153,7 @@ PoC 결과는 "기능 있음" 표보다 운영 증거로 남긴다.
 | secondary target | 필요한 hard constraint와 추가 운영비 |
 | portable 범위 | adapter contract test에서 실제로 공통인 항목 |
 | provider extension | 어느 Agent가 왜 lock-in을 수용하는지 |
+| kagent execution class | 기본 `Agent`와 `SandboxAgent`의 적용 조건, restore SLO, WorkerPool·snapshot owner |
 | GA 전 의존성 | Preview 기능 제거 시 fallback path |
 | durability 재개 | 실패한 실제 Agent, 재개 조건, Temporal·Dapr 비교 weight와 운영 증거 |
 
@@ -152,6 +171,7 @@ secondary target과 검증된 failover를 추가한다.
 - 기본 target 하나로 end-to-end walking skeleton을 먼저 만든다.
 - read-only·write Agent 두 개와 사용자 MCP 하나가 소비·공급 양쪽의 권한·action·audit 차이를 드러낸다.
 - 맨 Kubernetes와 kagent를 같은 fixture의 개발·운영 수치로 비교하고 provider 설명이 아니라 실패 주입과 contract test로 선택한다.
+- Substrate는 kagent의 별도 challenger로 A/B 검증하고, 순효과가 증명된 Agent class에만 제한한다.
 - 승인된 tool 소비 → 사용자 MCP·코드형 → write action → secondary target 순으로 위험을 연다.
 
 <LinkCard

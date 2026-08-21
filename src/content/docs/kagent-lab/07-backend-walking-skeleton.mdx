@@ -1,0 +1,343 @@
+---
+title: "7. Backend walking skeleton"
+description: Node/TypeScript가 Kubernetes API로 Agent를 server-side apply하고 Ready를 관찰한 뒤 kagent controller의 A2A endpoint로 호출하는 최소 연동을 실행한다
+reviewedAt: 2026-08-21
+status: review
+---
+
+import { LinkCard, Steps } from '@astrojs/starlight/components';
+import TermIntro from '../../../components/docs/TermIntro.astro';
+import Thesis from '../../../components/docs/Thesis.astro';
+
+<Thesis>우리 backend는 관리할 때 Kubernetes API의 CRD를 사용하고, 호출할 때 kagent controller의 A2A endpoint를 사용하는 두 개의 명시적 port를 가져야 한다</Thesis>
+
+<TermIntro
+  terms={[
+    ['walking skeleton', '', '기능은 작지만 등록·배포·상태·호출까지 실제 production 경로를 관통하는 최소 구현이다.'],
+    ['management path', '', 'backend가 Kubernetes API에 Agent resource를 쓰고 status를 읽는 관리 경로다.'],
+    ['invocation path', '', 'backend가 Grant를 통과한 사용자 요청을 controller의 A2A endpoint로 중계하는 호출 경로다.'],
+    ['field manager', '', 'server-side apply에서 어느 주체가 manifest의 필드를 소유하는지 기록하는 이름이다.'],
+  ]}
+/>
+
+앞 장까지는 사람이 `kubectl`과 `kagent` CLI를 사용했다. 이 장부터는 우리 Node/TypeScript backend가 같은 일을
+직접 한다. 아직 포털 DB나 OIDC는 만들지 않고 두 adapter port가 실제 cluster에서 통하는지만 검증한다.
+
+```d2 layout=elk pad=40 title="Node backend의 관리 경로는 Kubernetes API로, 호출 경로는 kagent controller 8083의 A2A route로 갈라지는 구조"
+direction: right
+
+classes: {
+  key: {
+    style: {
+      fill: "#dbeafe"
+      stroke: "#2563eb"
+      font-color: "#1e3a8a"
+    }
+  }
+  zone: {
+    style: {
+      fill: "#ede9fe"
+      stroke: "#7c3aed"
+      font-color: "#4c1d95"
+    }
+  }
+  ok: {
+    style: {
+      fill: "#dcfce7"
+      stroke: "#16a34a"
+      font-color: "#14532d"
+    }
+  }
+}
+
+backend: "Node · TypeScript backend" { class: key }
+k8s: "Kubernetes API\nAgent CRD · status" { class: zone }
+controller: "kagent-controller\n:8083 · /api/a2a/..." { class: zone }
+agent: "backend-reader\nAgent workload" { class: ok }
+
+backend -> k8s: "① SSA apply · read"
+k8s -> agent: "controller가 reconcile"
+backend -> controller: "② A2A message/send"
+controller -> agent: "route"
+agent -> controller: "task · artifact" { style.stroke-dash: 3 }
+controller -> backend: "JSON-RPC response" { style.stroke-dash: 3 }
+```
+
+Agent Pod의 임의 Service나 dashboard 내부 API를 찾지 않는다. kagent가 문서화한 외부 호출 표면은
+`kagent-controller` Service의 `8083` 포트와 `/api/a2a/{namespace}/{agent-name}/` route다.
+
+## 성공 조건
+
+- backend code가 `backend-reader`를 server-side apply하고 같은 code를 다시 실행해도 resource가 하나다.
+- `Accepted=True`, `Ready=True`를 Kubernetes API 응답에서 확인한다.
+- Agent Card를 읽은 뒤 raw A2A `message/send`로 tool을 사용하는 답을 받는다.
+- 관리 경로와 호출 경로의 URL·credential·실패를 따로 기록한다.
+
+## 임시 Node project 준비
+
+Node.js 20 이상과 현재 kind context를 확인한다. `@kubernetes/client-node`는 cluster Kubernetes version과
+[호환되는 release](https://github.com/kubernetes-client/javascript#compatibility)를 골라 lockfile에 고정한다.
+이 덱을 검토한 시점의 `1.4.0`은 Kubernetes 1.34를 추적하며 이전 minor와의 호환 범위는 공식 표에서 확인한다.
+
+```bash
+node --version
+kubectl config current-context
+kubectl version
+```
+
+기대 context는 정확히 `kind-kagent-lab`이다. 임시 project를 만들고 의존성을 lock한다.
+
+```bash
+mkdir -p /tmp/kagent-backend-probe
+cd /tmp/kagent-backend-probe
+npm init -y
+npm install @kubernetes/client-node@1.4.0
+npm install --save-dev tsx
+npm ls @kubernetes/client-node tsx
+```
+
+## 관리와 호출을 한 code로 연결하기
+
+`/tmp/kagent-backend-probe/probe.ts`를 만들고 다음 code를 넣는다. production domain object를 흉내 내려고
+manifest 생성과 A2A 호출 함수를 분리했다. 실습 code라 현재 kubeconfig를 읽지만, 아래에서 in-cluster
+ServiceAccount로 바꿀 지점을 분명히 한다.
+
+```ts
+import { randomUUID } from 'node:crypto';
+import {
+  KubeConfig,
+  KubernetesObjectApi,
+  PatchStrategy,
+  type KubernetesObject,
+} from '@kubernetes/client-node';
+
+const namespace = 'kagent';
+const agentName = 'backend-reader';
+const a2aBaseUrl = process.env.KAGENT_A2A_URL ??
+  `http://localhost:8083/api/a2a/${namespace}/${agentName}/`;
+
+const kc = new KubeConfig();
+kc.loadFromDefault(); // production Pod에서는 loadFromCluster()
+
+if (kc.getCurrentContext() !== 'kind-kagent-lab') {
+  throw new Error(`refusing context: ${kc.getCurrentContext()}`);
+}
+
+const objects = KubernetesObjectApi.makeApiClient(kc);
+
+function buildManifest(): KubernetesObject {
+  return {
+    apiVersion: 'kagent.dev/v1alpha2',
+    kind: 'Agent',
+    metadata: {
+      name: agentName,
+      namespace,
+      labels: {
+        'study.upggu.com/managed-by': 'backend-probe',
+      },
+    },
+    spec: {
+      description: 'Read-only Agent managed by the backend walking skeleton.',
+      type: 'Declarative',
+      declarative: {
+        runtime: 'go',
+        modelConfig: 'default-model-config',
+        systemMessage: [
+          'You are a read-only Kubernetes assistant.',
+          'Use a tool for current cluster facts and never mutate resources.',
+        ].join('\n'),
+        tools: [{
+          type: 'McpServer',
+          mcpServer: {
+            apiGroup: 'kagent.dev',
+            kind: 'RemoteMCPServer',
+            name: 'kagent-tool-server',
+            toolNames: [
+              'k8s_get_available_api_resources',
+              'k8s_get_resources',
+            ],
+          },
+        }],
+      },
+    },
+  };
+}
+
+async function applyAgent() {
+  return objects.patch(
+    buildManifest(),
+    undefined,
+    undefined,
+    'kagent-lab-backend',
+    false,
+    PatchStrategy.ServerSideApply,
+  );
+}
+
+async function waitReady(timeoutMs = 180_000) {
+  const ref = {
+    apiVersion: 'kagent.dev/v1alpha2',
+    kind: 'Agent',
+    metadata: { name: agentName, namespace },
+  };
+  const deadline = Date.now() + timeoutMs;
+
+  while (Date.now() < deadline) {
+    const current = await objects.read(ref) as KubernetesObject & {
+      status?: { conditions?: Array<{ type: string; status: string; reason?: string }> };
+    };
+    const conditions = current.status?.conditions ?? [];
+    const accepted = conditions.find((item) => item.type === 'Accepted');
+    const ready = conditions.find((item) => item.type === 'Ready');
+
+    if (accepted?.status === 'False') {
+      throw new Error(`Agent rejected: ${accepted.reason ?? 'unknown reason'}`);
+    }
+    if (ready?.status === 'True') return current;
+    await new Promise((resolve) => setTimeout(resolve, 2_000));
+  }
+  throw new Error('Agent Ready timeout');
+}
+
+async function readAgentCard() {
+  const response = await fetch(new URL('.well-known/agent.json', a2aBaseUrl));
+  if (!response.ok) throw new Error(`Agent Card HTTP ${response.status}`);
+  return response.json() as Promise<{ name: string; capabilities?: { streaming?: boolean } }>;
+}
+
+async function invoke(text: string) {
+  const requestId = randomUUID();
+  const response = await fetch(a2aBaseUrl, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({
+      jsonrpc: '2.0',
+      id: requestId,
+      method: 'message/send',
+      params: {
+        id: requestId,
+        message: {
+          role: 'user',
+          parts: [{ kind: 'text', text }],
+        },
+      },
+    }),
+    signal: AbortSignal.timeout(120_000),
+  });
+  if (!response.ok) throw new Error(`A2A HTTP ${response.status}`);
+
+  const payload = await response.json() as {
+    error?: { code: number; message: string };
+    result?: { status?: { state?: string }; artifacts?: Array<{
+      parts?: Array<{ kind?: string; text?: string }>;
+    }> };
+  };
+  if (payload.error) throw new Error(`A2A ${payload.error.code}: ${payload.error.message}`);
+  return payload.result;
+}
+
+await applyAgent();
+const ready = await waitReady();
+const card = await readAgentCard();
+const result = await invoke(
+  'List the Services in the kagent namespace. Use a tool and cite the evidence.',
+);
+
+console.log(JSON.stringify({
+  agentUid: ready.metadata?.uid,
+  cardName: card.name,
+  streaming: card.capabilities?.streaming,
+  taskState: result?.status?.state,
+  artifacts: result?.artifacts,
+}, null, 2));
+```
+
+`force=false`가 중요한 이유는 다른 manager가 소유한 필드를 조용히 빼앗지 않기 위해서다. 충돌은 adapter가
+사용자에게 보여 줄 실패이지, 처음부터 강제 소유권 이전으로 숨길 일이 아니다.
+
+## 실행하고 idempotency 확인하기
+
+<Steps>
+
+1. 별도 terminal에서 controller의 A2A port를 연다.
+
+   ```bash
+   kubectl -n kagent port-forward svc/kagent-controller 8083:8083
+   ```
+
+2. project terminal에서 probe를 두 번 실행한다.
+
+   ```bash
+   cd /tmp/kagent-backend-probe
+   KAGENT_A2A_URL="http://localhost:8083/api/a2a/kagent/backend-reader/" \
+     npx tsx probe.ts
+   KAGENT_A2A_URL="http://localhost:8083/api/a2a/kagent/backend-reader/" \
+     npx tsx probe.ts
+   ```
+
+3. resource가 하나이고 field manager가 남았는지 확인한다.
+
+   ```bash
+   kubectl -n kagent get agent backend-reader
+   kubectl -n kagent get agent backend-reader -o yaml
+   ```
+
+</Steps>
+
+두 실행의 `agentUid`가 같아야 한다. `metadata.managedFields`에는 `kagent-lab-backend`가 보이고,
+task state는 완료 상태이며 artifact에 Service 조회 결과가 있어야 한다. 답변 내용은 cluster 시점에 따라 달라지므로
+문자열을 golden value로 고정하지 않는다.
+
+:::caution[Card의 URL을 무조건 따라가지 않는다]
+port-forward를 통해 받은 Agent Card는 URL에 `127.0.0.1`을 담을 수 있다. production backend가 card의 URL을
+무검증으로 따라가면 SSRF와 잘못된 route의 원인이 된다. adapter가 승인한 controller/gateway base URL에
+namespace와 DNS-safe Agent name을 조합하고, card는 capability·skill 검증에 사용한다.
+:::
+
+## 실제 backend로 옮길 때 바뀌는 것
+
+| 실습 probe | 온프렘 backend |
+|---|---|
+| `loadFromDefault()`와 개인 kubeconfig | `loadFromCluster()`와 전용 ServiceAccount |
+| `localhost:8083` port-forward | `http://kagent-controller.kagent.svc.cluster.local:8083` 또는 승인된 gateway |
+| code 안의 한 manifest | DB의 immutable `AgentVersion`에서 deterministic manifest 생성 |
+| 바로 invoke | OIDC token 검증 → `Grant` → session ownership 검사 뒤 invoke |
+| stdout | deployment status·A2A event·effective config hash를 DB와 trace에 기록 |
+| 단일 process poll | informer/watch 재연결과 여러 replica의 writer 조정 |
+
+CRD schema와 A2A payload가 domain code 전체로 새지 않게 `KagentAdapter` 내부에 가둔다. 다음 장에서는 이
+backend가 가져야 할 Kubernetes 권한과, 사용자가 controller `8083`에 직접 붙어 Grant를 우회하지 못하게 하는
+두 번째 문을 검증한다.
+
+## 안 될 때 먼저 볼 것
+
+| 증상 | 확인 |
+|---|---|
+| SSA가 `403` | 현재 kubeconfig 사용자 권한. 다음 장에서는 backend ServiceAccount Role로 축소 |
+| SSA가 `409` | `managedFields`의 다른 manager와 충돌 필드. 무조건 `force=true`로 넘기지 않음 |
+| `Ready` timeout | Agent condition·생성된 Pod·model/MCP dependency |
+| Card가 `404` | controller port-forward와 namespace·Agent 이름·trailing slash |
+| A2A가 JSON-RPC error | `error.code`·`error.message`, controller와 Agent log |
+| task는 완료됐지만 tool evidence가 없음 | allowlist·MCP 상태와 artifact/event를 분리해 확인 |
+
+## 완료 체크
+
+- Node/TypeScript code가 `backend-reader`를 SSA로 만들고 Ready를 기다렸다.
+- 같은 code를 두 번 실행해도 UID가 같은 resource 하나만 남았다.
+- controller A2A route에 raw `message/send`를 보내 artifact를 받았다.
+- production에서 바꿀 kubeconfig·ServiceAccount·URL·Grant·DB 경계를 표시했다.
+- `backend-reader`는 다음 장과 Substrate 비교를 위해 남겨 둔다.
+
+## 참고 자료
+
+- [kagent A2A 예제](https://kagent.dev/docs/kagent/examples/a2a-agents/) — controller `8083`, Agent Card path와 invoke 계약
+- [kagent Telegram A2A 예제](https://kagent.dev/docs/kagent/examples/telegram-bot/) — `message/send` JSON-RPC payload와 context 연결
+- [Kubernetes JavaScript client](https://github.com/kubernetes-client/javascript) — `KubernetesObjectApi`와 client compatibility
+- [Server-Side Apply](https://kubernetes.io/docs/reference/using-api/server-side-apply/) — field ownership와 conflict
+- [Agent 배포 플랫폼 10장](/agent-platform/10-kagent-integration/) — 이 probe를 포털 DB·Grant·informer로 확장하는 정본
+
+<LinkCard
+  title="8. Backend 권한과 직접 우회 차단"
+  description="관리 RBAC, invocation Grant, session ownership과 controller A2A port의 network 경계를 각각 검증한다."
+  href="/kagent-lab/08-security-boundary/"
+/>

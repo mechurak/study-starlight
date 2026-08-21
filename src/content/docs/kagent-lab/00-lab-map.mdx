@@ -1,14 +1,15 @@
 ---
 title: "0. 실습 지도와 안전 경계"
 description: kagent 실습의 구성 요소와 호출 흐름을 먼저 보고 전용 cluster·context·비밀·tool 권한 경계를 고정한다
-reviewedAt: 2026-08-19
+reviewedAt: 2026-08-21
 status: review
 ---
 
 import { LinkCard } from '@astrojs/starlight/components';
 import TermIntro from '../../../components/docs/TermIntro.astro';
+import Thesis from '../../../components/docs/Thesis.astro';
 
-> 첫 명령보다 먼저 정할 것은 **어느 cluster에서, 어떤 권한의 Agent를, 무엇으로 성공 판정할지**다
+<Thesis>첫 명령보다 먼저 어느 cluster에서 어떤 권한의 Agent를 만들고, backend와 온프렘 승격을 무엇으로 성공 판정할지 고정한다</Thesis>
 
 <TermIntro
   terms={[
@@ -21,7 +22,7 @@ import TermIntro from '../../../components/docs/TermIntro.astro';
 
 ## 이번 실습의 작은 세계
 
-```d2 layout=elk title="dashboard·CLI·A2A 세 입구가 같은 kagent controller를 거쳐 Kubernetes API의 Agent·ModelConfig·MCPServer를 읽고, Agent workload가 model provider와 MCP tool server에 닿는 구조"
+```d2 layout=elk title="backend의 관리 요청은 Kubernetes API로, 호출 요청은 kagent controller의 A2A route로 들어가며 controller가 Agent workload를 조정하는 두 경로"
 direction: right
 
 classes: {
@@ -51,16 +52,13 @@ classes: {
 user: "사용자" {
   class: key
 }
-ui: "dashboard" {
+portal: "사내 frontend · backend" {
   class: key
 }
 cli: "kagent CLI" {
   class: key
 }
-a2a: "A2A endpoint" {
-  class: key
-}
-ctrl: "kagent controller" {
+ctrl: "kagent controller\nA2A :8083" {
   class: zone
 }
 api: "Kubernetes API\nAgent · ModelConfig · MCPServer" {
@@ -76,23 +74,22 @@ tool: "MCP tool server" {
   class: ok
 }
 
-user -> ui
+user -> portal
 user -> cli
-user -> a2a
-ui -> ctrl
-cli -> ctrl
-a2a -> ctrl
+portal -> api: "관리: CRD apply · status"
+portal -> ctrl: "호출: A2A"
+cli -> ctrl: "invoke"
 ctrl -> api
-api -> pod
+ctrl -> pod: "reconcile · route"
 pod -> model
 pod -> tool
 ```
 
-dashboard·CLI·A2A는 입구가 셋일 뿐 같은 controller와 Agent 상태를 본다. Agent가 답하려면 resource가
-accepted된 뒤 workload가 ready여야 하고, model provider와 tool server에도 실제로 닿아야 한다.
+관리와 호출은 같은 경로가 아니다. backend는 Kubernetes API에 CRD를 apply하고 status를 읽으며,
+실제 질문은 `kagent-controller` Service의 `8083` A2A route로 보낸다. Agent가 답하려면 resource가
+accepted된 뒤 workload가 ready여야 하고, controller의 route와 model provider·tool server에도 실제로 닿아야 한다.
 
-입구가 교체 가능하다는 뜻이기도 하다. 사내에 자체 포털을 두면 dashboard 자리를 우리 frontend·backend가
-대신하고 dashboard는 운영자 콘솔로 남는다. 그 연결 설계는
+사내에 자체 포털을 두면 dashboard는 운영자 콘솔로 남고, 우리 backend가 위의 두 경로를 소유한다. 그 연결 설계는
 [Agent 배포 플랫폼 10장](/agent-platform/10-kagent-integration/)에 있다.
 
 ## 이 실습에서 다루는 실행 수명주기
@@ -105,8 +102,8 @@ accepted된 뒤 workload가 ready여야 하고, model provider와 tool server에
 | 일반 `Agent` | 직접 만들고 `Ready`·invoke까지 확인 |
 | one-shot task | `kagent invoke` 한 번의 시작과 완료를 관찰 |
 | 주기·event trigger | 다루지 않음. 외부 scheduler가 Agent를 호출하는 platform 영역 |
-| `SandboxAgent` | 실행하지 않음. idle actor를 snapshot하고 복원하는 구조는 [9장](/kagent-lab/09-harness-substrate/)에서 개념으로 본다 |
-| `AgentHarness` | 실행하지 않음. 장기 coding sandbox도 [9장](/kagent-lab/09-harness-substrate/)에서 개념으로 본다 |
+| `SandboxAgent` | [11~12장](/kagent-lab/11-substrate-install/)에서 같은 cluster에 Substrate를 추가하고 직접 실행 |
+| `AgentHarness` | 첫 hands-on에서는 실행하지 않음. coding workspace 수요가 생길 때 13장의 후속 gate로 판단 |
 
 구현 방식·호출 계기·상주 방식·상태·격리를 독립적으로 나누는 기준과 kagent resource 매핑은
 [Agent 배포 플랫폼 — kagent 아키텍처](/agent-platform/08-kagent-architecture/#실행-수명주기는-다른-resource와-trigger로-표현한다)에서
@@ -120,8 +117,9 @@ accepted된 뒤 workload가 ready여야 하고, model provider와 tool server에
 | kagent를 설치하고 Agent를 실제로 어떻게 호출하나 | **지금 보는 kagent 실습** |
 | 회사 catalog·ACL·승인·배포 계약에 어떻게 편입하나 | [Agent 배포 플랫폼](/agent-platform/) |
 
-이 덱은 production 설치 가이드가 아니다. 단일 kind cluster와 단일 사용자 환경에서 OpenAI API 또는
-OpenAI-compatible 사내 LiteLLM gateway를 연결해 resource와 호출 계약을 눈으로 확인한다.
+이 덱은 production 설치 runbook이 아니다. kind에서 계약을 확인하고, [10장](/kagent-lab/10-onprem-staging/)에서
+비운영 온프렘 staging에 승격하기 위한 values·인프라·acceptance test를 만든다. 실제 운영 변경 승인과 조직별
+secret·registry·storage 절차는 각 플랫폼 runbook이 맡는다.
 
 ## 고정할 이름과 자원
 
@@ -133,10 +131,13 @@ OpenAI-compatible 사내 LiteLLM gateway를 연결해 resource와 호출 계약�
 | custom Agent | `lab-reader` | sample Agent와 구분 |
 | custom MCP server | `mcp-website-fetcher` | tool workload를 따로 추적 |
 | fetch Agent | `simple-fetch-agent` | 4장의 MCP 실습 Agent를 sample·`lab-reader`와 구분 |
+| backend 적용 Agent | `backend-reader` | 사람의 `kubectl`과 backend ServiceAccount 경로를 구분 |
+| Substrate namespace | `ate-system` | kagent namespace와 Substrate control/data plane을 구분 |
+| SandboxAgent | `sandbox-reader` | 일반 `lab-reader`와 A/B 비교 |
 
-로컬 runtime에는 CPU 4개, 메모리 8 GiB, 디스크 여유 15 GiB 이상을 권장한다. 고정된 kagent 최소
-요구량이 아니라 kind node, controller·UI·DB, sample Agent와 tool image를 함께 띄우기 위한 **학습용
-출발값**이다. 부족하면 1장에서 실제 Pod request와 pending 원인을 보고 조정한다.
+기본 0~10장은 로컬 runtime에 CPU 4개, 메모리 8 GiB, 디스크 여유 15 GiB 이상을 권장한다. Substrate까지
+실행할 때는 CPU 6개, 메모리 12 GiB, 디스크 여유 25 GiB를 학습용 출발값으로 잡는다. 제품의 고정 최소치가
+아니므로 1장과 11장에서 실제 Pod request·Pending 원인을 보고 조정한다.
 
 ## 비밀과 비용 경계
 
@@ -185,6 +186,7 @@ context를 바로잡는다.
 
 - 실습용 이름과 cleanup 대상을 말할 수 있다.
 - MCP는 Agent가 tool을 부르는 안쪽 계약, A2A는 client가 Agent를 부르는 바깥쪽 계약이라고 구분한다.
+- backend 관리 경로는 Kubernetes API, 호출 경로는 controller의 A2A endpoint라고 구분한다.
 - API key를 파일에 쓰지 않고 OpenAI 직접 연결과 LiteLLM gateway 연결을 구분한다.
 
 ## 참고 자료

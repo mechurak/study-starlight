@@ -1,14 +1,15 @@
 ---
 title: "3. 조회 전용 Declarative Agent"
 description: Agent v1alpha2 manifest로 default model·system message·조회 MCP tool allowlist를 연결하고 Ready 상태와 호출을 검증한다
-reviewedAt: 2026-08-19
+reviewedAt: 2026-08-21
 status: review
 ---
 
 import { LinkCard, Steps } from '@astrojs/starlight/components';
 import TermIntro from '../../../components/docs/TermIntro.astro';
+import Thesis from '../../../components/docs/Thesis.astro';
 
-> Declarative Agent는 prompt 파일 하나가 아니라 **model·instructions·tool reference를 묶어 원하는 상태로 만든 resource**다
+<Thesis>Declarative Agent는 prompt 파일 하나가 아니라 명시적 runtime·model·instructions·tool reference를 묶은 Kubernetes resource다</Thesis>
 
 <TermIntro
   terms={[
@@ -60,6 +61,7 @@ spec:
   description: Read-only lab agent that explains resources in the kagent namespace.
   type: Declarative
   declarative:
+    runtime: go
     modelConfig: default-model-config
     systemMessage: |-
       You are a read-only Kubernetes lab assistant.
@@ -148,6 +150,7 @@ kagent invoke -n kagent -a lab-reader -S \
 | 필드 | 지금 고정한 것 |
 |---|---|
 | `type: Declarative` | kagent가 표준 runtime을 구성 |
+| `runtime: go` | 문서·version별 기본값 변화에 기대지 않고 실행 engine을 고정 |
 | `modelConfig` | model credential과 provider 세부를 Agent와 분리 |
 | `systemMessage` | 역할과 행동 원칙 |
 | `mcpServer` | tool을 발견할 endpoint resource |

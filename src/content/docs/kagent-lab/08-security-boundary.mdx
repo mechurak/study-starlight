@@ -1,0 +1,262 @@
+---
+title: "8. Backend 권한과 직접 우회 차단"
+description: backend ServiceAccount의 namespaced RBAC, 사용자 Grant와 session ownership, controller A2A port의 직접 우회 차단을 서로 다른 acceptance test로 검증한다
+reviewedAt: 2026-08-21
+status: review
+---
+
+import { LinkCard, Steps } from '@astrojs/starlight/components';
+import TermIntro from '../../../components/docs/TermIntro.astro';
+import Thesis from '../../../components/docs/Thesis.astro';
+
+<Thesis>관리 RBAC·Agent 호출 Grant·tool action 권한은 서로 다른 문이며, backend가 허용해도 controller A2A port 직접 접근이 열려 있으면 invocation authorization은 실패한 설계다</Thesis>
+
+<TermIntro
+  terms={[
+    ['Grant', '', '어떤 회사 principal이 어떤 Agent를 조회·호출·편집할 수 있는지 포털 DB에 저장한 제품 중립 권한이다.'],
+    ['session ownership', '', '대화 session ID를 만든 principal과 이후 요청 principal이 같은지 backend가 확인하는 경계다.'],
+    ['direct bypass', '', '사용자가 backend의 Grant 검사 없이 controller나 Agent endpoint를 직접 호출하는 우회 경로다.'],
+    ['negative test', '', '허용 사례가 아니라 금지해야 할 요청이 실제로 거부되는지 확인하는 시험이다.'],
+  ]}
+/>
+
+7장의 probe는 개발자 kubeconfig로 모든 단계를 실행했다. production backend에는 그 권한을 주지 않는다.
+또 kagent v0.9 계열의 OIDC 로그인은 사용자가 누구인지 확인하는 **인증**이지 Agent별 application access
+control이 아니다. 이번 장은 서로 다른 세 문을 따로 잠근다.
+
+| 문 | 판단 주체 | 막을 대상 |
+|---|---|---|
+| control plane | Kubernetes RBAC | backend가 허용되지 않은 namespace·Secret·cluster resource를 변경 |
+| invocation | 포털 DB의 Grant + gateway/network | 금지 사용자가 Agent를 호출하거나 controller `8083`으로 우회 |
+| action | tool gateway·MCP server | 허용된 Agent 호출 안에서 금지된 write action 실행 |
+
+## Backend ServiceAccount를 최소화하기
+
+실습에서는 `kagent` namespace에 ServiceAccount를 만들지만 `Agent` 관리 권한만 준다. `Secret`,
+`ModelConfig`, `RemoteMCPServer`, `SandboxAgent`와 cluster-scoped resource는 허용하지 않는다. Substrate를 실제
+채택한 뒤에만 `SandboxAgent` 권한을 별도 검토한다.
+
+```bash
+kubectl apply -f - <<'EOF'
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: agent-backend
+  namespace: kagent
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: agent-backend
+  namespace: kagent
+rules:
+  - apiGroups: ["kagent.dev"]
+    resources: ["agents"]
+    verbs: ["get", "list", "watch", "create", "patch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: agent-backend
+  namespace: kagent
+subjects:
+  - kind: ServiceAccount
+    name: agent-backend
+    namespace: kagent
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: agent-backend
+EOF
+```
+
+권한이 있는지보다 **없는 권한이 실제로 없는지**가 더 중요하다.
+
+```bash
+BACKEND_AS="system:serviceaccount:kagent:agent-backend"
+
+kubectl auth can-i --as="$BACKEND_AS" patch agents.kagent.dev -n kagent
+kubectl auth can-i --as="$BACKEND_AS" watch agents.kagent.dev -n kagent
+kubectl auth can-i --as="$BACKEND_AS" get secrets -n kagent
+kubectl auth can-i --as="$BACKEND_AS" patch sandboxagents.kagent.dev -n kagent
+kubectl auth can-i --as="$BACKEND_AS" create clusterroles.rbac.authorization.k8s.io
+```
+
+기대 결과는 앞의 둘만 `yes`, 뒤의 셋은 `no`다. `kubectl auth can-i`의 `--as`는 kind 관리자 신원으로
+ServiceAccount authorization을 모의한다. 온프렘에서 impersonation 권한이 없다면 플랫폼 관리자가 같은
+검증을 수행하고 결과를 증거로 남긴다.
+
+:::caution[RBAC는 invocation ACL이 아니다]
+위 Role은 Kubernetes API의 `Agent` resource를 만질 권한만 정한다. 일반 사용자가 chat에서 `backend-reader`를
+호출할 수 있는지는 포털 DB의 Grant가 판단한다. 둘을 같은 표나 같은 token으로 합치지 않는다.
+:::
+
+## Grant와 session ownership을 실패부터 시험하기
+
+`/tmp/kagent-backend-probe/policy.test.ts`를 만들고 backend가 지켜야 할 최소 불변조건을 executable test로 남긴다.
+실제 구현에서는 in-memory `Set` 대신 DB transaction과 IdP principal을 사용한다.
+
+```ts
+import assert from 'node:assert/strict';
+import test from 'node:test';
+
+type Principal = { issuer: string; subject: string };
+const key = (p: Principal) => `${p.issuer}\u0000${p.subject}`;
+
+const allowed: Principal = { issuer: 'https://idp.example', subject: 'user-a' };
+const denied: Principal = { issuer: 'https://idp.example', subject: 'user-b' };
+const sameSubOtherIssuer: Principal = { issuer: 'https://other-idp.example', subject: 'user-a' };
+
+const invokeGrants = new Set([`${key(allowed)}\u0000backend-reader`]);
+const sessions = new Map<string, string>();
+
+function authorizeInvoke(principal: Principal, agent: string) {
+  if (!invokeGrants.has(`${key(principal)}\u0000${agent}`)) {
+    throw new Error('invoke denied');
+  }
+}
+
+function assertSessionOwner(principal: Principal, sessionId: string) {
+  const owner = sessions.get(sessionId);
+  if (owner && owner !== key(principal)) throw new Error('session owner mismatch');
+  sessions.set(sessionId, key(principal));
+}
+
+test('허용 principal만 backend-reader를 호출한다', () => {
+  assert.doesNotThrow(() => authorizeInvoke(allowed, 'backend-reader'));
+  assert.throws(() => authorizeInvoke(denied, 'backend-reader'));
+});
+
+test('같은 sub라도 issuer가 다르면 다른 principal이다', () => {
+  assert.throws(() => authorizeInvoke(sameSubOtherIssuer, 'backend-reader'));
+});
+
+test('다른 사용자의 session ID를 재사용하지 못한다', () => {
+  assertSessionOwner(allowed, 'session-1');
+  assert.throws(() => assertSessionOwner(denied, 'session-1'));
+});
+```
+
+```bash
+cd /tmp/kagent-backend-probe
+node --import tsx --test policy.test.ts
+```
+
+세 test가 모두 통과해야 한다. 실제 HTTP handler에서는 Agent Card 조회, invoke, stream 재연결, approval 응답
+각각에서 같은 authorization 함수를 다시 호출한다. frontend에서 Agent를 숨기는 것은 이 test를 대신하지 못한다.
+
+## 직접 A2A 우회 경로를 닫기
+
+7장의 정상 호출은 다음 URL로 갔다.
+
+```text
+http://kagent-controller.kagent.svc.cluster.local:8083/api/a2a/kagent/backend-reader/
+```
+
+따라서 막아야 할 대상은 임의의 Agent Pod Service가 아니라 **controller Pod의 8083 ingress**다. production에서는
+portal backend와 운영자 UI·승인된 gateway만 이 port에 닿게 한다. 다음 policy는 release 이름이 `kagent`이고
+backend가 `agent-portal` namespace의 `app.kubernetes.io/name=agent-backend` Pod라는 전제의 staging 예시다.
+
+```yaml
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: controller-approved-callers
+  namespace: kagent
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: kagent
+      app.kubernetes.io/instance: kagent
+      app.kubernetes.io/component: controller
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: agent-portal
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: agent-backend
+      ports:
+        - protocol: TCP
+          port: 8083
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: kagent
+              app.kubernetes.io/instance: kagent
+              app.kubernetes.io/component: ui
+      ports:
+        - protocol: TCP
+          port: 8083
+        - protocol: TCP
+          port: 8084
+```
+
+적용 전 `kubectl -n kagent get pod --show-labels`와 실제 backend label을 비교한다. Gateway·Prometheus·service
+mesh가 controller에 닿는 환경이면 필요한 source와 port를 명시적으로 더한다. 빈칸을 추측해서 운영에 적용하지 않는다.
+
+:::caution[kind 기본 network만으로 통과 판정을 내리지 않는다]
+NetworkPolicy는 설치된 CNI가 집행해야 한다. 이 덱의 기본 kind network에서 manifest가 accepted됐다는 것만으로
+packet 차단을 증명할 수 없다. policy-capable CNI를 설치한 별도 변형이나 10장의 온프렘 staging에서 아래
+허용·거부 probe를 실제로 실행한다.
+:::
+
+## Staging에서 실행할 허용·거부 probe
+
+<Steps>
+
+1. backend Pod에서 Agent Card와 `message/send`가 성공하는지 확인한다.
+2. label이 없는 Pod와 다른 namespace Pod에서 같은 controller Service의 `8083` 연결이 실패하는지 확인한다.
+3. 외부 ingress·NodePort·service mesh route에 `8083` 우회 노출이 없는지 조회한다.
+4. 금지 사용자가 portal API에서 `403`을 받고, 같은 request ID가 deny audit event에 남는지 확인한다.
+5. 다른 사용자의 session ID와 approval ID를 제출했을 때 모두 거부되는지 확인한다.
+
+</Steps>
+
+timeout은 곧바로 성공으로 기록하지 않는다. DNS 실패인지 NetworkPolicy deny인지 CNI flow log와 backend log로
+구분한다. 허용 probe까지 함께 성공해야 policy가 의도한 source만 남겼다고 판단할 수 있다.
+
+## HITL과 identity propagation의 추가 gate
+
+이번 필수 Agent는 read-only라 Human-in-the-Loop(HITL) approval을 만들지 않는다. write tool을 여는 단계에서는
+다음 항목을 별도 acceptance test로 추가한다.
+
+| 시험 | 통과 조건 |
+|---|---|
+| approval stream | backend가 A2A stream의 승인 대기 event를 우리 UI 형식으로 번역하고 연결이 끊겨도 재조회 |
+| approval ownership | 요청자·승인자 policy를 서버가 검사하고 다른 사용자의 approval ID를 거부 |
+| identity propagation | tool에는 승인된 OBO token 또는 workload credential만 전달하고 원본 browser token을 무차별 전달하지 않음 |
+| action deny | model prompt 밖의 tool gateway/MCP server가 금지 action을 거부하고 decision log 기록 |
+| retry | side effect에 idempotency key를 전달해 재시도 중 중복 실행 방지 |
+
+OIDC 로그인, Kubernetes RBAC, NetworkPolicy 중 하나만으로 이 표를 통과했다고 간주하지 않는다.
+
+## 완료 체크
+
+- backend ServiceAccount는 `Agent` get/list/watch/create/patch만 가능하고 Secret·cluster resource는 거부된다.
+- Grant는 `(issuer, subject)` 복합 principal을 사용하고 금지 사용자·session 탈취 test가 통과했다.
+- 직접 우회 대상이 Agent Pod가 아니라 controller `8083`이라는 것을 설명할 수 있다.
+- NetworkPolicy manifest 적용과 실제 packet deny 검증을 구분해 staging 할 일로 기록했다.
+- write tool 전에 필요한 HITL·OBO·action deny acceptance test를 남겼다.
+
+## 참고 자료
+
+- [kagent v0.9 release notes](https://kagent.dev/docs/kagent/resources/release-notes/) — OIDC 인증과 application access control의 경계
+- [kagent A2A 예제](https://kagent.dev/docs/kagent/examples/a2a-agents/) — controller `8083` 호출 표면
+- [Kubernetes RBAC](https://kubernetes.io/docs/reference/access-authn-authz/rbac/) — ServiceAccount의 namespaced 최소 권한
+- [Kubernetes NetworkPolicy](https://kubernetes.io/docs/concepts/services-networking/network-policies/) — CNI가 집행하는 ingress·egress 경계
+- [Agent 배포 플랫폼 5장](/agent-platform/05-authorization/) — control·invocation·action 세 권한의 정본
+
+<LinkCard
+  title="9. BYO Agent를 kind에 배포하기"
+  description="선택 실습 — code형 Agent image를 local loop에서 끝내지 않고 kind workload와 A2A route까지 검증한다."
+  href="/kagent-lab/09-byo-agent/"
+/>
+
+<LinkCard
+  title="10. 온프렘 staging으로 승격하기"
+  description="필수 경로 — BYO를 건너뛰고 external PostgreSQL·HA·watch scope·사내 trust·rollback gate로 간다."
+  href="/kagent-lab/10-onprem-staging/"
+/>

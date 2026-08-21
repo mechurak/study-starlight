@@ -1,14 +1,15 @@
 ---
 title: "6. 상태와 로그로 실패 진단하기"
 description: Accepted·Ready condition과 workload·controller log를 순서대로 읽고 잘못된 modelConfig reference를 의도적으로 진단한다
-reviewedAt: 2026-08-19
+reviewedAt: 2026-08-21
 status: review
 ---
 
 import { LinkCard, Steps } from '@astrojs/starlight/components';
 import TermIntro from '../../../components/docs/TermIntro.astro';
+import Thesis from '../../../components/docs/Thesis.astro';
 
-> Agent가 안 보일 때 dashboard를 새로 고치기 전에 **선언 → reconcile → workload → dependency → invoke** 순서로 좁힌다
+<Thesis>Agent가 안 보이면 dashboard를 새로 고치기 전에 선언·reconcile·workload·dependency·invoke 순서로 실패 범위를 좁힌다</Thesis>
 
 <TermIntro
   terms={[
@@ -47,6 +48,7 @@ spec:
   description: Intentionally broken agent for condition inspection.
   type: Declarative
   declarative:
+    runtime: go
     modelConfig: model-config-does-not-exist
     systemMessage: You are intentionally misconfigured for a lab.
 EOF
@@ -152,7 +154,7 @@ kagent bug-report
 - [Kubernetes API conventions — conditions](https://github.com/kubernetes/community/blob/master/contributors/devel/sig-architecture/api-conventions.md#typical-status-properties) — generation과 condition 해석
 
 <LinkCard
-  title="7. BYO Agent의 local loop와 배포 경계"
-  description="code형 Agent를 생성·빌드·로컬 실행하고 cluster 배포 전에 추가되는 책임을 확인한다."
-  href="/kagent-lab/07-byo-agent/"
+  title="7. Backend walking skeleton"
+  description="Node/TypeScript backend가 Kubernetes API로 Agent를 관리하고 controller A2A route로 호출하는 두 경로를 연결한다."
+  href="/kagent-lab/07-backend-walking-skeleton/"
 />

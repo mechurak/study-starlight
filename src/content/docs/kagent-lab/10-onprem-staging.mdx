@@ -1,0 +1,272 @@
+---
+title: "10. 온프렘 staging으로 승격하기"
+description: kind demo와 운영 설치의 차이를 external PostgreSQL·controller HA·namespace scope·사내 CA와 registry·OIDC·upgrade rollback acceptance test로 검증한다
+reviewedAt: 2026-08-21
+status: review
+---
+
+import { LinkCard, Steps } from '@astrojs/starlight/components';
+import TermIntro from '../../../components/docs/TermIntro.astro';
+import Thesis from '../../../components/docs/Thesis.astro';
+
+<Thesis>kind에서 동작한 demo values를 그대로 온프렘에 복사하지 말고, 비운영 staging에서 외부 DB·HA·watch scope·사내 trust·backend 우회 차단·rollback을 통과한 설치만 채택 후보로 올린다</Thesis>
+
+<TermIntro
+  terms={[
+    ['promotion', '', '같은 artifact와 계약을 유지하면서 더 production에 가까운 환경의 통제를 추가해 검증하는 과정이다.'],
+    ['watch scope', '', 'kagent controller가 어느 namespace의 resource를 관찰하고 조정할지 제한한 범위다.'],
+    ['external PostgreSQL', '', 'kagent chart의 학습용 bundled DB 대신 조직이 backup·HA·TLS를 운영하는 database다.'],
+    ['rollback rehearsal', '', '문제가 생겼을 때 실제 이전 publication과 application version으로 복귀해 복구 시간을 재는 연습이다.'],
+  ]}
+/>
+
+이 장은 두 단계로 실행한다. 누구나 kind에서 staging values를 render하고 검토할 수 있다. 실제 온프렘 cluster가
+준비돼 있으면 같은 checklist를 **비운영 staging**에서 실행한다. production context에 직접 적용하지 않는다.
+
+## kind와 staging의 차이부터 고정하기
+
+| 관심사 | kind 실습 | 온프렘 staging 통과 조건 |
+|---|---|---|
+| version | CLI가 설치한 v0.9.9 | CRD·application chart·image digest를 change record에 고정 |
+| database | bundled PostgreSQL | 외부 PostgreSQL, TLS·backup·restore·용량·HA 검증 |
+| controller | 1 replica | 3 replica와 leader failover 측정 |
+| watch/RBAC | 기본 cluster-wide일 수 있음 | 허용 namespace 목록과 금지 namespace negative test |
+| model | shell에서 넣은 학습 key | workload 전용 LiteLLM virtual key·private CA·rotation |
+| image | public registry와 kind cache | 사내 registry mirror·digest·signature·pull secret |
+| network | port-forward | backend/gateway만 controller `8083` 허용, model·MCP egress allowlist |
+| identity | 단일 실습 사용자 | 운영자 OIDC와 별개의 portal Grant·session ownership |
+| upgrade | cluster 재생성 | DB backup·CRD compatibility·synthetic invoke·rollback rehearsal |
+| Substrate | bundled Valkey·RustFS 선택 실습 | 전용 node pool·외부 S3-compatible storage·snapshot lifecycle |
+
+## 설치 artifact와 context 기록하기
+
+staging 이름을 실제 값으로 바꾼 뒤 문자열이 일치할 때만 진행한다.
+
+```bash
+export KAGENT_VERSION="0.9.9"
+export KAGENT_STAGING_CONTEXT="replace-with-nonprod-context"
+
+test "$(kubectl config current-context)" = "$KAGENT_STAGING_CONTEXT"
+kubectl cluster-info
+kubectl version
+helm version
+```
+
+chart 정본과 현재 kind 설치 값을 비교 자료로 남긴다. Secret이 포함될 수 있는 `helm get values` 산출물은
+공개 저장소에 커밋하지 않는다.
+
+```bash
+helm show chart oci://ghcr.io/kagent-dev/kagent/helm/kagent \
+  --version "$KAGENT_VERSION"
+helm show values oci://ghcr.io/kagent-dev/kagent/helm/kagent \
+  --version "$KAGENT_VERSION" > /tmp/kagent-values-0.9.9.yaml
+```
+
+OCI chart tag만 기록하지 말고 pull한 artifact digest와 실제 image digest를 배포 기록에 남긴다. 사내 registry로
+mirror했다면 upstream digest와 mirror digest의 대응도 같이 기록한다.
+
+## Production-shaped values 골격
+
+다음은 **검토 시작점**이지 회사별 완성 values가 아니다. DB URL은 Secret volume에서 읽고, bundled PostgreSQL을
+끈다. controller replica가 2개 이상이면 kagent가 leader election을 자동으로 켠다. `rbac.namespaces`가 빈 배열이면
+cluster-scoped RBAC와 all-namespace watch가 기본이므로 허용 범위를 명시한다.
+
+```yaml
+# values-staging.yaml
+controller:
+  replicas: 3
+  volumes:
+    - name: db-url
+      secret:
+        secretName: kagent-postgres-url
+  volumeMounts:
+    - name: db-url
+      mountPath: /var/run/secrets/kagent-db
+      readOnly: true
+
+database:
+  postgres:
+    bundled:
+      enabled: false
+    urlFile: /var/run/secrets/kagent-db/url
+    vectorEnabled: false
+
+rbac:
+  namespaces:
+    - kagent
+    - agents-lab
+
+podSecurityContext:
+  runAsNonRoot: true
+  seccompProfile:
+    type: RuntimeDefault
+
+securityContext:
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop: [ALL]
+  readOnlyRootFilesystem: true
+```
+
+memory 기능에 pgvector를 실제로 쓸 때만 external DB extension을 준비하고 `vectorEnabled: true`로 바꾼다.
+DB password가 들어간 URL을 values나 `--set` history에 넣지 않는다. Secret의 `url` key는 조직 secret manager와
+GitOps 암호화 절차로 만들고, 이 문서에는 literal을 적지 않는다.
+
+:::caution[watch scope를 좁히면 reference도 같이 설계한다]
+`kagent`와 `agents-lab` 밖의 `ModelConfig`·MCP resource를 참조하려는 설계라면 controller watch와 cross-namespace
+reference policy가 맞는지 먼저 검증한다. 동작하지 않는 범위를 임시 ClusterRole로 넓혀 해결하지 않는다.
+:::
+
+## Render와 server dry-run으로 먼저 깨뜨리기
+
+<Steps>
+
+1. chart schema와 template이 values를 받아들이는지 확인한다.
+
+   ```bash
+   helm lint oci://ghcr.io/kagent-dev/kagent/helm/kagent \
+     --version "$KAGENT_VERSION" \
+     --values values-staging.yaml
+   ```
+
+2. 최종 manifest에서 image·RBAC·database·security context를 검토한다.
+
+   ```bash
+   helm template kagent oci://ghcr.io/kagent-dev/kagent/helm/kagent \
+     --version "$KAGENT_VERSION" \
+     --namespace kagent \
+     --values values-staging.yaml \
+     > /tmp/kagent-staging-rendered.yaml
+   ```
+
+3. staging에 같은 version의 CRD가 설치된 뒤 server-side dry-run을 수행한다.
+
+   ```bash
+   kubectl apply --dry-run=server -f /tmp/kagent-staging-rendered.yaml
+   ```
+
+</Steps>
+
+render 결과에서 `ClusterRoleBinding`이 예상 밖으로 남거나 bundled PostgreSQL Pod/PVC가 보이면 진행을 멈춘다.
+`helm lint` 성공은 network·DB·model 연결을 증명하지 않는다.
+
+## 온프렘 의존성 preflight
+
+| 의존성 | 실행할 시험 | 실패하면 |
+|---|---|---|
+| PostgreSQL | controller node에서 TLS·DNS·credential 연결, backup 생성과 격리된 restore | 설치 중단 |
+| registry | 모든 chart image digest를 staging node에서 pull, signature/admission 확인 | mirror·pull secret 수정 |
+| private CA | controller·Agent·MCP image와 process가 LiteLLM·registry certificate chain 신뢰 | CA bundle 배포 수정 |
+| proxy·egress | model·승인 MCP·DNS·NTP만 허용하고 private/metadata address 차단 | egress policy 수정 |
+| CNI | NetworkPolicy 허용·거부 probe와 flow log 확인 | 8장의 직접 우회 test 보류가 아니라 CNI 보완 |
+| storage | DB와 log/trace retention에 필요한 StorageClass·IOPS·복구 시간 | capacity 계획 수정 |
+| identity | Keycloak/Entra issuer·JWKS·group claim과 clock skew 확인 | OIDC 공개 금지 |
+
+private CA를 끄거나 TLS verification을 비활성화해서 preflight를 통과시키지 않는다. proxy를 쓴다면 kagent의
+`proxy.url`이 Agent-to-Agent·Agent-to-MCP 내부 URL을 어떻게 rewrite하는지도 별도 synthetic call로 확인한다.
+
+## Pinned 설치와 상태 확인
+
+신규 staging이면 CRD chart를 먼저 설치하고 application chart를 적용한다. 기존 release의 upgrade라면 아래 명령
+전에 DB backup, 현재 CRD schema, `helm get manifest`, 실행 image digest를 change record에 보관한다.
+
+```bash
+helm upgrade --install kagent-crds \
+  oci://ghcr.io/kagent-dev/kagent/helm/kagent-crds \
+  --version "$KAGENT_VERSION" \
+  --namespace kagent --create-namespace --wait
+
+helm upgrade --install kagent \
+  oci://ghcr.io/kagent-dev/kagent/helm/kagent \
+  --version "$KAGENT_VERSION" \
+  --namespace kagent \
+  --values values-staging.yaml \
+  --timeout 15m --wait
+```
+
+```bash
+helm -n kagent list
+kubectl -n kagent get deploy,pod,svc
+kubectl -n kagent get lease
+kubectl -n kagent get agent,modelconfig,remotemcpserver
+```
+
+bundled PostgreSQL workload가 없어야 하고 controller replica 셋이 ready여야 한다. 외부 DB endpoint·credential은
+log에 출력하지 않는다.
+
+## OIDC와 application ACL을 분리하기
+
+kagent chart의 `oauth2-proxy`를 Keycloak/Entra에 연결하면 dashboard 운영자를 인증할 수 있다. 그러나 검토
+기준 release에는 Agent별 application access control이 없으므로, 이 기능을 임직원 portal authorization으로
+재사용하지 않는다.
+
+- dashboard는 운영자 group과 관리망에만 노출한다.
+- 임직원 호출은 우리 backend의 OIDC 검증·Grant·session ownership을 지난다.
+- backend는 in-cluster ServiceAccount로 CRD를 관리하고 controller Service DNS로 A2A를 호출한다.
+- ingress·service mesh·NetworkPolicy 어디에서도 controller `8083` 직접 우회 route를 열지 않는다.
+
+## 반드시 실행할 acceptance test
+
+| 시험 | 통과 증거 |
+|---|---|
+| backend management | `loadFromCluster()` ServiceAccount가 허용 namespace에 SSA·watch, Secret·금지 namespace는 `403` |
+| backend invocation | service DNS의 controller `8083`으로 Agent Card·`message/send` 성공, request/session ID 감사 기록 |
+| direct bypass | 승인 backend는 성공하고 다른 namespace·외부 route는 CNI/gateway에서 실패 |
+| Grant | 허용 principal 성공, 금지 principal·다른 issuer의 같은 `sub`·session 탈취는 portal `403` |
+| controller failover | leader Pod 삭제 중 다른 replica가 lease를 얻고 정한 SLO 안에 reconcile·invoke 복구 |
+| DB restart | PostgreSQL failover·controller restart 뒤 session·Agent status 영향과 복구 시간 기록 |
+| secret rotation | model key·CA Secret 교체 뒤 Agent restart와 새 credential 적용 확인 |
+| namespace scope | 허용 namespace Agent는 reconcile, 금지 namespace resource는 controller가 처리하지 않음 |
+| registry/CA | node 재기동·cache 없는 pull과 LiteLLM TLS 연결 성공, verification bypass 없음 |
+| noisy workload | quota·limit 초과 Agent가 controller와 다른 부서 Agent를 고갈시키지 않음 |
+| application rollback | 이전 `READY` Deployment로 publication pointer를 복귀하고 synthetic invoke 통과 |
+| chart rollback | application·DB·CRD 호환 범위를 확인한 runbook으로 복구 시간을 실제 측정 |
+
+Helm rollback은 이미 바뀐 CRD schema나 DB migration을 자동으로 안전하게 되돌린다는 뜻이 아니다. upgrade 전에
+공식 upgrade note와 지원 version을 확인하고, **application rollback과 data/schema rollback을 분리**해 적는다.
+
+## Substrate를 staging에 올리기 전 gate
+
+11~12장의 kind 실습을 통과해도 바로 staging에 켜지 않는다. 다음 준비가 있어야 한다.
+
+- kagent·Substrate 호환 version pair와 두 chart·image digest 고정
+- gVisor workload를 받을 전용 node pool, label·taint·capacity·kernel/runtime 검증
+- bundled RustFS 대신 TLS·encryption·backup이 있는 S3-compatible snapshot storage
+- snapshot prefix의 tenant 경계, retention·삭제·incident access log
+- WorkerPool capacity 부족·storage 단절·restore timeout alert와 rollback 경로
+- 일반 Agent publication을 유지한 채 SandboxAgent publication으로 전환·복귀하는 시험
+
+별도 cluster는 필수가 아니다. 실제 공존을 검증하려면 같은 staging cluster의 전용 node pool과 namespace가 더
+유용하다. 다만 장애 주입의 blast radius가 staging의 다른 시험을 침범하면 별도 cluster를 선택한다.
+
+## 승격 판정
+
+다음 중 하나라도 증거가 없으면 production 승격이 아니라 미완료 PoC다.
+
+- external DB restore와 controller failover 시간
+- backend의 허용·거부·session ownership·직접 우회 negative test
+- pinned upgrade·rollback rehearsal
+- registry·CA·proxy·egress의 cache 없는 재현
+- 맨 Kubernetes 기준선과 비교할 개발량·steady resource·장애 복구 수치
+
+마지막 항목은 [13장](/kagent-lab/13-adoption-decision/)에서 kagent와 Substrate 채택 판정표로 모은다.
+
+## 참고 자료
+
+- [kagent 운영 고려사항](https://kagent.dev/docs/kagent/operations/operational-considerations/) — external PostgreSQL, controller leader election, security context와 proxy
+- [kagent Helm reference](https://kagent.dev/docs/kagent/resources/helm/) — `rbac.namespaces`, database·controller·OIDC values
+- [kagent upgrade](https://kagent.dev/docs/kagent/operations/upgrade/) — release별 upgrade 절차와 확인 항목
+- [Agent 배포 플랫폼 15장](/agent-platform/15-operations/) — runtime을 넘어선 hybrid 운영·DR 정본
+- [Agent 배포 플랫폼 16장](/agent-platform/16-adoption/) — PoC acceptance와 맨 Kubernetes 기준선
+
+<LinkCard
+  title="11. 같은 클러스터에 Agent Substrate 추가하기"
+  description="기본 Agent와 backend 경로를 유지한 채 같은 kind cluster에 pinned Substrate control/data plane과 WorkerPool을 추가한다."
+  href="/kagent-lab/11-substrate-install/"
+/>
+
+<LinkCard
+  title="13. 온프렘 도입 판정"
+  description="필수 경로 — Substrate 실습을 건너뛰고 맨 Kubernetes와 기본 kagent의 증거부터 판정표에 모은다."
+  href="/kagent-lab/13-adoption-decision/"
+/>

@@ -31,7 +31,8 @@ kagent와 어디서 만나는가**다. 사내 상황을 다음으로 가정한�
 ## dashboard를 어디까지 쓸 것인가
 
 kagent dashboard는 [8장](/agent-platform/08-kagent-architecture/#전체-중-kagent의-자리)에서 봤듯
-Kubernetes API의 resource를 보는 **또 하나의 클라이언트**다. 자체 포털을 만들면 역할이 이렇게 갈린다.
+controller의 내부 API를 통해 resource-derived 상태와 chat을 보여 주는 **운영 도구**다. 자체 포털을 만들면
+역할이 이렇게 갈린다.
 
 | | kagent dashboard | 사내 포털 |
 |---|---|---|
@@ -45,16 +46,17 @@ dashboard를 없앨 필요는 없다. 다만 **최종 사용자에게 열지 않
 
 ## 통합 지점을 무엇으로 잡을 것인가
 
-backend가 kagent에 말을 거는 방법은 셋이고, 답은 하나다.
+backend가 kagent에 말을 거는 방법은 목적에 따라 둘이다. dashboard 내부 API와 CLI shell은 어느 쪽의 계약도
+아니다.
 
-| 후보 | 성격 | 판단 |
+| 목적 | 계약 | 쓰지 않을 것 |
 |---|---|---|
-| dashboard가 쓰는 내부 HTTP API | UI 전용. 공식 문서가 외부 클라이언트용으로 문서화·version 보장하지 않음 | 쓰지 않는다 |
-| `kagent` CLI를 shell로 실행 | 사람이 쓰는 도구. 출력 형식·종료 코드가 계약이 아님 | 쓰지 않는다 |
-| **Kubernetes API의 CRD** | 공식 API reference가 schema와 API version을 문서화 | **여기를 계약으로 삼는다** |
+| 배포·수정·삭제·상태 관찰 | Kubernetes API의 CRD schema·status | dashboard 내부 HTTP API, CLI shell |
+| Agent Card·task·stream 호출 | `kagent-controller:8083`의 `/api/a2a/{namespace}/{agent-name}/` | Agent Pod의 임의 Service, CLI shell |
 
-CRD를 고르면 얻는 것이 하나 더 있다. Agent 배포가 **Kubernetes resource 조작**이 되므로 RBAC·감사 로그·
-NetworkPolicy·GitOps 같은 기존 온프렘 운영 자산을 그대로 쓴다. backend가 특별한 protocol을 배울 필요가 없다.
+관리 경로에 CRD를 고르면 Agent 배포가 **Kubernetes resource 조작**이 되므로 RBAC·감사 로그·GitOps 같은 기존
+온프렘 운영 자산을 그대로 쓴다. 호출 경로는 A2A JSON-RPC·stream·task 상태를 우리 invoke contract로
+번역한다. 두 client의 credential·timeout·retry·관측값도 분리한다.
 
 :::caution[alpha API라는 것을 잊지 않는다]
 `kagent.dev/v1alpha2`는 이름 그대로 alpha다. upgrade 때 필드가 바뀔 수 있으므로 manifest 생성 코드를
@@ -97,7 +99,7 @@ be -> fe: "상태 stream · 폴링 응답" { style.stroke-dash: 3 }
 [9장의 필드 구분표](/agent-platform/09-kagent-resources/#사내-플랫폼이-소유할-필드와-막을-필드)대로
 namespace·security context·`allowedNamespaces`는 서버가 채운다.
 
-### Agent를 호출할 때
+### controller A2A route로 Agent를 호출할 때
 
 ```d2 pad=40 title="사용자의 호출이 backend의 Grant 검사를 거쳐 Agent의 A2A endpoint로 가고 응답 stream이 되돌아오며 감사 기록이 남는 시퀀스"
 shape: sequence_diagram
@@ -106,14 +108,17 @@ user: 사용자
 fe: Frontend
 be: Backend
 db: Platform DB
-agent: "Agent Pod (A2A)"
+ctrl: "kagent-controller:8083\n/api/a2a/{namespace}/{agent}/"
+runtime: "Agent Pod 또는\nSubstrate actor"
 
 user -> fe: "질문 입력"
 fe -> be: "POST /agents/{id}/invoke"
 be -> be: "token 검증"
 db -> be: "Grant 조회 — 이 사용자가 호출 가능한가" { style.stroke-dash: 3 }
-be -> agent: "A2A invoke (cluster 내부 Service)"
-agent -> be: "응답 stream" { style.stroke-dash: 3 }
+be -> ctrl: "A2A message/send"
+ctrl -> runtime: "route"
+runtime -> ctrl: "task · artifact" { style.stroke-dash: 3 }
+ctrl -> be: "A2A 응답 · stream" { style.stroke-dash: 3 }
 be -> fe: "stream 중계" { style.stroke-dash: 3 }
 be -> db: "감사 event 기록"
 ```
@@ -123,7 +128,8 @@ tool 승인 같은 **대화 중 이벤트를 우리 UI 규격으로 번역**하�
 
 ## backend 구현 — Node/TypeScript
 
-`@kubernetes/client-node`가 공식 클라이언트다. 세 가지만 정하면 나머지는 평범한 서버 코드다.
+관리에는 공식 `@kubernetes/client-node`, 호출에는 controller A2A client를 둔다. 두 client를 한 class의
+숨은 분기로 합치지 말고 `deploy/status` port와 `invoke` port로 나눈다.
 
 ### 신원 — in-cluster ServiceAccount
 
@@ -139,7 +145,8 @@ const objects = KubernetesObjectApi.makeApiClient(kc);
 ```
 
 ServiceAccount에는 `kagent.dev` API group의 `agents`·`modelconfigs`·`remotemcpservers`에 대한 권한만
-준다. 대상 namespace도 목록으로 제한한다. backend가 탈취됐을 때의 blast radius가 여기서 정해진다.
+준다. 대상 namespace도 목록으로 제한한다. `SandboxAgent` publication을 실제로 열 때만 별도 policy와 함께
+`sandboxagents` 권한을 추가한다. backend가 탈취됐을 때의 blast radius가 여기서 정해진다.
 
 ### 쓰기 — server-side apply
 
@@ -179,6 +186,30 @@ informer.on('error', (err) => scheduleRestart(err));
 
 informer는 끊긴다. `error` 핸들러에서 재시작을 예약하지 않으면 조용히 죽고, 화면의 상태가 영원히
 `Pending`에 머문다. backend replica가 여러 개면 어느 replica가 DB에 쓸지도 정해야 한다.
+
+### 호출 — controller A2A route
+
+in-cluster URL은 controller Service DNS와 Agent의 namespace·resource name으로 결정한다.
+
+```ts
+const url = new URL(
+  `/api/a2a/${namespace}/${agentName}/`,
+  'http://kagent-controller.kagent.svc.cluster.local:8083',
+);
+
+const response = await fetch(url, {
+  method: 'POST',
+  headers: { 'content-type': 'application/json' },
+  body: JSON.stringify(toA2AMessageSend(platformInvocation)),
+  signal: AbortSignal.timeout(120_000),
+});
+const result = normalizeA2AResponse(await response.json());
+```
+
+실제 adapter는 먼저 `/.well-known/agent.json`을 검증하고 request ID·session owner·timeout·stream reconnect를
+기록한다. `Agent`가 `SandboxAgent`로 바뀌어도 이 URL shape와 응답 정규화는 같아야 한다. 실행 가능한
+server-side apply·condition wait·raw A2A 예제는
+[kagent-lab 7장](/kagent-lab/07-backend-walking-skeleton/)에서 Node/TypeScript로 관통한다.
 
 ## 무엇을 어디에 저장하는가
 
@@ -242,21 +273,21 @@ classes: {
 
 user: "임직원" { class: key }
 be: "Backend\nACL · Grant 검사" { class: ok }
-k8s: "Kubernetes API\nAgent CR" { class: ok }
-agent: "Agent Pod\nA2A endpoint" { class: ok }
+k8s: "Kubernetes API\nAgent · SandboxAgent CR" { class: ok }
+ctrl: "kagent controller\nA2A :8083" { class: ok }
 
 user -> be: "① 관리 · ② 호출"
 be -> k8s: "ServiceAccount로 apply"
-be -> agent: "승인된 호출만 중계"
+be -> ctrl: "승인된 A2A 호출만 중계"
 user -> k8s: "직접 접근 없음 (kubeconfig 미배포)" { class: bad; style.stroke-dash: 3 }
-user -> agent: "NetworkPolicy로 차단" { class: bad; style.stroke-dash: 3 }
+user -> ctrl: "8083 직접 접근을 NetworkPolicy로 차단" { class: bad; style.stroke-dash: 3 }
 ```
 
 - **관리 경로** — Agent 생성·수정·삭제. backend가 DB의 소유권·부서를 검사한 뒤 자기 ServiceAccount로
   대행한다. 사용자에게 kubeconfig를 주지 않으므로 우회 경로 자체가 없다.
-- **호출 경로** — 배포된 Agent의 A2A endpoint는 cluster 안 Service로 존재한다. 사내망에서 이 Service에
-  직접 닿을 수 있으면 backend의 Grant 검사가 무의미해진다. **기본 deny NetworkPolicy로 Agent namespace의
-  ingress를 backend에서만 허용**해야 통제가 완성된다.
+- **호출 경로** — 문서화된 A2A 표면은 `kagent-controller` Service의 `8083`이다. 사내망에서 이 port에
+  직접 닿을 수 있으면 backend의 Grant 검사가 무의미해진다. **controller Pod의 `8083` ingress를 backend·승인된
+  gateway·운영 UI에서만 허용**해야 통제가 완성된다.
 
 namespace는 부서 단위로 나누는 편이 단순하다. ResourceQuota로 부서별 자원을 나누고, NetworkPolicy와
 egress 허용 목록을 namespace 단위로 관리하고, 사고 시 격리 범위도 부서로 떨어진다. 사용자마다 namespace를
@@ -274,7 +305,7 @@ CR을 apply했다고 끝이 아니다. 포털이 감당해야 할 상태 차이�
 
 | 상황 | 증상 | 대응 |
 |---|---|---|
-| apply는 성공, Pod는 실패 | DB는 `Deployed`, 실제는 `CrashLoopBackOff` | condition만 보지 말고 Pod·Service health를 함께 읽어 정규화 |
+| apply는 성공, runtime은 실패 | DB는 `Deployed`, Pod는 `CrashLoopBackOff`이거나 actor restore 실패 | condition과 Pod·actor·A2A health를 함께 읽어 정규화 |
 | cluster에서 직접 수정 | dashboard·`kubectl`로 누군가 spec 변경 | 주기적 재조정 job이 DB 기준으로 다시 apply |
 | CR은 있는데 DB에 없음 | 삭제 실패나 수동 생성으로 생긴 고아 resource | label 기준으로 조회해 관리자에게 보고 |
 
@@ -285,19 +316,21 @@ CR을 apply했다고 끝이 아니다. 포털이 감당해야 할 상태 차이�
 ## 10장 요약
 
 - dashboard는 운영자 콘솔로 남기고 최종 사용자에게 열지 않는다.
-- 통합 지점은 문서화되지 않은 내부 REST API가 아니라 CRD다. 필드를 다루는 코드는 adapter 모듈에 모은다.
+- 관리 계약은 CRD·status, 호출 계약은 controller A2A다. dashboard 내부 API·CLI·Agent Pod Service는 쓰지 않는다.
 - backend는 in-cluster ServiceAccount로 server-side apply하고 informer로 status를 받아 DB에 반영한다.
 - 정체성·version·Grant·감사는 우리 DB가 원본이고, 실행 상태만 Kubernetes가 원본이다.
-- 관리 경로는 ServiceAccount 대행으로, 호출 경로는 NetworkPolicy로 막아야 통제가 완성된다.
+- 관리 경로는 ServiceAccount 대행으로, 호출 경로는 controller `8083` ingress 제한으로 막아야 통제가 완성된다.
 - 부서 단위 namespace가 quota·정책·격리 범위를 함께 정리해 준다.
 
 ## 참고 자료
 
 - [kagent v0.9 release notes](https://kagent.dev/docs/kagent/resources/release-notes) — OIDC 인증 지원과 access control 미구현 경계
 - [kagent API reference](https://kagent.dev/docs/kagent/resources/api-ref) — backend가 생성할 CR의 schema
+- [kagent A2A 예제](https://kagent.dev/docs/kagent/examples/a2a-agents/) — controller `8083`의 Agent Card·task route
 - [Kubernetes Server-Side Apply](https://kubernetes.io/docs/reference/using-api/server-side-apply/) — field manager와 소유권 추적
 - [@kubernetes/client-node](https://github.com/kubernetes-client/javascript) — Node 클라이언트의 apply·informer 예제
 - [CKA 덱 — NetworkPolicy](/cka/12-networkpolicy/) — 기본 deny와 ingress 제한 작성법
+- [kagent 실습 — backend와 보안 경계](/kagent-lab/07-backend-walking-skeleton/) — Node probe와 controller 우회 차단 acceptance test
 
 <LinkCard
   title="11. kagent adapter 운영과 경계"
