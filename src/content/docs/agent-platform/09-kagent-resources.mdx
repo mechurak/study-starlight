@@ -150,8 +150,15 @@ skill은 tool과 다르다. tool이 "호출 가능한 함수"라면 skill은 **A
 
 | 형태 | 선언 위치 | 성격 |
 |---|---|---|
-| A2A skill | `a2aConfig.skills` | 다른 Agent·클라이언트가 읽는 능력 메타데이터 |
+| A2A `AgentSkill` metadata | `spec.declarative.a2aConfig.skills` | 다른 Agent·클라이언트가 Agent Card에서 읽는 능력 설명 |
 | container skill | `spec.skills.refs`(OCI) · `spec.skills.gitRefs`(Git) | 외부에서 가져오는 실행 가능한 구현 |
+
+:::caution[A2A 약어는 protocol 이름으로만 쓴다]
+[A2A 표준](https://a2a-protocol.org/latest/specification/#445-agentskill)의 이름은 Agent2Agent이고, `AgentSkill`은
+Agent Card에 실리는 능력 metadata type이다. [kagent Agents 개념](https://kagent.dev/docs/kagent/concepts/agents/)은
+`a2aConfig.skills`를 Actions-to-actions (A2A) skills라고 부르지만 별도 protocol이나 실행 action이 아니다.
+이 덱에서 A2A는 항상 Agent-to-Agent protocol을 뜻하고, 해당 필드는 `AgentSkill` metadata라고 부른다.
+:::
 
 ```yaml
 skills:

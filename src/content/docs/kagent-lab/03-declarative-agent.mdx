@@ -1,6 +1,6 @@
 ---
 title: "3. 조회 전용 Declarative Agent"
-description: Agent v1alpha2 manifest로 default model·system message·조회 MCP tool allowlist를 연결하고 Ready 상태와 호출을 검증한다
+description: Agent v1alpha2 manifest로 default model·system message·조회 MCP tool allowlist·AgentSkill metadata를 연결하고 Ready 상태와 호출을 검증한다
 reviewedAt: 2026-08-21
 status: review
 ---
@@ -49,6 +49,8 @@ Agent마다 key와 URL을 복제하지 않는다. 한 `ModelConfig`를 여러 Ag
 ## Agent 만들기
 
 다음 Agent는 Kubernetes 조회 tool 둘만 참조한다. 변경 tool을 prompt로 금지하는 데 그치지 않고 allowlist에서 뺀다.
+`a2aConfig.skills`에는 외부 client가 Agent Card에서 볼 조회 능력 설명을 하나 넣는다. 이는
+metadata이며 tool을 새로 실행하거나 권한을 추가하지 않는다.
 
 ```bash
 kubectl apply -f - <<'EOF'
@@ -81,6 +83,20 @@ spec:
           toolNames:
             - k8s_get_available_api_resources
             - k8s_get_resources
+    a2aConfig:
+      skills:
+        - id: inspect-kubernetes-resources
+          name: Inspect Kubernetes resources
+          description: Read and explain Kubernetes resources in a requested namespace.
+          tags:
+            - kubernetes
+            - read-only
+          examples:
+            - List the Pods in the kagent namespace and cite the tool evidence.
+          inputModes:
+            - text
+          outputModes:
+            - text
 EOF
 ```
 
@@ -155,6 +171,7 @@ kagent invoke -n kagent -a lab-reader -S \
 | `systemMessage` | 역할과 행동 원칙 |
 | `mcpServer` | tool을 발견할 endpoint resource |
 | `toolNames` | server 전체가 아니라 조회 기능 둘만 허용 |
+| `a2aConfig.skills` | Agent Card에 공개할 AgentSkill metadata—실행 tool이 아님 |
 | `status.conditions` | controller가 선언을 실제 상태로 바꾼 결과 |
 
 ## 안 될 때 먼저 볼 것
@@ -173,6 +190,7 @@ kagent invoke -n kagent -a lab-reader -S \
 - dashboard chat에서 조회·거부를 시험했고 같은 호출을 CLI로 재현했다.
 - 조회 요청에는 tool evidence가 있고 결과가 `kubectl`과 맞는다.
 - 삭제 요청 뒤 실제 resource가 변하지 않았다.
+- `a2aConfig.skills`와 MCP `toolNames`를 서로 다른 선언으로 구분한다.
 - cluster와 Agent는 다음 장에서 재사용한다.
 
 ## 참고 자료

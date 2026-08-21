@@ -18,6 +18,11 @@ Docker·kind·kubectl·Helm의 설치 명령은 복제하지 않는다. `lab-env
 제품 중립 domain model과 전체 포털 설계는 `agent-platform` 덱으로 넘긴다. 다만 이 덱에서는 그 설계를
 말로만 남기지 않고, 최소 backend probe와 RBAC·A2A 우회 차단 acceptance test까지 직접 실행한다.
 
+kagent 공식 Examples의 app·framework별 walkthrough는 이 덱에 다시 복제하지 않는다. 14장에서
+catalog와 실제 수요별 예제로 연결하고, 이 덱은 예제를 운영 경계로 옮길 때 깨질 수 있는
+negative test·권한·공급망·network 상황만 덧붙인다. 이미 5장과 11~12장이 다루는 A2A·Substrate
+기본 절차는 공식 예제를 별도 실습으로 중복하지 않는다.
+
 ## 기준 환경과 버전
 
 **2026년 8월 21일**에 kagent와 Agent Substrate 공식 문서를 확인했다.

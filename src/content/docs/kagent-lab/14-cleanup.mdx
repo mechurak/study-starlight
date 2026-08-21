@@ -189,6 +189,28 @@ backup·rollback과 다른 tenant 영향까지 검토한 승인 change로 수행
 9. Substrate는 필수가 아니라 idle 밀도·gVisor 요구가 restore 지연과 새 운영비보다 클 때 고르는 runtime이다.
 10. AgentHarness는 coding workspace 요구가 생길 때 별도 신뢰 경계로 검토한다.
 
+## 공식 Examples에서 더 해볼 것
+
+[kagent 공식 Examples](https://kagent.dev/docs/kagent/examples/)는 A2A·agentgateway·외부 MCP client,
+ADK·CrewAI·LangGraph BYO, 문서 Agent, Slack·Discord·Telegram, Skills·HITL, Agent Harness·Substrate를
+end-to-end walkthrough로 모아 둔 catalog다. 절차와 최신 manifest는 공식 문서를 정본으로 보고,
+이 덱에서는 0~14장을 끝낸 뒤 **실제 수요 하나**만 골라 다음 실패 조건을 같이 시험한다.
+별도 수요가 아직 없다면 HITL, agents via MCP, agentgateway 순서가 좋다. 8장의 권한 경계를
+write 승인, 외부 client 호출, model egress 정책 순으로 확장할 수 있다.
+
+| 수요 | 공식 실습 | 이 덱에서 추가할 실패 조건 |
+|---|---|---|
+| write tool을 연다 | [Human-in-the-Loop](https://kagent.dev/docs/kagent/examples/human-in-the-loop/) | `requireApproval`에서 빠진 write tool은 즉시 실행된다. 거절 후 미실행을 확인하고, HITL이 RBAC·Grant·action deny를 대체하지 않음을 시험한다. |
+| Cursor·Claude 같은 MCP client에서 Agent를 부른다 | [Using kagent agents via MCP](https://kagent.dev/docs/kagent/examples/agents-mcp/) | local endpoint 포트가 엇갈리면 port-forward의 왼쪽 포트를 기준으로 맞춘다. `8083:8083`이면 `http://localhost:8083/mcp`다. `list_agents`·`invoke_agent`를 노출하므로 controller를 공개 endpoint로 바로 열지 않는다. |
+| model egress에 정책을 넣는다 | [Using agentgateway with kagent](https://kagent.dev/docs/kagent/examples/agentgateway/) | gateway는 model 호출 경로를 다루지 A2A invocation ACL과 MCP action 권한을 막지 않는다. Agent의 provider 직접 egress를 차단하고 rate limit·guardrail·audit policy의 target과 bypass를 각각 검증한다. |
+| 행동 절차를 재사용한다 | [Add skills to agents](https://kagent.dev/docs/kagent/examples/skills/) | skill을 로드하면 `bash`·file read/write/edit tool이 추가되고, 공식 예제 Agent는 `k8s_apply_manifest`도 허용한다. `latest`·`insecureSkipVerify`는 전용 lab에만 두고, digest pin·서명·ServiceAccount·approval을 검증한다. |
+| 특정 framework를 이식한다 | [ADK](https://kagent.dev/docs/kagent/examples/a2a-byo/)·[CrewAI](https://kagent.dev/docs/kagent/examples/crewai-byo/)·[LangGraph](https://kagent.dev/docs/kagent/examples/langchain-byo/) 중 하나 | 세 개를 다 돌리지 말고 실제 후보만 고른다. image digest·Secret·A2A port·health contract와 framework state/checkpoint의 session ownership·retention을 깨뜨려 본다. |
+| chat channel을 입구로 쓴다 | [Slack](https://kagent.dev/docs/kagent/examples/slack-a2a/)·[Discord](https://kagent.dev/docs/kagent/examples/discord-a2a/)·[Telegram](https://kagent.dev/docs/kagent/examples/telegram-bot/) 중 하나 | bot token 최소 scope, webhook·event 서명과 replay, workspace·channel·user identity를 Grant에 매핑한다. chat 입구가 controller `8083` 직접 우회가 되지 않게 한다. |
+| coding workspace가 필요하다 | [Agent Harness](https://kagent.dev/docs/kagent/examples/agent-harness/) | OpenClaw·Hermes의 shell·source credential·workspace·Slack token과 shared actor snapshot을 하나의 신뢰 경계로 본다. 장기 session의 WorkerPool slot·snapshot 보존·삭제·복원을 따로 측정한다. |
+
+5장은 공식 A2A 예제의 Agent Card·controller `8083`·CLI 호출을 이미 포함하고, 11~12장은
+공식 Substrate walkthrough을 A/B 비교로 확장한다. 두 예제는 추가 실습으로 중복하지 않는다.
+
 ## 다음에 이어갈 길
 
 - 실제 사내 platform decision: [Agent 배포 플랫폼 — 단계적 도입](/agent-platform/16-adoption/)
