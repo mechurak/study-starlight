@@ -23,13 +23,10 @@ import Thesis from '../../../components/docs/Thesis.astro';
 flowchart LR
     CORE["Platform Core<br/>Agent · Version · Grant"] --> PORT["RuntimeAdapter port"]
     PORT --> KA["KagentAdapter"]
-    PORT --> DA["DaprKubernetesAdapter"]
     PORT --> AA["AgentCoreAdapter"]
     KA --> K8S["Agent CR · Service · Secret"]
-    DA --> DAPR["Deployment · Dapr resources"]
     AA --> AWS["ECR · Runtime · Endpoint"]
     K8S --> NORMAL["Normalized DeploymentStatus"]
-    DAPR --> NORMAL
     AWS --> NORMAL
     NORMAL --> CORE
 
@@ -38,11 +35,13 @@ flowchart LR
     classDef ok fill:#dcfce7,stroke:#16a34a,color:#14532d
     class CORE key
     class PORT,NORMAL zone
-    class KA,DA,AA,K8S,DAPR,AWS ok
+    class KA,AA,K8S,AWS ok
 ```
 
 platform core는 Kubernetes client나 AWS SDK를 import하지 않는다. adapter가 provider credential, retry,
-eventual consistency와 error message를 소유한다.
+eventual consistency와 error message를 소유한다. 지금 adapter는 둘이지만 port는 개수를 가정하지 않는다 —
+[보류한 durable execution 층](/agent-platform/12-durable-execution/)을 재개하면 같은 port에 세 번째
+adapter가 붙는다.
 
 ## 최소 operation
 
@@ -129,14 +128,15 @@ resource는 지우지 않는다.
 
 logical secret은 adapter가 target별 reference로 바꾼다.
 
-| 공통 의도 | kagent target | Dapr Agents target | AgentCore target |
-|---|---|---|---|
-| runtime workload identity | Kubernetes ServiceAccount | ServiceAccount + Dapr App ID | AgentCore workload/execution role |
-| secret reference | Secret/Vault injection | Dapr secret store·Secret reference | Secrets Manager·AgentCore Identity provider |
-| private CA | Secret volume·ModelConfig TLS | sidecar·app trust store | image trust store·private endpoint 설정 |
-| egress policy | NetworkPolicy·proxy | NetworkPolicy + App ID access policy | security group·VPC endpoint·route |
+| 공통 의도 | kagent target | AgentCore target |
+|---|---|---|
+| runtime workload identity | Kubernetes ServiceAccount | AgentCore workload/execution role |
+| secret reference | Secret/Vault injection | Secrets Manager·AgentCore Identity provider |
+| private CA | Secret volume·ModelConfig TLS | image trust store·private endpoint 설정 |
+| egress policy | NetworkPolicy·proxy | security group·VPC endpoint·route |
 
-secret value를 adapter DB나 provider tag에 복제하지 않는다.
+secret value를 adapter DB나 provider tag에 복제하지 않는다. target이 늘어나면 이 표에 column이
+하나 추가될 뿐 공통 의도 행은 그대로다 — 그것이 logical reference를 쓰는 이유다.
 
 ## Contract test
 

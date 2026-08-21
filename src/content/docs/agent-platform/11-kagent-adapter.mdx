@@ -54,8 +54,9 @@ capabilities:
   persistentFilesystem: agent-harness
 ```
 
-`durableWorkflowState`가 `unsupported`라는 점이 [12장 Dapr Agents](/agent-platform/12-dapr-agents/)와
-갈리는 지점이다. 승인 대기가 며칠 걸리거나 중단 지점부터 이어져야 하는 Agent라면 target 선택을 다시 본다.
+`durableWorkflowState: unsupported`는 깎여 나간 기능이 아니라 [보류한 결정 B](/agent-platform/12-durable-execution/)를
+capability로 정직하게 드러낸 것이다. 승인 대기가 며칠 걸리거나 중단 지점부터 이어져야 하는 Agent 수요가
+확인되면 target을 바꾸는 것이 아니라 12장의 재개 조건을 연다.
 
 ## 인증과 인가의 빈칸
 
@@ -109,6 +110,12 @@ endpoint에 닿지 못할 수 있다. adapter는 condition·Pod·Service를 함�
 **불리하다:** platform team이 controller·Postgres·upgrade·capacity·sandbox를 직접 운영할 여력이 없거나,
 session별 강한 격리를 빠르게 제공해야 한다. kagent가 Kubernetes 운영 책임을 없애지는 않는다.
 
+비교 상대는 AgentCore만이 아니다. **기준선은 어댑터가 kagent 없이 Deployment·Service를 직접 만드는
+맨 Kubernetes다.** 특히 코드형(BYO) 위주라면 kagent BYO는 "Deployment 생성 + A2A 계약 기대"에
+가까워 기준선과의 격차가 얇다. kagent를 정당화하는 것은 구성형 Agent를 runner 개발 없이 실행해 주는
+engine과 선언형 lifecycle이고, 이 가치가 실제로 쓰이는지는
+[16장의 PoC](/agent-platform/16-adoption/#kagent-poc에서-볼-것)에서 판정한다.
+
 ## 11장 요약
 
 - `Grant`·`Publication`은 kagent resource에 넣지 않고 portal이 소유한다.
@@ -125,7 +132,7 @@ session별 강한 격리를 빠르게 제공해야 한다. kagent가 Kubernetes 
 - [kagent 실습 덱 7장](/kagent-lab/07-byo-agent/) — BYO image를 kind cluster에 올려 보기
 
 <LinkCard
-  title="12. Dapr Agents adapter"
-  description="코드형 Agent의 workflow·state·tool 호출을 재시작 뒤에도 이어지는 실행 계약으로 번역한다."
-  href="/agent-platform/12-dapr-agents/"
+  title="12. 보류한 결정 — durable execution"
+  description="durable execution 층을 지금 도입하지 않는 이유와 비용, 재개 조건, Temporal·Dapr Agents 비교 기준을 기록한다."
+  href="/agent-platform/12-durable-execution/"
 />

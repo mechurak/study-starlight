@@ -12,7 +12,7 @@ import Thesis from '../../../components/docs/Thesis.astro';
 
 <TermIntro
   terms={[
-    ['Agent runtime', 'Agent Runtime', 'Agent code를 실행하고 요청·session을 처리하는 환경. kagent·Dapr Agents·AgentCore가 서로 다른 방식으로 맡는다.'],
+    ['Agent runtime', 'Agent Runtime', 'Agent code를 실행하고 요청·session을 처리하는 환경. kagent·AgentCore가 서로 다른 방식으로 맡는다.'],
     ['control plane', 'Control Plane', 'Agent의 등록·version·권한·승인·배포 의도를 저장하고 실제 상태를 맞추는 관리 영역이다.'],
     ['deployment adapter', 'Deployment Adapter', '제품 중립 배포 요청을 특정 runtime API나 Kubernetes resource로 번역하는 경계다.'],
     ['principal', 'Security Principal', '권한을 부여받는 주체. 사용자·부서 group·service workload가 될 수 있다.'],
@@ -58,7 +58,7 @@ obs -> create: "다음 version" {
 }
 ```
 
-파란 단계는 사내 플랫폼이 소유하고, 초록 단계 — 배포(3)와 호출 실행(5) — 만 kagent·Dapr Agents·AgentCore
+파란 단계는 사내 플랫폼이 소유하고, 초록 단계 — 배포(3)와 호출 실행(5) — 만 kagent·AgentCore
 같은 runtime의 일이다. runtime이 맡는 일이 여섯 단계의 가운데에 끼어 있는 이 모양이, Agent를 띄우는 것은
 lifecycle의 한 단계일 뿐이라는 이 장의 주장이다.
 
@@ -109,7 +109,7 @@ dependency·egress·filesystem·process 권한까지 위험 범위가 넓다. �
 |---|---|---|
 | Agent builder/framework | Agent가 어떻게 추론하고 tool을 고르는가 | LangGraph, CrewAI, ADK, Dapr Agents |
 | 사내 portal/control plane | 누가 만들고 승인하고 쓰는가 | 이 덱에서 설계할 영역 |
-| runtime/provider | 어디서 어떤 격리와 lifecycle로 실행하는가 | kagent, Dapr on Kubernetes, AgentCore |
+| runtime/provider | 어디서 어떤 격리와 lifecycle로 실행하는가 | kagent, AgentCore |
 | model gateway/serving | 어느 모델에 어떤 quota로 연결하는가 | LiteLLM, vLLM, KServe |
 | observability/evaluation | 왜 이런 응답이 나왔고 품질이 나아졌는가 | Langfuse, OTel |
 
@@ -120,6 +120,20 @@ dependency·egress·filesystem·process 권한까지 위험 범위가 넓다. �
 제품 하나가 여러 칸을 제공할 수는 있어도 경계가 사라지는 것은 아니다. Dapr Agents는 framework와 durable
 runtime substrate에 걸치고, AgentCore에는 Identity와 Registry가 있으며, kagent에는 UI와 memory가 있다. 그래도
 회사의 조직·승인·퇴사·data classification 규칙은 사내 control plane에 남는다.
+
+## Runtime 결정은 둘로 나뉜다
+
+세 번째 줄의 runtime/provider를 고르는 일도 사실 결정 하나가 아니다. 누가 workload를 만들고 살리고
+호출 표면을 제공하는가(**결정 A — workload lifecycle**)와, 중단된 다단계 실행을 누가 기록하고 이어
+주는가(**결정 B — execution durability**)는 독립된 결정이다.
+
+결정 A에서 잊기 쉬운 선택지가 하나 있다. 온프렘 Kubernetes가 이미 있으므로, **어댑터가 kagent 없이
+Deployment·Service를 직접 만드는 맨 Kubernetes**도 항상 답이 될 수 있다 — 운영할 제품이 하나 줄고,
+대신 구성형 Agent의 실행 runner를 회사가 만들어 소유해야 한다. 그래서 이 덱은 결정 A를 이렇게 둔다:
+온프렘의 **기준선(영가설)은 맨 Kubernetes 어댑터**, 기본 후보는 그 기준선 대비 남는 가치를
+[16장의 PoC](/agent-platform/16-adoption/)에서 증명해야 하는 kagent, AWS 쪽은 AgentCore.
+결정 B는 수요가 증명될 때까지 **"없음"으로 보류**한다. 보류의 비용과 재개 조건, 재개 시
+후보(Temporal·Dapr Agents)는 [12장](/agent-platform/12-durable-execution/)에 기록한다.
 
 ## 첫 설계 질문
 
@@ -133,13 +147,16 @@ runtime substrate에 걸치고, AgentCore에는 Identity와 Registry가 있으�
 
 ## 이 덱의 범위
 
-이 덱은 portal 화면을 구현하거나 kagent·Dapr·AgentCore 설치 명령을 나열하지 않는다. 대신 구현 전에 고정해야 할
+이 덱은 portal 화면을 구현하거나 kagent·AgentCore 설치 명령을 나열하지 않는다. 대신 구현 전에 고정해야 할
 domain model과 adapter contract를 만든다. 제품 장은 "무슨 기능이 있나"보다 그 계약에 어떻게 매핑되고
 어떤 의미는 매핑되지 않는지에 집중한다.
 
 ## 0장 요약
 
-- kagent·Dapr Agents·AgentCore는 사내 Agent 플랫폼 전체가 아니라 runtime/provider의 일부다.
+- kagent·AgentCore는 사내 Agent 플랫폼 전체가 아니라 runtime/provider의 일부다.
+- runtime 결정은 workload lifecycle(결정 A)과 execution durability(결정 B)로 나뉜다.
+  결정 A의 온프렘 기준선은 맨 Kubernetes 어댑터고 kagent는 그 대비 정당화가 필요한 기본 후보다.
+  결정 B는 보류하고 재개 조건을 12장에 기록한다.
 - 회사가 소유할 것은 `Agent`·`Version`·`Trigger`·`Grant`·`Deployment`의 의미다.
 - 구성형과 코드형 Agent는 검증 risk tier를 분리한다.
 - 배포 흐름과 호출 흐름은 같은 ID를 쓰지만 권한·실패·감사 경계가 다르다.

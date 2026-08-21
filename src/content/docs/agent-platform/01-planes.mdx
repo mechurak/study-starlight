@@ -19,7 +19,7 @@ import Thesis from '../../../components/docs/Thesis.astro';
 
 ## 네 plane의 전체 지도
 
-```d2 layout=elk pad=40 title="experience·control·runtime·foundation 네 plane이 위에서 아래로 쌓이고, 사람의 요청은 control의 catalog를 거쳐 runtime으로 내려가며, 세 runtime이 foundation의 identity·모델·tool·관측을 공유하는 지도"
+```d2 layout=elk pad=40 title="experience·control·runtime·foundation 네 plane이 위에서 아래로 쌓이고, 사람의 요청은 control의 catalog를 거쳐 runtime으로 내려가며, 두 runtime이 foundation의 identity·모델·tool·관측을 공유하는 지도"
 direction: down
 
 classes: {
@@ -67,7 +67,6 @@ ctrl: "Control plane — 회사 의미의 단일 원본" {
 
 run: "Runtime plane — 실행 backend" {
   kag: "kagent · Kubernetes" { class: ok }
-  dapr: "Dapr Agents · Workflow" { class: ok }
   acr: "AgentCore Runtime" { class: ok }
 }
 
@@ -81,7 +80,6 @@ base: "Foundation plane — 모든 runtime이 공유" {
 exp.creator -> ctrl.catalog: "등록 · version 제출"
 exp.market -> ctrl.catalog: "검색 · 호출"
 ctrl.recon -> run.kag
-ctrl.recon -> run.dapr
 ctrl.recon -> run.acr
 exp -> base.idp: "로그인 · group claim"
 run -> base.model: "모델 호출"
@@ -126,9 +124,10 @@ runtime은 image나 선언형 spec을 실제 process로 만들고 다음을 담�
 - runtime identity와 secret 주입
 - provider-native log·metric·trace
 
-kagent에서는 Kubernetes와 controller가 Agent resource를 workload로 맞춘다. Dapr Agents에서는 일반 app Pod와
-sidecar·Workflow·state store가 step 단위 복구를 맡는다. AgentCore에서는 AWS 관리형 runtime이 session별
-microVM과 version endpoint를 맡는다. 공통 interface는 같아도 lifecycle·복구·격리 단위의 의미는 다르다.
+kagent에서는 Kubernetes와 controller가 Agent resource를 workload로 맞춘다. AgentCore에서는 AWS 관리형
+runtime이 session별 microVM과 version endpoint를 맡는다. 공통 interface는 같아도 lifecycle·복구·격리
+단위의 의미는 다르다. step 단위 복구를 주는 durable execution 층은 이 plane에 아직 없다 —
+[보류한 결정](/agent-platform/12-durable-execution/)이라, 재개하면 같은 자리에 target 하나가 늘어난다.
 
 ## Foundation plane — 여러 runtime이 공유한다
 

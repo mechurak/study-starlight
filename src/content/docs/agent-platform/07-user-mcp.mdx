@@ -173,7 +173,6 @@ audit payload에 저장하지 않고 target별 secret store reference로 주입�
 | target | server 실행 | Agent가 보는 연결 | provider reference 예 |
 |---|---|---|---|
 | kagent + kmcp | `MCPServer`가 container workload를 관리 | `MCPServer` 또는 기존 endpoint의 `RemoteMCPServer` | cluster·namespace·name·UID |
-| Dapr on Kubernetes | 일반 Deployment·Service를 platform adapter가 관리 | Dapr `MCPServer` resource가 transport·auth·middleware를 선언 | cluster·namespace·resource name |
 | AgentCore | AgentCore Runtime 또는 별도 승인 환경에서 실행 | Gateway의 MCP server target과 capability sync | Gateway·target ARN |
 
 provider resource가 곧 회사의 `Tool`은 아니다. 같은 ToolVersion을 다른 target에 배포하면 `ToolDeployment.providerRef`만
@@ -212,8 +211,6 @@ Tool 운영 지표는 Agent 응답 성공률에 묻히지 않게 분리한다.
 
 - [kmcp MCP server 배포](https://kagent.dev/docs/kmcp/deploy/server/) — image·package에서 `MCPServer`와 workload를 만드는 흐름.
 - [kmcp `MCPServer` API](https://kagent.dev/docs/kmcp/reference/api-ref/) — resource·security context·ServiceAccount·status 조건.
-- [Dapr `MCPServer` resource](https://docs.dapr.io/developing-ai/mcp/mcp-server-resource/) — transport·auth·middleware와 durable tool connection.
-- [Dapr MCP security](https://docs.dapr.io/developing-ai/mcp/mcp-security/) — workload identity·access policy와 남는 신뢰 경계.
 - [AgentCore Gateway MCP server target](https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/gateway-target-MCPservers.html) — capability sync와 outbound authorization.
 
 <LinkCard

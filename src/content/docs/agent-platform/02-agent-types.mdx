@@ -32,7 +32,7 @@ import Thesis from '../../../components/docs/Thesis.astro';
 
 - 플랫폼은 Agent 종류를 **어떤 축으로 기록**해야 하나?
 - chatbot·copilot·autonomous agent 같은 **통용 이름**은 그 축의 어디에 대응되나?
-- 실행 어댑터로 쓸 kagent·Dapr Agents·AgentCore는 **각자 Agent를 어떻게 구분**하고,
+- 실행 어댑터로 검토한 kagent·Dapr Agents·AgentCore는 **각자 Agent를 어떻게 구분**하고,
   그 구분은 어느 축의 답인가?
 
 ## 여섯 개의 분류 축
@@ -264,8 +264,9 @@ Amazon Bedrock AgentCore에는 kagent의 `spec.type`이나 Dapr의 클래스처�
 container로 번역한다.
 
 각 제품이 왜 이렇게 답하는지, 답의 빈칸을 adapter가 어떻게 메우는지는
-[8~11장](/agent-platform/08-kagent-architecture/)·[12장](/agent-platform/12-dapr-agents/)·[13장](/agent-platform/13-agentcore/)에서
-확인한다.
+[8~11장](/agent-platform/08-kagent-architecture/)과 [13장](/agent-platform/13-agentcore/)에서 확인한다.
+Dapr Agents는 채택한 target이 아니라 [보류한 durable execution 층](/agent-platform/12-durable-execution/)의
+후보라서, 상태·복구 축(`DURABLE_WORKFLOW`)의 답도 그 결정이 재개될 때 실행 계약이 된다.
 
 ## 축은 domain 객체에 나눠 담는다
 

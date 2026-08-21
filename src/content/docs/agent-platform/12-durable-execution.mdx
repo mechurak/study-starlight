@@ -1,0 +1,200 @@
+---
+title: "12. 보류한 결정 — durable execution"
+description: durable execution 층을 지금 도입하지 않는 이유와 그 비용, 재개 조건, 재개 시 Temporal·Dapr Agents 비교 기준을 기록한다
+reviewedAt: 2026-08-21
+---
+
+import { LinkCard } from '@astrojs/starlight/components';
+import TermIntro from '../../../components/docs/TermIntro.astro';
+import Thesis from '../../../components/docs/Thesis.astro';
+
+<Thesis>durable execution 층은 지금 도입하지 않는다 — 수요가 acceptance test로 증명되면 그때 Temporal과 Dapr Agents를 비교한다</Thesis>
+
+<TermIntro
+  terms={[
+    ['durable execution', 'Durable Execution', 'process가 재시작돼도 기록된 실행 history에서 중단 지점부터 이어 가는 실행 방식이다.'],
+    ['activity', 'Workflow Activity', 'LLM·tool·외부 API처럼 비결정적 작업을 workflow가 예약하고 결과를 기록하는 실행 단위다.'],
+    ['보류한 결정', 'Deferred Decision', '지금 답하지 않되 재개 조건과 후보를 기록해 두는 설계 결정. 층의 삭제가 아니라 도입 시점의 유예다.'],
+  ]}
+/>
+
+## Runtime 결정은 둘로 나뉜다
+
+runtime을 고른다는 한 문장 안에는 서로 다른 결정 두 개가 들어 있다. 이 둘을 섞으면 "durable
+workflow가 필요할지 모르니 Dapr도 깔아 두자" 같은 선납이 생긴다.
+
+- **결정 A — workload lifecycle.** 누가 Pod를 만들고 살리고 호출 표면을 제공하는가.
+  온프렘의 기준선은 어댑터가 Deployment를 직접 만드는 맨 Kubernetes고, 기본 후보는
+  kagent([8~11장](/agent-platform/08-kagent-architecture/)), AWS 쪽은
+  AgentCore([13장](/agent-platform/13-agentcore/))다.
+- **결정 B — execution durability.** 중단된 다단계 실행을 누가 기록하고 이어 주는가.
+  이 장의 주제이고, 답은 **지금은 "없음"**이다.
+
+```d2 layout=elk pad=40 title="runtime 결정이 workload lifecycle과 execution durability로 나뉘고, 결정 A는 맨 Kubernetes를 기준선으로 kagent·AgentCore를 검증하며 결정 B는 없음으로 보류하되 재개 시 Temporal·Dapr Agents를 검토하는 구조"
+direction: right
+
+classes: {
+  key: {
+    style: {
+      fill: "#dbeafe"
+      stroke: "#2563eb"
+      font-color: "#1e3a8a"
+    }
+  }
+  ok: {
+    style: {
+      fill: "#dcfce7"
+      stroke: "#16a34a"
+      font-color: "#14532d"
+    }
+  }
+  mute: {
+    style: {
+      fill: "#f1f5f9"
+      stroke: "#94a3b8"
+      font-color: "#334155"
+    }
+  }
+  warn: {
+    style: {
+      fill: "#fef3c7"
+      stroke: "#d97706"
+      font-color: "#78350f"
+    }
+  }
+}
+
+rt: "runtime 결정" { class: key }
+
+a: "결정 A — workload lifecycle" {
+  k8s: "맨 Kubernetes\n기준선" { class: mute }
+  kag: "kagent" { class: ok }
+  acr: "AgentCore" { class: ok }
+}
+
+b: "결정 B — execution durability" {
+  none: "없음 (현재)" { class: warn }
+  cands: "재개 시 검토" {
+    tmp: "Temporal" { class: mute }
+    dapr: "Dapr Agents" { class: mute }
+  }
+  none -> cands: "재개 조건 충족 시" {
+    style.stroke-dash: 3
+  }
+}
+
+rt -> a: "채택"
+rt -> b: "보류"
+```
+
+두 결정은 독립이다. durable engine의 worker는 결국 컨테이너 안의 일반 process라서, 결정 B를 나중에
+재개해도 결정 A에서 고른 kagent BYO Pod나 어댑터가 만든 Deployment 위에 그대로 얹을 수 있다.
+반대로 어느 durable engine도 결정 A를 대신 풀어 주지 않는다 — Agent 전용 배포 control plane은
+Temporal에도 Dapr에도 없다.
+
+## 왜 보류하는가
+
+durable execution이 주는 것은 분명하다. LLM 판단·tool 호출을 activity 경계로 기록해 process가
+죽어도 완료된 step을 재사용하고, 며칠짜리 승인 대기를 중단된 workflow로 표현할 수 있다.
+그런데도 지금 도입하지 않는 이유는 두 가지다.
+
+첫째, **수요가 아직 없다.** step 단위 복구가 필요한 다단계 업무 Agent가 실제로 등록된 적이 없는
+상태에서 도입하면, 기반 비용을 선납하고 쓰임은 가정으로 남는다. 이 덱의 세 번째 축(최소
+공통분모로 깎지 않기)과 같은 논리로, 필요 없는 층을 미리 들이지도 않는다.
+
+둘째, **선납 비용이 크다.** Dapr 경로는 control plane 서비스들과 모든 Agent Pod의 sidecar,
+workflow state store를 함께 들여야 하고 Python runtime을 고정한다. Temporal 경로는 sidecar 없이
+server와 persistence DB만 운영하면 되어 더 가볍지만, 그래도 상시 운영할 별도 시스템이다.
+어느 쪽이든 "혹시 필요할지 모르니"로 정당화되지 않는다.
+
+## "없음"의 실행 계약
+
+보류는 공짜가 아니다. durable engine이 없는 동안 플랫폼은 다음 계약으로 버틴다.
+
+- **실패한 다단계 실행은 처음부터 재시도한다.** step 중간 결과를 재사용하지 않는다.
+  요청-응답형 대화 Agent에는 문제가 없고, 긴 pipeline일수록 재시도 비용이 커진다.
+- **장기 대기 업무는 중단된 workflow가 아니라 상태 + 재invocation으로 모델링한다.** 승인 대기나
+  외부 event를 기다리는 업무는 backend DB에 업무 상태를 기록하고, 승인 완료·event 도착이
+  [`Trigger`](/agent-platform/02-agent-types/#여섯-개의-분류-축)로 별도 invocation을 시작하는
+  모양으로 설계한다. Agent process가 기다리며 상주하지 않는다.
+- **tool idempotency는 그대로 필수다.** gateway retry와 처음부터 재시도 때문에 같은 tool 호출이
+  반복될 수 있다. 결제·승인·삭제 tool의 idempotency key와 업무 system의 중복 방지는
+  durable engine의 유무와 무관한 요구다.
+
+:::caution[at-least-once는 엔진이 없어도 존재한다]
+durable workflow를 빼면 exactly-once가 되는 것이 아니다. timeout 뒤 재시도, 사용자의 재요청,
+처음부터 재실행 모두 side effect를 중복시킬 수 있다. [5장의 tool action 경계](/agent-platform/05-authorization/)와
+idempotency 검증은 결정 B와 무관하게 유지한다.
+:::
+
+## 재개 조건
+
+보류한 결정에는 다시 여는 조건이 붙어야 한다. 다음 중 하나가 **실제 등록 수요와 acceptance
+test로** 확인되면 이 장을 다시 연다.
+
+- 실패 후 처음부터 재시도하는 비용(시간·token·업무 영향)이 수용 불가한 다단계 업무 Agent
+- 상태 + 재invocation 모델로 표현하기에 분기·보상 처리가 너무 복잡해진 장기 업무
+- step별 retry 정책과 실행 history 감사가 규제·감사 요구로 필요한 업무
+
+"있으면 좋겠다"는 재개 조건이 아니다. [16장의 결정 기록](/agent-platform/16-adoption/#결정-기록)과
+같은 방식으로, 어떤 Agent가 어떤 test를 통과하지 못해 재개하는지를 증거로 남긴다.
+
+## 재개 시 후보 — Temporal과 Dapr Agents
+
+| 비교 축 | Temporal | Dapr Agents on Kubernetes |
+|---|---|---|
+| 실행 모델 | workflow·activity를 SDK로 작성, worker는 일반 process | `DurableAgent`가 LLM·tool 호출을 Dapr Workflow로 기록 |
+| 새로 운영할 것 | server 서비스들 + persistence DB(Postgres 지원). sidecar 없음 | Dapr control plane·모든 Pod의 sidecar·workflow state store |
+| 언어 | Go·Java·TypeScript·Python 등 — 포털 backend(Node/TS)와 같은 언어 가능 | Python framework |
+| 라이선스 | server·SDK 모두 [MIT](https://github.com/temporalio/temporal/blob/main/LICENSE), self-host 상용 무료 | Apache 2.0 (CNCF) |
+| agent 통합 | [OpenAI Agents SDK 통합 GA](https://temporal.io/blog/announcing-openai-agents-sdk-integration) 등 framework 통합 제공 | framework 자체가 agent 전용 |
+| 결정 A에 주는 것 | 없음 — workload 배포는 여전히 어댑터 몫 | 없음 — 일반 Pod에 sidecar 주입, Agent CR/controller 없음 |
+
+이 환경 기준의 우선순위는 **Temporal이 1순위**다. sidecar 없이 침습성이 낮고, 포털 backend와
+같은 TypeScript SDK를 쓸 수 있으며, MIT라 사내 도입 검토에 걸리는 것이 없다. Dapr Agents는
+조직이 Dapr 운영 기반을 이미 표준으로 갖췄을 때만 우위가 생긴다 — 그 전제가 없으면 durable
+execution 하나를 얻기 위한 기반 선납이 너무 크다.
+
+재개 시 PoC는 어느 후보든 같은 것을 검증한다. process 재시작 뒤 같은 workflow instance가
+이어지는지, LLM·tool activity의 retry가 idempotency key와 함께 side effect를 중복시키지 않는지,
+HITL 승인 대기 상태가 재시작 뒤에도 유지되는지, workflow history와 대화 memory·업무 audit의
+보존 기간을 분리했는지다.
+
+## 어느 후보든 바뀌지 않는 것
+
+결정 B를 재개해도 이 덱의 구조는 그대로다.
+
+- durable engine은 **substrate지 Agent control plane이 아니다.** 등록·승인·ACL·catalog는
+  여전히 포털 backend가 소유한다.
+- [6장의 adapter contract](/agent-platform/06-adapter-contract/)는 바뀌지 않는다. durable target이
+  추가되면 secret·identity mapping 표에 column이 하나 늘어날 뿐 공통 의도 행은 그대로다.
+- [11장 kagent capability](/agent-platform/11-kagent-adapter/#capability-profile)의
+  `durableWorkflowState: unsupported`가 새 target에서 `supported`로 바뀌고, placement policy가
+  그 capability를 요구하는 Agent만 새 target으로 보낸다.
+- workload identity·mTLS 같은 Dapr의 부가 기능은 durable execution의 근거가 되지 못한다.
+  그 자리는 ServiceAccount·NetworkPolicy가 이미 맡고 있다.
+
+## 12장 요약
+
+- runtime 결정은 workload lifecycle(결정 A)과 execution durability(결정 B)로 나뉜다.
+  결정 A는 kagent·AgentCore로 답했고 결정 B는 보류한다.
+- 보류하는 동안 실패는 처음부터 재시도하고, 장기 대기 업무는 backend 상태 + Trigger 재invocation으로
+  모델링하며, tool idempotency는 그대로 강제한다.
+- 재개 조건은 실제 등록 수요와 acceptance test다. "있으면 좋겠다"로 재개하지 않는다.
+- 재개 시 1순위 후보는 Temporal(MIT·sidecar 없음·TS SDK), Dapr Agents는 Dapr 기반이 이미
+  표준일 때의 후보다. 어느 쪽도 Agent control plane을 주지 않는다.
+
+## 참고 자료
+
+- [Temporal server LICENSE](https://github.com/temporalio/temporal/blob/main/LICENSE) — server·SDK의 MIT 라이선스.
+- [Temporal self-hosted guide](https://docs.temporal.io/self-hosted-guide) — self-host 구성 요소와 persistence 선택.
+- [Temporal + OpenAI Agents SDK](https://docs.temporal.io/ai-cookbook/openai-agents-sdk-python) — agent 실행을 durable하게 만드는 통합.
+- [Dapr Agents 소개](https://docs.dapr.io/developing-ai/dapr-agents/dapr-agents-introduction/) — v1.0 상태와 durable execution·배포 성격.
+- [Dapr Workflow activity](https://docs.dapr.io/developing-applications/building-blocks/workflow/workflow-features-concepts/) — at-least-once와 idempotency 요구.
+- [Dapr sidecar](https://docs.dapr.io/concepts/dapr-services/sidecar/) — Kubernetes annotation 기반 sidecar 주입과 운영 기반.
+
+<LinkCard
+  title="13. AgentCore adapter"
+  description="같은 계약을 AWS 관리형 session runtime과 VPC·PrivateLink·JWT 경계로 번역한다."
+  href="/agent-platform/13-agentcore/"
+/>

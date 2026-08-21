@@ -67,7 +67,6 @@ synthetic test는 허용 사용자·금지 사용자·read tool·거부될 write
 | catalog에는 있는데 403 | Grant, group claim, publication | provider를 재시작 |
 | deploy가 `UNKNOWN` | provider API·credential·network | 새 resource를 중복 생성 |
 | kagent Agent ready, invoke 실패 | route·A2A endpoint·gateway auth | Pod 수만 증가 |
-| Dapr workflow가 멈춤 | sidecar·Scheduler·workflow state store | 새 workflow instance를 중복 시작 |
 | AgentCore cold start 지연 | session ID 재사용·lifecycle·image init | 모든 timeout을 크게 증가 |
 | tool 403 | user delegation·Cedar/OPA decision | Agent에 admin token 지급 |
 | 응답은 성공, audit 유실 | OTel/SIEM pipeline·backpressure | 정상 처리로 종결 |
@@ -75,8 +74,7 @@ synthetic test는 허용 사용자·금지 사용자·read tool·거부될 write
 
 ## Capacity와 quota
 
-kagent target은 cluster CPU·memory·Pod·DB와 local model capacity를 계산한다. Dapr Agents target은 app Pod와
-sidecar, Scheduler, workflow state store의 처리량·보존량을 함께 본다. AgentCore target은 service quota,
+kagent target은 cluster CPU·memory·Pod·DB와 local model capacity를 계산한다. AgentCore target은 service quota,
 concurrent session, cold start, VPC ENI와 사용량 비용을 본다. 공통 dashboard에는 Agent별 invocation과 cost를
 정규화하되 provider bill의 단위를 억지로 하나로 만들지 않는다.
 
@@ -85,7 +83,7 @@ concurrent session, cold start, VPC ENI와 사용량 비용을 본다. 공통 da
 
 ## Upgrade와 drift
 
-adapter release, kagent CRD/controller, Dapr runtime·Agents SDK, AgentCore API contract를 Agent version과 분리해
+adapter release, kagent CRD/controller, AgentCore API contract를 Agent version과 분리해
 관리한다. provider upgrade는 대표 canary Agent set으로 다음을 회귀 검증한다.
 
 - streaming과 long session

@@ -5,11 +5,13 @@
 ## 이 덱의 한 문장
 
 사내 Agent 플랫폼의 오래가는 자산은 특정 runtime의 CRD나 API가 아니라 **Agent·Tool·Version·Trigger·Grant·Deployment의
-제품 중립 계약**이다. kagent, Dapr Agents on Kubernetes, Amazon Bedrock AgentCore는 이 계약을 실행 상태로
-바꾸는 서로 다른 배포 어댑터다.
+제품 중립 계약**이다. kagent와 Amazon Bedrock AgentCore는 이 계약을 실행 상태로 바꾸는 서로 다른 배포
+어댑터다. durable execution 층은 필요가 acceptance test로 증명될 때까지 **보류한 결정**이며,
+재개 시 Temporal과 Dapr Agents on Kubernetes를 비교한다.
 
 ```text
-임직원 → 사내 포털·ACL·승인 → 제품 중립 Agent 계약 → Runtime Adapter → kagent | Dapr Agents | AgentCore
+임직원 → 사내 포털·ACL·승인 → 제품 중립 Agent 계약 → Runtime Adapter → kagent | AgentCore
+(durable execution 층은 보류 — 재개 시 Temporal | Dapr Agents 검토)
 ```
 
 ## 기준 환경
@@ -19,14 +21,15 @@
 - 온프렘 Kubernetes가 있고, AWS VPC를 사내망의 신뢰 가능한 확장으로 사용할 가능성이 있다.
 - Agent는 prompt·knowledge·승인된 MCP를 조합한 구성형과, 컨테이너로 배포하는 코드형을 모두 포함한다.
 - 사내 Keycloak 또는 Entra ID가 사용자와 부서 group의 단일 원본이다.
-- 사내 포털의 frontend와 backend(Node/TypeScript)가 같은 온프렘 cluster에 이미 떠 있다. 10장의 연결
+- 사내 포털의 frontend와 backend(Node/TypeScript)가 같은 온프렘 cluster에 이미 떠 있다. Agent의
+  등록·승인·접근 제어는 이 backend가 소유하고, 이슈로 남는 것은 runtime이다. 10장의 연결
   설계는 이 스택을 전제로 쓴다. 사용자에게 kubeconfig를 주지 않는다.
 
 ## 범위 경계
 
 - **다룬다:** 포털과 runtime의 경계, 제품 중립 domain model, Agent 분류 축과 trigger, Agent·사용자 제작 MCP의
   등록·승인·배포 lifecycle, 세 단계 권한, adapter contract, kagent(아키텍처·resource·사내 연결·adapter 4장),
-  Dapr Agents, AgentCore, hybrid target 선택, 운영·도입 검증.
+  보류한 durable execution 층(재개 조건과 Temporal·Dapr Agents 후보), AgentCore, hybrid target 선택, 운영·도입 검증.
 - **다루지 않는다:** Agent framework 사용법, prompt engineering, 모델 학습·평가, GPU 모델 서빙 상세,
   MCP 서버 구현 튜토리얼, Kubernetes 설치, AWS 계정·VPC 구축 절차.
 - 모델 API 입구는 [LiteLLM 덱](/litellm/), LLM trace와 평가는 [Langfuse 덱](/langfuse/),
@@ -53,9 +56,17 @@ Agent의 정체성이나 ACL 변경이 아니라 Deployment 변경이다.
 request·schedule·event는 활성화 방식이며, resident·suspendable·ephemeral은 process 상주 방식이다.
 state·격리·행위 위험도 별도 축으로 기록하고 target capability와 policy로 유효한 조합을 고른다.
 
+다섯 번째 축은 **runtime 결정을 둘로 나눈다**다. 누가 workload를 만들고 살리고 호출 표면을 제공하는가
+(결정 A — workload lifecycle)와 중단된 다단계 실행을 누가 이어 주는가(결정 B — execution durability)는
+서로 다른 결정이다. 결정 A의 온프렘 기본 후보는 kagent, AWS는 AgentCore다. 다만 kagent는 확정이 아니라
+**어댑터가 Deployment를 직접 만드는 맨 Kubernetes를 기준선(영가설)으로 두고 검증하는 후보**다 —
+기준선 대비 남는 가치(구성형 engine 등)를 PoC에서 증명하지 못하면 온프렘 답은 맨 Kubernetes 어댑터다.
+결정 B는 수요가 acceptance test로 확인될 때까지 "없음"으로 둔다. 보류가 층의 삭제로 읽히지 않도록
+재개 조건과 후보 비교를 12장에 기록한다.
+
 ## 기준 시점과 확인한 사실
 
-**2026년 8월 19일** 기준으로 공식 문서를 확인했다. 아래 상태는 변화가 빠르므로 수정할 때 원문을 다시 본다.
+**2026년 8월 21일** 기준으로 공식 문서를 확인했다. 아래 상태는 변화가 빠르므로 수정할 때 원문을 다시 본다.
 
 | 항목 | 확인한 사실 | 공식 출처 |
 |---|---|---|
@@ -71,6 +82,9 @@ state·격리·행위 위험도 별도 축으로 기록하고 target capability�
 | Dapr 배포 | 일반 application Pod에 sidecar를 주입한다. Agent 전용 CR/controller lifecycle은 platform adapter가 보완 | Dapr sidecar docs |
 | Dapr 권한 | App ID별 SPIFFE workload identity·mTLS와 MCP access policy 제공. 임직원 invoke ACL과는 다른 층 | Dapr MCP security docs |
 | Dapr activity | at-least-once 실행이므로 side-effect tool은 idempotency가 필요 | Dapr Workflow activity docs |
+| Temporal 라이선스 | Temporal server와 공식 SDK(Go·Java·TypeScript·Python 등)는 MIT. self-host 상용 사용에 라이선스 비용·제한 없음. Temporal Cloud는 별도 유료 관리형 (2026-08-21 확인) | temporalio/temporal LICENSE, Temporal community forum |
+| Temporal 운영 형태 | sidecar 없이 server 서비스들과 persistence DB(Postgres 지원)를 운영. workflow worker는 일반 application process (2026-08-21 확인) | Temporal self-hosted guide |
+| Temporal agent 통합 | OpenAI Agents SDK 통합이 public preview를 거쳐 2026-03-23 GA. Vercel AI SDK 통합도 제공 (2026-08-21 확인) | Temporal blog, AI cookbook |
 | AgentCore Runtime | 임의 framework·model을 지원하는 AWS 관리형 runtime. HTTP·MCP·A2A·AG-UI contract 제공 | AgentCore Runtime docs |
 | AgentCore 격리 | runtime session별 전용 microVM. user와 session ID 매핑은 client backend 책임 | AgentCore session docs |
 | AgentCore private network | VPC ENI와 PrivateLink를 지원하고 VPC에 연결된 온프렘 private resource 접근 가능 | AgentCore VPC docs |
@@ -84,6 +98,11 @@ state·격리·행위 위험도 별도 축으로 기록하고 target capability�
 - kagent dashboard를 최종 사용자 화면으로 쓰지 않는다. 자체 포털을 만들면 dashboard는 운영자 콘솔로 남는다.
 - backend가 kagent에 말을 거는 지점은 CRD다. dashboard의 내부 HTTP API나 CLI shell 실행을 계약으로 쓰지 않는다.
 - Kubernetes를 데이터베이스로 쓰지 않는다. 정체성·version·Grant·감사는 포털 DB가 원본이고 실행 상태만 cluster가 원본이다.
+- durable execution 층은 채택된 구성 요소가 아니라 **보류한 결정(결정 B)**으로 쓴다. kagent·AgentCore와
+  나란한 세 번째 어댑터로 나열하지 않고, 상세·재개 조건·후보 비교는 12장에만 둔다.
+- kagent를 확정된 결정처럼 쓰지 않는다. 온프렘 결정 A의 기준선은 맨 Kubernetes 어댑터이고,
+  kagent는 그 기준선 대비 정당화를 PoC에서 통과해야 하는 기본 후보다.
+- Temporal을 이미 도입한 것처럼 쓰지 않는다. 결정 B 재개 시 1순위로 검토할 후보다.
 - Dapr Agents를 kagent와 완전히 같은 제품군으로 쓰지 않는다. 전자는 code-first durable framework/substrate,
   후자는 Agent CR 중심 Kubernetes control plane이다.
 - Dapr App ID·SPIFFE identity를 임직원 identity로 설명하지 않는다. workload 간 인증·인가 경계다.
