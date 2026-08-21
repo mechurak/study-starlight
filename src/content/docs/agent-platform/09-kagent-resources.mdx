@@ -173,6 +173,22 @@ container skill은 **외부 code를 Agent 안으로 끌어오는 경로**다. �
 직접 넣게 두면 [4장의 공급망 검사](/agent-platform/04-lifecycle/#자동-검사는-위험별로-나눈다)를 우회하는 문이 된다.
 포털에서는 승인된 registry로 제한하고 OCI digest나 Git commit SHA로 고정하는 것이 기본이다.
 
+:::caution[함정 — skill image는 실행 환경이 아니라 파일 묶음이다]
+image로 왔다고 해서 skill이 자기 실행 환경을 함께 가져오지는 않는다.
+[Add skills to agents 예제](https://kagent.dev/docs/kagent/examples/skills/)에서 Agent가 시작하면 kagent는
+init container로 skill image를 받아 파일만 Agent container의 `/skills`에 풀고, 실제 실행은 Agent container의
+runtime과 함께 등록되는 `bash`·file tool이 맡는다. 예제의 skill `Dockerfile`이 base image 없이
+`FROM scratch`인 이유이기도 하다.
+
+그래서 skill에 Python script를 넣고 `requirements.txt`를 같이 담아도 그 패키지는 설치되지 않는다.
+**의존성은 skill이 아니라 Agent image 쪽에 있어야 한다.** 빠지면 `ModuleNotFoundError`가 tool 출력으로
+돌아오는데, Agent는 거기서 멈추지 않고 스스로 우회한다. script를 포기하고 결과를 직접 만들어 내면
+겉보기에는 성공이지만 검증된 code로 처리하려던 보장은 사라진다.
+
+포털에서는 skill 등록 schema에 **필요 runtime과 package를 명시 항목으로 두고** 승인 단계에서 대상 Agent
+image와 대조한다. skill 작성 쪽에서는 표준 library만 쓰는 무의존 script를 기본으로 삼는다.
+:::
+
 ## 사람이 개입하는 지점 — HITL
 
 kagent는 두 가지 개입 수단을 준다.
