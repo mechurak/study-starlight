@@ -52,6 +52,8 @@ Cloudflare Pages의 얇은 checkout에서는 HEAD가 실질적인 root commit으
 
 ## 왜 `PNPM_VERSION`을 박아야 하나
 
+아래는 **2026-08에 확인한 것**이다 — Cloudflare 빌드 이미지의 기본값은 바뀔 수 있다.
+
 - `pnpm-workspace.yaml`의 **`allowBuilds`는 pnpm 10.26.0에서 들어온 문법**인데
   (그 전에는 `onlyBuiltDependencies`),
   Cloudflare v3 빌드 이미지의 기본 pnpm은 **10.11.1** 이다 → 필드를 무시하고

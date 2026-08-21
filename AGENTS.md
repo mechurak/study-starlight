@@ -30,6 +30,8 @@ dev 서버는 백그라운드 모드로 띄운다: `astro dev --background`
 
 `src/data/decks.mjs`의 `termIntroDeckSlugs`에 등록된 덱의 **학습 본문 장**은 첫머리에
 `<TermIntro>`를 둔다. `index`, `*-glossary`, `*-wrapup`은 제외한다.
+**새 학습 덱은 만들 때 여기에 등록한다.** 실습·문제풀이 위주 덱(cka-udemy, kagent-lab 같은)은
+등록하지 않고, 이 규칙 도입 전의 덱 일부도 빠져 있다.
 형식은 `src/components/docs/TermIntro.astro` 머리 주석에 있다.
 
 ## 절대 깨뜨리면 안 되는 것

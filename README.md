@@ -50,12 +50,14 @@ pnpm preview
 ## 새 덱 추가
 
 1. `src/content/docs/<덱이름>/` 에 `index.mdx`(개요)와 본문 페이지를 만든다
-2. `src/data/decks.mjs`에 덱 메타데이터와 사이드바 그룹·slug를 추가한다
-3. `pnpm check`로 manifest와 실제 파일이 맞는지 확인한다
+2. 덱 폴더에 `_baseline.md`를 만들어 기준 버전·서술 규칙·범위 경계를 적는다 — 거의 모든
+   덱이 갖고 있는 표준 관행이다 ([AGENTS.md](AGENTS.md)의 "덱" 절 참고.
+   `_`로 시작하는 파일이라 빌드에는 안 잡힌다)
+3. `src/data/decks.mjs`에 덱 메타데이터와 사이드바 그룹·slug를 추가한다.
+   학습 덱이면 `termIntroDeckSlugs`에도 등록한다 (기준은 AGENTS.md의 "덱" 절)
+4. `pnpm check`로 manifest와 실제 파일이 맞는지 확인한다
 
-README나 AGENTS.md는 고칠 필요가 없다 — 덱에 특별한 규칙·기준이 생기면
-그 덱 폴더에 `_baseline.md`를 만들어 적는다 ([AGENTS.md](AGENTS.md)의 "덱" 절 참고.
-`_`로 시작하는 파일이라 빌드에는 안 잡힌다).
+README나 AGENTS.md는 고칠 필요가 없다 — 덱별 규칙은 전부 그 덱의 `_baseline.md`에 둔다.
 
 ## 더 읽을 것
 
@@ -66,4 +68,4 @@ README나 AGENTS.md는 고칠 필요가 없다 — 덱에 특별한 규칙·기�
 | [docs/verification.md](docs/verification.md) | 자동 검사와 변경별 브라우저 검증 |
 | [docs/starlight-changes.md](docs/starlight-changes.md) | 기본 Starlight에서 바꾼 것 전체 목록 — 업그레이드 전에 볼 것 |
 | [docs/deploy.md](docs/deploy.md) | Cloudflare Pages 연동, `PNPM_VERSION`, 도메인 변경 |
-| `src/content/docs/<덱>/_baseline.md` | 덱별 기준·규칙 — 있으면 그 덱을 고치기 전에 읽는다 (cka: 커리큘럼·버전, shadcn: 서술 규칙, server: Ubuntu 24.04 고정) |
+| `src/content/docs/<덱>/_baseline.md` | 덱별 기준 버전·서술 규칙·범위 경계 — 거의 모든 덱에 있고, 그 덱을 고치기 전에 반드시 먼저 읽는다 |

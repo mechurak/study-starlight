@@ -157,6 +157,7 @@ src/components/
 | `<Badge>` | 성숙도·deprecated·기본값·시험 비중 같은 짧은 상태 |
 | `<DeckMap>` | 덱 index의 “구성” 절 — 덱마다 하나 |
 | `<SourceFigure>` | 공식 문서 등 외부 이미지 — 읽을 지점·대체 텍스트·원문 출처 포함 |
+| `<ExternalLink>` | 새 탭에서 열어야 하는 외부 링크 — 기본은 일반 마크다운 링크 |
 | D2 | 새 다이어그램의 기본값 — 관계도, 시퀀스, 상태, 아키텍처, 흐름 |
 | Mermaid | 기존 Mermaid 다이어그램의 수정, D2 미지원 타입(timeline 등) |
 
@@ -164,7 +165,7 @@ src/components/
 두지 말고 `<Tabs syncKey="operating-system">`로 동기화한다. 독자가 한 번 자기 OS를 고르면
 페이지의(그리고 다른 페이지의) 모든 그룹이 함께 전환된다. 동기화되는 모든 그룹의 `<TabItem>`
 label은 정확히 `macOS`, `Ubuntu`로 맞춘다 — label이 다르면 동기화가 깨진다.
-실제 사용 예는 `src/content/docs/lab-environment/01-kind.mdx`에 있다(한 페이지에서 다섯 번 동기화).
+실제 사용 예는 `src/content/docs/lab-environment/01-kind.mdx`에 있다.
 
 `<FileTree>`는 `- 경로/` 뒤에 설명을 이어 쓰면 주석으로 표시된다. 중요한 파일은 `**굵게**` 한다.
 

@@ -6,7 +6,8 @@
 pnpm check
 ```
 
-`check:content`가 manifest 등록, 프론트매터, h4, 덱 index 컴포넌트, 필수 `TermIntro`를 검사하고,
+`check:content`가 manifest 등록과 중복(slug·topicOrder), 프론트매터, h4, 미지원 펜스 언어
+(promql·logql·traceql → `text`), 덱 index 컴포넌트, 필수 `TermIntro`를 검사하고,
 이어서 Astro 빌드와 Pagefind 인덱스 생성을 확인한다.
 
 ## 변경별 브라우저 검증
