@@ -439,9 +439,10 @@ export const deckDefinitions = [
 					'agent-platform/11-kagent-adapter',
 				],
 			],
-			['보류한 결정과 AWS 어댑터', ['agent-platform/12-durable-execution', 'agent-platform/13-agentcore']],
+			['보류한 결정', ['agent-platform/12-durable-execution']],
+			['AWS 실행 어댑터', ['agent-platform/13-agentcore']],
 			['하이브리드 운영', ['agent-platform/14-hybrid', 'agent-platform/15-operations']],
-			['도입과 마무리', ['agent-platform/16-adoption', 'agent-platform/17-wrapup']],
+			['도입과 마무리', ['agent-platform/16-adoption', 'agent-platform/reference-glossary', 'agent-platform/17-wrapup']],
 		],
 	},
 	{

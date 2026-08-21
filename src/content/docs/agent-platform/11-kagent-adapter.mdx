@@ -1,6 +1,6 @@
 ---
 title: "11. kagent adapter 운영과 경계"
-description: 공통 배포 계약을 kagent resource에 매핑하고 capability·인가 빈칸·격리·공급망으로 남는 위험을 드러낸다
+description: 맨 Kubernetes 기준선과 kagent를 같은 배포 계약에 매핑하고 capability·운영비·인가·격리 차이를 검증한다
 aliases: [kagent adapter, kagent capability, kagent 격리, kagent 공급망]
 reviewedAt: 2026-08-21
 ---
@@ -9,7 +9,7 @@ import { LinkCard } from '@astrojs/starlight/components';
 import TermIntro from '../../../components/docs/TermIntro.astro';
 import Thesis from '../../../components/docs/Thesis.astro';
 
-<Thesis>kagent는 Kubernetes 안의 Agent lifecycle을 표준화하지만 회사의 catalog와 entitlement를 소유하지 않는다</Thesis>
+<Thesis>kagent는 맨 Kubernetes 기준선보다 구성형 runner와 선언 lifecycle의 비용을 실제로 줄일 때만 채택할 가치가 있다</Thesis>
 
 <TermIntro
   terms={[
@@ -28,6 +28,7 @@ import Thesis from '../../../components/docs/Thesis.astro';
 | 공통 객체 | kagent/Kubernetes 표현 |
 |---|---|
 | `AgentVersion` | immutable image digest 또는 선언형 `Agent.spec` snapshot |
+| `KnowledgeBinding` | versioned retrieval config와 index endpoint reference |
 | `Trigger` | 외부 scheduler·event consumer와 A2A invoke 설정 |
 | `DeploymentTarget` | cluster, namespace, ServiceAccount, node/security preset |
 | `Deployment` | namespaced `Agent` resource와 생성된 workload |
@@ -37,6 +38,40 @@ import Thesis from '../../../components/docs/Thesis.astro';
 
 `Grant`와 `Publication`은 kagent resource에 억지로 넣지 않는다. portal API가 invoke 전 ACL을 검사하고,
 외부 route는 승인된 publication만 kagent A2A endpoint로 연결한다.
+
+## 맨 Kubernetes 기준선
+
+영가설은 제품이 없는 상태가 아니라 **KubernetesAdapter가 같은 공통 계약을 직접 구현하는 최소 운영안**이다.
+그래야 kagent를 썼을 때 무엇이 사라지고 무엇이 새로 생기는지 측정할 수 있다.
+
+| 공통 계약 | 맨 Kubernetes 구현 | 회사가 소유할 부분 |
+|---|---|---|
+| 코드형 `AgentVersion` | immutable image digest의 Deployment·Service | A2A/HTTP conformance, manifest 생성, health 정규화 |
+| 구성형 `AgentVersion` | 회사 표준 runner image + immutable prompt/model/tool/knowledge config | reasoning loop와 streaming·HITL·session runner |
+| `Trigger.REQUEST` | stable gateway가 Service endpoint 호출 | ACL, session binding, streaming proxy |
+| `Trigger.SCHEDULE` | CronJob이 stable invoke API를 호출하거나 승인된 Job 생성 | timezone·중복·retry·service principal |
+| `Trigger.EVENT` | queue consumer가 stable invoke API를 호출 | schema·deduplication·acknowledgment |
+| `ToolBinding` | runner config + tool gateway·NetworkPolicy | MCP client, allowlist, OBO/action policy |
+| `KnowledgeBinding` | runner retrieval config + versioned index endpoint | ingestion·ACL filter·citation·index lifecycle |
+| `Deployment` | server-side apply한 Deployment·Service·HPA/Job | reconciler, informer, drift·error 번역 |
+| session·memory | 외부 store와 runner library | ownership, retention, portability |
+
+baseline adapter도 [6장의 contract test](/agent-platform/06-adapter-contract/#contract-test)를 모두 통과해야 한다.
+Kubernetes가 replica와 rollout을 맡아도 구성형 engine, A2A surface, tool event, session store와 사용자용 오류
+번역은 제공하지 않는다. 이것이 직접 구축 비용이다.
+
+kagent challenger는 같은 fixture로 다음 차이만 증명한다.
+
+| 판단 항목 | 기준선 비용 | kagent가 줄여야 할 비용 | 새로 생기는 비용 |
+|---|---|---|---|
+| 구성형 Agent | runner 개발·version 호환·HITL stream | 내장 engine과 선언형 spec으로 대체 | engine·CRD upgrade와 Postgres 운영 |
+| model·tool wiring | 회사 manifest와 client 구현 | ModelConfig·MCP reference 제공 | kagent schema와 controller 의존 |
+| lifecycle | adapter가 workload 직접 reconcile | Agent condition과 controller 제공 | condition 정규화와 controller 장애 대응 |
+| 코드형 Agent | Deployment·Service 생성 | BYO A2A template·일관된 resource 제공 | 기준선과 기능 격차가 작을 수 있음 |
+| suspend·workspace | 별도 sandbox control plane | SandboxAgent·AgentHarness 제공 | Agent Substrate·snapshot 인프라 |
+
+PoC decision record에는 기능 유무가 아니라 개발·운영 시간, upgrade rehearsal, 장애 복구와 실제 사용 Agent 수를
+남긴다. 구성형 engine이나 suspend/workspace를 사용하지 않는다면 kagent를 유지할 근거가 약하다.
 
 ## Capability profile
 
@@ -50,17 +85,19 @@ capabilities:
   residency: [resident, suspendable] # Agent · SandboxAgent
   ephemeralJob: manual # Job 직접 구성은 kagent 모델 밖
   scheduledInvoke: external # CronJob·Argo가 A2A invoke
-  durableWorkflowState: unsupported
   persistentFilesystem: agent-harness
+  workloadExtensions:
+    sidecarInjection: supported
+    longLivedWorker: supported
 ```
 
-`durableWorkflowState: unsupported`는 깎여 나간 기능이 아니라 [보류한 결정 B](/agent-platform/12-durable-execution/)를
-capability로 정직하게 드러낸 것이다. 승인 대기가 며칠 걸리거나 중단 지점부터 이어져야 하는 Agent 수요가
-확인되면 target을 바꾸는 것이 아니라 12장의 재개 조건을 연다.
+durable recovery 보장은 이 target profile에 넣지 않는다. 승인 대기가 며칠 걸리거나 중단 지점부터 이어져야 하는
+수요가 확인되면 target을 바꾸는 대신 [보류한 결정 B](/agent-platform/12-durable-execution/)를 열고 별도
+`ExecutionProfile`을 조합한다. 이때 target capability는 그 profile에 필요한 sidecar·worker 배치가 가능한지만 답한다.
 
 ## 인증과 인가의 빈칸
 
-kagent v0.9는 oauth2-proxy 기반 OIDC 인증을 지원하지만 공식 release note는 **access control이 아직 구현되지
+kagent v0.9.9 검토 기준으로 oauth2-proxy 기반 OIDC 인증을 지원하지만 공식 release note는 **access control이 아직 구현되지
 않았다**고 명시한다. 로그인한 사용자의 identity를 안다는 것과 Agent별 실행·수정 권한을 판단하는 것은 다르다.
 
 Kubernetes RBAC도 직접적인 답은 아니다. 이것은 creator나 controller가 Kubernetes API의 `Agent` resource를
@@ -94,7 +131,7 @@ container skill의 OCI·Git 참조, MCP server image, BYO image가 모두 code �
 4. `Agent` resource를 server-side apply한다.
 5. condition과 실제 Pod·Service health를 함께 읽어 normalized status로 바꾼다.
 6. synthetic invoke와 ACL deny test 뒤 portal publication을 연다.
-7. rollback은 이전 version의 별도 resource로 route를 돌린다.
+7. 이전 version은 별도 resource로 `READY`까지 만들고, platform core가 publication pointer를 돌린다.
 
 CR spec을 제자리에서 덮어써 이전 version의 조사 가능성을 없애지 않는다.
 
@@ -119,6 +156,8 @@ engine과 선언형 lifecycle이고, 이 가치가 실제로 쓰이는지는
 ## 11장 요약
 
 - `Grant`·`Publication`은 kagent resource에 넣지 않고 portal이 소유한다.
+- 맨 Kubernetes 기준선은 구성형 runner·A2A·session·reconciler를 회사가 직접 소유하는 실제 구현안이다.
+- kagent는 같은 contract test에서 구성형 engine·선언 lifecycle·sandbox의 순가치를 증명해야 한다.
 - 표현하지 못하는 실행 성격은 깎지 말고 capability로 선언한다.
 - OIDC 인증이 있다는 것과 Agent별 권한 판단은 다른 문제다.
 - image·skill·MCP server가 모두 공급망 입구이므로 같은 검사를 받는다.
@@ -130,6 +169,8 @@ engine과 선언형 lifecycle이고, 이 가치가 실제로 쓰이는지는
 - [운영 고려사항](https://kagent.dev/docs/kagent/operations/operational-considerations) — HA, secret, security context
 - [kagent BYO Agent](https://kagent.dev/docs/kagent/examples/a2a-byo) — image와 A2A runtime 계약
 - [kagent 실습 덱 7장](/kagent-lab/07-byo-agent/) — BYO image를 kind cluster에 올려 보기
+- [Kubernetes Deployments](https://kubernetes.io/docs/concepts/workloads/controllers/deployment/) — 기준선 adapter가 직접 만드는 workload lifecycle.
+- [Kubernetes Server-Side Apply](https://kubernetes.io/docs/reference/using-api/server-side-apply/) — 기준선과 kagent adapter가 공유하는 idempotent apply 기반.
 
 <LinkCard
   title="12. 보류한 결정 — durable execution"

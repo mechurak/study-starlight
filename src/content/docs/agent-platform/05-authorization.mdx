@@ -15,6 +15,7 @@ import Thesis from '../../../components/docs/Thesis.astro';
     ['authorization', 'Authorization', '검증된 principal이 특정 resource에 action을 해도 되는지 판단하는 것.'],
     ['OBO', 'On-Behalf-Of', 'Agent가 공용 service 계정이 아니라 현재 사용자의 위임 권한으로 downstream을 호출하는 방식이다.'],
     ['PEP', 'Policy Enforcement Point', '정책 결정을 실제 요청에 강제하는 지점. portal API, runtime ingress, tool gateway가 예다.'],
+    ['principal key', 'Principal Key', 'issuer와 subject를 정규화해 만든 사내 불변 ID. email이나 bare sub를 ACL key로 쓰지 않는다.'],
   ]}
 />
 
@@ -43,13 +44,16 @@ flowchart LR
 
 ## Principal과 Grant
 
-IdP에서 사용자와 부서 group을 가져오되 ACL에는 불변 ID를 저장한다.
+IdP에서 사용자와 부서 group을 가져오되 ACL에는 issuer 범위가 포함된 불변 ID를 저장한다.
+[OpenID Connect Core](https://openid.net/specs/openid-connect-core-1_0-18.html#ClaimStability)는 `(iss, sub)`만
+안정적인 사용자 식별자로 보장한다. bare `sub`만 저장하면 다른 realm·tenant의 동명 subject가 충돌할 수 있다.
 
 ```text
-principalType: USER | GROUP | WORKLOAD
-principalId:   IdP sub 또는 object ID
-display:       kim@example.com | Finance
-role:          INVOKER | EDITOR | OWNER
+principalType:     USER | GROUP | WORKLOAD
+principalKey:      사내 정규화 ID
+identityProvider:  issuer + subject | tenantId + objectId
+display:           kim@example.com | Finance
+role:              INVOKER | EDITOR | OWNER
 ```
 
 group membership은 로그인 때만 복사해 오래 cache하지 않는다. 조직 변경이 빠르게 반영돼야 하는 Agent는 token
@@ -73,7 +77,7 @@ provider에는 "이 portal 또는 이 group claim만 호출" 같은 거친 경�
 ## Session은 권한 객체다
 
 session ID를 클라이언트가 자유롭게 정하게 하면 다른 사용자의 context를 재사용할 수 있다. control plane은
-`(principalId, agentId, conversationId, backendSessionId)` 관계를 보관하고 매 요청마다 소유권을 검사한다.
+`(principalKey, agentId, conversationId, backendSessionId)` 관계를 보관하고 매 요청마다 소유권을 검사한다.
 
 AgentCore도 session별 microVM을 격리하지만 user와 session ID의 관계는 client backend 책임이라고 명시한다.
 kagent에서도 memory·conversation store의 조회 key에 verified principal을 포함해야 한다.
@@ -120,7 +124,7 @@ reference로 선언하고 target별 secret store에서 주입한다.
 ## 5장 요약
 
 - 관리·호출·tool action 권한은 서로 다른 문이다.
-- email은 표시값이고 ACL key는 IdP의 불변 ID다.
+- email은 표시값이고 ACL key는 OIDC `(iss, sub)` 또는 Entra `(tenantId, objectId)`에서 만든 principal key다.
 - session ID 소유권은 portal backend가 강제한다.
 - Agent의 판단이 아니라 gateway의 deterministic policy가 업무 action을 허용한다.
 

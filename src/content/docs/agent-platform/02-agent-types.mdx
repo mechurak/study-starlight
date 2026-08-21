@@ -1,6 +1,6 @@
 ---
-title: "2. Agent 종류는 여섯 축으로 나눈다"
-description: chatbot·copilot 같은 통용 이름과 kagent·Dapr Agents·AgentCore의 Agent 분류를 카탈로그가 기록할 여섯 축으로 번역한다
+title: "2. Agent 종류는 여섯 차원으로 나눈다"
+description: chatbot·copilot 같은 통용 이름과 kagent·Dapr Agents·AgentCore의 Agent 분류를 카탈로그가 기록할 여섯 요구 차원으로 번역한다
 aliases: [Agent 종류, Agent 분류, agent taxonomy, agent type]
 reviewedAt: 2026-08-21
 ---
@@ -9,13 +9,13 @@ import { LinkCard } from '@astrojs/starlight/components';
 import TermIntro from '../../../components/docs/TermIntro.astro';
 import Thesis from '../../../components/docs/Thesis.astro';
 
-<Thesis>Agent 종류는 한 단어가 아니라 여섯 개의 독립 축의 조합이고, 제품의 분류는 그 축의 부분 답이다</Thesis>
+<Thesis>Agent 종류는 한 enum이 아니라 여섯 요구 차원의 조합이고, 함께 성립할 수 있는 값은 set과 구조체로 기록한다</Thesis>
 
 <TermIntro
   terms={[
-    ['분류 축', 'Classification Axis', 'Agent 종류를 결정하는 독립 질문 하나. 여섯 축의 답을 조합하면 한 Agent의 실행·운영 성격이 된다.'],
+    ['요구 차원', 'Requirement Dimension', 'Agent의 실행·운영 성격을 설명하는 질문 묶음. 값이 서로 배타적이지 않으면 set이나 구조체로 기록한다.'],
     ['enum', 'Enumeration', '가능한 값을 하나의 고정 목록으로 관리하는 방식. 여기서는 Agent 종류를 한 목록으로 합치는 설계를 가리킨다.'],
-    ['상주', 'Process Residency', '요청이 없을 때에도 Agent process가 살아 있는지를 나타내는 축이다.'],
+    ['상주', 'Process Residency', '요청이 없을 때에도 Agent process가 살아 있는지를 나타내는 요구 차원이다.'],
     ['durable workflow', 'Durable Workflow', '실행 기록을 저장해 process가 중단돼도 남은 step부터 이어 가는 실행 방식이다.'],
   ]}
 />
@@ -30,25 +30,27 @@ import Thesis from '../../../components/docs/Thesis.astro';
 
 이 장을 읽고 나면 다음에 답할 수 있다.
 
-- 플랫폼은 Agent 종류를 **어떤 축으로 기록**해야 하나?
-- chatbot·copilot·autonomous agent 같은 **통용 이름**은 그 축의 어디에 대응되나?
+- 플랫폼은 Agent 종류를 **어떤 요구 차원으로 기록**해야 하나?
+- chatbot·copilot·autonomous agent 같은 **통용 이름**은 그 차원의 어디에 대응되나?
 - 실행 어댑터로 검토한 kagent·Dapr Agents·AgentCore는 **각자 Agent를 어떻게 구분**하고,
-  그 구분은 어느 축의 답인가?
+  그 구분은 어느 차원의 답인가?
 
-## 여섯 개의 분류 축
+## 여섯 개의 요구 차원
 
 `Declarative`·`BYO`나 `chatbot`·`batch agent`처럼 한 단어로 Agent 종류를 정하면 서로 다른 질문이 섞인다.
 예를 들어 매일 보고서를 만드는 Agent는 코드형일 수도 구성형일 수도 있고, 매번 새 process에서 실행할 수도
-상주 service를 `CronJob`이 호출할 수도 있다. 플랫폼은 최소한 다음 축을 독립적으로 기록해야 한다.
+상주 service를 `CronJob`이 호출할 수도 있다. 플랫폼은 최소한 다음 차원을 분리해 기록해야 한다. 여기서
+"분리"는 모든 값을 하나씩만 고른다는 뜻이 아니다. 활성화는 Trigger 여러 개가 공존할 수 있고, 상태·위험·격리는
+여러 하위 필드로 표현한다.
 
-| 분류 축 | 답할 질문 | 대표 값 |
+| 요구 차원 | 답할 질문 | 권장 표현 |
 |---|---|---|
-| 작성 방식 | 실행 logic을 누가 공급하나 | `CONFIGURED`, `CODE` |
-| 활성화 방식 | 무엇이 실행을 시작하나 | `REQUEST`, `SCHEDULE`, `EVENT` |
-| 상주 방식 | 요청이 없을 때 process가 남나 | `RESIDENT`, `SUSPENDABLE`, `EPHEMERAL` |
-| 상태·복구 | 중단 뒤 어디서 이어가나 | `TURN`, `SESSION`, `DURABLE_WORKFLOW`, `WORKSPACE` |
-| 격리 | 무엇과 failure·filesystem 경계를 공유하나 | `SHARED`, `POD`, `SANDBOX`, `MICROVM` |
-| 행위 위험 | 어떤 권한과 data를 다루나 | `READ`, `WRITE`, `DESTRUCTIVE`, `CODE_EXEC` |
+| 작성 방식 | 실행 logic을 누가 공급하나 | `authoringMode: CONFIGURED \| CODE` |
+| 활성화 방식 | 무엇이 실행을 시작하나 | Trigger별 `REQUEST \| SCHEDULE \| EVENT` — 여러 Trigger 허용 |
+| 상주 방식 | 요청이 없을 때 process가 남나 | `residency: RESIDENT \| SUSPENDABLE \| EPHEMERAL` |
+| 상태·복구 | 무엇을 보존하고 어디서 이어가나 | `stateScopes: [TURN, SESSION, WORKSPACE]` + `recovery: RESTART \| CHECKPOINTED \| DURABLE` |
+| 격리 | 어떤 경계를 어떤 장치로 격리하나 | `boundary: WORKLOAD \| SESSION \| WORKSPACE` + `mechanism: CONTAINER \| SANDBOX \| MICROVM` |
+| 행위 위험 | 어떤 data action과 실행 능력을 주나 | `dataActions: [READ, WRITE, DESTRUCTIVE]` + `executionCapabilities: [CODE_EXEC]` |
 
 ### 활성화와 상주를 분리한다
 
@@ -105,53 +107,54 @@ scale-to-zero한 뒤 요청 때 복구한다.
 Pod가 재시작돼도 workflow state가 저장돼 있으면 긴 작업을 이어갈 수 있다. 반대로 Pod가 계속 떠 있어도 state를
 memory에만 두면 재시작 한 번에 session이 사라진다.
 
-| 상태 모델 | 보존해야 할 것 | 대표 용도 |
+| state scope | 보존해야 할 것 | 대표 용도 |
 |---|---|---|
 | `TURN` | 단일 요청의 입력·출력 | 번역·요약 같은 독립 호출 |
 | `SESSION` | 대화 history·memory reference | chat·질의응답 |
-| `DURABLE_WORKFLOW` | step·retry·timer·approval 대기 | 장애 조치·장기 업무 자동화 |
 | `WORKSPACE` | filesystem·process·terminal context | coding Agent·조사 sandbox |
 
-따라서 health check의 `Ready`만으로 복구 가능성을 판단하지 않는다. version contract에는 state backend,
-checkpoint 단위, retry 시 side effect의 idempotency, session retention을 함께 둔다.
+`SESSION`과 `WORKSPACE`는 함께 필요할 수 있다. 별도의 recovery field는 `RESTART`(처음부터),
+`CHECKPOINTED`(애플리케이션이 저장한 checkpoint), `DURABLE`(workflow history에서 step 재개) 중 요구 수준을
+기록한다. 따라서 health check의 `Ready`만으로 복구 가능성을 판단하지 않는다. version contract에는 state
+backend, checkpoint 단위, retry 시 side effect의 idempotency, session retention을 함께 둔다.
 
-## 흔히 부르는 이름은 축의 별칭이다
+## 흔히 부르는 이름은 차원의 별칭이다
 
-업계에서 흔히 쓰는 Agent 분류 이름은 대부분 위 축들의 특정 조합을 부르는 별칭이다. 이름은 검색과
-소통에 유용하지만 배포 계약에 그대로 넣을 단위는 아니므로, 기록은 축 값으로 한다.
+업계에서 흔히 쓰는 Agent 분류 이름은 대부분 위 차원들의 특정 조합을 부르는 별칭이다. 이름은 검색과
+소통에 유용하지만 배포 계약에 그대로 넣을 단위는 아니므로, 기록은 구조화한 차원 값으로 한다.
 
-| 통용 이름 | 대체로 가리키는 것 | 이 덱의 축으로 번역하면 |
+| 통용 이름 | 대체로 가리키는 것 | 이 덱의 차원으로 번역하면 |
 |---|---|---|
 | chatbot · Q&A agent | 사람과 turn 단위로 대화한다 | 활성화 `REQUEST` · 상태 `SESSION` · 위험 `READ` 중심 |
-| copilot · assistant | 사람이 매 단계 결과를 확인하고 승인한다 | `REQUEST` + human approval — 위험 축을 낮게 유지하는 정책 |
-| autonomous agent | LLM이 도구와 순서를 스스로 정해 여러 step을 진행한다 | 특정 축 값이 아니라 행위 위험·격리 축의 상한 요구 |
+| copilot · assistant | 사람이 매 단계 결과를 확인하고 승인한다 | `REQUEST` + human approval — 위험 차원을 낮게 유지하는 정책 |
+| autonomous agent | LLM이 도구와 순서를 스스로 정해 여러 step을 진행한다 | 특정 값이 아니라 행위 위험·격리 차원의 상한 요구 |
 | background · ambient agent | 사람이 자리에 없을 때 실행된다 | 활성화 `SCHEDULE`·`EVENT` + service principal |
 | multi-agent | 여러 Agent가 협업한다 | 각 Agent를 독립 등록하고 orchestrator도 하나의 Agent로 취급 — 연결은 A2A·event |
 
 또 하나 자주 만나는 구분은 workflow 대 agent다.
 [Anthropic의 Building effective agents](https://www.anthropic.com/engineering/building-effective-agents)가
 널리 퍼뜨린 이 구분은 실행 경로를 code가 미리 고정하는가(workflow), LLM이 매 step 스스로 정하는가(agent)를
-나눈다. 이 구분은 위 여섯 축과 직교한다 — 경로가 고정된 workflow도 schedule로 활성화되는 ephemeral
+나눈다. 이 구분은 위 여섯 차원과 직교한다 — 경로가 고정된 workflow도 schedule로 활성화되는 ephemeral
 process일 수도, 항상 상주하는 service일 수도 있다. 그래서 이 덱은 이것을 별도 enum으로 두지 않고
 `AgentVersion`의 구현 설명과 risk 평가의 입력으로만 쓴다.
 
 ## 분류 조합으로 운영 정책을 고른다
 
-처음의 네 Agent를 축으로 다시 쓰면 각각 다른 운영 정책이 따라온다.
+처음의 네 Agent를 요구 차원으로 다시 쓰면 각각 다른 운영 정책이 따라온다.
 
-| 예 | 작성 | 활성화 | 상주 | 상태 | 주요 policy |
+| 예 | 작성 | 활성화 | 상주 | state scope · recovery | 주요 policy |
 |---|---|---|---|---|---|
-| 사내 문서 질의 | 구성형 | 요청 | 상주 또는 suspend | session | read-only tool·session retention |
-| 매일 비용 보고서 | 구성형 또는 코드형 | schedule | 상주 호출 또는 ephemeral | turn | timezone·중복 실행·catch-up |
-| 장애 자동 조치 | 코드형 | event | 상주 | durable workflow | approval·idempotency·재시도 상한 |
-| coding Agent | 코드형 | 요청 | suspend | workspace | 강한 sandbox·egress·filesystem quota |
+| 사내 문서 질의 | 구성형 | 요청 | 상주 또는 suspend | `[SESSION]` · `RESTART` | read-only tool·session retention |
+| 매일 비용 보고서 | 구성형 또는 코드형 | schedule | 상주 호출 또는 ephemeral | `[TURN]` · `RESTART` | timezone·중복 실행·catch-up |
+| 장애 자동 조치 | 코드형 | event | 상주 | `[TURN]` · `DURABLE` | approval·idempotency·재시도 상한 |
+| coding Agent | 코드형 | 요청 | suspend | `[SESSION, WORKSPACE]` · `CHECKPOINTED` | 강한 sandbox·egress·filesystem quota |
 
-## 세 제품은 서로 다른 축의 부분 답이다
+## 세 제품은 서로 다른 차원의 부분 답이다
 
 제품 이름은 이 조합을 결정한 뒤 고른다. 세 제품이 자기 API에서 Agent를 구분하는 방식은 서로 다른
-축의 부분 답이고, 어느 하나도 여섯 축 전체를 대신하지 않는다.
+차원의 부분 답이고, 어느 하나도 여섯 차원 전체를 대신하지 않는다.
 
-```d2 layout=elk pad=40 title="여섯 분류 축 중 kagent는 작성·상주·workspace 상태에, Dapr Agents는 상태·복구에, AgentCore는 격리와 managed 상주에 답하고, 활성화 축은 플랫폼 Trigger가, 행위 위험 축은 별도 정책 층이 소유하는 관계"
+```d2 layout=elk pad=40 title="여섯 요구 차원 중 kagent는 작성·상주·workspace에, Dapr Agents는 복구에, AgentCore는 격리와 managed 상주에 답하고, 활성화는 플랫폼 Trigger가, 행위 위험은 별도 정책 층이 소유하는 관계"
 direction: right
 
 classes: {
@@ -194,9 +197,9 @@ pol: "정책 층\ntool allowlist · access policy · Cedar" { class: warn }
 ax1: "작성 방식" { class: zone }
 ax2: "활성화 방식" { class: zone }
 ax3: "상주 방식" { class: zone }
-ax4: "상태·복구" { class: zone }
-ax5: "격리" { class: zone }
-ax6: "행위 위험" { class: zone }
+ax4: "state scope · 복구 보장" { class: zone }
+ax5: "격리 경계 · 장치" { class: zone }
+ax6: "data action · code 실행" { class: zone }
 
 kag -> ax1: "spec.type\nDeclarative · BYO"
 kag -> ax3: "SandboxAgent"
@@ -208,13 +211,13 @@ plat -> ax2: "Trigger 객체"
 pol -> ax6
 ```
 
-| 제품 | 제품이 구분하는 것 | 주로 답하는 축 | 답하지 않는 축 |
+| 제품 | 제품이 구분하는 것 | 주로 답하는 차원 | 답하지 않는 차원 |
 |---|---|---|---|
 | kagent | `Agent.spec.type`의 `Declarative`·`BYO`, 별도 kind인 `SandboxAgent`·`AgentHarness` | 작성 방식 · 상주(suspend)·격리 · workspace 상태 | 활성화 — core spec에 schedule이 없다 |
-| Dapr Agents | `DurableAgent` 클래스(동기 `Agent` 클래스는 deprecated), multi-agent orchestrator | 상태·복구(`DURABLE_WORKFLOW`) | 상주·격리 — 어느 클래스든 일반 Pod다 |
+| Dapr Agents | `DurableAgent` 클래스(동기 `Agent` 클래스는 deprecated), multi-agent orchestrator | 복구 보장(`DURABLE`) | 상주·격리 — 어느 클래스든 일반 Pod다 |
 | AgentCore | Agent 타입 없음 — protocol contract(HTTP·MCP·A2A·AG-UI)와 session runtime | 격리(`MICROVM`) · managed 상주 | 작성 방식·활성화 |
 
-특히 행위 위험 축은 세 제품 모두 Agent 분류가 아니라 별도 policy 층 — kagent의 tool allowlist,
+특히 행위 위험 차원은 세 제품 모두 Agent 분류가 아니라 별도 policy 층 — kagent의 tool allowlist,
 Dapr의 access policy, AgentCore Gateway의 Cedar policy — 으로만 다룬다.
 
 ### kagent — 작성 방식은 spec으로, 상주는 별도 kind로
@@ -224,54 +227,55 @@ kagent는 [`Agent` resource](https://kagent.dev/docs/kagent/resources/api-ref)�
 kagent runtime이 실행하고, `BYO`(Bring Your Own)는 사용자가 만든 container image를 배포한다.
 상주와 workspace는 이 값이 아니라 **별도 Kubernetes kind**로 갈라진다.
 
-| kagent 이름 | 무엇인가 | 축으로 번역하면 |
+| kagent 이름 | 무엇인가 | 차원으로 번역하면 |
 |---|---|---|
 | `Agent` + `spec.type: Declarative` | prompt·model·tool을 spec으로 선언, runtime이 실행 | 작성 `CONFIGURED` · 상주 `RESIDENT` |
 | `Agent` + `spec.type: BYO` | 사용자 container image를 배포, A2A server 계약 기대 | 작성 `CODE` · 상주 `RESIDENT` |
 | `SandboxAgent` | idle이면 actor를 snapshot해 compute를 회수, 요청 때 복원 | 상주 `SUSPENDABLE` |
 | `AgentHarness` | filesystem·process를 가진 장기 coding sandbox | 상태 `WORKSPACE` |
 
-어느 kind에도 schedule 필드가 없으므로 활성화 축은 kagent 밖에서 — 플랫폼 `Trigger`를
+어느 kind에도 schedule 필드가 없으므로 활성화 차원은 kagent 밖에서 — 플랫폼 `Trigger`를
 `CronJob`·event consumer에 매핑하고 A2A로 호출해서 — 채운다.
 
-### Dapr Agents — 클래스 구분은 상태·복구 축의 답이다
+### Dapr Agents — 클래스 구분은 복구 보장의 답이다
 
 Dapr Agents의 Agent 클래스 구분은 **무엇이 실행을 복구하는가**로 나뉜다. kagent처럼 작성 방식을
 나누는 것이 아니다 — 어차피 전부 Python code형이다.
 
-| Dapr Agents 이름 | 무엇인가 | 축으로 번역하면 |
+| Dapr Agents 이름 | 무엇인가 | 차원으로 번역하면 |
 |---|---|---|
-| `Agent` 클래스 | process 안에서 동기 실행, 대화 memory를 직접 보관 — v1.0.0-rc.1부터 deprecated | 상태 `SESSION` — process가 죽으면 사라진다 |
-| `DurableAgent` | LLM 판단·tool 호출을 Dapr Workflow로 기록, 재시작 뒤 같은 instance를 재개 | 상태 `DURABLE_WORKFLOW` |
-| `LLMOrchestrator` · `RoundRobin` · `Random` | 여러 Agent 협업에서 다음 실행할 Agent를 고르는 조율자 | 축 값이 아니라 multi-agent 구성 — 조율자도 독립 Agent로 등록한다 |
+| `Agent` 클래스 | 동기·ephemeral 실행. memory는 in-memory 또는 persistent store를 선택 — v1.0.0-rc.1부터 deprecated | 복구 `RESTART` — 실행 자체는 재개되지 않음 |
+| `DurableAgent` | LLM 판단·tool 호출을 Dapr Workflow로 기록, 재시작 뒤 같은 instance를 재개 | 복구 `DURABLE` |
+| `LLMOrchestrator` · `RoundRobin` · `Random` | 여러 Agent 협업에서 다음 실행할 Agent를 고르는 조율자 | 요구 차원 값이 아니라 multi-agent 구성 — 조율자도 독립 Agent로 등록한다 |
 
-상주·격리 축에는 답하지 않는다. 어느 클래스든 workload는 sidecar가 붙은 일반 Pod이고,
+상주·격리 차원에는 답하지 않는다. 어느 클래스든 workload는 sidecar가 붙은 일반 Pod이고,
 code 실행 sandbox는 별도로 설계한다.
 
 ### AgentCore — Agent 타입 enum 자체가 없다
 
 Amazon Bedrock AgentCore에는 kagent의 `spec.type`이나 Dapr의 클래스처럼 Agent 종류에 이름을
-붙이는 API가 **없다**. Runtime은 framework를 가리지 않고 container를 받고, 구분은 두 곳에서만
+붙이는 API가 **없다**. Runtime은 framework를 가리지 않고 Container 또는 CodeZip artifact를 받고, 구분은 두 곳에서만
 나타난다.
 
-| AgentCore가 구분하는 것 | 무엇인가 | 축으로 번역하면 |
+| AgentCore가 구분하는 것 | 무엇인가 | 차원으로 번역하면 |
 |---|---|---|
-| protocol contract | container가 따르는 HTTP·MCP·A2A·AG-UI 계약 | 축 값이 아니라 호출 표면 — adapter가 배포 전에 검증 |
+| protocol contract | artifact가 따르는 HTTP·MCP·A2A·AG-UI 계약 | 차원 값이 아니라 호출 표면 — adapter가 배포 전에 검증 |
 | runtime session | session마다 전용 microVM, idle timeout이면 compute 종료 | 격리 `MICROVM` · 상주는 AWS가 관리 |
 
-작성 방식·활성화 축은 기록할 자리가 없으므로 platform domain model이 소유한다. 구성형 Agent를
-이 target에 두려면 adapter가 공통 runtime image에 prompt·tool binding을 주입해 코드형과 같은
-container로 번역한다.
+작성 방식·활성화 차원은 기록할 자리가 없으므로 platform domain model이 소유한다. 구성형 Agent를
+이 target에 두려면 adapter가 공통 runtime artifact에 prompt·tool binding을 주입해 코드형과 같은
+배포물로 번역한다. production portability가 필요하면 OCI image를 기본으로 하고, CodeZip은 AgentCore 전용
+extension으로 명시한다.
 
 각 제품이 왜 이렇게 답하는지, 답의 빈칸을 adapter가 어떻게 메우는지는
 [8~11장](/agent-platform/08-kagent-architecture/)과 [13장](/agent-platform/13-agentcore/)에서 확인한다.
 Dapr Agents는 채택한 target이 아니라 [보류한 durable execution 층](/agent-platform/12-durable-execution/)의
-후보라서, 상태·복구 축(`DURABLE_WORKFLOW`)의 답도 그 결정이 재개될 때 실행 계약이 된다.
+후보라서, 복구 보장(`DURABLE`)의 답도 그 결정이 재개될 때 실행 계약이 된다.
 
-## 축은 domain 객체에 나눠 담는다
+## 차원은 domain 객체에 나눠 담는다
 
 - `Agent`: 업무 정체성, owner, data classification과 기본 risk tier
-- `AgentVersion`: 작성 방식, artifact, protocol, state·recovery contract
+- `AgentVersion`: 작성 방식, artifact, protocol, state scope·recovery contract
 - `Trigger`: request·schedule·event source, 실행 principal, task template, timeout·retry·concurrency policy
 - `DeploymentTarget`: 가능한 isolation·residency·network·state capability
 - `Deployment`: 선택된 target에서 실제 적용한 replica·sandbox·provider reference
@@ -282,12 +286,12 @@ timeout은 다르게 적용할 수 있다. 이 객체들의 계약은 다음 장
 
 ## 2장 요약
 
-- Agent 종류는 작성·활성화·상주·상태·격리·행위 위험의 여섯 독립 축으로 기록한다. 한 enum으로 합치면
-  서로 다른 질문이 섞인다.
-- chatbot·copilot·ambient 같은 통용 이름은 축 조합의 별칭이다. 검색어로는 두되 배포 계약에는 축 값을 쓴다.
+- Agent 종류는 작성·활성화·상주·상태·격리·행위 위험의 여섯 요구 차원으로 기록한다. 함께 성립할 수 있는
+  값은 단일 enum이 아니라 set과 구조체로 둔다.
+- chatbot·copilot·ambient 같은 통용 이름은 차원 조합의 별칭이다. 검색어로는 두되 배포 계약에는 구조화된 값을 쓴다.
 - kagent는 작성 방식과 상주·workspace에, Dapr Agents는 상태·복구에, AgentCore는 격리와 managed 상주에
-  답한다. 활성화 축은 플랫폼 `Trigger`가, 행위 위험 축은 별도 정책 층이 소유한다.
-- 축 값은 하나의 필드가 아니라 `AgentVersion`·`Trigger`·`DeploymentTarget` 같은 객체에 나눠 담는다.
+  답한다. 활성화 차원은 플랫폼 `Trigger`가, 행위 위험 차원은 별도 정책 층이 소유한다.
+- 차원 값은 하나의 필드가 아니라 `AgentVersion`·`Trigger`·`DeploymentTarget` 같은 객체에 나눠 담는다.
 
 ## 참고 자료
 
@@ -295,11 +299,12 @@ timeout은 다르게 적용할 수 있다. 이 객체들의 계약은 다음 장
 - [kagent Agent Substrate](https://kagent.dev/docs/kagent/concepts/agent-substrate) — idle actor snapshot·복원과 `SandboxAgent`.
 - [kagent Agent Harness](https://kagent.dev/docs/kagent/concepts/agent-harness/) — 장기 coding sandbox와 workspace 경계.
 - [Dapr Agents core concepts](https://docs.dapr.io/developing-ai/dapr-agents/dapr-agents-core-concepts/) — deprecated `Agent`와 `DurableAgent` 클래스, orchestrator.
-- [AgentCore Runtime 동작](https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/runtime-how-it-works.html) — framework 불문 container와 protocol contract.
+- [AgentCore Runtime 동작](https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/runtime-how-it-works.html) — framework 불문 runtime과 protocol contract.
+- [AgentCore Runtime build types](https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/runtime-get-started-cli.html) — Container·CodeZip artifact와 ARM64 조건.
 - [AgentCore Runtime session 격리](https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/runtime-sessions.html) — session별 microVM lifecycle.
 
 <LinkCard
   title="3. 제품 밖의 domain model"
-  description="여섯 축을 담는 Agent·Version·Trigger·Grant·Deployment 객체와 불변조건을 설계한다."
+  description="여섯 요구 차원을 담는 Agent·Version·Trigger·Grant·Deployment 객체와 불변조건을 설계한다."
   href="/agent-platform/03-domain-model/"
 />

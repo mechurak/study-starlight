@@ -83,7 +83,7 @@ fe -> be: "POST /agents (OIDC token)"
 be -> be: "token 검증 · 부서 확인"
 be -> be: "생성 권한 검사"
 db -> be: "승인된 model · tool 목록" { style.stroke-dash: 3 }
-be -> db: "Agent · AgentVersion 저장 (원본)"
+be -> db: "Agent · KnowledgeBinding · AgentVersion 저장 (원본)"
 be -> k8s: "Agent CR server-side apply"
 k8s -> ctrl: "watch"
 ctrl -> k8s: "Deployment · Service 생성, status 기록"
@@ -188,6 +188,7 @@ informer는 끊긴다. `error` 핸들러에서 재시작을 예약하지 않으�
 |---|---|---|
 | Agent 정체성·소유자·설명 | 우리 DB | provider를 바꿔도 남아야 한다 |
 | version 이력 | 우리 DB | CR을 덮어쓰면 이전 version 조사가 불가능 |
+| knowledge source·version·binding | 우리 DB | source revision·ACL·index lineage가 runtime보다 오래 남아야 한다 |
 | 부서·개인 권한(Grant) | 우리 DB | kagent에 대응 개념이 없다 |
 | 승인 이력·감사 event | 우리 DB | 보존 기간이 cluster 수명과 다르다 |
 | 실행 중인 Agent 상태 | Kubernetes | controller가 만드는 사실 |
@@ -200,12 +201,13 @@ stream을 중계하는 김에 **우리 DB에도 남기는 편**이 낫다. clust
 
 :::tip[CR을 덮어쓰지 않는다]
 version을 올릴 때 같은 CR spec을 제자리에서 갈아 끼우면 "어제 그 답변을 만든 설정"이 사라진다.
-DB에 `AgentVersion`을 남기고, 문제 조사·rollback은 그 기록에서 다시 apply하는 방식으로 한다.
+DB에 `AgentVersion`을 남기고 version별 deterministic CR 이름을 만든다. 문제 조사·deployment repair는 그 기록으로
+별도 resource를 다시 apply하고, 사용자를 되돌리는 일은 portal의 publication pointer가 맡는다.
 :::
 
 ## 부서별 접근 통제 두 경로
 
-여기가 kagent를 그냥 쓰면 안 되는 이유다. kagent v0.9는 oauth2-proxy 기반 OIDC **인증**을 지원하지만,
+여기가 kagent를 그냥 쓰면 안 되는 이유다. 검토 기준인 kagent v0.9.9는 oauth2-proxy 기반 OIDC **인증**을 지원하지만,
 공식 release note는 application access control이 **아직 구현되지 않았다**고 명시한다. 로그인한 사용자가
 누구인지 아는 것과 Agent별 실행·수정 권한을 판단하는 것은 다르다.
 

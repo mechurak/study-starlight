@@ -59,14 +59,14 @@ exp: "Experience plane — 사람이 보는 경험" {
 }
 
 ctrl: "Control plane — 회사 의미의 단일 원본" {
-  catalog: "Agent · Version · Grant DB" { class: zone }
+  catalog: "Agent · Knowledge · Version · Grant DB" { class: zone }
   policy: "Approval · Placement Policy" { class: zone }
   recon: "Deployment Reconciler" { class: zone }
   catalog -> policy -> recon
 }
 
 run: "Runtime plane — 실행 backend" {
-  kag: "kagent · Kubernetes" { class: ok }
+  kag: "맨 Kubernetes · kagent" { class: ok }
   acr: "AgentCore Runtime" { class: ok }
 }
 
@@ -106,6 +106,7 @@ control plane은 다음을 단일 원본으로 둔다.
 
 - Agent의 회사 ID, owner, 설명과 risk tier
 - immutable version과 artifact digest
+- knowledge source revision·index artifact와 binding
 - user·group별 grant
 - 승인된 target policy와 현재 deployment
 - 공개·중지·폐기 상태
@@ -124,10 +125,14 @@ runtime은 image나 선언형 spec을 실제 process로 만들고 다음을 담�
 - runtime identity와 secret 주입
 - provider-native log·metric·trace
 
-kagent에서는 Kubernetes와 controller가 Agent resource를 workload로 맞춘다. AgentCore에서는 AWS 관리형
-runtime이 session별 microVM과 version endpoint를 맡는다. 공통 interface는 같아도 lifecycle·복구·격리
-단위의 의미는 다르다. step 단위 복구를 주는 durable execution 층은 이 plane에 아직 없다 —
-[보류한 결정](/agent-platform/12-durable-execution/)이라, 재개하면 같은 자리에 target 하나가 늘어난다.
+맨 Kubernetes adapter는 Deployment·Service를 직접 만들고, kagent에서는 Kubernetes와 controller가 Agent
+resource를 workload로 맞춘다. AgentCore에서는 AWS 관리형 runtime이 session별 microVM과 version endpoint를
+맡는다. 공통 interface는 같아도 lifecycle·격리 단위의 의미는 다르다.
+
+step 단위 복구를 주는 durable execution은 이 셋과 같은 target이 아니다. 현재 execution profile은 `none`이고,
+[보류한 결정](/agent-platform/12-durable-execution/)을 재개하면 Temporal이나 Dapr Agents worker를 이미 고른
+workload target 위에 조합한다. 따라서 RuntimeAdapter가 하나 늘어나는 것이 아니라 별도 durability port와
+실행 profile이 생긴다.
 
 ## Foundation plane — 여러 runtime이 공유한다
 
@@ -135,11 +140,11 @@ runtime이 session별 microVM과 version endpoint를 맡는다. 공통 interface
 
 | 기반 | 공통 계약 | backend별 차이 |
 |---|---|---|
-| identity | 불변 user ID와 group claim | Keycloak private endpoint, AWS JWT/IAM |
+| identity | issuer가 포함된 불변 principal key와 group claim | Keycloak private endpoint, AWS JWT/IAM |
 | model | 공개 model alias와 data zone | 온프렘 vLLM, Bedrock·외부 provider |
 | tool | MCP/OpenAPI schema, auth mode, risk | cluster service, AgentCore Gateway |
 | secret | logical secret reference | Kubernetes Secret/Vault, AWS Secrets Manager |
-| trace | `agentId`, `versionId`, `deploymentId`, `userId` | OTel collector, CloudWatch |
+| trace | `agentId`, `versionId`, `deploymentId`, `principalKey` | OTel collector, CloudWatch |
 
 ## 배포 흐름과 요청 흐름
 
@@ -190,10 +195,11 @@ consumer: Consumer
 
 - experience는 사람이 보는 경험, control은 회사 의미, runtime은 process, foundation은 공통 기반을 맡는다.
 - 배포와 호출은 별도 흐름이며 같은 권한으로 처리하지 않는다.
+- durability는 runtime target이 아니라 선택한 workload에 조합하는 execution profile이다.
 - 공통 trace field와 logical reference를 먼저 정하면 backend별 구현을 바꿔도 연결이 남는다.
 
 <LinkCard
-  title="2. Agent 종류는 여섯 축으로 나눈다"
-  description="카탈로그에 올 Agent의 종류를 여섯 축으로 기록하고, 세 제품의 분류를 그 축으로 번역한다."
+  title="2. Agent 종류는 여섯 차원으로 나눈다"
+  description="카탈로그에 올 Agent의 요구를 여섯 차원으로 기록하고, 세 제품의 분류를 그 차원으로 번역한다."
   href="/agent-platform/02-agent-types/"
 />

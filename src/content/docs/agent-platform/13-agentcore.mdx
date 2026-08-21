@@ -16,6 +16,7 @@ import Thesis from '../../../components/docs/Thesis.astro';
     ['PrivateLink', 'AWS PrivateLink', 'VPC의 private IP를 통해 AWS service API를 호출해 public internet traversal을 피하는 방식이다.'],
     ['custom JWT authorizer', 'Custom JWT Authorizer', '사내 IdP token의 issuer·audience·scope·claim을 runtime 앞에서 검증하는 기능이다.'],
     ['Cedar', 'Cedar Policy Language', 'AgentCore Gateway tool action을 결정적으로 허용·거부하는 policy 언어다.'],
+    ['CodeZip', 'Direct Code Deployment', 'Agent code와 dependency를 ZIP으로 묶어 S3에서 Runtime에 배포하는 AgentCore artifact 방식이다.'],
   ]}
 />
 
@@ -79,9 +80,9 @@ private 경로를 써도 runtime control/data plane과 session compute는 AWS re
 
 ## Runtime contract와 격리
 
-AgentCore Runtime은 custom code와 LangGraph·CrewAI·ADK 같은 framework를 container로 실행한다. HTTP, MCP,
-A2A, AG-UI contract를 지원하며 version과 endpoint를 관리한다. container는 현재 ARM64와 protocol별 port/path
-계약을 따라야 하므로 adapter가 build manifest를 검증한다.
+AgentCore Runtime은 custom code와 LangGraph·CrewAI·ADK 같은 framework를 Container 또는 CodeZip으로
+실행한다. HTTP, MCP, A2A, AG-UI contract를 지원하며 version과 endpoint를 관리한다. Runtime은 ARM64에서
+동작하므로 container image와 CodeZip의 native dependency가 Linux ARM64인지 adapter가 검증한다.
 
 각 runtime session은 전용 microVM의 compute·memory·filesystem으로 격리된다. idle timeout이나 최대 lifecycle에
 도달하면 compute는 종료되고, 필요한 상태는 Memory나 session storage로 내린다. 단, AWS도 user와 session ID의
@@ -90,26 +91,43 @@ A2A, AG-UI contract를 지원하며 version과 endpoint를 관리한다. contain
 ### Agent 타입 enum이 없다
 
 kagent의 `Agent.spec.type`이나 Dapr Agents의 클래스처럼 Agent 종류에 이름을 붙이는 API가 AgentCore에는
-없다. Runtime은 framework를 가리지 않고 container를 받고, 구분은 두 곳에서만 나타난다 — container가
+없다. Runtime은 framework를 가리지 않고 artifact를 받고, 구분은 두 곳에서만 나타난다 — artifact가
 따르는 protocol contract와 session lifecycle이다. 즉 AgentCore는
-[Agent 종류 분류](/agent-platform/02-agent-types/#여섯-개의-분류-축)의 격리(`MICROVM`)와
+[Agent 종류 분류](/agent-platform/02-agent-types/#여섯-개의-요구-차원)의 격리(`MICROVM`)와
 managed 상주 축에 답하고, 작성 방식·활성화 축은 기록할 자리가 없으므로 platform domain model이 소유한다.
-구성형 Agent를 이 target에 두려면 adapter가 platform 공통 runtime image에 prompt·tool binding을 주입해
-코드형과 같은 container로 번역한다. 행위 위험 축은 Gateway의 Cedar Policy라는 별도 층이 맡는다.
+구성형 Agent를 이 target에 두려면 adapter가 platform 공통 runtime artifact에 prompt·knowledge·tool binding을
+주입해 코드형과 같은 배포물로 번역한다. 행위 위험 차원은 Gateway의 Cedar Policy라는 별도 층이 맡는다.
+
+### Container와 CodeZip을 정책으로 고른다
+
+[AgentCore CLI 문서](https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/runtime-get-started-cli.html)는
+CodeZip과 Container 두 build type을 지원하고 CodeZip을 CLI 기본값으로 제시한다. 그러나 provider 기본값과
+회사 production 기본값은 다르다.
+
+| artifact | 장점 | 제약 | 플랫폼 정책 |
+|---|---|---|---|
+| Container | 기존 OCI CI·SBOM·signature·digest와 portability를 재사용 | ARM64 image build, 최대 image·cold start 조건 검증 | production portable 기본 |
+| CodeZip | Docker 없이 빠른 iteration, 작은 package의 update가 단순 | package size·native dependency·S3 artifact와 AgentCore 종속 | 명시적 provider extension, 승인된 build profile만 허용 |
+
+CodeZip을 허용하면 source tree를 그대로 보내지 않는다. 재현 가능한 build가 dependency lock, SBOM, source commit,
+ZIP digest와 S3 object version을 만들고 `AgentVersion.artifact`에 고정한다. [direct code 문서](https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/runtime-get-started-code-deploy.html)의
+package limit과 runtime requirement는 대상 region에서 PoC 시작 시 다시 확인한다.
 
 ## 공통 객체 매핑
 
 | 공통 객체 | AgentCore 표현 |
 |---|---|
-| `AgentVersion` | ECR image digest + immutable Runtime version/config |
+| `AgentVersion` | ECR image digest 또는 CodeZip digest·S3 object version + immutable Runtime config |
+| `KnowledgeBinding` | Runtime artifact에 주입한 retrieval config 또는 승인된 Gateway capability |
 | `DeploymentTarget` | AWS account·region·VPC subnet·SG·execution role preset |
 | `Deployment` | Runtime version + endpoint |
 | `providerRef` | Runtime ARN, version, endpoint qualifier |
 | runtime identity | execution role과 AgentCore workload identity |
 | `ToolBinding` | Gateway target, credential provider, Policy association |
 
-adapter는 ECR push 자체보다 승인된 digest가 ARM64인지, target VPC가 필요한 endpoint를 갖는지, execution role이
-허용 범위를 넘지 않는지 검증한다. Runtime update가 새 version을 만들면 publication은 새 endpoint 검증 뒤 전환한다.
+adapter는 artifact upload 자체보다 승인된 digest와 provenance가 맞는지, native dependency가 ARM64인지, target
+VPC가 필요한 endpoint를 갖는지, execution role이 허용 범위를 넘지 않는지 검증한다. Runtime update가 새
+version을 만들면 publication은 새 endpoint 검증 뒤 전환한다.
 
 ## 사내망처럼 사용하는 조건
 
@@ -150,9 +168,19 @@ Preview이고 search authorization은 registry 단위가 중심이므로, produc
 **불리하다:** 실행·prompt·memory가 물리적 온프렘을 벗어나면 안 되거나, AgentCore 미지원 region·quota가 문제거나,
 AWS API·ECR·ARM64 contract 종속성을 받아들이기 어렵다.
 
+## 13장 요약
+
+- AgentCore는 AWS 안의 managed runtime target이며 사내 catalog·ACL·session ownership을 대신하지 않는다.
+- Runtime artifact는 Container와 CodeZip을 지원한다. OCI를 portable production 기본으로 두고 CodeZip은 명시적 extension으로 관리한다.
+- session별 microVM 격리와 user-session binding은 다른 책임이다. 후자는 portal backend가 소유한다.
+- VPC·PrivateLink는 private path를 만들지만 data가 온프렘에 남는다는 뜻은 아니다.
+- Registry와 Policy는 각각 provider catalog 보조와 tool action 경계이며 회사 Publication·Grant를 대신하지 않는다.
+
 ## 참고 자료
 
 - [AgentCore Runtime 동작](https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/runtime-how-it-works.html) — framework, version, protocol.
+- [Runtime build types](https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/runtime-get-started-cli.html) — CodeZip·Container 선택과 ARM64 조건.
+- [Direct code deployment](https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/runtime-get-started-code-deploy.html) — ZIP packaging과 Container 비교.
 - [Runtime session 격리](https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/runtime-sessions.html) — microVM과 client의 session 책임.
 - [VPC 연결](https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/agentcore-vpc.html) — ENI, subnet, endpoint 요구.
 - [JWT authorizer](https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/inbound-jwt-authorizer.html) — scope와 custom claim.

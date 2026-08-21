@@ -1,6 +1,6 @@
 ---
 title: "6. Adapter contract"
-description: validate·deploy·status·rollback과 capability profile로 runtime provider 경계를 고정한다
+description: validate·deploy·status·stop과 capability profile로 runtime provider 경계를 고정하고 publication 전환·durability와 분리한다
 ---
 
 import { LinkCard } from '@astrojs/starlight/components';
@@ -21,11 +21,17 @@ import Thesis from '../../../components/docs/Thesis.astro';
 
 ```mermaid
 flowchart LR
-    CORE["Platform Core<br/>Agent · Version · Grant"] --> PORT["RuntimeAdapter port"]
+    CORE["Platform Core<br/>Agent · Knowledge · Version · Grant"] --> PORT["RuntimeAdapter port"]
+    CORE --> DPORT["Durability port<br/>ExecutionProfile"]
+    PORT --> K0["KubernetesAdapter<br/>기준선"]
     PORT --> KA["KagentAdapter"]
     PORT --> AA["AgentCoreAdapter"]
+    K0 --> K8S0["Deployment · Service · Job"]
     KA --> K8S["Agent CR · Service · Secret"]
-    AA --> AWS["ECR · Runtime · Endpoint"]
+    AA --> AWS["OCI/CodeZip · Runtime · Endpoint"]
+    DPORT --> NONE["none<br/>현재"]
+    DPORT -.-> DEFER["Temporal · Dapr Agents<br/>재개 시 후보"]
+    K8S0 --> NORMAL["Normalized DeploymentStatus"]
     K8S --> NORMAL["Normalized DeploymentStatus"]
     AWS --> NORMAL
     NORMAL --> CORE
@@ -34,14 +40,16 @@ flowchart LR
     classDef zone fill:#ede9fe,stroke:#7c3aed,color:#4c1d95
     classDef ok fill:#dcfce7,stroke:#16a34a,color:#14532d
     class CORE key
-    class PORT,NORMAL zone
-    class KA,AA,K8S,AWS ok
+    class PORT,DPORT,NORMAL zone
+    class K0,KA,AA,K8S0,K8S,AWS ok
+    class NONE,DEFER zone
 ```
 
 platform core는 Kubernetes client나 AWS SDK를 import하지 않는다. adapter가 provider credential, retry,
-eventual consistency와 error message를 소유한다. 지금 adapter는 둘이지만 port는 개수를 가정하지 않는다 —
-[보류한 durable execution 층](/agent-platform/12-durable-execution/)을 재개하면 같은 port에 세 번째
-adapter가 붙는다.
+eventual consistency와 error message를 소유한다. 맨 Kubernetes·kagent·AgentCore는 workload를 만드는 같은
+port의 구현이다. [보류한 durable execution 층](/agent-platform/12-durable-execution/)은 이 port의 세 번째
+구현이 아니다. 별도 durability port가 `ExecutionProfile`을 검증하고, 선택한 RuntimeAdapter가 만든 workload
+안의 worker와 조합한다.
 
 ## 최소 operation
 
@@ -52,11 +60,16 @@ adapter가 붙는다.
 | `deploy` | approved version, target, idempotency key | deployment와 providerRef |
 | `getStatus` | deployment | normalized state, health, provider detail link |
 | `stop` | deployment, drain policy | 새 invocation 차단과 session 처리 결과 |
-| `rollback` | current, previous deployment | route 또는 endpoint pointer 전환 결과 |
+| `setTraffic` | ready deployments, weights | provider가 지원할 때만 endpoint-version traffic 반영 |
 | `delete` | deployment, retention policy | runtime resource 제거. domain record는 유지 |
 
 실제 invocation은 별도 `RuntimeInvoker` port로 분리할 수 있다. 배포 credential과 호출 credential의 권한 범위가
 다르고, streaming·session 처리는 control API보다 request path에 가깝기 때문이다.
+
+`PublicationRouter.switchActiveDeployment(publicationId, deploymentId)`는 platform core의 operation이다.
+adapter가 provider-native traffic split을 지원하면 `setTraffic`으로 구현을 보조할 수 있지만, 어느 Deployment가
+회사 catalog의 active version인지 결정하지 않는다. 따라서 publication rollback과 provider resource repair를
+같은 `rollback` method로 합치지 않는다.
 
 ## 공통 spec은 의도만 담는다
 
@@ -64,8 +77,19 @@ adapter가 붙는다.
 runtime:
   protocol: a2a
   artifact:
-    imageDigest: registry.company/agents/report@sha256:...
+    kind: OCI_IMAGE # CONFIG_BUNDLE | CODE_ZIP
+    uri: registry.company/agents/report
+    digest: sha256:...
     architecture: amd64
+  configuration:
+    promptBundleDigest: sha256:...
+    knowledgeBindings:
+      - knowledgeVersionId: knv_hr_policy_2026_08
+        retrievalPolicyVersion: rpv_3
+    policyBundleVersion: pbv_12
+    effectiveConfigHash: sha256:...
+  executionProfile:
+    durability: none
   resources:
     cpu: "1"
     memory: 2Gi
@@ -80,7 +104,8 @@ runtime:
 ```
 
 여기에 Kubernetes `nodeSelector`나 AWS subnet ID를 넣지 않는다. target policy가 zone과 capability를 실제
-namespace, subnet, security group, execution role로 번역한다.
+namespace, subnet, security group, execution role로 번역한다. `CODE_ZIP`은 AgentCore 같은 일부 target만
+지원하는 artifact extension이고, portable production 기본값은 immutable OCI digest다.
 
 ## Capability로 차이를 드러낸다
 
@@ -128,12 +153,12 @@ resource는 지우지 않는다.
 
 logical secret은 adapter가 target별 reference로 바꾼다.
 
-| 공통 의도 | kagent target | AgentCore target |
-|---|---|---|
-| runtime workload identity | Kubernetes ServiceAccount | AgentCore workload/execution role |
-| secret reference | Secret/Vault injection | Secrets Manager·AgentCore Identity provider |
-| private CA | Secret volume·ModelConfig TLS | image trust store·private endpoint 설정 |
-| egress policy | NetworkPolicy·proxy | security group·VPC endpoint·route |
+| 공통 의도 | 맨 Kubernetes target | kagent target | AgentCore target |
+|---|---|---|---|
+| runtime workload identity | Kubernetes ServiceAccount | Kubernetes ServiceAccount | AgentCore workload/execution role |
+| secret reference | Secret/Vault injection | Secret/Vault injection | Secrets Manager·AgentCore Identity provider |
+| private CA | Secret volume·image trust store | Secret volume·ModelConfig TLS | artifact trust store·private endpoint 설정 |
+| egress policy | NetworkPolicy·proxy | NetworkPolicy·proxy | security group·VPC endpoint·route |
 
 secret value를 adapter DB나 provider tag에 복제하지 않는다. target이 늘어나면 이 표에 column이
 하나 추가될 뿐 공통 의도 행은 그대로다 — 그것이 logical reference를 쓰는 이유다.
@@ -146,16 +171,20 @@ secret value를 adapter DB나 provider tag에 복제하지 않는다. target이 
 - 지원하지 않는 architecture와 protocol 거부
 - create 성공 뒤 응답 유실을 재현하고 복구
 - ready → invoke → stop → invoke 거부
-- 이전 version rollback
 - provider resource 수동 삭제 뒤 drift 감지
 - log와 trace에 공통 correlation field 존재
+
+platform integration suite는 별도로 새 Deployment를 만든 뒤 publication pointer를 전환·복귀하고, adapter의
+`stop`·`delete`가 Publication을 암묵적으로 바꾸지 않는지 검사한다. durability를 재개하면 같은 RuntimeAdapter
+suite를 재사용하고 별도 execution recovery suite를 추가한다.
 
 ## 6장 요약
 
 - platform core와 provider SDK 사이에 배포와 호출 port를 둔다.
+- publication pointer 전환은 platform core, provider traffic 조정은 adapter의 선택 capability다.
 - 공통 spec에는 의도, target에는 실제 인프라 mapping을 둔다.
 - capability negotiation으로 backend 고유 기능을 보존한다.
-- adapter는 idempotency, eventual consistency, provider error 번역을 책임진다.
+- adapter는 idempotency, eventual consistency, provider error 번역을 책임지고 durability는 별도 port로 조합한다.
 
 <LinkCard
   title="7. 사용자 MCP를 플랫폼에 올리기"

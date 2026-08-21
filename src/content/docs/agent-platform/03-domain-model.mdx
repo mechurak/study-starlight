@@ -1,13 +1,13 @@
 ---
 title: "3. 제품 밖의 domain model"
-description: Agent의 정체성·버전·trigger·권한·배포 객체를 kagent CRD와 AWS ARN 밖에 정의한다
+description: Agent·knowledge·tool의 정체성·버전·trigger·권한·배포 객체를 kagent CRD와 AWS ARN 밖에 정의한다
 ---
 
 import { LinkCard } from '@astrojs/starlight/components';
 import TermIntro from '../../../components/docs/TermIntro.astro';
 import Thesis from '../../../components/docs/Thesis.astro';
 
-<Thesis>`Agent`는 서비스의 정체성이고 `Deployment`는 그 정체성을 실행한 한 복사본이다</Thesis>
+<Thesis>`Agent`는 서비스의 정체성, `AgentVersion`은 실효 동작의 snapshot, `Deployment`는 이를 실행한 한 복사본이다</Thesis>
 
 <TermIntro
   terms={[
@@ -16,12 +16,13 @@ import Thesis from '../../../components/docs/Thesis.astro';
     ['providerRef', 'Provider Reference', 'kagent resource name이나 AgentCore ARN처럼 provider에서만 의미 있는 식별자다.'],
     ['desired state', 'Desired State', 'control plane이 기대하는 배포 상태. adapter가 provider의 실제 상태를 이 값에 맞춘다.'],
     ['trigger', 'Invocation Trigger', '사람의 요청·schedule·event처럼 Agent 실행을 시작시키는 계기와 실행 정책이다.'],
+    ['knowledge binding', 'Knowledge Binding', 'AgentVersion이 어느 KnowledgeVersion을 어떤 검색·인용 정책으로 사용하는지 고정한 관계다.'],
   ]}
 />
 
 ## 객체 관계
 
-```d2 layout=elk pad=40 title="Agent와 Tool의 정체성에서 Version·Grant·Publication·Trigger를 거쳐 target별 Deployment와 providerRef로 이어지는 객체 관계"
+```d2 layout=elk pad=40 title="Agent·Knowledge·Tool의 정체성과 immutable version이 binding을 거쳐 target별 Deployment와 providerRef로 이어지고 Publication이 준비된 Agent Deployment를 선택하는 객체 관계"
 direction: right
 
 classes: {
@@ -52,13 +53,17 @@ agent: "Agent\n정체성 · owner" { class: key }
 ver: "AgentVersion\nimmutable artifact" { class: key }
 tool: "Tool\n정체성 · owner" { class: key }
 toolver: "ToolVersion\nartifact · schema" { class: key }
+knowledge: "KnowledgeSource\n정체성 · owner" { class: key }
+knowver: "KnowledgeVersion\nsource · index snapshot" { class: key }
 grant: "Grant\nprincipal · role" { class: zone }
 pub: "Publication\n공개 상태" { class: zone }
 trg: "Trigger\nrequest · schedule · event" { class: zone }
 binding: "ToolBinding\nallowlist · auth mode" { class: zone }
+kbind: "KnowledgeBinding\nquery · citation policy" { class: zone }
 target: "DeploymentTarget\nzone · capabilities" { class: ok }
 dep: "Deployment\nversion × target" { class: ok }
 tdep: "ToolDeployment\n실행 또는 연결" { class: ok }
+kdep: "KnowledgeDeployment\nindex · endpoint" { class: ok }
 pref: "providerRef\nnamespace/name 또는 ARN" { class: ok }
 
 agent -> ver
@@ -72,14 +77,20 @@ tool -> toolver
 toolver -> tdep
 target -> tdep
 tdep -> pref
+knowledge -> knowver
+knowver -> kdep
+target -> kdep
+kdep -> pref
 ver -> binding
 binding -> toolver
+ver -> kbind
+kbind -> knowver
 pub -> dep
 trg -> pub
 ```
 
-이 객체들이 담을 내용 중 Agent의 종류 — 작성·활성화·상주·상태·격리·행위 위험의 여섯 축 — 는
-[2장](/agent-platform/02-agent-types/)에서 정의했다. 이 장은 그 축 값과 권한·배포 상태를
+이 객체들이 담을 내용 중 Agent의 종류 — 작성·활성화·상주·상태·격리·행위 위험의 여섯 요구 차원 — 는
+[2장](/agent-platform/02-agent-types/)에서 정의했다. 이 장은 그 구조화된 값과 권한·배포 상태를
 **어느 객체에 담고 어떤 불변조건으로 지키는지**를 설계한다.
 
 ## Agent와 AgentVersion
@@ -92,9 +103,22 @@ trg -> pub
 - 업무 domain과 data classification
 - 생성·폐기 상태
 
-실행 결과를 바꿀 수 있는 값은 `AgentVersion`으로 내린다. 작성 방식, image digest, prompt bundle, model policy,
-tool binding, runtime contract와 resource hint가 여기에 포함된다. `latest` tag나 mutable Git branch를 승인된
-version의 근거로 쓰지 않는다.
+실행 결과를 바꿀 수 있는 값은 `AgentVersion`으로 내린다. 작성 방식, artifact, prompt bundle, model policy,
+knowledge·tool binding, skill, execution profile, runtime contract와 resource hint가 여기에 포함된다. artifact는
+`OCI_IMAGE`, `CODE_ZIP`, `CONFIG_BUNDLE`처럼 종류와 content digest를 함께 기록한다. target은 지원하지 않는
+artifact를 `validate`에서 거부한다. `latest` tag나 mutable Git branch를 승인된 version의 근거로 쓰지 않는다.
+
+승인 시 다음 실효 구성의 content hash를 만든다.
+
+```text
+prompt + knowledge bindings + tool bindings + skills + model policy + policy bundle + execution profile
+                                      ↓
+                             effectiveConfigHash
+```
+
+전역 guardrail을 긴급 변경해야 한다면 기존 version을 몰래 바꾸지 않는다. 독립된 `PolicyBundleVersion`을 만들고
+publication이 사용하는 실효 조합을 감사한다. 같은 답변을 재현할 때는 `versionId`뿐 아니라 이 hash와 각 binding
+version을 함께 사용한다.
 
 ## Trigger는 Agent process가 아니다
 
@@ -169,7 +193,39 @@ endpointRef: ep_01J...
 같은 version을 AgentCore에 배포하면 `providerRef`가 runtime ARN과 endpoint qualifier로 바뀔 뿐 `agentId`,
 `versionId`, `Grant`는 그대로다.
 
-## ToolBinding은 endpoint 목록이 아니다
+## Knowledge와 Tool은 version에 binding한다
+
+### KnowledgeBinding은 검색 계약이다
+
+`KnowledgeSource`는 문서 저장소·업무 DB·승인된 upload 묶음의 회사 정체성이다. owner, data classification,
+원본 위치의 logical reference와 삭제 책임을 가진다. 새 문서를 수집하거나 source revision·ACL·chunking·embedding
+model·index build가 바뀌면 immutable `KnowledgeVersion`을 만든다.
+
+```yaml
+knowledgeVersionId: knv_hr_policy_2026_08
+knowledgeSourceId: kns_hr_policy
+sourceRevision: git:8f6c2d1
+accessPolicyVersion: kap_14
+indexBuild:
+  chunkerVersion: semantic-v3
+  embeddingModelVersion: text-embedding-3-large@2026-07
+  artifactDigest: sha256:...
+deletionLineage:
+  supersedes: knv_hr_policy_2026_07
+  removedDocumentIds: []
+```
+
+`KnowledgeBinding`은 AgentVersion이 이 snapshot을 어떻게 조회할지 고정한다. top-k, metadata filter, citation 필수
+여부와 query principal 전달 방식을 담는다. vector DB collection이나 provider index ID는 environment별
+`KnowledgeDeployment.providerRef`에 둔다. source 문서 삭제나 ACL 축소가 생기면 영향받는 KnowledgeVersion과
+publication을 찾아 재색인·중지하고, 이전 index의 retention과 삭제 증거를 남긴다.
+
+:::caution[memory와 knowledge는 다르다]
+대화에서 개인 선호를 추출하는 runtime memory는 승인된 업무 corpus의 ingestion·ACL·인용 계약을 대신하지 않는다.
+memory는 session/user state이고 knowledge는 versioned data dependency다.
+:::
+
+### ToolBinding은 endpoint 목록이 아니다
 
 tool을 URL만으로 연결하면 실행 권한의 의미가 사라진다. binding에는 다음을 함께 둔다.
 
@@ -186,30 +242,50 @@ tool을 URL만으로 연결하면 실행 권한의 의미가 사라진다. bindi
 
 ## 식별자와 표시값을 분리한다
 
-이메일과 부서명은 바뀐다. ACL key는 IdP의 불변 `sub`·object ID를 사용하고 화면에 현재 email과 display name을
-붙인다. Agent 이름도 rename할 수 있으므로 URL과 audit event에는 `agentId`를 쓴다.
+이메일과 부서명은 바뀐다. OIDC의 `sub`는 issuer 안에서만 유일하므로 ACL의 unique key는
+`(identityProviderId, subject)`로 둔다. `identityProviderId`에는 검증된 issuer를 매핑하고, Entra ID라면
+`(tenantId, objectId)`를 같은 구조로 정규화한다. 화면에는 현재 email과 display name을 붙인다.
+Agent 이름도 rename할 수 있으므로 URL과 audit event에는 `agentId`를 쓴다.
+
+```yaml
+principalKey: prn_01J...
+identityProviderId: idp_corp_keycloak
+issuer: https://id.company.example/realms/employees
+subject: 4f0f7f1d-...
+display:
+  email: kim@example.com
+  name: 김사원
+```
 
 모든 trace와 audit event에는 최소 다음 correlation field가 있어야 한다.
 
 ```text
-agentId · versionId · deploymentId · targetId · triggerId · principalId · sessionId · traceId
+agentId · versionId · deploymentId · targetId · triggerId
+principalKey · sessionId · traceId · effectiveConfigHash
 ```
+
+tool event에는 `toolVersionId`·`capabilityName`·`policyDecisionId`, retrieval event에는
+`knowledgeVersionId`·`knowledgeDeploymentId`를 추가한다.
 
 ## 지켜야 할 불변조건
 
-1. published version은 수정하지 않는다.
+1. 승인된 version과 binding은 수정하지 않는다. 변경은 새 version으로 만든다.
 2. 하나의 production publication은 하나의 active version을 가리킨다.
 3. provider resource를 삭제해도 Agent와 audit 기록은 삭제하지 않는다.
 4. owner가 사라지기 전에 group owner 또는 successor에게 이전한다.
 5. deployment `READY`와 publication `AVAILABLE`을 같은 상태로 취급하지 않는다.
 6. secret value를 version spec과 audit payload에 넣지 않는다.
+7. `AgentVersion`, `Deployment`, `Publication` 상태는 서로 독립적으로 전이한다.
+8. invocation은 당시의 `effectiveConfigHash`와 knowledge·policy version을 재구성할 수 있어야 한다.
+9. source 삭제·ACL 축소는 index 재생성, publication 영향 판정과 삭제 증거까지 이어진다.
 
 ## 3장 요약
 
-- Agent와 Tool은 정체성, Version은 실행 가능한 불변 snapshot, Deployment는 target별 실행·연결 결과다.
-- [2장의 여섯 분류 축](/agent-platform/02-agent-types/)은 `AgentVersion`·`Trigger`·`DeploymentTarget`에 나눠 담고, schedule과 event는 `Trigger`로 표현한다.
+- Agent·Knowledge·Tool은 정체성, Version은 실행 가능한 불변 snapshot, Deployment는 target별 실행·연결 결과다.
+- [2장의 여섯 요구 차원](/agent-platform/02-agent-types/)은 `AgentVersion`·`Trigger`·`DeploymentTarget`에 나눠 담고, schedule과 event는 `Trigger`로 표현한다.
+- knowledge는 source·version·deployment·binding으로 나눠 ingestion·ACL·index lineage를 재현한다.
 - Grant와 Publication을 provider resource 밖에 두어 호출 권한과 공개 상태를 유지한다.
-- provider-specific ID·URL·secret은 공통 객체의 중심으로 들어오지 않는다.
+- provider-specific ID·URL·secret은 공통 객체의 중심으로 들어오지 않고, 실효 구성 hash를 trace에 남긴다.
 
 <LinkCard
   title="4. 등록부터 폐기까지"

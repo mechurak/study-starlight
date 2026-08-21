@@ -20,7 +20,7 @@ import Thesis from '../../../components/docs/Thesis.astro';
   ]}
 />
 
-앞선 7장까지가 제품 밖의 계약이었다면 8~11장은 그 계약을 실제로 실행하는 첫 target인 kagent를 다룬다.
+앞선 7장까지가 제품 밖의 계약이었다면 8~11장은 그 계약을 실제로 실행하는 첫 target 후보인 kagent v0.9.9를 다룬다.
 이 장은 **구성 요소와 실행 형태**만 고정한다. resource 필드는 [9장](/agent-platform/09-kagent-resources/),
 사내 frontend·backend와의 연결은 [10장](/agent-platform/10-kagent-integration/),
 adapter 구현과 권한 경계는 [11장](/agent-platform/11-kagent-adapter/)으로 넘긴다.
@@ -110,15 +110,17 @@ Kubernetes controller로, engine을 "Agent의 대화 loop를 실행하는 핵심
 
 ## 두 engine runtime
 
-Declarative Agent는 `runtime` 필드로 engine 구현을 고른다. 차이는 기능이 아니라 **시작 시간과 자원**이다.
+Declarative Agent는 `runtime` 필드로 engine 구현을 고른다. 공식 Agents 문서는 Python을 기본값으로 설명하지만,
+이 덱은 alpha schema의 암묵적 기본값에 기대지 않고 모든 manifest에 값을 명시한다. 주요 차이는 시작 시간·자원과
+사용 가능한 framework integration이다.
 
-| runtime | 시작 시간 | 특징 |
+| 명시할 runtime | 문서상 시작 시간 | 특징 |
 |---|---|---|
-| Python ADK (기본) | 약 15초 | LangGraph·CrewAI·OpenAI 통합을 함께 쓸 수 있다 |
+| Python ADK | 약 15초 | LangGraph·CrewAI·OpenAI 통합을 함께 쓸 수 있다 |
 | Go ADK | 약 2초 | 자원 사용이 적다. `SandboxAgent`는 이 runtime만 쓴다 |
 
-Agent 수가 많아지면 이 15초가 그대로 비용이 된다. 사내에서 Agent를 수백 개 등록받을 계획이라면
-runtime 기본값을 무엇으로 강제할지가 platform policy 항목이 된다.
+Agent 수가 많아지면 시작 시간과 idle resource가 비용이 된다. 사내에서 Agent를 수백 개 등록받을 계획이라면
+runtime 선택 기준과 지원 feature를 platform policy로 고정하고, upgrade 때 두 runtime의 contract test를 다시 돈다.
 
 ## 세 가지 실행 형태
 
@@ -166,14 +168,14 @@ Agent code를 직접 실행할 수 있지만, 이때는 kagent `Agent`의 Ready 
 못한다. 이 차이를 capability로 드러내는 방법은
 [11장](/agent-platform/11-kagent-adapter/#capability-profile)에 있다.
 
-제품 중립 분류는 [Agent 종류의 여섯 축](/agent-platform/02-agent-types/#여섯-개의-분류-축)에서,
+제품 중립 분류는 [Agent 종류의 여섯 요구 차원](/agent-platform/02-agent-types/#여섯-개의-요구-차원)에서,
 trigger 계약은 [제품 밖의 domain model](/agent-platform/03-domain-model/#trigger는-agent-process가-아니다)에서 정의한다.
 
 ## 8장 요약
 
 - kagent의 진실은 Kubernetes API의 resource이고 dashboard·CLI는 그것을 보는 입구다.
 - controller는 resource를 조정하고 engine은 Agent Pod 안에서 대화 loop를 돌린다.
-- engine runtime은 Python ADK(기본, 약 15초)와 Go ADK(약 2초) 중에서 고른다.
+- engine runtime은 Python ADK(문서상 약 15초)와 Go ADK(약 2초) 중에서 고르고 manifest에 명시한다.
 - `Declarative`/`BYO`는 공급 주체 축, `Agent`/`SandboxAgent`/`AgentHarness`는 상주 방식 축이다.
 - 일정·event 실행은 kagent 밖의 scheduler가 A2A로 invoke하는 형태로 번역한다.
 

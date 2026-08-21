@@ -1,6 +1,6 @@
 ---
 title: "4. 등록부터 폐기까지"
-description: Agent version의 제출·검사·승인·배포·공개·중지·폐기를 하나의 lifecycle로 설계한다
+description: AgentVersion의 승인, Deployment의 준비, Publication의 공개를 서로 다른 lifecycle로 설계한다
 ---
 
 import { LinkCard } from '@astrojs/starlight/components';
@@ -14,39 +14,97 @@ import Thesis from '../../../components/docs/Thesis.astro';
     ['promotion', 'Promotion', '같은 immutable artifact를 dev에서 staging, production으로 승격하는 과정이다.'],
     ['attestation', 'Attestation', '어떤 build와 검사가 artifact에 수행됐는지 서명된 증거로 남긴 것이다.'],
     ['reconciliation', 'Reconciliation', '원하는 상태와 provider 실제 상태를 반복 비교해 차이를 줄이는 동작이다.'],
+    ['publication pointer', 'Publication Pointer', '사용자가 호출할 때 선택할 준비된 Deployment를 가리키는 control-plane 참조다.'],
   ]}
 />
 
-## Lifecycle 전체
+## 세 lifecycle 전체
 
-```mermaid
-stateDiagram-v2
-    [*] --> Draft
-    Draft --> Submitted: version 제출
-    Submitted --> Rejected: 정적 검사 실패
-    Submitted --> PendingApproval: 자동 검사 통과
-    PendingApproval --> Rejected: 심사 반려
-    PendingApproval --> Approved: 승인
-    Approved --> Deploying: target 배포
-    Deploying --> DeployFailed: 배포·smoke 실패
-    DeployFailed --> Deploying: 재시도
-    Deploying --> Ready: runtime 준비
-    Ready --> Published: ACL·route 공개
-    Published --> Suspended: 운영·보안 중지
-    Suspended --> Published: 해제
-    Published --> Retired: 새 version 전환
-    Rejected --> Draft: 수정
-    Retired --> [*]
+세 상태를 한 그림에 섞으면 `APPROVED`, `READY`, `AVAILABLE`을 같은 종류의 상태로 오해하기 쉽다. 다음처럼
+각 lifecycle을 독립된 상태도로 읽고, 앞 lifecycle의 성공 상태는 다음 lifecycle을 시작할 수 있는 **gate**로만
+사용한다.
+
+### AgentVersion — 승인
+
+```d2 layout=dagre pad=30 title="AgentVersion이 draft에서 자동 검사와 승인을 거쳐 approved 또는 rejected가 되고, approved version이 최종적으로 retired되는 상태 전이"
+direction: right
+
+draft: DRAFT
+submitted: SUBMITTED
+pending: PENDING_APPROVAL
+approved: APPROVED {
+  style.fill: "#dcfce7"
+  style.stroke: "#16a34a"
+  style.font-color: "#14532d"
+}
+rejected: REJECTED
+retired: RETIRED
+
+draft -> submitted -> pending -> approved -> retired
+submitted -> rejected: "자동 검사 실패"
+pending -> rejected: "반려"
+rejected -> draft: "새 내용으로 재작성"
 ```
 
-`Ready`와 `Published` 사이에 경계를 둔다. provider health가 초록이어도 ACL, route, audit sink와 synthetic
-invoke가 함께 검증되지 않으면 사용자가 호출하게 하지 않는다.
+### Deployment — 실행
+
+```d2 layout=dagre pad=30 title="Deployment가 provisioning을 거쳐 ready가 되고, 실패와 성능 저하를 복구하거나 drain 뒤 stopped되는 상태 전이"
+direction: right
+
+pending: PENDING
+provisioning: PROVISIONING
+ready: READY {
+  style.fill: "#dcfce7"
+  style.stroke: "#16a34a"
+  style.font-color: "#14532d"
+}
+degraded: DEGRADED
+failed: FAILED
+draining: DRAINING
+stopped: STOPPED
+
+pending -> provisioning -> ready -> draining -> stopped
+provisioning -> failed -> provisioning: "재시도"
+ready -> degraded -> ready: "복구"
+```
+
+### Publication — 공개
+
+```d2 layout=dagre pad=30 title="Publication이 closed에서 ACL과 route 공개를 거쳐 available이 되고, 일시 중지 또는 영구 폐기되는 상태 전이"
+direction: right
+
+closed: CLOSED
+available: AVAILABLE {
+  style.fill: "#dcfce7"
+  style.stroke: "#16a34a"
+  style.font-color: "#14532d"
+}
+suspended: SUSPENDED
+retired: RETIRED
+
+closed -> available: "ACL · route 공개"
+available -> suspended -> available: "재개"
+available -> retired
+suspended -> retired
+```
+
+한 AgentVersion은 온프렘·AWS 또는 blue·green처럼 여러 Deployment를 가질 수 있다. 하나가 `READY`이고 다른
+하나가 `FAILED`여도 version은 여전히 `APPROVED`다. Publication은 준비된 Deployment 하나와 route weight를
+가리키므로, provider health가 초록이어도 ACL·audit sink·synthetic invoke가 함께 검증되지 않으면
+`AVAILABLE`로 전이하지 않는다.
+
+| lifecycle | 상태의 단일 원본 | 답하는 질문 |
+|---|---|---|
+| AgentVersion | portal approval DB | 이 불변 구성을 배포해도 되는가 |
+| Deployment | portal desired state + provider observed state | 이 target의 복사본이 실제로 준비됐는가 |
+| Publication | portal catalog·route DB | 지금 누가 어느 Deployment를 호출하는가 |
 
 ## Creator가 제출하는 것
 
 구성형 Agent는 portal form이나 Git의 선언 파일을 제출한다. 코드형 Agent는 source repository와 build recipe를
-제출하고 platform CI가 image를 만든다. production에서 사용자가 임의 registry URL이나 mutable tag를 직접
-입력하게 하지 않는다.
+제출하고 platform CI가 target capability에 맞는 immutable artifact를 만든다. portable production 기본은 OCI
+digest이고 AgentCore CodeZip은 명시적 extension이다. production에서 사용자가 임의 registry URL이나 mutable
+tag를 직접 입력하게 하지 않는다.
 
 사용자가 만든 MCP도 같은 제출·검사·승인 뼈대를 쓰되 AgentVersion에 종속시키지 않는다. MCP source·image 또는
 remote endpoint를 독립된 ToolVersion으로 받고, discovery schema와 tool publication을 추가로 검증한다. 구체적인
@@ -56,7 +114,8 @@ remote endpoint를 독립된 ToolVersion으로 받고, discovery schema와 tool 
 
 - metadata와 owner
 - framework와 protocol contract
-- model·tool·data classification 선언
+- model·knowledge·tool·data classification 선언
+- KnowledgeVersion·ToolVersion binding과 effective configuration hash
 - CPU·memory·architecture hint
 - test case와 expected behavior
 - target 제약: `restricted only`, `AWS allowed` 등
@@ -66,7 +125,8 @@ remote endpoint를 독립된 ToolVersion으로 받고, discovery schema와 tool 
 | 검사 | 구성형 | 코드형 |
 |---|---:|---:|
 | schema와 필수 metadata | ✓ | ✓ |
-| prompt·knowledge data 등급 | ✓ | ✓ |
+| prompt·knowledge source revision·data 등급 | ✓ | ✓ |
+| knowledge ACL·index digest·삭제 lineage | ✓ | ✓ |
 | tool scope와 human approval | ✓ | ✓ |
 | dependency·container 취약점 |  | ✓ |
 | SBOM·image signature·digest | runtime image 기준 | ✓ |
@@ -101,8 +161,15 @@ adapter는 승인된 digest와 target만 받아 배포한다. 배포 후 다음 
 6. trace·audit·cost record 도착
 
 새 version은 바로 전체 전환하지 않는다. backend가 traffic split을 지원하면 canary를 사용하고, 아니면 portal
-route에서 소수 test principal만 새 deployment로 보낸다. rollback은 image를 다시 build하는 것이 아니라
-publication pointer를 직전 ready deployment로 돌리는 동작이어야 한다.
+route에서 소수 test principal만 새 deployment로 보낸다.
+
+여기에는 서로 다른 복구 동작 두 개가 있다.
+
+- **publication rollback** — platform core가 active pointer를 직전 `READY` Deployment로 되돌린다. image를
+  다시 build하지 않으며 provider adapter operation도 아니다.
+- **deployment rollback·repair** — provider resource 자체가 잘못됐을 때 adapter가 이전 spec을 별도
+  Deployment로 다시 reconcile하거나 provider-native traffic weight를 조정한다. 결과가 `READY`가 된 뒤에만
+  publication 후보가 된다.
 
 ## 변경과 drift
 
@@ -117,8 +184,10 @@ provider의 일시적 조회 실패를 `DELETED`로 오판하지 않도록 `UNKN
 
 ## 중지와 폐기
 
-`Suspended`는 route와 invoke 권한을 즉시 막되 runtime을 조사할 수 있게 남길 수 있다. `Retired`는 새 conversation을
-받지 않고 retention 기간 뒤 deployment를 제거한다. DB record와 audit log는 보존 정책에 따라 남긴다.
+Publication의 `SUSPENDED`는 route와 invoke를 즉시 막되 Deployment를 조사할 수 있게 남긴다. Publication
+`RETIRED`는 새 conversation을 받지 않는 종결 상태다. AgentVersion `RETIRED`는 신규 Deployment 후보에서
+제외한다. Deployment는 drain 뒤 `STOPPED`로 전이하고 retention 기간 뒤 adapter가 runtime resource를 제거한다.
+세 상태를 한 필드로 덮어쓰지 않으며 DB record와 audit log는 보존 정책에 따라 남긴다.
 
 owner 퇴사, 취약한 dependency, 오래 사용되지 않은 Agent, 만료된 data approval은 자동 review trigger다.
 
@@ -126,8 +195,8 @@ owner 퇴사, 취약한 dependency, 오래 사용되지 않은 Agent, 만료된 
 
 - immutable artifact 하나를 검사하고 environment 사이에서 승격한다.
 - 구성형과 코드형은 자동 검사와 승인 강도가 다르다.
-- runtime 준비, 권한 공개, catalog 공개를 별도 상태로 둔다.
-- rollback은 이전 publication pointer로 빠르게 돌아가는 동작이다.
+- AgentVersion 승인, Deployment 준비, Publication 공개는 서로 다른 상태 머신이다.
+- publication rollback과 provider deployment repair를 별도 연산으로 둔다.
 
 <LinkCard
   title="5. 권한은 세 번 검사한다"

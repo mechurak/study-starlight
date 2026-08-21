@@ -21,7 +21,7 @@ import Thesis from '../../../components/docs/Thesis.astro';
 
 | 경로 | 대표 지표 | 실패의 첫 소유자 |
 |---|---|---|
-| 배포 | approval-to-ready, deploy failure, rollback time | control plane·adapter |
+| 배포·공개 | approval-to-ready, deploy failure, deployment repair와 publication rollback time | control plane·adapter·publication router |
 | 호출 | auth deny, time to first token, completion rate | gateway·runtime·model |
 | action | tool allow/deny, latency, side-effect failure | tool gateway·업무 system |
 
@@ -32,9 +32,13 @@ LLM 응답 200만 재면 tool이 실패한 Agent도 정상으로 보인다. 세 
 portal gateway가 다음 field를 만들고 runtime·model gateway·tool gateway에 전파한다.
 
 ```text
-agentId · versionId · deploymentId · targetId
-principalId · sessionId · traceId · policyDecisionId
+agentId · versionId · deploymentId · targetId · triggerId
+principalKey · sessionId · traceId · effectiveConfigHash
 ```
+
+tool event에는 `toolVersionId`·`capabilityName`·`policyDecisionId`, retrieval event에는
+`knowledgeVersionId`·`knowledgeDeploymentId`를 추가한다. OIDC token의 bare `sub`나 email을 correlation key로
+쓰지 않고 portal이 정규화한 issuer-scoped `principalKey`를 전파한다.
 
 prompt·response 원문은 기본 correlation field가 아니다. data classification에 따라 저장 여부, redaction, 암호화,
 retention과 열람 role을 정한다. [Langfuse 덱](/langfuse/)의 trace 설계와 연결하되 SIEM audit 원장을 대체하지 않는다.
@@ -91,19 +95,19 @@ adapter release, kagent CRD/controller, AgentCore API contract를 Agent version�
 - private CA·IdP·secret rotation
 - deny policy와 OBO tool
 - trace correlation과 redaction
-- rollback과 기존 session 처리
+- 새 Deployment 전환·publication rollback과 기존 session 처리
 
 수동 변경은 주기적 inventory와 desired-state diff로 찾는다. 보안 경계 drift는 자동 suspend가 가능해야 한다.
 
 ## Backup과 복구
 
-가장 먼저 복구할 것은 provider resource가 아니라 platform DB의 Agent·Version·Grant·Publication과 audit key다.
-artifact registry와 Git이 있으면 deployment는 adapter로 재생성할 수 있다.
+가장 먼저 복구할 것은 provider resource가 아니라 platform DB의 Agent·Version·KnowledgeVersion·Grant·Publication과
+audit key다. artifact registry, source snapshot과 index build artifact가 있으면 deployment는 adapter로 재생성할 수 있다.
 
-복구 순서는 `IdP/ACL → catalog DB → artifact/secret reference → adapter → runtime → route → synthetic test`다.
+복구 순서는 `IdP/ACL → catalog DB → source·artifact·index/secret reference → adapter → runtime → route → synthetic test`다.
 memory와 conversation은 data 등급·RPO에 따라 별도 복구한다.
 
-## 12장 요약
+## 15장 요약
 
 - 배포·호출·action 경로의 SLO와 실패 소유자를 분리한다.
 - 공통 correlation field로 provider trace를 연결하고 audit 원장을 별도로 둔다.
@@ -112,6 +116,6 @@ memory와 conversation은 data 등급·RPO에 따라 별도 복구한다.
 
 <LinkCard
   title="16. 두 Agent로 시작하기"
-  description="기본 target 하나와 검증 Agent 두 개로 adapter·ACL·rollback의 가장 위험한 가정을 시험한다."
+  description="기본 target 하나와 검증 Agent 두 개로 adapter·ACL·publication 전환의 가장 위험한 가정을 시험한다."
   href="/agent-platform/16-adoption/"
 />

@@ -115,7 +115,7 @@ declarative:
   promptTemplate:
     dataSources:
       - kind: ConfigMap
-        name: kagent-builtin-prompts
+        name: policy-bundle-pbv-12
         alias: builtin
     systemMessage: |
       You are {{.AgentName}}.
@@ -123,8 +123,9 @@ declarative:
 ```
 
 사용자가 쓴 prompt 뒤에 회사의 보안·컴플라이언스 지침을 항상 덧붙이고 싶다면, 포털이 문자열을 이어 붙이는
-대신 이 구조를 쓰는 편이 낫다. 지침을 한 곳에서 고치면 모든 Agent에 반영되고, 사용자 prompt와 회사 지침이
-resource 위에서 분리돼 남는다.
+대신 이 구조를 쓸 수 있다. 다만 공유 ConfigMap을 제자리에서 고치면 승인된 Agent의 동작이 조용히 바뀐다.
+ConfigMap 이름에 `PolicyBundleVersion`을 넣고 immutable로 운영하며, 변경 시 `pbv-13`을 만들어 publication이
+사용할 실효 조합을 승인한다. invocation에는 `effectiveConfigHash`와 policy bundle version을 남긴다.
 
 ### model — ModelConfig 참조
 
@@ -133,7 +134,8 @@ API key를 직접 쓰지 않는다는 뜻이다. 사내에서는 이 자리가 [
 OpenAI-compatible `ModelConfig` 하나로 수렴하는 경우가 많다.
 
 포털이 사용자에게 보여줄 "모델 선택" 드롭다운은 결국 **승인된 `ModelConfig` 목록**이다. 사용자가 임의의
-provider·baseUrl을 입력하게 두면 model 비용과 data 유출 경계가 동시에 깨진다.
+provider·baseUrl을 입력하게 두면 model 비용과 data 유출 경계가 동시에 깨진다. 같은 이름의 ModelConfig를
+덮어쓰지 않고 model policy version과 content hash를 AgentVersion에 고정한다.
 
 ### tools — 무엇을 할 수 있는가
 
@@ -154,15 +156,15 @@ skill은 tool과 다르다. tool이 "호출 가능한 함수"라면 skill은 **A
 ```yaml
 skills:
   refs:
-    - image: registry.example.com/skill:v1
+    - image: registry.company/skills/report@sha256:8b4c...
   gitRefs:
-    - url: https://github.com/org/skills.git
-      ref: main
+    - url: https://git.company.example/agent-skills.git
+      ref: 8f6c2d1a4b7e9c0d
 ```
 
 container skill은 **외부 code를 Agent 안으로 끌어오는 경로**다. 임의의 공개 registry·Git URL을 사용자가
 직접 넣게 두면 [4장의 공급망 검사](/agent-platform/04-lifecycle/#자동-검사는-위험별로-나눈다)를 우회하는 문이 된다.
-포털에서는 승인된 registry로 제한하는 것이 기본이다.
+포털에서는 승인된 registry로 제한하고 OCI digest나 Git commit SHA로 고정하는 것이 기본이다.
 
 ## 사람이 개입하는 지점 — HITL
 
@@ -221,6 +223,11 @@ long-term memory는 [Agent Memory](https://kagent.dev/docs/kagent/concepts/agent
 대화에서 사용자 의도·선호를 주기적으로 뽑아 embedding으로 저장했다가 응답 전에 유사도로 검색해 넣는다.
 활성화하려면 embedding용 `ModelConfig`를 별도로 준비하고 보관 기간(TTL)을 정한다. 임의의 vector DB를 꽂는
 plugin 구조는 아니므로, 사내 표준 vector store가 이미 있다면 그쪽은 MCP tool로 붙이는 편이 현실적이다.
+
+이 memory는 [3장의 KnowledgeVersion](/agent-platform/03-domain-model/#knowledge와-tool은-version에-binding한다)을
+대신하지 않는다. 개인 대화에서 추출한 memory와 승인된 업무 corpus의 source revision·ACL·index lineage는
+수명과 삭제 책임이 다르다. kagent에 제품 중립 knowledge binding을 직접 매핑할 필드가 없다면 회사 runner의
+retrieval client 또는 승인된 MCP capability로 주입하고 그 version을 trace에 남긴다.
 
 :::caution[개인정보가 조용히 축적되는 자리]
 memory는 사용자가 명시적으로 저장을 요청하지 않아도 대화에서 자동으로 정보를 추출한다. 사내 도입 시
@@ -328,7 +335,7 @@ image는 배포 자체를 거절한다. 사내 포털에서 "내 컨테이너 �
 | 구분 | 필드 | 이유 |
 |---|---|---|
 | 사용자가 채운다 | `systemMessage`, tool 선택(`toolNames`), 이름·설명 | Agent의 목적 그 자체 |
-| 목록에서 고른다 | `modelConfig`, MCP server, skill ref | 승인된 것만 노출 |
+| 목록에서 고른다 | versioned `modelConfig`, KnowledgeVersion, MCP capability, immutable skill ref | 승인된 것만 노출 |
 | 플랫폼이 정한다 | namespace, `deployment`, `runtime`, security context, `allowedNamespaces` | 격리·비용·blast radius |
 | 사용자에게 열지 않는다 | `headersFrom`의 Secret 이름, 임의 image·Git URL, cross-namespace 참조 | 자격증명과 공급망 경계 |
 
@@ -339,9 +346,10 @@ image는 배포 자체를 거절한다. 사내 포털에서 "내 컨테이너 �
 ## 9장 요약
 
 - Declarative Agent는 instruction·model·tool·skill 네 구성 요소로 이뤄진다.
-- 공용 지침은 문자열 연결이 아니라 `promptTemplate`의 ConfigMap 조각으로 강제한다.
+- 공용 지침은 versioned immutable ConfigMap으로 주입하고 policy bundle version을 trace에 남긴다.
 - `requireApproval`은 행위 위험을 막는 장치이지 호출 권한이 아니다.
 - 대화 상태는 session·compaction·long-term memory 세 층이고, memory는 정책을 정하고 켠다.
+- runtime memory와 승인된 KnowledgeVersion의 ingestion·ACL·index lifecycle을 구분한다.
 - tool은 `toolNames` allowlist로 좁히고 자격증명은 `headersFrom` 참조로 넘긴다.
 - 사용자에게 열 필드와 서버가 채울 필드를 나누는 것이 포털 폼 설계의 시작이다.
 
