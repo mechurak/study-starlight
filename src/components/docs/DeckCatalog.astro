@@ -1,11 +1,20 @@
 ---
 /*
-  랜딩(/)의 덱 목록 — 카테고리 카드 · 정렬 가능한 테이블.
+  랜딩(/)의 덱 목록 — 태그 필터 · 카테고리 카드 · 정렬 가능한 테이블.
 
   카드 보기는 덱을 카테고리로 묶어 처음 둘러보기 좋게 하고,
   테이블 보기는 덱이 많을 때 전체를 빠르게 비교하게 한다.
   테이블의 카테고리와 최근 수정일 제목행은 버튼이며, 누를 때마다 오름차순과
   내림차순을 바꾼다. 현재 보기는 localStorage에 저장한다.
+
+  카테고리는 굵은 묶음이고, 카테고리를 가로지르는 축(온프렘·실습·인증 같은)은
+  태그가 맡는다. 필터는 교집합(AND)이다 — 덱 23개에서 합집합은 대부분을 남겨
+  필터가 아무 일도 안 하는 것처럼 보인다. 대신 AND는 막다른 길이 생기므로
+  선택이 바뀔 때마다 남은 칩의 개수를 다시 세고, 0이 되는 칩은 흐리게 한다.
+
+  태그 선택은 localStorage에 저장하지 않는다. 보기 전환은 지속되는 취향이지만
+  태그는 그때의 질의라, 저장하면 다음에 왔을 때 덱 대부분이 말없이 사라진다.
+  대신 '?tags=k8s,onprem'으로 URL에 남겨 링크가 되게 한다(replaceState).
 
   sections: 카테고리 하나 = 섹션 하나
     title  카테고리 이름 (h2)
@@ -18,6 +27,9 @@
       title     덱 이름
       desc      한 줄 소개 (평문 — 서식 처리 없음)
       chapters  장 수 — 카드 오른쪽 위 분량 표시
+      tags      해석된 {id, label, axis} — 카드·행의 라벨이자 필터 대상
+  facets: 필터 칩 — sections의 태그와 같은 어휘에 전체 기준 count가 붙은 것
+  axes:   칩을 묶는 축 (주제 · 형식 · 환경)
 
   각 덱의 최종 수정일은 Starlight가 페이지 수정일에 쓰는 Git 이력에서 가져온다.
   파일 시스템 mtime은 배포 체크아웃 시각으로 바뀌므로 사용하지 않는다. 덱의 index와
@@ -31,6 +43,12 @@ import { getNewestCommitDate } from 'virtual:starlight/git-info';
 
 type Tone = 'key' | 'ok' | 'warn' | 'bad' | 'mute' | 'zone';
 
+interface Tag {
+  id: string;
+  label: string;
+  axis: string;
+}
+
 interface Deck {
   slug: string;
   href: string;
@@ -38,6 +56,7 @@ interface Deck {
   title: string;
   desc: string;
   chapters: number;
+  tags: Tag[];
 }
 
 interface Section {
@@ -49,9 +68,11 @@ interface Section {
 
 interface Props {
   sections: Section[];
+  facets: (Tag & { count: number })[];
+  axes: { id: string; label: string }[];
 }
 
-const { sections } = Astro.props;
+const { sections, facets, axes } = Astro.props;
 const docs = await getCollection('docs');
 
 const sectionsWithDates = sections.map((section) => ({
@@ -90,10 +111,33 @@ const formatDate = (date: Date) =>
     day: 'numeric',
     timeZone: 'Asia/Seoul',
   });
+
+const tagIds = (deck: { tags: Tag[] }) => deck.tags.map((tag) => tag.id).join(' ');
 ---
 
 <div class="catalog" data-deck-catalog>
-  <div class="catalog__toolbar" role="group" aria-label="덱 표시 방식">
+  {/* 필터가 툴바 위에 온다 — 필터는 "무엇을", 보기 전환은 "어떻게"다.
+      data-pagefind-ignore: 랜딩도 색인 대상이라, 두지 않으면 '온프렘'·'실습' 같은
+      칩 라벨 때문에 '/'가 진짜 덱 페이지와 검색 순위를 다툰다. */}
+  <div class="catalog__filter" data-tag-filter data-pagefind-ignore role="group" aria-label="태그 필터">
+    {axes.map((axis) => (
+      <div class="filter__axis" role="group" aria-label={axis.label}>
+        {/* 바깥 role="group"이 이미 같은 이름을 갖고 있어 중복해 읽히지 않게 감춘다 */}
+        <span class="filter__axis-label" aria-hidden="true">{axis.label}</span>
+        {facets
+          .filter((facet) => facet.axis === axis.id)
+          .map((facet) => (
+            <button class="filter__chip" type="button" data-tag={facet.id} data-axis={facet.axis} aria-pressed="false">
+              {facet.label}
+              <span class="filter__count" data-chip-count>{facet.count}</span>
+            </button>
+          ))}
+      </div>
+    ))}
+    <button class="filter__clear" type="button" data-filter-clear hidden>필터 지우기</button>
+  </div>
+
+  <div class="catalog__toolbar" role="group" aria-label="덱 표시 방식" data-pagefind-ignore>
     <span class="catalog__toolbar-label">보기</span>
     <div class="catalog__view-switch">
       <button class="catalog__view-button" type="button" data-view-button="cards" aria-pressed="true">
@@ -123,7 +167,7 @@ const formatDate = (date: Date) =>
         </header>
         <div class="catalog__grid">
           {section.decks.map((deck) => (
-            <a class="deck" href={deck.href}>
+            <a class="deck" href={deck.href} data-tags={tagIds(deck)}>
               <span class="deck__icon" aria-hidden="true">
                 <Icon name={deck.icon as any} size="1.25rem" />
               </span>
@@ -138,6 +182,15 @@ const formatDate = (date: Date) =>
                     마지막 수정 <time datetime={deck.updatedAt.toISOString()}>{formatDate(deck.updatedAt)}</time>
                   </span>
                 )}
+                {/* 카드 전체가 <a>다 — 여기의 태그는 라벨이지 버튼이 아니다.
+                    앵커 안에 버튼을 중첩하면 잘못된 HTML이고 키보드 탐색이 깨진다.
+                    필터 바와 같은 이유로 색인에서 뺀다 — 카드마다 반복되므로
+                    이쪽이 오히려 랜딩의 검색 무게를 더 키운다. */}
+                <span class="deck__tags" data-pagefind-ignore>
+                  {deck.tags.map((tag) => (
+                    <span class="deck__tag" data-axis={tag.axis}>{tag.label}</span>
+                  ))}
+                </span>
               </span>
             </a>
           ))}
@@ -146,7 +199,9 @@ const formatDate = (date: Date) =>
     ))}
   </div>
 
-  <div class="catalog-table-wrap" data-catalog-view="table" hidden>
+  {/* 테이블 보기는 카드 보기와 같은 제목·설명을 한 번 더 실을 뿐이라 통째로 색인에서 뺀다.
+      hidden이어도 Pagefind는 빌드된 HTML을 그대로 읽으므로 붙이지 않으면 두 번 실린다. */}
+  <div class="catalog-table-wrap" data-catalog-view="table" hidden data-pagefind-ignore>
     <table class="catalog-table">
       <thead>
         <tr>
@@ -172,6 +227,7 @@ const formatDate = (date: Date) =>
             data-category={deck.category}
             data-updated={deck.updatedAt?.getTime() ?? ''}
             data-original-index={index}
+            data-tags={tagIds(deck)}
           >
             <th scope="row">
               <a class="catalog-table__deck" href={deck.href}>
@@ -181,6 +237,14 @@ const formatDate = (date: Date) =>
                 <span>
                   <span class="catalog-table__name">{deck.title}</span>
                   <span class="catalog-table__blurb">{deck.desc}</span>
+                  {/* 새 열이 아니라 덱 셀의 셋째 줄이다 — 열을 늘리면 min-width가 커져
+                      이미 잘리는 blurb가 더 잘린다. */}
+                  {/* 색인 제외는 래퍼의 data-pagefind-ignore가 이미 담당한다 */}
+                  <span class="catalog-table__tags">
+                    {deck.tags.map((tag) => (
+                      <span class="deck__tag" data-axis={tag.axis}>{tag.label}</span>
+                    ))}
+                  </span>
                 </span>
               </a>
             </th>
@@ -199,10 +263,21 @@ const formatDate = (date: Date) =>
     </table>
     <p class="sr-only" aria-live="polite" data-sort-status></p>
   </div>
+
+  {/* 두 패널 바깥이어야 한다 — hidden 하위의 aria-live는 접근성 트리에 없어서
+      아무것도 읽지 않는다. data-sort-status는 테이블 래퍼 안이라 재사용할 수 없다. */}
+  <p class="sr-only" aria-live="polite" data-filter-status></p>
+
+  <p class="catalog__empty" data-filter-empty hidden data-pagefind-ignore>
+    선택한 태그를 모두 가진 덱이 없습니다.
+    <button class="filter__clear" type="button" data-filter-clear>필터 지우기</button>
+  </p>
 </div>
 
 <script>
   const VIEW_STORAGE_KEY = 'deck-catalog-view';
+  // 태그 선택은 localStorage에 저장하지 않는다 — 지속되는 취향이 아니라 그때의 질의다.
+  const TAGS_PARAM = 'tags';
 
   document.querySelectorAll<HTMLElement>('[data-deck-catalog]').forEach((catalog) => {
     const viewButtons = catalog.querySelectorAll<HTMLButtonElement>('[data-view-button]');
@@ -239,6 +314,123 @@ const formatDate = (date: Date) =>
     } catch {
       // localStorage를 읽을 수 없으면 기본 카드 보기를 유지한다.
     }
+
+    // ── 태그 필터 ────────────────────────────────────────────────────────────
+    const chips = Array.from(catalog.querySelectorAll<HTMLButtonElement>('[data-tag]'));
+    const clearButtons = catalog.querySelectorAll<HTMLButtonElement>('[data-filter-clear]');
+    const barClear = catalog.querySelector<HTMLElement>('[data-tag-filter] [data-filter-clear]');
+    const emptyState = catalog.querySelector<HTMLElement>('[data-filter-empty]');
+    const filterStatus = catalog.querySelector<HTMLElement>('[data-filter-status]');
+    const sectionEls = catalog.querySelectorAll<HTMLElement>('.catalog__section');
+
+    // 문자열 includes는 'agent'가 'agent-platform'에 걸리는 접두 충돌이 난다.
+    const tagSetOf = (el: HTMLElement) => new Set((el.dataset.tags ?? '').split(' ').filter(Boolean));
+    const cardEntries = Array.from(catalog.querySelectorAll<HTMLElement>('.deck')).map((el) => ({
+      el,
+      tags: tagSetOf(el),
+    }));
+    const rowEntries = Array.from(catalog.querySelectorAll<HTMLElement>('[data-deck-rows] tr')).map((el) => ({
+      el,
+      tags: tagSetOf(el),
+    }));
+
+    const vocabulary = chips.map((chip) => chip.dataset.tag ?? '');
+    const selected = new Set<string>();
+    let announced = false;
+
+    // 교집합 — 선택한 태그를 모두 가진 덱만 남는다.
+    const matches = (tags: Set<string>) => Array.from(selected).every((tag) => tags.has(tag));
+
+    const applyFilter = () => {
+      // DOM에서 빼지 않고 hidden으로 감춘다. 정렬이 rowsContainer.rows를 재배치하므로
+      // 제거하면 이후 정렬에서 영영 빠진다. hidden은 접근성 트리·탭 순서에서도 뺀다.
+      for (const { el, tags } of cardEntries) el.hidden = !matches(tags);
+      for (const { el, tags } of rowEntries) el.hidden = !matches(tags);
+
+      // 헤딩만 덩그러니 남지 않게 섹션을 통째로 접는다.
+      sectionEls.forEach((section) => {
+        section.hidden = !section.querySelector('.deck:not([hidden])');
+      });
+
+      const visible = cardEntries.filter(({ el }) => !el.hidden);
+
+      // 남은 덱 기준으로 칩 개수를 다시 센다. 0이 되는 칩은 막다른 길이라 흐리게 한다.
+      // disabled 속성은 쓰지 않는다 — 탭 순서에서 빠지면 어느 칩이 죽었는지 알 수 없다.
+      chips.forEach((chip) => {
+        const tag = chip.dataset.tag ?? '';
+        const isSelected = selected.has(tag);
+        const count = isSelected ? visible.length : visible.filter(({ tags }) => tags.has(tag)).length;
+        const chipCount = chip.querySelector<HTMLElement>('[data-chip-count]');
+        if (chipCount) chipCount.textContent = String(count);
+        chip.setAttribute('aria-disabled', String(!isSelected && count === 0));
+      });
+
+      if (emptyState) emptyState.hidden = visible.length > 0;
+      if (barClear) barClear.hidden = selected.size === 0;
+
+      // 첫 호출은 읽지 않는다 — 페이지가 뜨자마자 맥락 없는 안내가 나가는 걸 막는다.
+      if (announced && filterStatus) {
+        filterStatus.textContent =
+          visible.length > 0 ? `${visible.length}개 덱이 조건에 맞습니다.` : '조건에 맞는 덱이 없습니다.';
+      }
+      announced = true;
+    };
+
+    const syncUrl = () => {
+      const url = new URL(location.href);
+      url.searchParams.delete(TAGS_PARAM);
+      const others = url.searchParams.toString();
+      // 클릭 순서가 아니라 어휘 순서로 — 같은 선택이면 늘 같은 URL이 된다.
+      const value = vocabulary.filter((tag) => selected.has(tag)).join(',');
+      // searchParams.set을 쓰면 쉼표가 %2C로 인코딩돼 링크가 읽기 어려워진다.
+      // tag id는 [a-z0-9-]로 강제되므로(check-content) 이스케이프가 필요 없다.
+      const search = value
+        ? `?${others ? `${others}&` : ''}${TAGS_PARAM}=${value}`
+        : others
+          ? `?${others}`
+          : '';
+      // pushState면 칩을 누른 횟수만큼 뒤로가기가 필요하고 popstate 처리도 따라온다.
+      history.replaceState(null, '', url.pathname + search + url.hash);
+    };
+
+    const syncPressed = () => {
+      chips.forEach((chip) => {
+        chip.setAttribute('aria-pressed', String(selected.has(chip.dataset.tag ?? '')));
+      });
+    };
+
+    chips.forEach((chip) => {
+      chip.addEventListener('click', () => {
+        const tag = chip.dataset.tag;
+        if (!tag || chip.getAttribute('aria-disabled') === 'true') return;
+        if (selected.has(tag)) selected.delete(tag);
+        else selected.add(tag);
+        chip.setAttribute('aria-pressed', String(selected.has(tag)));
+        applyFilter();
+        syncUrl();
+      });
+    });
+
+    clearButtons.forEach((button) => {
+      button.addEventListener('click', () => {
+        selected.clear();
+        syncPressed();
+        applyFilter();
+        syncUrl();
+      });
+    });
+
+    const requestedTags = new URLSearchParams(location.search).get(TAGS_PARAM);
+    if (requestedTags !== null) {
+      // 모르는 id는 조용히 버린다 — 어휘가 바뀐 뒤의 오래된 링크는 깨지지 말고 무뎌져야 한다.
+      const known = new Set(vocabulary);
+      for (const tag of requestedTags.split(',')) {
+        if (known.has(tag)) selected.add(tag);
+      }
+      syncPressed();
+    }
+    applyFilter();
+    if (requestedTags !== null) syncUrl();
 
     sortButtons.forEach((button) => {
       button.addEventListener('click', () => {
@@ -314,6 +506,106 @@ const formatDate = (date: Date) =>
     margin-top: 1rem;
   }
 
+  /* [hidden]은 UA 규칙이라 .deck의 display:flex 같은 작성자 규칙에 진다.
+     필터가 카드 보기에서만 조용히 안 먹는 걸 막으려면 명시해야 한다. */
+  .catalog__section[hidden],
+  .deck[hidden],
+  .catalog-table tbody tr[hidden],
+  .catalog__empty[hidden],
+  .filter__clear[hidden] {
+    display: none;
+  }
+
+  /* 태그 필터 — 카테고리 tone과 경쟁하지 않게 무채색 아웃라인이다.
+     선택 상태만 accent를 쓴다. accent 토큰은 테마가 두 모드 모두 정의하므로
+     여기엔 [data-theme='dark'] 오버라이드가 필요 없다. */
+  .catalog__filter {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.4rem 0.85rem;
+  }
+  .filter__axis {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.35rem;
+  }
+  .filter__axis-label {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--sl-color-gray-3);
+  }
+  .filter__chip {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 0.3rem;
+    min-height: 1.75rem;
+    padding: 0.2rem 0.55rem;
+    border: 1px solid var(--sl-color-gray-5);
+    border-radius: 999px;
+    background: transparent;
+    color: var(--sl-color-gray-2);
+    font: inherit;
+    font-size: 0.75rem;
+    font-weight: 600;
+    white-space: nowrap;
+    cursor: pointer;
+  }
+  /* 형식·환경은 색이 아니라 모양으로 나눈다 — 여섯 tone을 여기까지 끌어 쓰면
+     한 화면에 색 체계가 셋이 된다. 모양은 색맹·다크모드에서도 남는다. */
+  .filter__chip[data-axis='format'],
+  .filter__chip[data-axis='env'] {
+    border-radius: 0.35rem;
+  }
+  .filter__chip:hover {
+    border-color: var(--sl-color-gray-4);
+    color: var(--sl-color-white);
+  }
+  .filter__chip[aria-pressed='true'] {
+    border-color: var(--sl-color-accent);
+    background: var(--sl-color-accent-low);
+    color: var(--sl-color-white);
+  }
+  .filter__chip[aria-disabled='true'] {
+    opacity: 0.4;
+    cursor: default;
+  }
+  .filter__count {
+    font-size: 0.68rem;
+    font-weight: 500;
+    color: var(--sl-color-gray-3);
+  }
+  .filter__chip[aria-pressed='true'] .filter__count {
+    color: inherit;
+  }
+  .filter__clear {
+    padding: 0.2rem 0.5rem;
+    border: 0;
+    border-radius: 0.35rem;
+    background: transparent;
+    color: var(--sl-color-gray-3);
+    font: inherit;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-decoration: underline;
+    text-underline-offset: 0.2em;
+    cursor: pointer;
+  }
+  .filter__clear:hover {
+    color: var(--sl-color-white);
+  }
+
+  .catalog__empty {
+    margin: 0;
+    padding: 2.5rem 1rem;
+    border: 1px dashed var(--sl-color-gray-5);
+    border-radius: 0.75rem;
+    color: var(--sl-color-gray-2);
+    font-size: 0.9rem;
+    text-align: center;
+  }
+
   .catalog__toolbar {
     display: flex;
     justify-content: flex-end;
@@ -361,7 +653,9 @@ const formatDate = (date: Date) =>
   }
   .catalog__view-button:focus-visible,
   .catalog-table__sort:focus-visible,
-  .catalog-table__deck:focus-visible {
+  .catalog-table__deck:focus-visible,
+  .filter__chip:focus-visible,
+  .filter__clear:focus-visible {
     outline: 2px solid var(--sl-color-accent-high);
     outline-offset: 2px;
   }
@@ -473,6 +767,28 @@ const formatDate = (date: Date) =>
     color: var(--sl-color-gray-3);
   }
 
+  /* 카드·표의 태그는 라벨이다. 필터 칩보다 한 단계 더 조용하게 — 테두리 없이 */
+  .deck__tags,
+  .catalog-table__tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.25rem;
+    margin-top: 0.2rem;
+  }
+  .deck__tag {
+    padding: 0.05rem 0.4rem;
+    border-radius: 0.35rem;
+    background: var(--sl-color-gray-6);
+    color: var(--sl-color-gray-3);
+    font-size: 0.68rem;
+    font-weight: 600;
+    line-height: 1.6;
+    white-space: nowrap;
+  }
+  .deck__tag[data-axis='topic'] {
+    border-radius: 999px;
+  }
+
   .catalog-table-wrap {
     max-width: 100%;
     overflow-x: auto;
@@ -490,22 +806,25 @@ const formatDate = (date: Date) =>
   }
   .catalog-table :is(th, td) {
     border: 0;
-    border-bottom: 1px solid var(--sl-color-gray-6);
     padding: 0.75rem 0.85rem;
     text-align: start;
     vertical-align: middle;
   }
+  /* 구분선을 행의 위쪽에 둔다. 아래쪽 + :last-child 방식이면 마지막 행이 필터로
+     숨었을 때 보이는 마지막 행의 선이 래퍼 테두리와 겹쳐 2px가 된다.
+     border-collapse: collapse라 첫 본문 행의 위 선은 thead 아래 선과 병합된다. */
+  .catalog-table tbody :is(th, td) {
+    border-top: 1px solid var(--sl-color-gray-6);
+  }
   .catalog-table thead th {
     position: sticky;
     top: 0;
+    border-bottom: 1px solid var(--sl-color-gray-6);
     background: var(--sl-color-gray-7);
     color: var(--sl-color-gray-2);
     font-size: 0.75rem;
     font-weight: 650;
     white-space: nowrap;
-  }
-  .catalog-table tbody tr:last-child :is(th, td) {
-    border-bottom: 0;
   }
   .catalog-table tbody tr:hover {
     background: color-mix(in srgb, var(--sl-color-accent-low) 35%, transparent);
@@ -637,6 +956,14 @@ const formatDate = (date: Date) =>
     }
     .catalog__grid {
       grid-template-columns: 1fr;
+    }
+    /* 칩은 줄바꿈으로 흘린다. 가로 스크롤 스트립은 칩을 화면 밖에 숨기고,
+       Tab으로 들어가면 예측 못 할 위치로 스크롤된다. 개수만 덜어 폭을 줄인다. */
+    .catalog__filter {
+      gap: 0.35rem 0.6rem;
+    }
+    .filter__count {
+      display: none;
     }
   }
 </style>

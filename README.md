@@ -54,6 +54,9 @@ pnpm preview
    덱이 갖고 있는 표준 관행이다 ([AGENTS.md](AGENTS.md)의 "덱" 절 참고.
    `_`로 시작하는 파일이라 빌드에는 안 잡힌다)
 3. `src/data/decks.mjs`에 덱 메타데이터와 사이드바 그룹·slug를 추가한다.
+   `category`(4종 중 하나)와 `tags`(최소 하나)는 필수다 — 둘 다 `pnpm check`가 검사한다.
+   배열에 넣는 **위치가 랜딩 카드 순서**이므로 제 카테고리 블록 안에 넣는다
+   (`topicOrder`는 사이드바 순서라 별개다).
    학습 덱이면 `termIntroDeckSlugs`에도 등록한다 (기준은 AGENTS.md의 "덱" 절)
 4. `pnpm check`로 manifest와 실제 파일이 맞는지 확인한다
 

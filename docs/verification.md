@@ -6,9 +6,9 @@
 pnpm check
 ```
 
-`check:content`가 manifest 등록과 중복(slug·topicOrder), 프론트매터, h4, 미지원 펜스 언어
-(promql·logql·traceql → `text`), 덱 index 컴포넌트, 필수 `TermIntro`를 검사하고,
-이어서 Astro 빌드와 Pagefind 인덱스 생성을 확인한다.
+`check:content`가 manifest 등록과 중복(slug·topicOrder), `category`·`tag` 어휘,
+프론트매터, h4, 미지원 펜스 언어(promql·logql·traceql → `text`), 덱 index 컴포넌트,
+필수 `TermIntro`를 검사하고, 이어서 Astro 빌드와 Pagefind 인덱스 생성을 확인한다.
 
 ## 변경별 브라우저 검증
 
@@ -30,7 +30,15 @@ pnpm check
 3. 이미지: 일반 본문 이미지와 `<SourceFigure>`의 확대 dialog가 열리고 닫히는지 확인한다.
 4. 검색: 검색 dialog를 열고 한국어 질의와 덱 별칭으로 결과가 나오는지 확인한다.
 5. 모바일: 390px에서 문서 본문이 `scrollWidth > clientWidth`가 아닌지 확인한다.
-   코드 블록 자체의 가로 스크롤은 정상이다.
+   코드 블록 자체의 가로 스크롤은 정상이다. 랜딩의 태그 칩 바는 여기서 5줄까지 늘어난다.
+6. 랜딩 태그 필터(`DeckCatalog`를 고쳤다면): 칩을 눌렀을 때 카드 보기에서 섹션이
+   헤딩째 사라지는지, 테이블 보기로 바꿔도 필터가 유지되는지, 정렬 → 필터와
+   필터 → 정렬 두 순서 모두 되는지 확인한다. 0이 되는 칩은 흐려지고 눌리지 않아야 하며,
+   선택된 칩은 흐려지지 않아 되돌아 나올 수 있어야 한다. `?tags=k8s,onprem` 링크를
+   새 탭에서 열면 칩이 눌린 채로 뜨고, 모르는 id는 조용히 버려져야 한다.
+   빈 상태는 크래프트한 URL(`?tags=onprem,frontend`)로만 닿는다.
+7. 검색 색인: 필터 바·툴바·태그 칩·테이블 보기·빈 상태는 `data-pagefind-ignore` 대상이다.
+   "온프렘"으로 검색했을 때 랜딩(`/`)이 결과에 뜨면 어딘가 빠진 것이다.
 
 Playwright 같은 브라우저 자동화를 썼다면 검증 후 `git status --short`로 임시 로그·스냅샷이
 변경 목록에 남지 않았는지 확인한다. 이 저장소에서 `.playwright-cli/`는 검증 산출물이므로

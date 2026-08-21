@@ -1,7 +1,13 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { deckDefinitions, termIntroDeckSlugs, topicPageSlugs } from '../src/data/decks.mjs';
+import {
+	deckCategoryIds,
+	deckDefinitions,
+	deckTagFacets,
+	termIntroDeckSlugs,
+	topicPageSlugs,
+} from '../src/data/decks.mjs';
 
 const repositoryRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const docsRoot = path.join(repositoryRoot, 'src/content/docs');
@@ -94,6 +100,55 @@ if (new Set(deckDefinitions.map((deck) => deck.topicOrder)).size !== deckDefinit
 	errors.push('src/data/decks.mjs: 중복된 topicOrder가 있습니다.');
 }
 
+// 카테고리·태그 어휘 자체의 무결성
+if (new Set(deckCategoryIds).size !== deckCategoryIds.length) {
+	errors.push('src/data/decks.mjs: 중복된 category id가 있습니다.');
+}
+const tagIds = deckTagFacets.map((facet) => facet.id);
+if (new Set(tagIds).size !== tagIds.length) {
+	errors.push('src/data/decks.mjs: 중복된 tag id가 있습니다.');
+}
+for (const id of tagIds) {
+	// id는 ASCII 슬러그로 고정한다 — 한국어 id는 NFC/NFD 차이로 조용히 어긋난다.
+	if (!/^[a-z0-9-]+$/u.test(id)) {
+		errors.push(`src/data/decks.mjs: tag id '${id}'는 소문자 ASCII와 '-'만 쓸 수 있습니다.`);
+	}
+}
+
+// 덱마다의 category · tags
+const categoryIdSet = new Set(deckCategoryIds);
+const tagIdSet = new Set(tagIds);
+const usedTagIds = new Set();
+
+for (const deck of deckDefinitions) {
+	if (!categoryIdSet.has(deck.category)) {
+		errors.push(`src/data/decks.mjs: '${deck.slug}'의 category '${deck.category}'가 카테고리 목록에 없습니다.`);
+	}
+	// 태그가 없으면 AND 필터에서 칩 하나만 눌러도 영영 닿을 수 없는 덱이 된다.
+	if (!Array.isArray(deck.tags) || deck.tags.length === 0) {
+		errors.push(`src/data/decks.mjs: '${deck.slug}'에 tags가 없습니다. 최소 하나를 붙입니다.`);
+		continue;
+	}
+	const seenTags = new Set();
+	for (const tag of deck.tags) {
+		if (!tagIdSet.has(tag)) {
+			errors.push(`src/data/decks.mjs: '${deck.slug}'의 tag '${tag}'가 태그 목록에 없습니다.`);
+		}
+		if (seenTags.has(tag)) {
+			errors.push(`src/data/decks.mjs: '${deck.slug}'에 중복된 tag '${tag}'가 있습니다.`);
+		}
+		seenTags.add(tag);
+		usedTagIds.add(tag);
+	}
+}
+
+for (const id of tagIds) {
+	// 아무 덱도 쓰지 않는 태그는 랜딩에 '(0)' 칩으로 남는다.
+	if (!usedTagIds.has(id)) {
+		errors.push(`src/data/decks.mjs: 태그 '${id}'를 쓰는 덱이 없습니다.`);
+	}
+}
+
 for (const deck of deckDefinitions) {
 	const indexFile = path.join(docsRoot, deck.slug, 'index.mdx');
 	if (!fs.existsSync(indexFile)) {
@@ -120,5 +175,7 @@ if (errors.length > 0) {
 	for (const error of errors) console.error(`- ${error}`);
 	process.exitCode = 1;
 } else {
-	console.log(`콘텐츠 검사 통과: ${deckDefinitions.length}개 덱, ${mdxFiles.length}개 MDX, ${actualSlugs.size}개 topic page`);
+	console.log(
+		`콘텐츠 검사 통과: ${deckDefinitions.length}개 덱, ${deckTagFacets.length}개 태그, ${mdxFiles.length}개 MDX, ${actualSlugs.size}개 topic page`,
+	);
 }

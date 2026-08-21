@@ -4,10 +4,10 @@ description: 주제별 기술 스터디 노트 — 검색하고, 찾아보고, �
 template: splash
 hero:
   title: Study Note
-  tagline: 주제(덱)별로 정리한 기술 학습 노트. 아래 카테고리에서 골라 들어가고, 상단 검색으로 어디서든 바로 찾아간다.
+  tagline: 주제(덱)별로 정리한 기술 학습 노트. 태그로 좁히거나 아래 카테고리에서 골라 들어가고, 상단 검색으로 어디서든 바로 찾아간다.
 ---
 
 import DeckCatalog from '../../components/docs/DeckCatalog.astro';
-import { deckCatalogSections } from '../../data/decks.mjs';
+import { deckCatalogSections, deckTagAxes, deckTagFacets } from '../../data/decks.mjs';
 
-<DeckCatalog sections={deckCatalogSections} />
+<DeckCatalog sections={deckCatalogSections} facets={deckTagFacets} axes={deckTagAxes} />

@@ -1,39 +1,69 @@
 // 덱과 랜딩 카탈로그의 단일 원본.
 // 사이드바 topic, 랜딩 카드, 콘텐츠 검사가 모두 이 데이터를 사용한다.
 
+// 카테고리는 "어디부터 볼지" 고르는 굵은 묶음이다. 세분화는 아래 태그가 담당하므로
+// 여기서 덱 하나를 두고 오래 고민하게 되면 카테고리가 아니라 태그를 손볼 때다.
+// tone은 mermaid classDef · DeckMap과 같은 여섯 팔레트에서 고른다. 'bad'(빨강)는
+// 그 팔레트에서 "문제·오류"를 뜻하므로 상시 식별색으로 쓰지 않는다.
 const categories = [
 	{
-		id: 'kubernetes',
-		title: '쿠버네티스',
-		desc: '시험 대비부터 온프렘 구축·운영까지',
+		id: 'infra',
+		title: '쿠버네티스 · 인프라',
+		desc: '시험 대비부터 온프렘 구축·운영까지 — 클러스터와 그 아래의 서버·네트워크·인증',
 		tone: 'key',
 	},
 	{
-		id: 'platform',
-		title: '인프라 · 플랫폼',
-		desc: '실습 기반부터 클러스터 위아래에서 돌아가는 것들 — 서버, 관측, 인증, 메시징',
+		id: 'ai',
+		title: 'AI · 데이터',
+		desc: 'LLM을 서빙하고 관측하고 한 지점으로 묶는 쪽 — 강화학습과 데이터 플랫폼까지',
 		tone: 'zone',
 	},
 	{
-		id: 'web',
-		title: '웹 개발',
-		desc: '지도부터 그리고, 도구가 각각 무슨 문제를 푸는지로 들어간다',
+		id: 'app',
+		title: '웹 · 애플리케이션',
+		desc: '요청의 일생부터 화면과 백엔드까지, 도구가 각각 무슨 문제를 푸는지로 들어간다',
 		tone: 'warn',
 	},
 	{
-		id: 'ai',
-		title: 'AI · 강화학습',
-		desc: '시행착오로 의사결정을 배우는 쪽 — 이론에서 트레이딩·로봇 응용까지',
-		tone: 'bad',
-	},
-	{
-		id: 'backend',
-		title: '백엔드 · 도구',
-		desc: '제품을 받치는 플랫폼과, 이 사이트를 만든 도구',
+		id: 'tools',
+		title: '도구 · 작업 환경',
+		desc: '이 사이트를 만든 도구와, 일하는 방식 자체를 바꾸는 것들',
 		tone: 'ok',
 	},
 ];
 
+// 태그 축 — 랜딩 필터에서 칩을 묶는 단위.
+const tagAxes = [
+	{ id: 'topic', label: '주제' },
+	{ id: 'format', label: '형식' },
+	{ id: 'env', label: '환경' },
+];
+
+// 태그 어휘 — 표시 순서 그대로 칩이 된다.
+// id는 ASCII 슬러그, label은 한국어다. 한국어를 id로 쓰면 NFC/NFD 정규화 차이로
+// Set 비교가 조용히 어긋나 덱이 필터에서 사라지는데, 에러 메시지에는 똑같이 보여
+// 추적이 안 된다. URL도 '?tags=k8s,onprem'과 퍼센트 인코딩 100자 남짓의 차이가 난다.
+//
+// 붙이는 기준: 그 덱이 실제로 여러 장을 쓰는 것만. 한 장 스쳐 가는 주제는 붙이지 않는다.
+const tags = [
+	{ id: 'k8s', label: '쿠버네티스', axis: 'topic' },
+	{ id: 'llm', label: 'LLM', axis: 'topic' },
+	{ id: 'agent', label: 'AI 에이전트', axis: 'topic' },
+	{ id: 'rl', label: '강화학습', axis: 'topic' },
+	{ id: 'auth', label: '인증 · 권한', axis: 'topic' },
+	{ id: 'o11y', label: '관측', axis: 'topic' },
+	{ id: 'data', label: '데이터', axis: 'topic' },
+	{ id: 'gpu', label: 'GPU', axis: 'topic' },
+	{ id: 'frontend', label: '프론트엔드', axis: 'topic' },
+	{ id: 'linux', label: '리눅스', axis: 'topic' },
+	{ id: 'hands-on', label: '실습', axis: 'format' },
+	{ id: 'exam', label: '시험', axis: 'format' },
+	{ id: 'onprem', label: '온프렘', axis: 'env' },
+	{ id: 'cloud', label: '클라우드', axis: 'env' },
+];
+
+// 배열 순서가 랜딩 카드 순서다 (topicOrder가 아니다 — 그건 사이드바 순서다).
+// 카테고리별로 모아 두었으니 덱을 추가할 때 제 카테고리 블록 안에 넣는다.
 export const deckDefinitions = [
 	{
 		slug: 'cka',
@@ -43,7 +73,8 @@ export const deckDefinitions = [
 		icon: 'open-book',
 		aliases: ['Certified Kubernetes Administrator', '쿠버네티스 관리자 시험'],
 		description: '커리큘럼 5개 도메인을 개념 → 명령 → 함정 순서로 관통하는 시험 대비 정리.',
-		category: 'kubernetes',
+		category: 'infra',
+		tags: ['k8s', 'exam'],
 		groups: [
 			['시험 소개', ['cka/00-intro', 'cka/01-exam']],
 			['기초', ['cka/02-architecture', 'cka/03-kubectl']],
@@ -72,7 +103,8 @@ export const deckDefinitions = [
 		icon: 'pencil',
 		aliases: ['KodeKloud CKA Practice Test', 'CKA 연습 문제', 'CKA labs', 'Kubernetes 관리자 실습'],
 		description: 'KodeKloud 랩을 뼈대로 여러 실습의 실패 진단·완료 검증·복구 패턴을 모은 CKA 연습 덱.',
-		category: 'kubernetes',
+		category: 'infra',
+		tags: ['k8s', 'exam', 'hands-on'],
 		groups: [
 			[
 				'워크로드와 스케줄링',
@@ -91,7 +123,8 @@ export const deckDefinitions = [
 		icon: 'setting',
 		aliases: ['Lab environment', '로컬 실습', '개발 환경 준비', 'kind 설치', 'Helm 설치'],
 		description: '여러 덱에서 다시 쓰는 kind·kubectl·Helm 환경 준비와 정리 — 운영체제별 설치부터 cleanup까지.',
-		category: 'platform',
+		category: 'infra',
+		tags: ['k8s', 'hands-on'],
 		groups: [
 			['Kubernetes', ['lab-environment/01-kind', 'lab-environment/02-helm']],
 		],
@@ -104,7 +137,8 @@ export const deckDefinitions = [
 		icon: 'server',
 		aliases: ['온프레미스 Kubernetes', 'on-premises Kubernetes'],
 		description: '클라우드가 대신 해 주던 자리 — LB·인증서·SSO·스토리지·백업 — 를 직접 채우는 운영.',
-		category: 'kubernetes',
+		category: 'infra',
+		tags: ['k8s', 'onprem'],
 		groups: [
 			['시작', ['onprem/00-intro', 'onprem/01-why']],
 			['기반', ['onprem/02-foundation']],
@@ -124,7 +158,8 @@ export const deckDefinitions = [
 		icon: 'linux',
 		aliases: ['Linux server', 'Ubuntu server'],
 		description: 'Ubuntu 24.04 실무 — “이 서버는 무슨 물건인가”부터 상황에서 출발하는 명령 정리.',
-		category: 'platform',
+		category: 'infra',
+		tags: ['linux', 'onprem'],
 		groups: [
 			['준비', ['server/00-intro', 'server/01-shell']],
 			['이 서버는 무엇인가', ['server/02-hardware', 'server/03-storage', 'server/04-process']],
@@ -143,7 +178,8 @@ export const deckDefinitions = [
 		icon: 'analytics',
 		aliases: ['모니터링', 'Monitoring', 'Telemetry'],
 		description: '메트릭·로그·트레이스를 Prometheus·Loki·Tempo·Grafana로 세우고, 셋 사이를 잇는 법.',
-		category: 'platform',
+		category: 'infra',
+		tags: ['o11y', 'k8s', 'hands-on'],
 		groups: [
 			['시작', ['observability/00-intro', 'observability/01-signals']],
 			['세 신호', ['observability/02-prometheus', 'observability/03-loki', 'observability/04-tempo']],
@@ -160,7 +196,8 @@ export const deckDefinitions = [
 		icon: 'seti:lock',
 		aliases: ['SSO', 'OIDC identity provider'],
 		description: '사내 AD를 사용자 저장소로 빌려 쓰는 SSO 허브 — 토큰, 연동, 배포까지 관리자 관점.',
-		category: 'platform',
+		category: 'infra',
+		tags: ['auth', 'k8s', 'onprem'],
 		groups: [
 			['시작', ['keycloak/00-intro', 'keycloak/01-why']],
 			['프로토콜', ['keycloak/02-oauth-oidc']],
@@ -178,7 +215,8 @@ export const deckDefinitions = [
 		icon: 'random',
 		aliases: ['Apache Kafka', '이벤트 스트리밍'],
 		description: '서비스 사이의 결합을 시간 축에서 끊는 로그 — 도입하는 사람 관점의 모델과 운영.',
-		category: 'platform',
+		category: 'infra',
+		tags: ['data', 'onprem'],
 		groups: [
 			['시작', ['kafka/00-intro', 'kafka/01-why']],
 			['핵심 모델', ['kafka/02-log', 'kafka/03-cluster']],
@@ -189,6 +227,166 @@ export const deckDefinitions = [
 		],
 	},
 	{
+		slug: 'gpustack',
+		topicOrder: 14,
+		label: 'GPUStack',
+		title: 'GPUStack',
+		icon: 'server',
+		aliases: ['GPU 클러스터 관리', 'DGX Spark 모델 서빙'],
+		description: 'DGX Spark 10대를 모델 서빙 풀로 묶는다 — LiteLLM 경계, vLLM, FastAPI, 2대 pair와 운영.',
+		category: 'ai',
+		tags: ['gpu', 'llm', 'onprem'],
+		groups: [
+			['시작', ['gpustack/00-position']],
+			['관리 평면', ['gpustack/01-architecture', 'gpustack/02-install']],
+			['워크로드', ['gpustack/03-vllm-embedding', 'gpustack/04-custom-backends']],
+			['배치와 라우팅', ['gpustack/05-pairs-routing']],
+			['운영과 선택', ['gpustack/06-operations', 'gpustack/07-adoption']],
+			['마무리', ['gpustack/08-wrapup']],
+		],
+	},
+	{
+		slug: 'gpu-platform',
+		topicOrder: 15,
+		label: '온프렘 GPU 플랫폼',
+		title: '온프렘 GPU 플랫폼',
+		icon: 'server',
+		aliases: ['Kubernetes GPU 플랫폼', 'KServe GPU 클러스터', 'DGX Spark A100 B300'],
+		description: 'DGX Spark·A100·B300을 추론 전용 운영 모델로 묶는다 — GPU Operator, KServe, LiteLLM과 단계적 전환.',
+		category: 'ai',
+		tags: ['gpu', 'llm', 'k8s', 'onprem'],
+		groups: [
+			['시작', ['gpu-platform/00-decision', 'gpu-platform/01-fleet']],
+			['GPU 기반', ['gpu-platform/02-gpu-foundation']],
+			['추론 평면', ['gpu-platform/03-kserve', 'gpu-platform/04-serving', 'gpu-platform/05-serving-operations']],
+			['데이터와 연결', ['gpu-platform/06-data-network']],
+			['전환', ['gpu-platform/07-migration']],
+			['마무리', ['gpu-platform/08-wrapup']],
+		],
+	},
+	{
+		slug: 'litellm',
+		topicOrder: 17,
+		label: 'LiteLLM',
+		title: 'LiteLLM',
+		icon: 'random',
+		aliases: ['LLM Gateway', 'AI Gateway', 'LiteLLM Proxy'],
+		description: '여러 LLM 앞의 단일 제어 지점 — 온프렘 Kubernetes에서 인증·라우팅·비용·장애를 운영한다.',
+		category: 'ai',
+		tags: ['llm', 'k8s', 'auth', 'onprem'],
+		groups: [
+			['시작', ['litellm/00-position', 'litellm/01-request-life']],
+			['제어 정책', ['litellm/02-model-config', 'litellm/03-access-budget', 'litellm/04-routing-reliability']],
+			['온프렘 Kubernetes', ['litellm/05-k8s-architecture', 'litellm/06-deploy', 'litellm/07-state']],
+			['운영', ['litellm/08-security', 'litellm/09-observability', 'litellm/10-operations', 'litellm/11-troubleshooting']],
+			['마무리', ['litellm/12-glossary', 'litellm/13-wrapup']],
+		],
+	},
+	{
+		slug: 'langfuse',
+		topicOrder: 18,
+		label: 'Langfuse',
+		title: 'Langfuse',
+		icon: 'analytics',
+		aliases: ['LLM Observability', 'LLMOps', 'LLM 평가', 'Prompt Management'],
+		description: 'LLM 앱이 왜 그런 응답을 냈는지 추적하고, prompt·평가·실험을 production 피드백 루프로 잇는다.',
+		category: 'ai',
+		tags: ['llm', 'o11y', 'k8s', 'onprem'],
+		groups: [
+			['시작', ['langfuse/00-position', 'langfuse/01-data-model']],
+			['관측 설계', ['langfuse/02-instrumentation', 'langfuse/03-trace-design']],
+			['개선 루프', ['langfuse/04-prompt-management', 'langfuse/05-evaluation', 'langfuse/06-datasets-experiments']],
+			['온프렘 Kubernetes', ['langfuse/07-k8s-architecture', 'langfuse/08-deploy-upgrade', 'langfuse/09-storage-retention']],
+			['운영', ['langfuse/10-security', 'langfuse/11-operations', 'langfuse/12-troubleshooting']],
+			['마무리', ['langfuse/13-glossary', 'langfuse/14-wrapup']],
+		],
+	},
+	{
+		slug: 'agent-platform',
+		topicOrder: 19,
+		label: 'Agent 배포 플랫폼',
+		title: '사내 Agent 배포 플랫폼',
+		icon: 'setting',
+		aliases: ['AI Agent Platform', 'Agent Runtime', 'kagent', 'Amazon Bedrock AgentCore', 'Temporal', 'Dapr Agents'],
+		description: 'Agent·권한·배포 계약을 제품 밖에 둔다 — kagent·AgentCore를 교체 가능한 실행 어댑터로 연결하고 durable execution 층은 보류한 결정으로 관리하는 설계.',
+		category: 'ai',
+		tags: ['agent', 'k8s', 'auth', 'onprem', 'cloud'],
+		groups: [
+			['큰 그림', ['agent-platform/00-position', 'agent-platform/01-planes']],
+			['제품 밖의 계약', ['agent-platform/02-agent-types', 'agent-platform/03-domain-model', 'agent-platform/04-lifecycle', 'agent-platform/05-authorization', 'agent-platform/06-adapter-contract', 'agent-platform/07-user-mcp']],
+			[
+				'kagent — 온프렘 실행 어댑터',
+				[
+					'agent-platform/08-kagent-architecture',
+					'agent-platform/09-kagent-resources',
+					'agent-platform/10-kagent-integration',
+					'agent-platform/11-kagent-adapter',
+				],
+			],
+			['보류한 결정', ['agent-platform/12-durable-execution']],
+			['AWS 실행 어댑터', ['agent-platform/13-agentcore']],
+			['하이브리드 운영', ['agent-platform/14-hybrid', 'agent-platform/15-operations']],
+			['도입과 마무리', ['agent-platform/16-adoption', 'agent-platform/reference-glossary', 'agent-platform/17-wrapup']],
+		],
+	},
+	{
+		slug: 'kagent-lab',
+		topicOrder: 20,
+		label: 'kagent 실습',
+		title: 'kagent 실습',
+		icon: 'pencil',
+		aliases: ['kagent lab', 'kagent hands-on', 'AI Agent Kubernetes 실습', 'kmcp 실습'],
+		description: '같은 kind 클러스터에서 kagent의 Agent·MCP·A2A부터 backend 연동·권한·온프렘 승격·Substrate A/B 비교까지 검증한다.',
+		category: 'ai',
+		tags: ['agent', 'k8s', 'hands-on'],
+		groups: [
+			['준비와 설치', ['kagent-lab/00-lab-map', 'kagent-lab/01-install']],
+			['Agent와 tool', ['kagent-lab/02-first-agent', 'kagent-lab/03-declarative-agent', 'kagent-lab/04-mcp-tool']],
+			['호출과 진단', ['kagent-lab/05-a2a-invoke', 'kagent-lab/06-observe-debug']],
+			['Backend 연동과 권한', ['kagent-lab/07-backend-walking-skeleton', 'kagent-lab/08-security-boundary']],
+			['코드형과 온프렘 승격', ['kagent-lab/09-byo-agent', 'kagent-lab/10-onprem-staging']],
+			['Agent Substrate', ['kagent-lab/11-substrate-install', 'kagent-lab/12-substrate-compare']],
+			['판정과 정리', ['kagent-lab/13-adoption-decision', 'kagent-lab/14-cleanup']],
+		],
+	},
+	{
+		slug: 'rl',
+		topicOrder: 12,
+		label: '강화학습',
+		title: '강화학습',
+		icon: 'setting',
+		aliases: ['Reinforcement Learning', 'RL'],
+		description: 'MDP부터 PPO·오프라인 RL까지, 그리고 시스템 트레이딩과 피지컬 AI(로봇)에 어떻게 쓰이는가.',
+		category: 'ai',
+		tags: ['rl'],
+		groups: [
+			['시작', ['rl/00-intro', 'rl/01-why']],
+			['문제를 세우기', ['rl/02-mdp', 'rl/03-value']],
+			['알고리즘', ['rl/04-value-based', 'rl/05-policy-gradient', 'rl/06-ppo-sac', 'rl/07-offline-model']],
+			['실전 공통', ['rl/08-reward', 'rl/09-training', 'rl/10-evaluation']],
+			['시스템 트레이딩', ['rl/11-market', 'rl/12-trading-design', 'rl/13-trading-practice']],
+			['피지컬 AI — 로봇', ['rl/14-robot', 'rl/15-robot-stack', 'rl/16-imitation-vla']],
+			['마무리', ['rl/17-career', 'rl/18-glossary', 'rl/19-wrapup']],
+		],
+	},
+	{
+		slug: 'databricks',
+		topicOrder: 16,
+		label: 'Databricks',
+		title: 'Databricks on AWS',
+		icon: 'seti:db',
+		aliases: ['AWS Databricks', '데이터브릭스', 'Lakehouse', 'CX망 Databricks'],
+		description: '사내 데이터를 AWS lakehouse로 가져온다 — CX/DX, VPC, S3, Unity Catalog와 운영 경계.',
+		category: 'ai',
+		tags: ['data', 'cloud'],
+		groups: [
+			['시작', ['databricks/00-position', 'databricks/01-architecture']],
+			['네트워크와 데이터', ['databricks/02-cx-vpc', 'databricks/03-data-foundation', 'databricks/04-data-flow']],
+			['소비와 통제', ['databricks/05-consumption', 'databricks/06-security', 'databricks/07-operations']],
+			['도입', ['databricks/08-adoption']],
+		],
+	},
+	{
 		slug: 'web',
 		topicOrder: 5,
 		label: '웹 개발 일반',
@@ -196,7 +394,8 @@ export const deckDefinitions = [
 		icon: 'rocket',
 		aliases: ['웹 생태계', 'Web development'],
 		description: '요청의 일생, 렌더링 전략, 기술 지형도, 도구 사슬을 통증 중심으로.',
-		category: 'web',
+		category: 'app',
+		tags: ['frontend', 'cloud'],
 		groups: [
 			['시작', ['web/00-intro', 'web/01-request', 'web/02-rendering']],
 			['지형', ['web/03-landscape']],
@@ -214,7 +413,8 @@ export const deckDefinitions = [
 		icon: 'laptop',
 		aliases: ['Next.js Tailwind shadcn/ui', '프론트엔드 스택'],
 		description: 'Next.js · Tailwind · shadcn/ui — 세 도구가 각각 무슨 문제를 푸는가.',
-		category: 'web',
+		category: 'app',
+		tags: ['frontend'],
 		groups: [
 			['시작', ['frontend/00-intro', 'frontend/01-landscape']],
 			[
@@ -249,7 +449,8 @@ export const deckDefinitions = [
 		icon: 'puzzle',
 		aliases: ['shadcn', 'shadcn ui'],
 		description: '앱의 외모를 다섯 리소스로 쪼개 이름 붙이고, 그 한 벌을 테마로 관리한다.',
-		category: 'web',
+		category: 'app',
+		tags: ['frontend'],
 		groups: [
 			['준비', ['shadcn/00-intro', 'shadcn/01-what-is-shadcn']],
 			['테마라는 그릇', ['shadcn/02-theme', 'shadcn/03-setup']],
@@ -262,25 +463,6 @@ export const deckDefinitions = [
 		],
 	},
 	{
-		slug: 'rl',
-		topicOrder: 12,
-		label: '강화학습',
-		title: '강화학습',
-		icon: 'setting',
-		aliases: ['Reinforcement Learning', 'RL'],
-		description: 'MDP부터 PPO·오프라인 RL까지, 그리고 시스템 트레이딩과 피지컬 AI(로봇)에 어떻게 쓰이는가.',
-		category: 'ai',
-		groups: [
-			['시작', ['rl/00-intro', 'rl/01-why']],
-			['문제를 세우기', ['rl/02-mdp', 'rl/03-value']],
-			['알고리즘', ['rl/04-value-based', 'rl/05-policy-gradient', 'rl/06-ppo-sac', 'rl/07-offline-model']],
-			['실전 공통', ['rl/08-reward', 'rl/09-training', 'rl/10-evaluation']],
-			['시스템 트레이딩', ['rl/11-market', 'rl/12-trading-design', 'rl/13-trading-practice']],
-			['피지컬 AI — 로봇', ['rl/14-robot', 'rl/15-robot-stack', 'rl/16-imitation-vla']],
-			['마무리', ['rl/17-career', 'rl/18-glossary', 'rl/19-wrapup']],
-		],
-	},
-	{
 		slug: 'supabase',
 		topicOrder: 11,
 		label: 'Supabase',
@@ -288,7 +470,8 @@ export const deckDefinitions = [
 		icon: 'seti:db',
 		aliases: ['Backend as a Service', 'BaaS'],
 		description: 'Auth가 발급한 JWT를 RLS가 행 단위로 판정한다 — 그 한 문장을 축으로 한 백엔드 플랫폼.',
-		category: 'backend',
+		category: 'app',
+		tags: ['data', 'auth', 'cloud'],
 		groups: [
 			['시작', ['supabase/00-intro', 'supabase/01-why']],
 			[
@@ -322,146 +505,14 @@ export const deckDefinitions = [
 		icon: 'star',
 		aliases: ['Astro Starlight'],
 		description: '왜 이 도구를 골랐고 어떻게 쓰는지 — 이 사이트 자체가 예제다.',
-		category: 'backend',
+		category: 'tools',
+		tags: ['frontend'],
 		groups: [
 			['시작', ['starlight/00-intro', 'starlight/01-landscape']],
 			['기반', ['starlight/02-astro', 'starlight/03-starlight']],
 			['콘텐츠', ['starlight/04-mdx', 'starlight/05-components', 'starlight/06-custom']],
 			['글쓰기와 운영', ['starlight/07-writing', 'starlight/08-pipeline']],
 			['마무리', ['starlight/09-wrapup']],
-		],
-	},
-	{
-		slug: 'gpustack',
-		topicOrder: 14,
-		label: 'GPUStack',
-		title: 'GPUStack',
-		icon: 'server',
-		aliases: ['GPU 클러스터 관리', 'DGX Spark 모델 서빙'],
-		description: 'DGX Spark 10대를 모델 서빙 풀로 묶는다 — LiteLLM 경계, vLLM, FastAPI, 2대 pair와 운영.',
-		category: 'platform',
-		groups: [
-			['시작', ['gpustack/00-position']],
-			['관리 평면', ['gpustack/01-architecture', 'gpustack/02-install']],
-			['워크로드', ['gpustack/03-vllm-embedding', 'gpustack/04-custom-backends']],
-			['배치와 라우팅', ['gpustack/05-pairs-routing']],
-			['운영과 선택', ['gpustack/06-operations', 'gpustack/07-adoption']],
-			['마무리', ['gpustack/08-wrapup']],
-		],
-	},
-	{
-		slug: 'gpu-platform',
-		topicOrder: 15,
-		label: '온프렘 GPU 플랫폼',
-		title: '온프렘 GPU 플랫폼',
-		icon: 'server',
-		aliases: ['Kubernetes GPU 플랫폼', 'KServe GPU 클러스터', 'DGX Spark A100 B300'],
-		description: 'DGX Spark·A100·B300을 추론 전용 운영 모델로 묶는다 — GPU Operator, KServe, LiteLLM과 단계적 전환.',
-		category: 'platform',
-		groups: [
-			['시작', ['gpu-platform/00-decision', 'gpu-platform/01-fleet']],
-			['GPU 기반', ['gpu-platform/02-gpu-foundation']],
-			['추론 평면', ['gpu-platform/03-kserve', 'gpu-platform/04-serving', 'gpu-platform/05-serving-operations']],
-			['데이터와 연결', ['gpu-platform/06-data-network']],
-			['전환', ['gpu-platform/07-migration']],
-			['마무리', ['gpu-platform/08-wrapup']],
-		],
-	},
-	{
-		slug: 'databricks',
-		topicOrder: 16,
-		label: 'Databricks',
-		title: 'Databricks on AWS',
-		icon: 'seti:db',
-		aliases: ['AWS Databricks', '데이터브릭스', 'Lakehouse', 'CX망 Databricks'],
-		description: '사내 데이터를 AWS lakehouse로 가져온다 — CX/DX, VPC, S3, Unity Catalog와 운영 경계.',
-		category: 'platform',
-		groups: [
-			['시작', ['databricks/00-position', 'databricks/01-architecture']],
-			['네트워크와 데이터', ['databricks/02-cx-vpc', 'databricks/03-data-foundation', 'databricks/04-data-flow']],
-			['소비와 통제', ['databricks/05-consumption', 'databricks/06-security', 'databricks/07-operations']],
-			['도입', ['databricks/08-adoption']],
-		],
-	},
-	{
-		slug: 'litellm',
-		topicOrder: 17,
-		label: 'LiteLLM',
-		title: 'LiteLLM',
-		icon: 'random',
-		aliases: ['LLM Gateway', 'AI Gateway', 'LiteLLM Proxy'],
-		description: '여러 LLM 앞의 단일 제어 지점 — 온프렘 Kubernetes에서 인증·라우팅·비용·장애를 운영한다.',
-		category: 'platform',
-		groups: [
-			['시작', ['litellm/00-position', 'litellm/01-request-life']],
-			['제어 정책', ['litellm/02-model-config', 'litellm/03-access-budget', 'litellm/04-routing-reliability']],
-			['온프렘 Kubernetes', ['litellm/05-k8s-architecture', 'litellm/06-deploy', 'litellm/07-state']],
-			['운영', ['litellm/08-security', 'litellm/09-observability', 'litellm/10-operations', 'litellm/11-troubleshooting']],
-			['마무리', ['litellm/12-glossary', 'litellm/13-wrapup']],
-		],
-	},
-	{
-		slug: 'langfuse',
-		topicOrder: 18,
-		label: 'Langfuse',
-		title: 'Langfuse',
-		icon: 'analytics',
-		aliases: ['LLM Observability', 'LLMOps', 'LLM 평가', 'Prompt Management'],
-		description: 'LLM 앱이 왜 그런 응답을 냈는지 추적하고, prompt·평가·실험을 production 피드백 루프로 잇는다.',
-		category: 'platform',
-		groups: [
-			['시작', ['langfuse/00-position', 'langfuse/01-data-model']],
-			['관측 설계', ['langfuse/02-instrumentation', 'langfuse/03-trace-design']],
-			['개선 루프', ['langfuse/04-prompt-management', 'langfuse/05-evaluation', 'langfuse/06-datasets-experiments']],
-			['온프렘 Kubernetes', ['langfuse/07-k8s-architecture', 'langfuse/08-deploy-upgrade', 'langfuse/09-storage-retention']],
-			['운영', ['langfuse/10-security', 'langfuse/11-operations', 'langfuse/12-troubleshooting']],
-			['마무리', ['langfuse/13-glossary', 'langfuse/14-wrapup']],
-		],
-	},
-	{
-		slug: 'agent-platform',
-		topicOrder: 19,
-		label: 'Agent 배포 플랫폼',
-		title: '사내 Agent 배포 플랫폼',
-		icon: 'setting',
-		aliases: ['AI Agent Platform', 'Agent Runtime', 'kagent', 'Amazon Bedrock AgentCore', 'Temporal', 'Dapr Agents'],
-		description: 'Agent·권한·배포 계약을 제품 밖에 둔다 — kagent·AgentCore를 교체 가능한 실행 어댑터로 연결하고 durable execution 층은 보류한 결정으로 관리하는 설계.',
-		category: 'platform',
-		groups: [
-			['큰 그림', ['agent-platform/00-position', 'agent-platform/01-planes']],
-			['제품 밖의 계약', ['agent-platform/02-agent-types', 'agent-platform/03-domain-model', 'agent-platform/04-lifecycle', 'agent-platform/05-authorization', 'agent-platform/06-adapter-contract', 'agent-platform/07-user-mcp']],
-			[
-				'kagent — 온프렘 실행 어댑터',
-				[
-					'agent-platform/08-kagent-architecture',
-					'agent-platform/09-kagent-resources',
-					'agent-platform/10-kagent-integration',
-					'agent-platform/11-kagent-adapter',
-				],
-			],
-			['보류한 결정', ['agent-platform/12-durable-execution']],
-			['AWS 실행 어댑터', ['agent-platform/13-agentcore']],
-			['하이브리드 운영', ['agent-platform/14-hybrid', 'agent-platform/15-operations']],
-			['도입과 마무리', ['agent-platform/16-adoption', 'agent-platform/reference-glossary', 'agent-platform/17-wrapup']],
-		],
-	},
-	{
-		slug: 'kagent-lab',
-		topicOrder: 20,
-		label: 'kagent 실습',
-		title: 'kagent 실습',
-		icon: 'pencil',
-		aliases: ['kagent lab', 'kagent hands-on', 'AI Agent Kubernetes 실습', 'kmcp 실습'],
-		description: '같은 kind 클러스터에서 kagent의 Agent·MCP·A2A부터 backend 연동·권한·온프렘 승격·Substrate A/B 비교까지 검증한다.',
-		category: 'platform',
-		groups: [
-			['준비와 설치', ['kagent-lab/00-lab-map', 'kagent-lab/01-install']],
-			['Agent와 tool', ['kagent-lab/02-first-agent', 'kagent-lab/03-declarative-agent', 'kagent-lab/04-mcp-tool']],
-			['호출과 진단', ['kagent-lab/05-a2a-invoke', 'kagent-lab/06-observe-debug']],
-			['Backend 연동과 권한', ['kagent-lab/07-backend-walking-skeleton', 'kagent-lab/08-security-boundary']],
-			['코드형과 온프렘 승격', ['kagent-lab/09-byo-agent', 'kagent-lab/10-onprem-staging']],
-			['Agent Substrate', ['kagent-lab/11-substrate-install', 'kagent-lab/12-substrate-compare']],
-			['판정과 정리', ['kagent-lab/13-adoption-decision', 'kagent-lab/14-cleanup']],
 		],
 	},
 	{
@@ -472,7 +523,8 @@ export const deckDefinitions = [
 		icon: 'pencil',
 		aliases: ['코딩 에이전트', 'Coding Agents', 'AGENTS.md', 'CLAUDE.md'],
 		description: '두 코딩 에이전트를 같은 저장소에서 쓰는 법 — 지침 계층, 컨텍스트, 작업 요청과 검증 패턴.',
-		category: 'backend',
+		category: 'tools',
+		tags: ['agent'],
 		groups: [
 			['프로젝트 지침', ['coding-agents/00-project-instructions']],
 		],
@@ -485,7 +537,8 @@ export const deckDefinitions = [
 		icon: 'puzzle',
 		aliases: ['Paseo plugin', 'Paseo enterprise catalog', '사내 AI 도구 카탈로그'],
 		description: '개인 PC의 Paseo를 사내 카탈로그 프런트엔드로 쓴다 — plugin, Keycloak, oauth2-proxy와 권한 필터링.',
-		category: 'backend',
+		category: 'tools',
+		tags: ['auth', 'onprem'],
 		groups: [
 			['큰 그림', ['paseo-enterprise/00-decision', 'paseo-enterprise/01-plugin-model', 'paseo-enterprise/02-architecture']],
 			['인증과 인가', ['paseo-enterprise/03-keycloak-login', 'paseo-enterprise/04-oauth2-proxy', 'paseo-enterprise/05-authorization']],
@@ -531,6 +584,19 @@ export const termIntroDeckSlugs = [
 	'paseo-enterprise',
 ];
 
+// 콘텐츠 검사 전용 — 덱의 category가 실제 카테고리인지 확인한다.
+// (오타 하나면 어느 섹션에도 안 걸려 랜딩에서 소리 없이 사라진다.)
+export const deckCategoryIds = categories.map((category) => category.id);
+
+export const deckTagAxes = tagAxes;
+
+// 랜딩 필터의 칩 목록. count는 필터를 걸기 전 전체 기준이고,
+// 선택이 생기면 DeckCatalog가 보이는 덱 기준으로 다시 계산한다.
+export const deckTagFacets = tags.map((tag) => ({
+	...tag,
+	count: deckDefinitions.filter((deck) => deck.tags?.includes(tag.id)).length,
+}));
+
 export const deckCatalogSections = categories.map((category) => ({
 	title: category.title,
 	desc: category.desc,
@@ -544,5 +610,7 @@ export const deckCatalogSections = categories.map((category) => ({
 			title: deck.title,
 			desc: deck.description,
 			chapters: deck.groups.reduce((count, [, items]) => count + items.length, 0),
+			// id가 아니라 해석된 {id,label,axis}를 넘긴다 — 컴포넌트에 조회 로직을 두지 않는다.
+			tags: (deck.tags ?? []).map((id) => tags.find((tag) => tag.id === id)).filter(Boolean),
 		})),
 }));
