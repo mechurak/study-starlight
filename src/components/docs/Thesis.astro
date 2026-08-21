@@ -1,0 +1,51 @@
+---
+/*
+  장 첫머리의 "결론부터" 핵심 요약 카드.
+
+  본문을 읽지 않아도 이 장이 무엇을 주장하는지 알 수 있게 하는 자리다 — 언제·어떻게
+  쓰는지는 docs/content-authoring.md의 "설명 순서와 제목" 참고. 내용은 slot으로 받고
+  굵기는 컴포넌트가 입히므로 안에서 `**`를 반복하지 않는다. `코드` 같은 인라인
+  마크다운은 그대로 쓸 수 있다.
+
+  <Thesis>`Agent`는 서비스의 정체성이고 `Deployment`는 그 정체성을 실행한 한 복사본이다</Thesis>
+*/
+interface Props {
+  label?: string;
+}
+const { label = '결론부터' } = Astro.props;
+---
+
+<div class="thesis">
+  <span class="thesis__label">{label}</span>
+  <div class="thesis__body"><slot /></div>
+</div>
+
+<style>
+  .thesis {
+    display: grid;
+    gap: 0.3rem;
+    padding: 0.85rem 1.1rem;
+    border-inline-start: 4px solid var(--sl-color-accent);
+    border-radius: 0.5rem;
+    background: var(--sl-color-accent-low);
+  }
+
+  .thesis__label {
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    color: var(--sl-color-accent-high);
+  }
+
+  .thesis__body {
+    font-size: 1.02rem;
+    font-weight: 600;
+    line-height: 1.65;
+    color: var(--sl-color-white);
+  }
+
+  /* 빈 줄로 띄워 쓴 slot 내용이 <p>로 감싸여도 카드 안 여백이 생기지 않게 한다 */
+  .thesis__body :global(p) {
+    margin: 0;
+  }
+</style>

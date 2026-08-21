@@ -8,9 +8,9 @@ status: review
 
 import { LinkCard, LinkButton } from '@astrojs/starlight/components';
 import DeckMap from '../../../components/docs/DeckMap.astro';
+import Thesis from '../../../components/docs/Thesis.astro';
 
-> 결론부터 말하면, **CX/DX로 우리 VPC에 닿게 하는 것만으로는 부족하고 그 안의 compute가 실제
-> 저장소까지 가는 network path와 Unity Catalog 권한을 함께 만들어야 한다**
+<Thesis>CX/DX로 우리 VPC에 닿게 하는 것만으로는 부족하고 그 안의 compute가 실제 저장소까지 가는 network path와 Unity Catalog 권한을 함께 만들어야 한다</Thesis>
 
 이 덱은 AWS에서 Databricks를 도입할 때 사내 데이터가 어디에 있고, 누가 처리하며, 어떤 선을 넘어
 이동하는지를 큰 그림부터 설명한다. 기준안은 민감한 데이터와 온프렘 source를 고려한
