@@ -202,8 +202,8 @@ export const deckDefinitions = [
 			['지형', ['web/03-landscape']],
 			['도구 사슬', ['web/04-runtime', 'web/05-package', 'web/06-bundler', 'web/07-vite']],
 			['품질과 규모', ['web/08-quality', 'web/09-monorepo']],
-			['서비스가 되기까지', ['web/10-backend', 'web/11-security', 'web/12-deploy']],
-			['마무리', ['web/13-glossary', 'web/14-wrapup']],
+			['서비스가 되기까지', ['web/10-backend', 'web/11-security', 'web/12-deploy', 'web/13-cloudflare']],
+			['마무리', ['web/14-glossary', 'web/15-wrapup']],
 		],
 	},
 	{

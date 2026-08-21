@@ -1,5 +1,5 @@
 ---
-title: "13. 용어 사전"
+title: "14. 용어 사전"
 description: "이 덱에 나온 용어 전부 — 약어를 만나면 여기로"
 ---
 
@@ -16,6 +16,8 @@ import { LinkCard } from '@astrojs/starlight/components';
 | CDN | Content Delivery Network | 전 세계 분산 캐시 서버망. 가까운 지점이 응답해서 빠르다 | [1장](/web/01-request/) |
 | 엣지 (Edge) | — | CDN의 각 지점. 캐시 서빙을 넘어 코드 실행까지 하는 위치 | [1장](/web/01-request/) · [4장](/web/04-runtime/) |
 | 오리진 (Origin) | — | CDN 뒤의 원본 서버. 캐시에 없는 것만 여기까지 온다 | [1장](/web/01-request/) |
+| reverse proxy | — | 사용자보다 먼저 요청을 받아 직접 응답하거나 뒤의 origin으로 전달하는 중계층 | [13장](/web/13-cloudflare/) |
+| Anycast | — | 여러 지역이 같은 IP를 광고해 요청을 가까운 network 지점으로 보내는 routing 방식 | [13장](/web/13-cloudflare/) |
 | serverless | — | 요청이 올 때만 함수가 실행되는 모델. 서버 관리가 없다 | [12장](/web/12-deploy/) |
 | 콜드 스타트 | Cold Start | serverless 함수가 깨어나며 생기는 첫 요청 지연 | [12장](/web/12-deploy/) |
 | PaaS / IaaS | Platform / Infrastructure as a Service | 클라우드 추상화 수준 — 코드만 주면 됨 vs VM부터 직접 | [12장](/web/12-deploy/) |
@@ -93,8 +95,24 @@ import { LinkCard } from '@astrojs/starlight/components';
 | OIDC | OpenID Connect | OAuth 2.0 위에 신원 확인을 얹은 로그인 규격 | [11장](/web/11-security/) |
 | PKCE | Proof Key for Code Exchange | OAuth의 인가 코드를 가로채여도 쓸모없게 만드는 장치 | [11장](/web/11-security/) |
 
+## Cloudflare
+
+| 용어 | 풀어 쓰면 | 뜻 | 자세히 |
+|---|---|---|---|
+| Pages | Cloudflare Pages | Git과 front-end build output 중심의 hosting·preview deployment 제품 | [13장](/web/13-cloudflare/) |
+| Workers | Cloudflare Workers | Cloudflare network에서 요청 code를 실행하는 serverless runtime | [13장](/web/13-cloudflare/) |
+| binding | Workers Binding | Worker에 Cloudflare 자원의 권한과 API를 함께 연결하는 방식 | [13장](/web/13-cloudflare/) |
+| KV | Workers KV | 전 세계 read-heavy workload에 맞는 eventually-consistent key-value store | [13장](/web/13-cloudflare/) |
+| R2 | Cloudflare R2 | file·object를 저장하는 S3-compatible object storage | [13장](/web/13-cloudflare/) |
+| D1 | Cloudflare D1 | SQLite SQL semantics를 쓰는 managed serverless database | [13장](/web/13-cloudflare/) |
+| Durable Objects | — | identity별 compute와 storage로 공유 상태를 조정하는 stateful serverless primitive | [13장](/web/13-cloudflare/) |
+| WAF | Web Application Firewall | rule로 HTTP·API 요청을 검사하고 원치 않는 traffic을 거르는 방화벽 | [13장](/web/13-cloudflare/) |
+| Access | Cloudflare Access | identity와 policy로 application 접근자를 결정하는 문지기 | [13장](/web/13-cloudflare/) |
+| Tunnel | Cloudflare Tunnel | origin의 outbound 연결로 Cloudflare와 private resource를 잇는 통로 | [13장](/web/13-cloudflare/) |
+| Zero Trust | — | network 안쪽이라는 이유 대신 매 요청의 identity·context·policy를 검증하는 접근 모델 | [13장](/web/13-cloudflare/) |
+
 <LinkCard
-  title="14. 마무리"
+  title="15. 마무리"
   description="한 장으로 접는 전체 지도, 그리고 다음에 갈 곳."
-  href="/web/14-wrapup/"
+  href="/web/15-wrapup/"
 />

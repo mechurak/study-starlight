@@ -1,5 +1,5 @@
 ---
-title: "14. 마무리"
+title: "15. 마무리"
 description: "한 장으로 접는 전체 지도, 그리고 다음에 갈 곳"
 ---
 
@@ -23,9 +23,9 @@ flowchart TB
         direction LR
         Q1["타입·린트·테스트"] --> Q2["CI"]
     end
-    subgraph SHIP["서비스로 (10~12장)"]
+    subgraph SHIP["서비스로 (10~13장)"]
         direction LR
-        S1["API · DB"] --> S3["브라우저 보안<br/>CORS · PKCE"] --> S2["배포<br/>git push = 배포"]
+        S1["API · DB"] --> S3["브라우저 보안<br/>CORS · PKCE"] --> S2["배포<br/>git push = 배포"] --> S4["Cloudflare<br/>edge · Access"]
     end
     TOOL --> QUAL --> SHIP
     SHIP -.->|"사용자의 요청이 다시"| REQ
@@ -37,7 +37,7 @@ flowchart TB
     class R1,R2,R3,R4 mute
     class T1,T2,T3 key
     class Q1,Q2 ok
-    class S1,S2,S3 warn
+    class S1,S2,S3,S4 warn
 ```
 
 ## 장별 한 문장
@@ -56,6 +56,7 @@ flowchart TB
 | [10. 백엔드](/web/10-backend/) | 보안 규칙은 서버·DB의 신뢰 경계에서 강제하고, DB 기본 선택은 Postgres다 |
 | [11. 브라우저 보안](/web/11-security/) | 브라우저는 남의 코드가 내 자격으로 도는 공간 — 그래서 CORS도 PKCE도 있다 |
 | [12. 배포](/web/12-deploy/) | 축은 "언제 실행되는가" — 정적 / 요청 시 / 상시 |
+| [13. Cloudflare](/web/13-cloudflare/) | DNS·성능·보안·실행·접근 제어를 요청 경로의 필요한 층에 붙인다 |
 
 ## 이 덱이 심으려 한 습관
 
