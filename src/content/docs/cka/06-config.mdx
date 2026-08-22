@@ -436,7 +436,42 @@ request 합이 이미 Allocatable에 닿았기 때문이다.
 
 ### CPU와 메모리의 단위
 
-**이 비대칭이 실무 감각의 핵심이다.**
+Kubernetes의 [리소스 단위](https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/#resource-units-in-kubernetes)에서
+CPU는 코어 수, 메모리는 바이트 수로 적는다.
+
+| 표기 | 뜻 |
+|---|---|
+| `1` CPU | 물리 코어 또는 가상 코어 1개 |
+| `1000m` | 1 CPU. `m`은 millicpu 또는 millicore다 |
+| `500m` | 0.5 CPU |
+| `1m` | 0.001 CPU, 코어 하나의 0.1%에 해당하는 양 |
+| `1Mi` | 1 mebibyte = 1,048,576 bytes = 1024² bytes |
+| `1M` | 1 megabyte = 1,000,000 bytes = 1000² bytes |
+
+CPU의 `m`은 **millisecond가 아니다.** requests/limits에서는 얼마나 많은 CPU 시간을
+예약·제한할지를 나타내고, `kubectl top`에서는 최근 측정 구간의 평균 CPU 사용 속도를
+같은 단위로 나타낸다.
+
+```text
+평균 CPU 사용량 = 측정 구간에 소비한 CPU 시간 / 실제 경과 시간
+
+15초 동안 CPU 시간 7.5초 소비
+= 7.5 CPU초 / 15초
+= 0.5 CPU
+= 500m
+```
+
+측정 구간이 15초이든 30초이든 결과는 코어 수로 정규화된다. 따라서 `500m`은 누적해서
+CPU를 500ms 사용했다는 뜻이 아니라, **그 구간에 평균적으로 코어 절반을 쓴 것과 같다**는
+뜻이다. 실제 구간은 Metrics API 응답의 `window`에 있으며, `timestamp - window`부터
+`timestamp`까지를 뜻한다. 자세한 필드 정의는 [Metrics API](https://kubernetes.io/docs/reference/external-api/metrics.v1beta1/)에서 확인한다.
+
+요청이 없는 frontend Pod은 CPU가 `1m`처럼 작아질 수 있다. 그래도 probe, 이벤트 루프,
+가비지 컬렉션 같은 백그라운드 작업 때문에 꼭 `0m`인 것은 아니다. 메모리는 시간당 소비량이
+아니라 측정 시점의 working set(실제로 사용 중인 메모리 집합)이라, 접속이 없어도 프로세스가
+떠 있는 만큼 유지될 수 있다.
+
+**CPU와 메모리 limit을 넘었을 때의 비대칭도 실무 감각의 핵심이다.**
 
 ```mermaid
 flowchart LR
@@ -453,7 +488,8 @@ flowchart LR
     class CPU,MEM key
 ```
 
-`128Mi` ≠ `128M` 이라는 점도 기억할 것.
+`128Mi` ≠ `128M` 이라는 점과, CPU의 `1m`과 메모리의 `1Mi`는 전혀 다른 단위라는 점도
+기억할 것.
 
 :::tip[시험]
 `Exit Code 137` + `Reason: OOMKilled` 를 보면
@@ -600,6 +636,7 @@ requests가 없는 Pod은 생성이 거부된다.**
 - **Secret의 base64는 보호가 아니다.** 보호는 **RBAC + etcd 암호화**
 - `CreateContainerConfigError` = **ConfigMap/Secret 이름·키 오타**
 - **requests는 스케줄링, limits는 런타임 강제.** 노드는 request 합만 본다
+- CPU `1000m` = 1코어, 메모리 `1Mi` = 1024² bytes. `top`의 CPU는 측정 구간의 평균 사용 속도
 - CPU 초과 = **throttling**, 메모리 초과 = **OOMKilled(137)**
 - **QoS는 지정하는 게 아니라 계산된다.** BestEffort가 가장 먼저 쫓겨난다
 - **ResourceQuota + LimitRange는 짝으로** — 그래야 requests 없는 Pod이 안 막힌다

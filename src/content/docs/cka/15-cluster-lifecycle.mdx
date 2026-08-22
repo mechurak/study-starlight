@@ -351,8 +351,11 @@ flowchart TD
 
 ### 업그레이드 — 노드 유형별 절차
 
-시험 중에는 공식 [Upgrading kubeadm clusters](https://kubernetes.io/docs/tasks/administer-cluster/kubeadm/kubeadm-upgrade/)
-페이지를 열어 놓고 그대로 따라가는 게 정석이다 — 저장소 URL 변경부터 uncordon까지 명령이 순서대로 다 있다.
+마이너 업그레이드라면 먼저 공식
+[Changing The Kubernetes Package Repository](https://kubernetes.io/docs/tasks/administer-cluster/kubeadm/change-package-repository/)에서
+저장소 URL을 목표 마이너로 바꾼다. 이어서
+[Upgrading kubeadm clusters](https://kubernetes.io/docs/tasks/administer-cluster/kubeadm/kubeadm-upgrade/)의
+노드별 절차를 따라 `kubeadm`부터 `uncordon`까지 진행한다.
 
 **7단계가 똑같고, 3번만 다르다.**
 
@@ -361,7 +364,7 @@ flowchart TD
 
 <Steps>
 
-1. **저장소 URL의 마이너 버전을 바꾼다** — ★ 가장 많이 빠뜨리는 단계
+1. **[저장소 URL의 마이너 버전을 바꾼다](https://kubernetes.io/docs/tasks/administer-cluster/kubeadm/change-package-repository/)** — ★ 가장 많이 빠뜨리는 단계
 
    ```bash
    sudo sed -i 's/v1.34/v1.35/' /etc/apt/sources.list.d/kubernetes.list
@@ -571,6 +574,65 @@ apiserver나 scheduler가 죽으면 다시 띄우면 그만이지만,
 그래서 백업은 "혹시 모르니"가 아니라 **클러스터를 되살릴 수 있는 유일한 수단**이고,
 시험에서도 이 장에서 가장 자주 나오는 작업이다.
 
+### etcd cluster와 endpoint
+
+문제의 *ETCD cluster*는 여러 etcd 멤버가 함께 제공하는 **하나의 논리적 저장소**를 뜻한다.
+[2장](/cka/02-architecture/)의 운영 구성은 보통 3·5개 멤버지만, 단일 컨트롤 플레인 실습처럼
+멤버가 하나뿐이어도 관례상 etcd cluster라고 부른다.
+
+*At what address can you reach the ETCD cluster from the controlplane node?*는 그 저장소에
+클라이언트로 접속할 **endpoint URL**을 묻는다. etcd 매니페스트의 `--listen-client-urls`에서
+확인하며, 같은 노드에서 실행하는 `etcdctl`은 보통 다음 주소를 쓴다.
+
+```text
+https://127.0.0.1:2379
+```
+
+- `127.0.0.1`: control plane 노드 자기 자신
+- `2379`: API 서버·`etcdctl` 같은 **클라이언트가 접속하는 포트**
+- `2380`: etcd 멤버끼리 Raft 통신에 쓰는 **peer 포트** — 이 문제의 답이 아니다
+
+IPv4 endpoint는 `https://127.0.0.1:2379`처럼 쓴다. 예전 풀이에 보이는
+`https://[127.0.0.1]:2379`의 대괄호는 필요 없다. 대괄호는 주소 안에 `:`가 있는 IPv6 literal과
+포트를 구분할 때만 쓴다: `https://[::1]:2379`.
+
+### TLS 플래그 — 누가 누구를 검증하는가
+
+서버 설정과 클라이언트 명령은 같은 인증서 파일을 서로 다른 이름의 플래그로 가리킬 수 있다.
+이름을 외우기보다 **플래그를 실행하는 쪽의 관점**으로 읽는다.
+
+| 관점 | 플래그 | 역할 |
+|---|---|---|
+| etcd 서버 매니페스트 | `--cert-file` | 서버가 접속한 클라이언트에게 제시하는 서버 인증서 |
+| etcd 서버 매니페스트 | `--key-file` | 서버 인증서의 개인 키 |
+| etcd 서버 매니페스트 | `--trusted-ca-file` | `--client-cert-auth=true`일 때 서버가 클라이언트 인증서를 검증할 신뢰 CA |
+| `etcdctl` 클라이언트 | `--cacert` | 클라이언트가 etcd 서버 인증서를 검증할 신뢰 CA |
+| `etcdctl` 클라이언트 | `--cert` · `--key` | 클라이언트가 etcd 서버에 자기 신원을 증명할 인증서와 개인 키 |
+
+따라서 *Where is the ETCD server certificate file located?*의 답은 매니페스트의
+`--cert-file` 값이다. `--trusted-ca-file`은 서버 인증서가 아니라 **검증 기준인 CA 인증서**다.
+각 플래그의 검증 방향은 etcd 공식
+[Transport security model](https://etcd.io/docs/v3.6/op-guide/security/)에서도 확인할 수 있다.
+
+### `ETCDCTL_API=3` — v3 명령 체계 선택
+
+`ETCDCTL_API=3`은 etcd 서버 버전을 바꾸지 않는다. `etcdctl` 프로세스가 v3 API의
+`snapshot save` 같은 명령 체계를 사용하도록 선택하는 환경변수다. etcdctl 3.3 이하는 v2가
+기본이라 필요했고, **3.4부터 v3가 기본**이라 현재 환경에서는 생략해도 된다. 버전이 불확실한
+실습과 공식 답안에서는 v3 사용을 명시하려고 계속 붙인다. 이 변경점은 etcd 공식
+[3.3에서 3.4 업그레이드 문서](https://etcd.io/docs/v3.6/upgrades/upgrade_3_4/#make-etcdctl_api3-etcdctl-default)에 명시되어 있다.
+
+```bash
+# 이 etcdctl 실행 한 번에만 적용한다
+ETCDCTL_API=3 etcdctl version
+
+# 현재 셸의 뒤이은 명령에도 적용한다
+export ETCDCTL_API=3
+```
+
+`sudo`로 실행할 때는 셸에서 미리 `export`한 값이 보존되지 않을 수 있으므로
+`sudo ETCDCTL_API=3 etcdctl ...`처럼 같은 명령에 붙이는 편이 확실하다.
+
 ### etcd 접근 준비
 
 ```bash
@@ -580,8 +642,7 @@ sudo cat /etc/kubernetes/manifests/etcd.yaml | grep -E 'listen-client-urls|cert-
 
 ```bash
 # 인증서 경로를 확인했으면 이렇게 쓴다
-export ETCDCTL_API=3
-sudo etcdctl \
+sudo ETCDCTL_API=3 etcdctl \
   --endpoints=https://127.0.0.1:2379 \
   --cacert=/etc/kubernetes/pki/etcd/ca.crt \
   --cert=/etc/kubernetes/pki/etcd/server.crt \

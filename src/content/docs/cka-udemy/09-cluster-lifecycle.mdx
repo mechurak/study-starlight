@@ -171,11 +171,39 @@ kubectl delete deployment,service web-check
 
 ## 노드 비우기 — Practice Test: OS Upgrades
 
+공식 문서: [Safely Drain a Node — Use `kubectl drain` to remove a node from service](https://kubernetes.io/docs/tasks/administer-cluster/safely-drain-node/#use-kubectl-drain-to-remove-a-node-from-service)
+
 원본 풀이: [03-Practice-Test-OS-Upgrades.md](https://github.com/kodekloudhub/certified-kubernetes-administrator-course/blob/master/docs/06-Cluster-Maintenance/03-Practice-Test-OS-Upgrades.md)
+
+### 왜 `--ignore-daemonsets`가 필요한가
+
+DaemonSet Pod은 CNI·로그 수집기처럼 **그 노드 자체에서 동작해야 하는 에이전트**다.
+일반 Pod처럼 퇴거해도 DaemonSet 컨트롤러가 같은 노드에 다시 만들며, DaemonSet Pod은
+노드의 unschedulable taint도 기본적으로 허용한다. 그래서 `kubectl drain`은 DaemonSet Pod을
+퇴거하지 않고, 이런 Pod을 발견하면 실수로 남긴 것이 아닌지 확인하도록 기본 실행을 중단한다.
+
+`--ignore-daemonsets`는 **DaemonSet Pod이 노드에 남는 것을 알고 있으니, 그 Pod은 건드리지 말고
+나머지 Pod의 퇴거를 계속하라**는 뜻이다. “DaemonSet Pod을 강제로 삭제하라”는 옵션이 아니다.
+drain이 성공해도 해당 Pod은 노드를 종료하기 전까지 계속 보일 수 있다.
+
+### `cordon`과 `uncordon`은 무슨 뜻인가
+
+명령 레퍼런스: [`kubectl cordon`](https://kubernetes.io/docs/reference/kubectl/generated/kubectl_cordon/) ·
+[`kubectl uncordon`](https://kubernetes.io/docs/reference/kubectl/generated/kubectl_uncordon/)
+
+영어 `cordon`은 출입을 막으려고 치는 **통제선**이고, `cordon off`는 통제선을 쳐서 구역을
+막는다는 뜻이다. Kubernetes에서도 같은 그림으로 기억하면 된다.
+
+- `cordon`: 노드 주위에 통제선을 친다 → **새 Pod을 스케줄하지 못하게** 한다. 기존 Pod은 그대로다.
+- `drain`: 먼저 통제선을 치고(cordon) → 기존 일반 Pod도 안전하게 퇴거한다.
+- `uncordon`: `un-`을 붙여 통제선을 걷는다 → 노드를 다시 **스케줄 가능**하게 만든다.
+
+따라서 `kubectl uncordon node01`은 유지보수가 끝난 `node01`을 다시 후보지로 열어 주는 명령이다.
+이미 다른 노드로 옮겨 간 Pod을 `node01`로 돌려보내지는 않는다.
 
 ```bash
 # "Run the command kubectl drain node01 --ignore-daemonsets"
-kubectl drain node01 --ignore-daemonsets   # 비우고 + cordon. DS Pod은 쫓아내도 되살아나니 무시하고 진행하라는 플래그 — 없으면 drain이 거부된다
+kubectl drain node01 --ignore-daemonsets   # cordon + 일반 Pod 퇴거. DaemonSet Pod은 남겨 두고 진행한다
 # "Run the command kubectl uncordon node01"
 kubectl uncordon node01                    # 다시 받게
 # "Run the command kubectl cordon node03"
@@ -213,10 +241,51 @@ uncordon은 "다시 스케줄 가능"으로 돌릴 뿐이다. 기존 Pod이 재�
 </Steps>
 
 (원본은 `apt install kubeadm=1.18...` 시절 답안이다. 지금은 pkgs.k8s.io 저장소의
-**마이너 버전별 리포지터리**를 먼저 바꿔야 다음 마이너가 보인다 — 절차 전문은
-[cka 15장](/cka/15-cluster-lifecycle/) 업그레이드 절. 시험 중에는 공식
-[Upgrading kubeadm clusters](https://kubernetes.io/docs/tasks/administer-cluster/kubeadm/kubeadm-upgrade/)
-페이지를 열어 놓고 그대로 따라가는 게 정석이다 — 저장소 교체 명령까지 다 있다.)
+**마이너 버전별 리포지터리**를 먼저 바꿔야 다음 마이너가 보인다. 공식
+[Changing The Kubernetes Package Repository](https://kubernetes.io/docs/tasks/administer-cluster/kubeadm/change-package-repository/)에서
+저장소를 목표 마이너로 바꾼 뒤,
+[Upgrading kubeadm clusters](https://kubernetes.io/docs/tasks/administer-cluster/kubeadm/kubeadm-upgrade/)의
+노드별 절차를 따른다 — 전체 흐름은 [cka 15장](/cka/15-cluster-lifecycle/) 업그레이드 절.)
+
+### APT에서 설치할 버전 찾기
+
+저장소를 목표 마이너로 바꾼 다음에는 패키지 목록을 새로 받고, 현재 저장소에서 설치할 수 있는
+`kubeadm` 버전을 확인한다.
+
+```bash
+sudo apt-get update
+sudo apt-cache madison kubeadm
+```
+
+`apt-cache madison`은 네트워크를 직접 조회하는 명령이 아니라, `apt-get update`가 받아 둔
+패키지 목록에서 **사용 가능한 버전과 그 버전을 제공하는 저장소**를 표로 보여준다.
+[APT 명령 레퍼런스](https://manpages.debian.org/bookworm/apt/apt-cache.8.en.html#madison)에서
+설명하는 출력 형식은 다음과 같다.
+
+```text
+kubeadm | 1.35.0-1.1 | https://pkgs.k8s.io/core:/stable:/v1.35/deb Packages
+```
+
+여기서 `1.35.0`은 Kubernetes 버전이고, 뒤의 `-1.1`은 APT 패키징 revision이다.
+KodeKloud는 이 출력의 **정확한 전체 문자열**을 복사해 설치한다.
+
+```bash
+sudo apt-get install kubeadm=1.35.0-1.1
+```
+
+공식 문서의 `1.35.x-*`에서 `x`는 글자 그대로 입력하는 값이 아니다. 고른 patch 버전으로
+바꿔 `1.35.0-*`처럼 쓰며, 마지막 `*`가 `-1.1` 같은 패키징 revision과 맞는다.
+
+```bash
+sudo apt-mark unhold kubeadm && \
+sudo apt-get update && sudo apt-get install -y kubeadm='1.35.0-*' && \
+sudo apt-mark hold kubeadm
+```
+
+`hold`는 일반 APT 업그레이드가 Kubernetes 패키지 버전을 뜻하지 않게 바꾸지 못하도록 막는다.
+공식 절차는 잠시 `unhold`하고 설치한 뒤 다시 `hold`하는 운영용 전체 흐름이다. KodeKloud 풀이는
+앞에서 이미 `apt-get update`와 정확한 버전 확인을 마쳤고 일회성 실습에 필요한 설치만 보여 준다.
+설치 방법이 다른 것이 아니라 **버전 지정과 hold 관리 범위를 어디까지 명시했는지가 다르다.**
 
 :::caution[함정 — 워커는 apply가 아니라 node]
 `kubeadm upgrade apply`는 **첫 컨트롤 플레인에서 한 번**이다.
@@ -245,11 +314,59 @@ kubectl get pods -n kube-system -o wide
 
 원본 풀이: [09-Practice-Test-Backup-and-Restore-Methods.md](https://github.com/kodekloudhub/certified-kubernetes-administrator-course/blob/master/docs/06-Cluster-Maintenance/09-Practice-Test-Backup-and-Restore-Methods.md)
 
+### 문제 문구에서 읽어야 할 것
+
+*ETCD cluster*는 한 개 이상의 etcd 멤버가 제공하는 **하나의 논리적 저장소**다. 이 실습처럼
+멤버가 하나인 환경도 관례상 cluster라고 부른다. *At what address can you reach the ETCD cluster
+from the controlplane node?*는 이 저장소의 **client endpoint URL**을 묻는 말이다.
+
+```text
+https://127.0.0.1:2379
+```
+
+- endpoint는 etcd Pod의 `--listen-client-urls`에서 확인한다
+- `2379`는 API 서버와 `etcdctl`이 접속하는 client 포트다
+- `2380`은 etcd 멤버 사이의 peer 포트라서 답이 아니다
+
+IPv4는 `https://127.0.0.1:2379`처럼 대괄호 없이 쓴다. KodeKloud의 일부 옛 풀이에 있는
+`https://[127.0.0.1]:2379`는 IPv4에 필요 없는 표기다. 대괄호는 `https://[::1]:2379`처럼
+콜론이 포함된 IPv6 주소와 포트를 구분할 때 사용한다.
+
+### 서버 매니페스트와 `etcdctl`의 인증서 플래그
+
+[8장](/cka-udemy/08-security/)에서 확인한 인증서 경로를 역할별로 연결하면 다음과 같다.
+
+| 실행 주체 | 플래그 | 의미 |
+|---|---|---|
+| etcd 서버 | `--cert-file` | etcd가 클라이언트에게 제시하는 서버 인증서 |
+| etcd 서버 | `--key-file` | 서버 인증서에 대응하는 개인 키 |
+| etcd 서버 | `--trusted-ca-file` | `--client-cert-auth=true`일 때 접속한 클라이언트 인증서를 검증할 CA |
+| `etcdctl` | `--cacert` | `etcdctl`이 etcd 서버 인증서를 검증할 CA |
+| `etcdctl` | `--cert` · `--key` | `etcdctl`이 etcd에 제시할 클라이언트 인증서와 개인 키 |
+
+따라서 *Where is the ETCD server certificate file located?*는 `--cert-file`의 값을 묻는다.
+`--trusted-ca-file`은 서버 인증서 자체가 아니라 **서버가 신뢰하는 CA 인증서**다. etcd의
+[Transport security model](https://etcd.io/docs/v3.6/op-guide/security/)에서 같은 검증 방향을 확인할 수 있다.
+
+### `ETCDCTL_API=3`이 필요한 버전
+
+이 환경변수는 etcd 서버의 버전을 바꾸는 옵션이 아니라 `etcdctl`이 **v3 API 명령 체계**를
+사용하도록 고르는 스위치다. etcdctl 3.3 이하는 v2가 기본이라 필요했지만, **3.4부터 v3가
+기본**이므로 요즘 버전에서는 생략해도 된다. 공식 명령과 실습 답안에서는 버전이 달라도
+`snapshot save`를 v3로 실행한다는 뜻을 분명히 하려고 계속 붙인다. 근거는 etcd 공식
+[3.3에서 3.4 업그레이드 문서](https://etcd.io/docs/v3.6/upgrades/upgrade_3_4/#make-etcdctl_api3-etcdctl-default)다.
+
+```bash
+etcdctl version                   # 설치된 etcdctl·API 버전 확인
+ETCDCTL_API=3 etcdctl version     # 이 실행 한 번에만 v3 지정
+export ETCDCTL_API=3              # 현재 셸의 뒤이은 명령에도 적용
+```
+
 ```bash
 # 백업 — 인증서 세 개는 etcd 스태틱 Pod 매니페스트에서 확인
 # 플래그가 기억 안 나면 공식 문서 "Operating etcd clusters for Kubernetes"에서 복사:
 # https://kubernetes.io/docs/tasks/administer-cluster/configure-upgrade-etcd/
-# ETCDCTL_API=3: v3 API 강제 — 요즘 etcdctl은 3이 기본이라 없어도 되지만, 답안 관습으로 남아 있다
+# ETCDCTL_API=3: v3 API 명시 — etcdctl 3.4부터는 v3가 기본이라 생략 가능
 # "Take a snapshot of the ETCD database using the built-in snapshot functionality. Store the backup file at location /opt/snapshot-pre-boot.db"
 ETCDCTL_API=3 etcdctl snapshot save /opt/snapshot-pre-boot.db \
   --endpoints=https://127.0.0.1:2379 \
@@ -266,23 +383,109 @@ sudo etcdutl --write-out=table snapshot status /opt/snapshot-pre-boot.db
 `snapshot save` 뒤 `etcdutl snapshot status`로 hash·revision·key 수·크기를 확인한다.
 `etcdctl snapshot status`는 etcd 3.5부터 deprecated이므로 `etcdutl`을 우선한다.
 
-복구는 두 단계 — **새 디렉터리로 복원 + etcd가 그 디렉터리를 보게 변경**:
+### 복구 절차 — 쓰기를 멈추고 새 data-dir로 전환
 
-```bash
-# "Luckily we took a backup. Restore the original state of the cluster using the backup file."
-ETCDCTL_API=3 etcdctl snapshot restore /opt/snapshot-pre-boot.db \
-  --data-dir /var/lib/etcd-from-backup
-```
+복구의 핵심은 **API 쓰기 중단 → 새 디렉터리로 복원 → etcd 전환 → 컨트롤 플레인 재동기화**다.
+공식 v1.35 [etcd 복구 문서](https://v1-35.docs.kubernetes.io/docs/tasks/administer-cluster/configure-upgrade-etcd/#restoring-an-etcd-cluster)는
+실행 중인 모든 API 서버를 먼저 멈추고, 모든 etcd 인스턴스를 복원한 다음 API 서버를 다시
+시작하라고 한다. 아래 단일 control plane 실습에서는 kube-apiserver 매니페스트 하나를 옮겨 구현한다.
 
-```yaml
-# /etc/kubernetes/manifests/etcd.yaml — etcd-data 볼륨의 hostPath만 바꾼다
-  - hostPath:
-      path: /var/lib/etcd-from-backup
-      type: DirectoryOrCreate
-    name: etcd-data
-```
+<Steps>
 
-저장하면 스태틱 Pod이 재생성된다 — 1분쯤 기다렸다가 `kubectl get deploy`로 검증.
+1. kube-apiserver를 내려 etcd로 들어오는 API 쓰기를 멈춘다
+
+   kubeadm은 control plane 구성 요소를 `/etc/kubernetes/manifests/`의 스태틱 Pod으로 실행한다.
+   kubelet은 이 디렉터리를 주기적으로 스캔해 파일이 사라지면 Pod을 내리고, 돌아오면 다시 만든다.
+   공식 [스태틱 Pod 동적 추가·제거](https://v1-35.docs.kubernetes.io/docs/tasks/configure-pod-container/static-pod/#dynamic-addition-and-removal-of-static-pods)에도
+   `mv` → 대기 → `crictl ps`로 확인하는 같은 예제가 있다.
+
+   ```bash
+   mv /etc/kubernetes/manifests/kube-apiserver.yaml /tmp/
+   sleep 20
+
+   # 실행 중인 kube-apiserver가 나오지 않아야 중지 완료
+   crictl ps | grep kube-apiserver
+   ```
+
+   HA control plane이면 한 노드만 내려서는 쓰기가 멈추지 않는다. 공식 문서의 **모든 API 서버**라는
+   조건대로 각 control plane 노드의 인스턴스를 모두 멈춰야 한다.
+
+2. 스냅샷을 현재 디렉터리와 다른 새 data-dir로 복원한다
+
+   ```bash
+   # "Luckily we took a backup. Restore the original state of the cluster using the backup file."
+   etcdutl snapshot restore /opt/snapshot-pre-boot.db \
+     --data-dir /var/lib/etcd-from-backup
+   ```
+
+   `etcdutl`은 로컬 스냅샷 파일을 새 data-dir로 푸는 도구다. `etcdctl snapshot restore`는
+   etcd 3.5부터 deprecated이므로 복구에는 `etcdutl`을 우선한다.
+
+3. etcd 스태틱 Pod이 새 data-dir을 보게 전환한다
+
+   ```yaml
+   # /etc/kubernetes/manifests/etcd.yaml — etcd-data 볼륨의 hostPath만 바꾼다
+     - hostPath:
+         path: /var/lib/etcd-from-backup
+         type: DirectoryOrCreate
+       name: etcd-data
+   ```
+
+   저장하면 kubelet이 변경을 감지해 etcd 스태틱 Pod을 재생성한다. 아직 API 서버가 내려가 있으므로
+   `kubectl`이 아니라 노드의 CRI를 직접 본다.
+
+   ```bash
+   crictl ps | grep etcd
+   # 비정상이면 종료된 컨테이너와 로그까지 확인
+   crictl ps -a | grep etcd
+   crictl logs <etcd-container-id>
+   ```
+
+4. kube-apiserver 매니페스트를 되돌려 API를 다시 연다
+
+   ```bash
+   mv /tmp/kube-apiserver.yaml /etc/kubernetes/manifests/
+   sleep 20
+   crictl ps | grep kube-apiserver
+   ```
+
+5. controller-manager·scheduler·kubelet을 재시작한다
+
+   공식 etcd 복구 문서는 이 구성 요소들이 복구 전의 오래된 데이터를 계속 의존하지 않도록
+   `kube-scheduler`, `kube-controller-manager`, `kubelet`도 재시작하라고 권고한다. 앞의 두 구성
+   요소도 kubeadm 스태틱 Pod이므로 같은 매니페스트 이동 패턴을 쓴다.
+
+   ```bash
+   mv /etc/kubernetes/manifests/kube-controller-manager.yaml /tmp/
+   sleep 20
+   mv /tmp/kube-controller-manager.yaml /etc/kubernetes/manifests/
+
+   mv /etc/kubernetes/manifests/kube-scheduler.yaml /tmp/
+   sleep 20
+   mv /tmp/kube-scheduler.yaml /etc/kubernetes/manifests/
+
+   systemctl restart kubelet
+   ```
+
+6. 런타임 → API → 복구된 리소스 순으로 확인한다
+
+   ```bash
+   # 네 control plane 컨테이너가 모두 Running인지 먼저 확인
+   crictl ps
+
+   # API가 준비된 뒤 클러스터 상태와 스냅샷 당시 리소스를 확인
+   kubectl get --raw='/readyz?verbose'
+   kubectl get nodes
+   kubectl get pods -n kube-system
+   kubectl get deployments,services --all-namespaces
+   ```
+
+</Steps>
+
+`sleep 20`은 kubelet의 다음 매니페스트 스캔을 기다리는 여유 시간이지 완료 판정 자체가 아니다.
+시험에서는 시간이 지났다는 사실보다 `crictl ps`에서 컨테이너가 실제로 사라지고 다시 생겼는지를 본다.
+또한 매니페스트 사본을 `kube-apiserver.yaml.backup`처럼 같은 디렉터리에 두면 kubelet이 그 파일도
+읽을 수 있으므로, 임시 사본은 반드시 `/etc/kubernetes/manifests/` 밖에 둔다.
 
 :::tip[백업엔 인증서 필수, 복원엔 불필요]
 `snapshot save`는 살아 있는 etcd에 접속하므로 인증서가 필요하고,
@@ -327,8 +530,8 @@ chown -R etcd:etcd /var/lib/etcd-data-new           # 복원 디렉터리 소유
 | kubeadm 설치 | `Installing kubeadm` | [Installing kubeadm](https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/install-kubeadm/)의 현재 패키지 저장소, swap·포트·런타임 사전 조건 |
 | init·join·CNI | `Creating cluster kubeadm` | [Creating a cluster with kubeadm](https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/create-cluster-kubeadm/)의 `kubeadm init`, kubeconfig 복사, Pod 네트워크, join 순서 |
 | drain·uncordon | `Safely Drain a Node` | [Safely Drain a Node](https://kubernetes.io/docs/tasks/administer-cluster/safely-drain-node/)에서 DaemonSet·단독 Pod·`emptyDir` 때문에 필요한 플래그와 데이터 유실 조건 |
-| 버전 업그레이드 | `Upgrading kubeadm clusters` | [Upgrading kubeadm clusters](https://kubernetes.io/docs/tasks/administer-cluster/kubeadm/kubeadm-upgrade/)의 **현재 목표 버전 전용** 저장소와 control plane/worker 절차. 시험 중 가장 먼저 열 페이지 |
-| etcd 백업·복구 | `Operating etcd clusters Kubernetes` | [Operating etcd clusters for Kubernetes](https://kubernetes.io/docs/tasks/administer-cluster/configure-upgrade-etcd/)의 snapshot save/status/restore 명령. endpoint와 인증서 경로는 실제 etcd 매니페스트에서 가져오기 |
+| 버전 업그레이드 | `Upgrading kubeadm clusters` | [Changing The Kubernetes Package Repository](https://kubernetes.io/docs/tasks/administer-cluster/kubeadm/change-package-repository/)에서 목표 마이너 저장소로 바꾸고, [Upgrading kubeadm clusters](https://kubernetes.io/docs/tasks/administer-cluster/kubeadm/kubeadm-upgrade/)에서 control plane/worker 절차 확인 |
+| etcd 백업·복구 | `Operating etcd clusters Kubernetes` · `Create static Pods dynamic removal` | [Operating etcd clusters for Kubernetes](https://kubernetes.io/docs/tasks/administer-cluster/configure-upgrade-etcd/)에서 API 서버 중지·restore·구성 요소 재시작을, [Create static Pods](https://kubernetes.io/docs/tasks/configure-pod-container/static-pod/#dynamic-addition-and-removal-of-static-pods)에서 매니페스트를 디렉터리 밖으로 옮겨 중지·재기동하는 패턴을 확인. endpoint와 인증서 경로는 실제 etcd 매니페스트에서 가져오기 |
 
 업그레이드 문서는 현재 최신 마이너를 기준으로 내용이 바뀐다. 시험 클러스터의 출발·목표 버전을 먼저
 확인하고, 페이지 상단의 버전 선택기에서 그 버전 문서를 고른 뒤 패키지 문자열까지 그대로 따른다.
