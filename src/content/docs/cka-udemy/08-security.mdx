@@ -120,7 +120,10 @@ API 서버 컨테이너 로그에 `127.0.0.1:2379`와
 
 원본 풀이: [12-Practice-Test-Certificates-API.md](https://github.com/kodekloudhub/certified-kubernetes-administrator-course/blob/master/docs/07-Security/12-Practice-Test-Certificates-API.md)
 
-새 사용자의 인증서 서명 요청(CSR, CertificateSigningRequest) 처리 —
+새 사용자의 인증서 서명 요청(CSR, CertificateSigningRequest)을 만들 때는 공식 문서
+[Issue a Certificate for a Kubernetes API Client Using a CertificateSigningRequest](https://kubernetes.io/docs/tasks/tls/certificate-issue-client-csr/#create-a-kubernetes-certificatesigningrequest)의
+**Create a Kubernetes CertificateSigningRequest** 예시를 복사한다. 이 실습의 흐름은
+CSR 파일 인코딩 → YAML의 `name`·`request` 수정 → 생성·확인 → 승인 또는 거부다.
 
 ```bash
 # "A new member akshay joined our team. He requires access to our cluster. The Certificate Signing Request is at the /root location."
@@ -136,9 +139,11 @@ kubectl certificate deny agent-smith    # 수상한 요청은 거부
 kubectl delete csr agent-smith
 ```
 
-CSR YAML의 뼈대(`signerName: kubernetes.io/kube-apiserver-client`, `usages: [client auth]`)는
-공식 문서 [Certificate Signing Requests](https://kubernetes.io/docs/reference/access-authn-authz/certificate-signing-requests/)에서
-복사한다 — [cka 14장](/cka/14-rbac/)에 전체 흐름이 있다.
+공식 예시에서 `apiVersion: certificates.k8s.io/v1`,
+`signerName: kubernetes.io/kube-apiserver-client`, `usages: [client auth]`를 유지하고,
+문제에서 준 이름과 CSR 내용만 바꾼다. 승인과 거부 명령은 공식 reference 문서의
+[Approval or rejection using kubectl](https://kubernetes.io/docs/reference/access-authn-authz/certificate-signing-requests/#approval-or-rejection-using-kubectl)에서
+확인한다 — [cka 14장](/cka/14-rbac/)에 전체 흐름이 있다.
 
 :::tip[누가 요청했는지 의심하기]
 `kubectl get csr <name> -o yaml`로 **groups와 usages**를 본다 — *Run the command kubectl get csr agent-smith -o yaml*.
@@ -510,7 +515,8 @@ ps -ef | grep kube-apiserver | grep admission-plugins
 | 이 장의 섹션 | 검색어 | 공식 문서에서 가져올 것 |
 |---|---|---|
 | 인증서 경로 | `PKI certificates requirements` | [PKI certificates and requirements](https://kubernetes.io/docs/setup/best-practices/certificates/)의 인증서 표. 실제 경로는 스태틱 Pod 플래그가 최종 근거이며 새 YAML 작성용 페이지는 아님 |
-| CSR | `Certificate Signing Requests` | [Certificates and Certificate Signing Requests](https://kubernetes.io/docs/reference/access-authn-authz/certificate-signing-requests/)의 `certificates.k8s.io/v1` CSR 예시에서 `request`, `signerName`, `usages` |
+| CSR 생성 | `Issue Certificate Kubernetes API Client CSR` | [Issue a Certificate for a Kubernetes API Client Using a CertificateSigningRequest](https://kubernetes.io/docs/tasks/tls/certificate-issue-client-csr/#create-a-kubernetes-certificatesigningrequest)의 **Create a Kubernetes CertificateSigningRequest** 예시에서 `request`, `signerName`, `usages` |
+| CSR 승인·거부 | `Certificate Signing Requests approval rejection kubectl` | [Certificates and Certificate Signing Requests](https://kubernetes.io/docs/reference/access-authn-authz/certificate-signing-requests/#approval-or-rejection-using-kubectl)의 **Approval or rejection using kubectl**에서 `certificate approve`·`certificate deny` 명령 |
 | kubeconfig | `Organizing Cluster Access kubeconfig` | [Organizing Cluster Access Using kubeconfig Files](https://kubernetes.io/docs/concepts/configuration/organize-cluster-access-kubeconfig/)에서 clusters/users/contexts의 연결 구조 확인 |
 | Role·ClusterRole·Binding | `RBAC` | [Using RBAC Authorization](https://kubernetes.io/docs/reference/access-authn-authz/rbac/)의 Role, ClusterRole, RoleBinding, ClusterRoleBinding 예시. namespace와 `roleRef.kind`를 특히 확인 |
 | ServiceAccount | `Service Accounts` | [Service Accounts](https://kubernetes.io/docs/concepts/security/service-accounts/)에서 Pod의 `serviceAccountName`과 토큰 방식 확인 |
