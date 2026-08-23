@@ -1,7 +1,7 @@
 ---
 title: "9. kagent의 Agent와 tool 리소스"
-description: Declarative Agent의 instruction·model·tool·skill부터 HITL·session·memory와 MCP tool 선언까지 CRD 필드 수준으로 읽는다
-aliases: [kagent Agent CRD, RemoteMCPServer, MCP Apps, kagent skills, kagent memory]
+description: Declarative Agent의 instruction·model·tool·skill과 deployment CPU·memory·volume부터 HITL·session·memory와 MCP tool 선언까지 CRD 필드 수준으로 읽는다
+aliases: [kagent Agent CRD, RemoteMCPServer, MCP Apps, kagent skills, kagent memory, kagent resources, kagent PVC]
 reviewedAt: 2026-08-21
 ---
 
@@ -99,6 +99,90 @@ fields.sm -> cm
 fields.sk -> oci
 fields.mem -> emb
 ```
+
+## workload 자원과 외부 상태
+
+prompt·model·tool이 Agent의 행동을 정한다면 `deployment`는 그 Agent를 **어떤 Kubernetes workload로
+실행할지** 정한다. 일반 `Agent`의 Declarative와 BYO 양쪽 모두 이 필드를 가지며, kagent controller가
+`Deployment`와 Pod spec으로 번역한다. 다만 kagent가 더 높은 수준의 resource profile이나 DB service catalog를
+제공하는 것은 아니다.
+
+### CPU·memory와 replica
+
+Declarative Agent는 `spec.declarative.deployment`, BYO Agent는 `spec.byo.deployment` 아래에 Kubernetes
+`ResourceRequirements`를 그대로 넣는다. 다음은 BYO Agent의 실행 자원 예다.
+
+```yaml
+spec:
+  type: BYO
+  byo:
+    deployment:
+      image: registry.company/agents/report@sha256:8b4c...
+      replicas: 1
+      resources:
+        requests:
+          cpu: 500m
+          memory: 512Mi
+        limits:
+          cpu: "2"
+          memory: 2Gi
+```
+
+[v0.9.9 구현](https://github.com/kagent-dev/kagent/blob/v0.9.9/go/core/internal/controller/translator/agent/deployments.go#L54-L67)은
+값을 생략했을 때 Pod 하나에 CPU `100m`·memory `384Mi`를 request하고 CPU `2000m`·memory `1Gi`를 limit으로
+넣는다. 이는 모든 Agent에 적합하다고 측정된 profile이 아니라 제품 기본값이다. [API reference의
+deployment schema](https://kagent.dev/docs/kagent/resources/api-ref/#declarativedeploymentspec)는 Agent별
+`resources`와 고정 `replicas`를 받지만 autoscaling policy를 표현하지 않는다.
+
+따라서 사내 포털은 raw 숫자를 그대로 열기보다 `small`·`standard`·`large` 같은 profile을 받아 adapter가
+`resources`로 번역한다. namespace의 `ResourceQuota`·`LimitRange`가 상한과 기본값을 강제하고, 실제
+CPU throttling·memory working set·Out Of Memory(OOM)를 본 뒤 profile을 조정한다. Horizontal Pod
+Autoscaler(HPA)가 필요하면 kagent가 소유한 Deployment의 `replicas`와 충돌하지 않는지 별도 contract test를
+통과시켜야 한다.
+
+### volume은 연결하지만 PVC와 DB는 만들지 않는다
+
+`deployment.volumes`와 `volumeMounts`에는 Kubernetes `Volume`을 넣을 수 있다. 아래처럼 기존
+PersistentVolumeClaim(PVC)과 DB credential Secret을 붙일 수 있지만, `finance-agent-data` PVC와
+`finance-agent-db` Secret은 플랫폼이 먼저 준비해야 한다.
+
+```yaml
+spec:
+  type: BYO
+  byo:
+    deployment:
+      image: registry.company/agents/finance@sha256:7a21...
+      env:
+        - name: DATABASE_URL
+          valueFrom:
+            secretKeyRef:
+              name: finance-agent-db
+              key: url
+      volumes:
+        - name: agent-data
+          persistentVolumeClaim:
+            claimName: finance-agent-data
+      volumeMounts:
+        - name: agent-data
+          mountPath: /var/lib/agent
+```
+
+kagent에는 Agent를 만들 때 PostgreSQL database·schema·user나 PVC를 함께 발급하는 service broker가 없다.
+BYO Agent가 별도 DB를 요구하면 포털이나 GitOps가 DB lifecycle·backup·quota·credential을 소유하고 Agent에는
+reference만 넣는다. Declarative Agent가 업무 DB를 조회하는 경우에는 DB credential을 runtime에 직접 주기보다
+승인된 MCP·HTTP tool로 좁혀 노출하는 편이 tool allowlist와 action policy를 유지하기 쉽다.
+
+일반 Agent는 StatefulSet이 아니라 Deployment로 생성된다. replica 여러 개가 한 `ReadWriteOnce` PVC를
+공유하거나 replica별 고정 volume identity가 필요한 workload는 이 계약과 맞지 않는다. 그런 상태는 외부 DB나
+object storage로 내리고, filesystem semantics가 꼭 필요할 때만 access mode·rollout·retention을 별도로 검증한다.
+
+:::caution[kagent PostgreSQL은 Agent 전용 업무 DB가 아니다]
+kagent 설치의 PostgreSQL은 controller의 backend이며 built-in long-term memory도 이 DB를 함께 쓴다.
+[Agent Memory](https://kagent.dev/docs/kagent/concepts/agent-memory/)는 Agent별 memory를 논리적으로 분리하지만,
+임직원이 올린 BYO application의 범용 database를 대신하지 않는다. 반대로 Declarative Agent가 같은 사용자의
+선호·이전 대화 핵심을 기억하려는 요구라면 별도 MCP를 만들기 전에 이 기능을 우선 검토한다.
+`SandboxAgent`·`AgentHarness`의 object snapshot도 process·workspace 복원을 위한 것이지 관계형 DB service가 아니다.
+:::
 
 ## Declarative Agent의 네 구성 요소
 
@@ -244,8 +328,29 @@ context:
 
 long-term memory는 [Agent Memory](https://kagent.dev/docs/kagent/concepts/agent-memory) 기능으로,
 대화에서 사용자 의도·선호를 주기적으로 뽑아 embedding으로 저장했다가 응답 전에 유사도로 검색해 넣는다.
-활성화하려면 embedding용 `ModelConfig`를 별도로 준비하고 보관 기간(TTL)을 정한다. 임의의 vector DB를 꽂는
-plugin 구조는 아니므로, 사내 표준 vector store가 이미 있다면 그쪽은 MCP tool로 붙이는 편이 현실적이다.
+물리적으로 Agent별 DB를 만드는 대신 pgvector가 활성화된 **kagent 공용 PostgreSQL**을 쓰고, Agent와 사용자
+범위로 memory를 나눈다. Declarative Agent에서 embedding용 `ModelConfig`와 보관 기간(TTL)을 선언하면 된다.
+
+```yaml
+declarative:
+  memory:
+    modelConfig: approved-embedding-model
+    ttlDays: 30
+```
+
+MCP는 이 built-in 기능의 필수 앞단이 아니라 **요구가 built-in 범위를 넘어설 때 쓰는 대안**이다.
+
+| 저장 요구 | 먼저 검토할 경로 | 경계 |
+|---|---|---|
+| 같은 Agent가 같은 사용자의 선호·이전 대화 핵심을 기억 | kagent built-in Memory | Declarative Agent, kagent PostgreSQL·TTL 사용 |
+| 회사 공통 memory, Agent 간 공유, kagent 밖 runtime과 portability | 독립 memory service를 MCP tool로 연결 | 별도 ACL·version·삭제 lifecycle 필요 |
+| 승인된 사내 문서 검색과 RAG | KnowledgeVersion을 조회하는 MCP·HTTP retrieval | source revision·문서 ACL·인용 lineage 필요 |
+| BYO Agent의 업무 record·transaction·checkpoint | 외부 DB를 application dependency로 연결 | schema migration·backup·credential은 플랫폼 책임 |
+
+built-in Memory는 backend를 다른 vector store로 교체할 수 없고, Agent 간 memory 공유와 memory 한 건 단위 삭제를
+지원하지 않는다. [공식 제한사항](https://kagent.dev/docs/kagent/concepts/agent-memory/#known-limitations)을
+수용할 수 없을 때만 사내 표준 memory를 MCP로 붙인다. 즉 "vector를 쓴다"는 공통점만으로 업무 Knowledge나
+application DB까지 kagent Memory에 넣지 않는다.
 
 이 memory는 [3장의 KnowledgeVersion](/agent-platform/03-domain-model/#knowledge와-tool은-version에-binding한다)을
 대신하지 않는다. 개인 대화에서 추출한 memory와 승인된 업무 corpus의 source revision·ACL·index lineage는
@@ -254,7 +359,9 @@ retrieval client 또는 승인된 MCP capability로 주입하고 그 version을 
 
 :::caution[개인정보가 조용히 축적되는 자리]
 memory는 사용자가 명시적으로 저장을 요청하지 않아도 대화에서 자동으로 정보를 추출한다. 사내 도입 시
-보관 기간, 삭제 요청 처리, 부서 이동 시 정리를 **정책으로 먼저 정하고** 켜야 한다.
+portal이 `user_id`를 요청값 그대로 믿지 않고 검증된 `(issuer, subject)`에 묶어야 한다. 보관 기간, Agent·사용자
+단위 전체 삭제, 부서 이동·퇴사 시 정리를 **정책으로 먼저 정하고** 켠다. 한 건 단위 삭제가 필요한 data는
+built-in Memory에 넣지 않는다.
 :::
 
 ## tool의 종류와 선언
@@ -359,7 +466,8 @@ image는 배포 자체를 거절한다. 사내 포털에서 "내 컨테이너 �
 |---|---|---|
 | 사용자가 채운다 | `systemMessage`, tool 선택(`toolNames`), 이름·설명 | Agent의 목적 그 자체 |
 | 목록에서 고른다 | versioned `modelConfig`, KnowledgeVersion, MCP capability, immutable skill ref | 승인된 것만 노출 |
-| 플랫폼이 정한다 | namespace, `deployment`, `runtime`, security context, `allowedNamespaces` | 격리·비용·blast radius |
+| 요구만 받는다 | workload 크기, persistent state 필요 여부 | profile과 storage binding으로 바꾼 뒤 정책을 검사 |
+| 플랫폼이 정한다 | namespace, `deployment.resources`·`replicas`·volume·env, `runtime`, security context, `allowedNamespaces` | 격리·비용·credential·blast radius |
 | 사용자에게 열지 않는다 | `headersFrom`의 Secret 이름, 임의 image·Git URL, cross-namespace 참조 | 자격증명과 공급망 경계 |
 
 이 표가 [10장](/agent-platform/10-kagent-integration/)에서 backend가 만드는 manifest의 골격이 된다.
@@ -369,9 +477,12 @@ image는 배포 자체를 거절한다. 사내 포털에서 "내 컨테이너 �
 ## 9장 요약
 
 - Declarative Agent는 instruction·model·tool·skill 네 구성 요소로 이뤄진다.
+- CPU·memory·replica·volume은 Agent의 `deployment`에서 Kubernetes workload로 번역하며 플랫폼 policy가 상한을 강제한다.
+- kagent는 기존 PVC·Secret을 Agent Pod에 연결하지만 Agent별 PVC나 업무 DB를 직접 발급하지 않는다.
 - 공용 지침은 versioned immutable ConfigMap으로 주입하고 policy bundle version을 trace에 남긴다.
 - `requireApproval`은 행위 위험을 막는 장치이지 호출 권한이 아니다.
 - 대화 상태는 session·compaction·long-term memory 세 층이고, memory는 정책을 정하고 켠다.
+- 같은 Agent의 대화 개인화는 built-in Memory를 먼저 검토하고, 공통·portable memory가 필요할 때 MCP로 분리한다.
 - runtime memory와 승인된 KnowledgeVersion의 ingestion·ACL·index lifecycle을 구분한다.
 - tool은 `toolNames` allowlist로 좁히고 자격증명은 `headersFrom` 참조로 넘긴다.
 - 사용자에게 열 필드와 서버가 채울 필드를 나누는 것이 포털 폼 설계의 시작이다.

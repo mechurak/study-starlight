@@ -197,6 +197,13 @@ kubectl -n kagent describe secret lab-byo-model
 `imagePullPolicy: IfNotPresent`가 있어야 node에 적재한 local image를 registry에서 다시 받으려 하지 않는다.
 이 값은 kind 전용이며 온프렘 manifest에는 registry digest와 조직의 pull policy를 사용한다.
 
+덱의 고정 버전인 [v0.9.9 `SharedDeploymentSpec`](https://github.com/kagent-dev/kagent/blob/v0.9.9/go/api/v1alpha2/agent_types.go#L423-L477)에는
+`envFrom`이 없으므로 필요한 Secret key를 `env[].valueFrom.secretKeyRef`로 하나씩 연결한다. 선택한 model
+경로의 manifest 하나만 적용한다.
+
+<Tabs>
+<TabItem label="OpenAI">
+
 ```bash
 kubectl apply -f - <<'EOF'
 apiVersion: kagent.dev/v1alpha2
@@ -210,9 +217,12 @@ spec:
     deployment:
       image: lab-byo:lab
       imagePullPolicy: IfNotPresent
-      envFrom:
-        - secretRef:
-            name: lab-byo-model
+      env:
+        - name: OPENAI_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: lab-byo-model
+              key: OPENAI_API_KEY
       resources:
         requests:
           cpu: 100m
@@ -222,6 +232,51 @@ spec:
           memory: 1Gi
 EOF
 ```
+
+</TabItem>
+<TabItem label="LiteLLM">
+
+```bash
+kubectl apply -f - <<'EOF'
+apiVersion: kagent.dev/v1alpha2
+kind: Agent
+metadata:
+  name: lab-byo
+  namespace: kagent
+spec:
+  type: BYO
+  byo:
+    deployment:
+      image: lab-byo:lab
+      imagePullPolicy: IfNotPresent
+      env:
+        - name: LITELLM_MODEL
+          valueFrom:
+            secretKeyRef:
+              name: lab-byo-model
+              key: LITELLM_MODEL
+        - name: LITELLM_BASE_URL
+          valueFrom:
+            secretKeyRef:
+              name: lab-byo-model
+              key: LITELLM_BASE_URL
+        - name: LITELLM_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: lab-byo-model
+              key: LITELLM_API_KEY
+      resources:
+        requests:
+          cpu: 100m
+          memory: 256Mi
+        limits:
+          cpu: "1"
+          memory: 1Gi
+EOF
+```
+
+</TabItem>
+</Tabs>
 
 kagent가 image를 실행해 주더라도 Agent logic·dependency·secret 사용·A2A implementation은 image 제작자의
 책임이다. 이것이 Declarative에서 BYO로 넘어갈 때 넓어지는 신뢰 경계다.

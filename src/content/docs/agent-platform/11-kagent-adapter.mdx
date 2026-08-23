@@ -65,6 +65,7 @@ kagent challenger는 같은 fixture로 다음 차이만 증명한다.
 | 판단 항목 | 기준선 비용 | kagent가 줄여야 할 비용 | 새로 생기는 비용 |
 |---|---|---|---|
 | 구성형 Agent | runner 개발·version 호환·HITL stream | 내장 engine과 선언형 spec으로 대체 | engine·CRD upgrade와 Postgres 운영 |
+| 대화 장기 memory | memory store·embedding·prefetch client 구현 | built-in PostgreSQL·pgvector memory로 대체 | 사용자 identity binding·TTL·삭제·portability 제약 |
 | model·tool wiring | 회사 manifest와 client 구현 | ModelConfig·MCP reference 제공 | kagent schema와 controller 의존 |
 | lifecycle | adapter가 workload 직접 reconcile | Agent condition과 controller 제공 | condition 정규화와 controller 장애 대응 |
 | 코드형 Agent | Deployment·Service 생성 | BYO A2A template·일관된 resource 제공 | 기준선과 기능 격차가 작을 수 있음 |
