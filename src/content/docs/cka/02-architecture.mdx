@@ -263,6 +263,24 @@ sudo crictl logs <container-id>
 sudo crictl pods                  # Pod 샌드박스 목록
 ```
 
+`crictl logs`는 Pod 이름이나 컨테이너 이름이 아니라 `crictl ps -a`의 **첫 번째 열인
+컨테이너 ID**를 받는다. 예를 들어 kubeadm 스태틱 Pod에서 `etcd-controlplane`은 Pod 이름,
+`etcd`는 컨테이너 이름이다. 둘 중 하나를 `crictl logs` 뒤에 직접 쓰면 안 되고,
+조회한 ID를 넘겨야 한다.
+
+```bash
+sudo crictl ps -a --name etcd
+# CONTAINER 열의 ID를 복사
+sudo crictl logs <etcd-container-id>
+```
+
+Pod 샌드박스만 보이면 `crictl pods -a`의 Pod ID로 그 안의 컨테이너를 다시 찾는다.
+
+```bash
+sudo crictl ps -a --pod <pod-id>
+sudo crictl logs <container-id>
+```
+
 :::tip[시험]
 API 서버가 안 뜨는 문제에서 `crictl ps -a | grep apiserver` 로
 컨테이너가 계속 재시작 중인지 보고, `crictl logs` 로 이유를 읽는 게 정석 루트다.
