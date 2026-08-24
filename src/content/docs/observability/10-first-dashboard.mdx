@@ -39,8 +39,8 @@ import Thesis from '../../../components/docs/Thesis.astro';
 닫았다면 `docker-otel-lgtm` 디렉터리에서 다시 연다.
 
 ```bash
-kubectl --context kind-observability-lab -n default get pod,service
-kubectl --context kind-observability-lab -n default port-forward service/lgtm \
+kubectl get pod,service
+kubectl port-forward service/lgtm \
   3000:3000 3200:3200 4040:4040 4317:4317 4318:4318 9090:9090
 ```
 

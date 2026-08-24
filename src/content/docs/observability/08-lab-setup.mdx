@@ -105,34 +105,40 @@ checkout한 소스는 v0.30.2지만 공식 Kubernetes YAML의 이미지는 `graf
 1. **전용 kind 클러스터를 만든다**
 
    ```bash
-   kind create cluster \
-     --name observability-lab \
-     --image kindest/node:v1.35.5@sha256:ce977ae6d65918d0b58a5f8b5e940429c2ce42fa3a5619ec2bbc60b949c0ac95
+   kind create cluster --name observability-lab
+
+   kubectl config use-context kind-observability-lab
+   kubectl config set-context --current --namespace=default
+   kubectl config current-context
+   kubectl version
    ```
+
+   특정 Kubernetes 버전을 고정하지 않고 설치된 kind release의 기본 node image를 사용한다. 이 실습은
+   특정 Kubernetes 기능에 의존하지 않는다. 대신 실제 client·server 버전을 기록하고, 이후 명령의
+   대상을 `kind-observability-lab` context와 `default` namespace로 한 번 정한다.
 
 2. **공식 Kubernetes 예제를 적용한다**
 
    ```bash
-   kubectl --context kind-observability-lab -n default apply -f k8s/lgtm.yaml
-   kubectl --context kind-observability-lab -n default rollout status \
-     deployment/lgtm --timeout=300s
+   kubectl apply -f k8s/lgtm.yaml
+   kubectl rollout status deployment/lgtm --timeout=300s
    ```
 
-   첫 명령은 공식 README의 `kubectl apply -f k8s/lgtm.yaml`에 안전한 context와 namespace만
-   명시한 것이다. YAML은 수정하지 않는다.
+   첫 명령은 공식 README의 명령 그대로다. YAML은 수정하지 않는다. 이 장부터 11장까지는 위에서
+   정한 current context와 namespace를 사용하므로 `--context`와 `-n`을 반복하지 않는다.
 
 3. **상태와 실제 image digest를 기록한다**
 
    ```bash
-   kubectl --context kind-observability-lab -n default get pod,service
-   kubectl --context kind-observability-lab -n default get pod -l app=lgtm \
+   kubectl get pod,service
+   kubectl get pod -l app=lgtm \
      -o jsonpath='LGTM image={.items[0].spec.containers[0].image}{"\n"}LGTM imageID={.items[0].status.containerStatuses[0].imageID}{"\n"}'
    ```
 
 4. **터미널 A에서 공식 port-forward를 연다**
 
    ```bash
-   kubectl --context kind-observability-lab -n default port-forward service/lgtm \
+   kubectl port-forward service/lgtm \
      3000:3000 3200:3200 4040:4040 4317:4317 4318:4318 9090:9090
    ```
 
@@ -182,7 +188,7 @@ checkout한 소스는 v0.30.2지만 공식 Kubernetes YAML의 이미지는 `graf
 |---|---|
 | Docker 연결 실패 | Docker Desktop 또는 Colima가 실행 중인지 `docker info`로 확인 |
 | 공식 YAML 다운로드·image pull 실패 | GitHub·Docker Hub egress, proxy, 사내 CA 확인 |
-| LGTM rollout timeout | `kubectl --context kind-observability-lab -n default logs deploy/lgtm` |
+| LGTM rollout timeout | `kubectl logs deploy/lgtm` |
 | `run-example.sh`가 바로 종료 | Java 17 이상과 Maven dependency·Java agent 다운로드 경로 확인 |
 | 앱은 뜨지만 신호가 없음 | 터미널 A에서 `4317`·`4318` port-forward가 열려 있는지 확인 |
 | `generate-traffic.sh: watch: command not found` | `watch`를 설치하거나 위 `while` 대안 사용 |

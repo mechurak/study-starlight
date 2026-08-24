@@ -71,19 +71,23 @@
   두 질의, Prometheus exemplar 저장(`trace_id` 라벨). Explore UI의 링크 클릭 자체는
   2026-08-18 구 실습에서 확인했고, 그 전제인 Loki derived field 프로비저닝은 이번에
   API로 재확인했다.
-- 8장의 클러스터 쪽 절차(고정 digest의 kind 생성 · lgtm.yaml 적용 · rollout · image digest
-  기록 명령 · port-forward)도 2026-08-24에 실행으로 확인했다. **Java example과 traffic
-  script는 Java 미설치 환경이라 미검증** — 8~10장이 `status: review`로 남는 이유다.
+- 8장의 클러스터 쪽 절차는 2026-08-24에 kind v1.35.5 node image로 실행해 lgtm.yaml 적용 ·
+  rollout · image digest 기록 · port-forward를 확인했다. 현재 절차는 `--image`를 고정하지 않으므로
+  설치된 kind release의 기본 node image를 사용하고, 실제 Kubernetes 버전은 생성 직후 기록한다.
+  **Java example과 traffic script는 Java 미설치 환경이라 미검증** — 8~10장이 `status: review`로
+  남는 이유다.
 - Docker·kind·kubectl의 운영체제별 준비와 정리는 [실습 환경 덱](/lab-environment/)이 맡는다.
   이 덱에는 관측 실습만의 자원·버전·명령만 남긴다.
-- 첫 실습은 kind의 Kubernetes **v1.35.5**를 고정하고, Grafana `docker-otel-lgtm`
-  **v0.30.2 공식 저장소**의 Kubernetes 예제와 Java example을 수정 없이 사용한다.
+- 첫 실습은 특정 Kubernetes 버전을 고정하지 않고 설치된 kind release의 기본 node image를 쓴다.
+  특정 Kubernetes 기능에 의존하지 않으며, 생성 직후 `kubectl version`으로 실제 버전을 기록한다.
+  Grafana `docker-otel-lgtm` **v0.30.2 공식 저장소**의 Kubernetes 예제와 Java example은 수정 없이 사용한다.
 - 공식 v0.30.2 예제도 `grafana/otel-lgtm:latest`를 사용한다. 재현 가능한 고정 버전 실습으로 오해하지 않고,
   문서의 `kubectl ... jsonpath` 명령으로 실제 image digest와 실행 날짜를 검증 기록에 남긴다.
 - LGTM 이미지는 **개발·데모 전용**이다. 단일 Pod · `emptyDir` · 로컬 admin을 운영 설치법처럼
   서술하지 않는다. 각 실습 장 첫부분에 운영 구성과의 차이를 밝힌다.
 - 실습은 새로 만든 `kind-observability-lab` context의 `default` namespace만 사용한다. 공식 예제가 namespace를
-  지정하지 않기 때문이다. 모든 문서 명령은 context를 명시하고, 다른 cluster의 `default`를 건드리지 않는다.
+  지정하지 않기 때문이다. 클러스터 생성 직후 current context와 namespace를 한 번 설정하고, 이후 문서
+  명령에서는 `--context`와 `-n`을 반복하지 않는다. 실습 중에는 current context를 다른 cluster로 바꾸지 않는다.
 - Java example은 host에서 실행하고 공식 port-forward의 OTLP 4317·4318을 통해 kind 안의 Collector로 보낸다.
   공식 앱의 임의 지연과 약 30% 오류를 쓰므로 고정된 정상 → 장애 → 회복 구간을 약속하지 않는다.
 - cleanup은 `kind delete cluster --name observability-lab`으로 전용 kind 클러스터만 삭제한다.
