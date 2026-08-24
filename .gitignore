@@ -18,8 +18,9 @@ pnpm-debug.log*
 local-references/
 
 
-# lab virtualenvs
+# lab virtualenvs and bytecode
 .venv/
+__pycache__/
 
 # environment variables
 .env
