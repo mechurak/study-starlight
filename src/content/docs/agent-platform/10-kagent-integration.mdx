@@ -58,6 +58,134 @@ backend가 kagent에 말을 거는 방법은 목적에 따라 둘이다. dashboa
 온프렘 운영 자산을 그대로 쓴다. 호출 경로는 A2A JSON-RPC·stream·task 상태를 우리 invoke contract로
 번역한다. 두 client의 credential·timeout·retry·관측값도 분리한다.
 
+### 일반 Agent와 MCP는 전용 workload를 만든다
+
+먼저 관리·배포 경로다. 가운데 CR은 API server에 저장되는 **선언과 상태**이고 Pod가 아니다.
+
+```d2 layout=elk pad=40 title="Portal Backend Pod가 Kubernetes API의 Agent·MCP resource를 관리하고 kagent와 kmcp controller가 각각 Agent와 MCP server workload를 만드는 관리·배포 구조"
+direction: down
+
+classes: {
+  key: {
+    style: {
+      fill: "#dbeafe"
+      stroke: "#2563eb"
+      font-color: "#1e3a8a"
+    }
+  }
+  zone: {
+    style: {
+      fill: "#ede9fe"
+      stroke: "#7c3aed"
+      font-color: "#4c1d95"
+    }
+  }
+  ok: {
+    style: {
+      fill: "#dcfce7"
+      stroke: "#16a34a"
+      font-color: "#14532d"
+    }
+  }
+  mute: {
+    style: {
+      fill: "#f1f5f9"
+      stroke: "#94a3b8"
+      font-color: "#334155"
+    }
+  }
+}
+
+backend: "Portal Backend Pod\nadapter\nDB가 제품 원본" { class: key }
+api: "Kubernetes API\nAgent CR · RemoteMCPServer CR\nMCPServer CR — Pod 아님" { class: zone }
+controller: "Service kagent-controller :8083\nkagent-controller Pod\nreconcile · A2A proxy" { class: ok }
+kmcp: "kmcp-controller Pod\nMCP lifecycle" { class: ok }
+agent: "Agent Deployment · Service\nAgent engine Pod" { class: ok }
+mcp: "MCP Deployment · Service\nMCP server Pod" { class: ok }
+remote: "기존 · 외부\nMCP endpoint" { class: mute }
+
+backend -> api: "apply · list/watch"
+api -> controller: "Agent watch · status"
+api -> kmcp: "MCPServer watch · status"
+controller -> agent: "Deployment · Service 생성"
+kmcp -> mcp: "생성"
+api -> remote: "RemoteMCPServer의 URL"
+```
+
+[kagent controller](https://kagent.dev/docs/kagent/concepts/architecture)는 `Agent` CR을 watch해 Agent engine의
+Deployment·Service를 만든다. backend는 이 controller Pod를 관리 API처럼 쓰지 않고 Kubernetes API로 CR을
+apply·list/watch한다.
+
+MCP는 두 갈래다. `RemoteMCPServer`는 이미 떠 있는 endpoint를 가리키므로 그 CR 자체가 Pod를 만들지 않는다.
+반면 kmcp의 [`MCPServer`](https://kagent.dev/docs/kmcp/deploy/server/)는 kmcp controller가 Deployment·Service와
+MCP server Pod로 번역한다. 포털에 보여 줄 Agent·tool 목록은 이 runtime inventory를 그대로 노출하지 않고,
+DB의 `Publication`·`Grant`·승인된 tool 목록과 합쳐 만든다.
+
+이미 배포된 Agent를 호출할 때는 Kubernetes API를 지나지 않는다. controller는 A2A 입구와 route를 맡고,
+대화 loop와 실제 MCP tool call은 **Agent engine Pod**에서 실행된다. 따라서 backend는 호출할 때만 controller
+Service를 지나며, Agent Pod나 MCP Pod의 임의 Service를 제품 계약으로 직접 호출하지 않는다.
+
+### SandboxAgent와 AgentHarness는 Agent Substrate로 간다
+
+`SandboxAgent`와 `AgentHarness`는 일반 `Agent`처럼 Agent별 Deployment Pod를 만들지 않는다. kagent controller가
+Agent Substrate에 actor 실행을 요청하면, Substrate가 공유 WorkerPool의 gVisor worker Pod에 actor를 배치하고
+idle 상태를 object storage에 snapshot한다.
+
+```d2 layout=elk pad=40 title="Portal Backend가 SandboxAgent와 AgentHarness CR을 관리하고 kagent controller와 Agent Substrate가 공유 WorkerPool에 두 종류의 actor를 배치해 snapshot storage로 suspend하는 구조"
+direction: down
+
+classes: {
+  key: {
+    style: {
+      fill: "#dbeafe"
+      stroke: "#2563eb"
+      font-color: "#1e3a8a"
+    }
+  }
+  zone: {
+    style: {
+      fill: "#ede9fe"
+      stroke: "#7c3aed"
+      font-color: "#4c1d95"
+    }
+  }
+  ok: {
+    style: {
+      fill: "#dcfce7"
+      stroke: "#16a34a"
+      font-color: "#14532d"
+    }
+  }
+  mute: {
+    style: {
+      fill: "#f1f5f9"
+      stroke: "#94a3b8"
+      font-color: "#334155"
+    }
+  }
+}
+
+backend: "Portal Backend Pod\nadapter · Grant 검사" { class: key }
+api: "Kubernetes API\nSandboxAgent CR · AgentHarness CR" { class: zone }
+control: "Service kagent-controller :8083\nkagent-controller Pod → Agent Substrate\nreconcile · route · shared WorkerPool" { class: zone }
+sandbox: "SandboxAgent actor\n공유 gVisor worker Pod 위\nGo Declarative Agent" { class: ok }
+harness: "AgentHarness actor\n공유 gVisor worker Pod 위\nacp-shim + OpenClaw · Hermes" { class: ok }
+storage: "Object storage\ncompressed snapshots" { class: mute }
+
+backend -> api: "apply · list/watch"
+api -> control: "watch · status"
+control -> sandbox: "actor 배치 · 복원"
+control -> harness: "ActorTemplate → shared actor"
+sandbox -> storage: "idle snapshot" { style.stroke-dash: 3 }
+harness -> storage: "idle snapshot" { style.stroke-dash: 3 }
+```
+
+[`SandboxAgent`](https://kagent.dev/docs/kagent/concepts/agent-substrate/)는 일반 `Agent`와 비슷한 spec의 Go
+Declarative Agent를 sandbox actor로 실행한다. [`AgentHarness`](https://kagent.dev/docs/kagent/concepts/agent-harness/)는
+별도 kind이며 OpenClaw·Hermes 같은 coding agent의 장기 실행 환경을 만든다. kagent는 harness마다
+`ActorTemplate`을 만들고 첫 chat 때 shared actor를 시작하며, A2A 요청을 actor 안의 `acp-shim`에 ACP로
+bridge한다. 둘 다 Agent별 상주 Pod 대신 WorkerPool Pod를 공유하지만 actor state와 snapshot은 분리된다.
+
 :::caution[alpha API라는 것을 잊지 않는다]
 `kagent.dev/v1alpha2`는 이름 그대로 alpha다. upgrade 때 필드가 바뀔 수 있으므로 manifest 생성 코드를
 backend 한 곳(adapter 모듈)에 모으고, 도메인 로직이 CRD 필드를 직접 다루지 않게 한다.
@@ -145,8 +273,9 @@ const objects = KubernetesObjectApi.makeApiClient(kc);
 ```
 
 ServiceAccount에는 `kagent.dev` API group의 `agents`·`modelconfigs`·`remotemcpservers`에 대한 권한만
-준다. 대상 namespace도 목록으로 제한한다. `SandboxAgent` publication을 실제로 열 때만 별도 policy와 함께
-`sandboxagents` 권한을 추가한다. backend가 탈취됐을 때의 blast radius가 여기서 정해진다.
+준다. 대상 namespace도 목록으로 제한한다. `SandboxAgent`나 `AgentHarness` publication을 실제로 열 때만 별도
+policy와 함께 `sandboxagents`·`agentharnesses` 권한을 추가한다. backend가 탈취됐을 때의 blast radius가
+여기서 정해진다.
 
 ### 쓰기 — server-side apply
 
