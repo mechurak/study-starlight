@@ -1,0 +1,229 @@
+---
+title: "참고. Desktop 조직 plugin 관리"
+description: 기존 skill 모노레포와 npm 설치기를 유지하면서 Claude Desktop·ChatGPT Desktop의 조직용 plugin 배포 경로를 연결하는 방법
+aliases: [Claude Desktop 조직 plugin, ChatGPT Desktop workspace plugin, 사내 skill 배포]
+reviewedAt: 2026-08-24
+status: review
+---
+
+import { LinkCard, Steps } from '@astrojs/starlight/components';
+import SourceFigure from '../../../components/docs/SourceFigure.astro';
+import TermIntro from '../../../components/docs/TermIntro.astro';
+import Thesis from '../../../components/docs/Thesis.astro';
+
+<Thesis>skill의 정본과 개발자용 npm 설치기는 유지하되, 비개발자에게는 각 Desktop 앱의 조직 Plugin Directory를 설치 화면으로 제공한다</Thesis>
+
+<TermIntro
+  terms={[
+    ['조직 marketplace', 'Organization plugin marketplace', '관리자가 승인한 plugin만 조직 사용자에게 보여 주고 기본 설치·필수 설치·차단 정책을 적용하는 배포 채널이다.'],
+    ['vendor package', 'Provider-specific plugin package', '같은 skill 원본을 Claude와 ChatGPT가 각각 읽는 manifest·디렉터리 구조로 조립한 산출물이다.'],
+    ['workspace publish', 'Workspace plugin publishing', '로컬에서 검증한 plugin을 특정 ChatGPT workspace와 역할에만 비공개로 배포하는 절차다.'],
+  ]}
+ />
+
+:::note[이 페이지의 위치]
+이 덱의 본문은 Paseo 사내 빌드를 배포한다는 결정을 기준으로 한다. 이 참고 페이지는 그보다 앞선
+대안을 다시 검토한다. **대상이 비개발자이고 필요한 기능이 skill 배포 중심이라면**, Claude와
+ChatGPT의 조직용 plugin 관리만으로 충분해 Paseo·Claude Code·Codex CLI 설치가 불필요할 수 있다.
+:::
+
+## 현재 운영 모델에 배포 채널을 하나 더 둔다
+
+현재의 skill 모노레포와 npm 패키지는 버릴 이유가 없다. 다만 npm 패키지를 비개발자 PC에서
+실행시키는 대신, release CI가 같은 원본에서 Desktop별 plugin 산출물을 만들게 한다.
+
+```d2 layout=elk pad=40 title="하나의 skill 모노레포에서 개발자용 npm 설치기와 두 Desktop 조직 plugin을 만드는 배포 구조"
+direction: down
+
+source: "skill monorepo\nSKILL.md · assets · metadata"
+release: "release CI\n검증 · version 고정 · provider별 패키징"
+
+channels: "배포 채널" {
+  direction: right
+  npm: "npm package\n개발자용 installer"
+  claude: "Claude 조직 marketplace\nGitHub-synced plugin"
+  chatgpt: "ChatGPT workspace\npublished plugin"
+}
+
+users: "사용자" {
+  direction: right
+  dev: "개발자\nClaude Code · Codex"
+  claude_desktop: "비개발자\nClaude Desktop"
+  chatgpt_desktop: "비개발자\nChatGPT Desktop"
+}
+
+source -> release: "한 번 검증"
+release -> channels.npm
+release -> channels.claude
+release -> channels.chatgpt
+channels.npm -> users.dev
+channels.claude -> users.claude_desktop
+channels.chatgpt -> users.chatgpt_desktop
+```
+
+이 구조에서 npm은 **원본 저장소의 release 도구이자 개발자 설치 채널**이다. Desktop 앱 안의
+목록·설치 버튼·업데이트 정책은 각 vendor가 제공하는 조직 관리 surface가 맡는다.
+
+## 두 제품의 조직 배포를 먼저 비교한다
+
+| 구분 | Claude Desktop | ChatGPT Desktop |
+|---|---|---|
+| 사용자 화면 | `Customize → Plugins → Browse`의 조직 marketplace | Plugins Directory의 workspace 영역과 `+` 설치 버튼 |
+| 관리자 배포 | Team·Enterprise Owner가 ZIP 업로드 또는 GitHub 동기화 marketplace 생성 | local plugin을 workspace에 publish하고 사용할 workspace role 지정 |
+| 설치 정책 | Required · Installed by default · Available for install · Not available | workspace별 plugin 가용성과 role, connector permission 관리 |
+| 기존 npm과의 관계 | GitHub 동기화 조직 marketplace는 `npm` source를 지원하지 않음 | local marketplace는 `npm` source를 지원하지만 사용자 PC에 npm CLI와 registry 인증이 필요 |
+| 이 시나리오의 권장 연결 | CI가 dependency를 포함한 GitHub marketplace repo를 생성 | CI가 workspace에 publish할 독립 plugin bundle을 생성 |
+
+두 앱 모두 임의 npm 패키지가 Desktop 설정 화면에 새 UI를 주입하는 구조는 아니다. 공식 확장
+단위인 **plugin**으로 skill을 묶어 vendor의 Directory에 올리는 것이 지원되는 경로다.
+
+## Claude Desktop — 조직 marketplace를 그대로 쓴다
+
+Claude Team·Enterprise의 Owner는 [조직용 plugin marketplace](https://support.claude.com/en/articles/13837433-manage-plugins-for-your-organization)를
+만들 수 있다. 수동 ZIP은 50 MB 미만이어야 하고, private·internal GitHub 또는 GitHub Enterprise
+저장소를 연결하면 commit을 동기화할 수 있다. 이 marketplace는 Claude web Chat, Desktop의 Chat
+tab과 Cowork에서 보이며, 사용자는 `Customize`의 통합 Directory에서 설치한다. 조직에서
+Cowork와 Skills가 먼저 활성화되어 있어야 한다.
+
+<SourceFigure
+  src="/images/paseo-enterprise/claude-org-plugin-marketplace.png"
+  alt="Claude 조직 plugin marketplace 관리 화면. GitHub Synced 상태, Available for install 정책, Update 버튼과 Sync automatically 토글이 보인다."
+  width={1826}
+  height={314}
+  caption="Owner가 marketplace의 GitHub 동기화 상태와 plugin별 기본 설치 정책을 한 화면에서 관리한다. 원본 화면의 조직명과 plugin명은 공식 문서에서 흐림 처리되어 있다."
+  sourceHref="https://support.claude.com/en/articles/13837433-manage-plugins-for-your-organization"
+  sourceLabel="Anthropic Help Center"
+ />
+
+이 경로의 핵심 제약은 **GitHub 동기화 조직 marketplace가 `npm`, `archive`, `command` source를
+받지 않는다는 것**이다. 기존 npm package URL을 marketplace manifest에 그대로 적지 않는다.
+release CI가 npm dependency를 resolve한 뒤 실제 plugin 디렉터리를 marketplace repo 안에
+vendor하여 `relative` source로 내보내면 된다.
+
+정책은 plugin별로 다음처럼 잡는 것이 자연스럽다.
+
+- 공통 보안·문서 skill: `Installed by default`
+- 직무별 bundle: `Available for install`, Enterprise group으로 대상 제한
+- 규정상 반드시 필요한 plugin: 신중하게 `Required`
+- 검증 전·폐기 plugin: `Not available`
+
+여러 group 정책이 겹치면 가장 허용적인 설정이 적용되므로, pilot group과 production group이
+겹치는 사용자를 먼저 확인한다. 또한 plugin에 hooks·subagents가 있어도 Claude Chat에서 모두
+동작하는 것은 아니다. [Claude plugin 사용 범위](https://support.claude.com/en/articles/13837440-use-plugins-in-claude)에
+따르면 skills는 Chat과 Cowork에서 쓰지만 hooks와 subagents는 Cowork 전용이다.
+
+## ChatGPT Desktop — workspace plugin으로 publish한다
+
+[ChatGPT Plugins Directory](https://learn.chatgpt.com/docs/plugins)는 OpenAI curated, workspace,
+개인이 만든 plugin을 구분해 보여 주고 사용자가 `+`로 설치하게 한다. plugin은 skills와
+connectors를 함께 묶을 수 있으며 ChatGPT의 Chat·Work와 Desktop 환경에서 사용된다.
+
+<SourceFigure
+  src="/images/paseo-enterprise/chatgpt-plugin-directory.png"
+  alt="ChatGPT Plugin Directory 화면. Curated by OpenAI, Shared with you, Created by me 탭과 plugin 카드별 설치 버튼이 보인다."
+  width={638}
+  height={401}
+  caption="사용자는 별도 CLI 대신 Plugin Directory에서 승인된 plugin을 찾고 카드의 설치 버튼을 누른다. 문서 예시 화면에는 curated·공유·개인 영역이 함께 보인다."
+  sourceHref="https://learn.chatgpt.com/docs/plugins"
+  sourceLabel="OpenAI Docs — Plugins"
+ />
+
+회사 plugin은 [OpenAI의 plugin 배포 문서](https://developers.openai.com/plugins/build/plugins#publish-a-local-plugin-to-your-workspace)에
+따라 관리자가 먼저 local plugin으로 검증한 뒤 `Plugins → Personal → ⋯ → Publish`에서
+workspace와 role을 지정해 비공개로 배포할 수 있다. 사용자는 workspace Directory에서 설치한다.
+
+OpenAI local marketplace는 `marketplace.json`의 source로 npm registry를 지정할 수 있다. 하지만
+이 방식은 각 client에 npm CLI와 private registry 인증이 필요하다. 바로 그 요구를 없애는 것이
+비개발자 경로의 목적이므로, 여기서는 npm source를 최종 사용자에게 노출하지 않고 CI가
+`.codex-plugin/plugin.json`과 `skills/`를 포함한 독립 bundle을 만든 뒤 workspace에 publish한다.
+
+:::caution[npm을 Desktop 공통 설치 프로토콜로 잡지 않는다]
+Claude 조직 marketplace의 GitHub sync는 npm source를 받지 않고, ChatGPT local marketplace의
+npm source는 client 환경을 요구한다. npm은 release pipeline 안에 남기고 Desktop에는 완성된
+plugin만 전달해야 두 제품에서 같은 비개발자 경험을 만들 수 있다.
+:::
+
+## 모노레포는 한 번 관리하고 두 번 조립한다
+
+공통 `SKILL.md`와 asset은 하나만 유지하고 provider manifest와 provider 전용 기능만 분리한다.
+
+```text
+skills-store/
+├─ skills/
+│  ├─ meeting-summary/
+│  │  ├─ SKILL.md
+│  │  └─ assets/
+│  └─ policy-search/
+├─ packages/
+│  └─ installer/                 # 기존 개발자용 npm package
+└─ dist/                         # CI 산출물, 원본 저장소에는 커밋하지 않음
+   ├─ claude-marketplace/
+   │  ├─ .claude-plugin/marketplace.json
+   │  └─ plugins/<bundle>/...
+   └─ chatgpt-plugin/
+      ├─ .codex-plugin/plugin.json
+      └─ skills/...
+```
+
+<Steps>
+1. **공통 원본 검증**
+
+   `SKILL.md` schema, asset 경로, owner, version, 금지 capability와 secret 포함 여부를 검사한다.
+
+2. **Claude 산출물 조립**
+
+   필요한 dependency를 vendor하고 조직 marketplace가 허용하는 source만 사용한다. 승인 후
+   GitHub marketplace repo의 default branch에 release commit을 반영한다.
+
+3. **ChatGPT 산출물 조립**
+
+   `.codex-plugin/plugin.json`과 `skills/`를 묶어 staging workspace에서 검증한다. 승인된 version만
+   production workspace에 publish한다.
+
+4. **Desktop에서 최종 검증**
+
+   비개발자 계정으로 목록 노출, 설치, update, 제거, group·role 차단과 새 대화에서의 skill
+   발견까지 확인한다. npm·Node·터미널이 없어도 완료되어야 한다.
+</Steps>
+
+## PoC에서 먼저 결정할 것
+
+| 결정 | 권장 시작점 | 이유 |
+|---|---|---|
+| plugin 크기 | 직무별 3~10개 skill bundle | skill 하나당 plugin 하나보다 목록과 승인 부담이 작고, 전사 mega bundle보다 권한 경계가 선명하다. |
+| 공통 범위 | instructions·references·assets 중심 | Desktop별 hooks·subagents·connector 차이로 공통 원본이 갈라지는 것을 늦춘다. |
+| Claude 업데이트 | GitHub automatic sync + release branch 보호 | 사용자 재설치 없이 조직 marketplace를 갱신하되 승인되지 않은 commit 유입을 막는다. |
+| ChatGPT 업데이트 | staging 검증 후 workspace publish | workspace 공개 범위와 role을 관리자가 마지막에 확인할 수 있다. |
+| 권한 모델 | 설치 가용성과 runtime 인가를 분리 | 이미 설치된 파일을 숨기는 것만으로 민감한 API·데이터 접근은 회수되지 않는다. |
+
+첫 PoC는 read-only skill 두세 개로 충분하다. 양쪽 Desktop에서 같은 질문을 했을 때 skill이
+발견되는지, source link와 version이 보이는지, 부서가 다른 계정에는 bundle이 숨겨지는지를
+검증한다. 사내 API나 action을 붙이는 단계부터는 plugin 설치 여부와 별개로 서버에서 SSO token과
+entitlement를 다시 확인한다.
+
+## 판단
+
+비개발자가 메인 타겟이라면 **native 조직 plugin 경로를 먼저 PoC하는 쪽이 효과가 크다.** 기존
+모노레포와 npm 패키지는 개발자 경험과 release 자동화에 그대로 쓰고, Claude에는 GitHub-synced
+조직 marketplace, ChatGPT에는 workspace-published plugin을 제공한다.
+
+Paseo 사내 빌드는 다음 요구가 실제로 남을 때 다시 선택한다.
+
+- Claude·ChatGPT를 가로지르는 단일 custom catalog UI와 설치 receipt가 필요하다.
+- provider Desktop이 지원하지 않는 local workspace·agent orchestration이 필요하다.
+- 사내 온프렘 전용 tool을 provider의 조직 관리 범위보다 더 세밀하게 통제해야 한다.
+- 여러 provider의 배포·감사 상태를 한 control plane에서 reconcile해야 한다.
+
+## 확인한 공식 문서
+
+- [Manage plugins for your organization](https://support.claude.com/en/articles/13837433-manage-plugins-for-your-organization) — Claude 조직 marketplace 생성, GitHub sync, 설치 정책과 group override.
+- [Browse skills, connectors, and plugins in one directory](https://support.claude.com/en/articles/14328846-browse-skills-connectors-and-plugins-in-one-directory) — Claude Desktop 사용자의 통합 Directory 경로.
+- [Plugins](https://learn.chatgpt.com/docs/plugins) — ChatGPT Plugin Directory와 사용자 설치 흐름.
+- [Build plugins](https://developers.openai.com/plugins/build/plugins) — ChatGPT local marketplace, npm source 조건, workspace publish와 plugin 구조.
+- [Enterprise apps and connectors](https://learn.chatgpt.com/docs/enterprise/apps-and-connectors) — workspace plugin 가용성, role과 connector permission 관리.
+
+<LinkCard
+  title="0. Paseo 사내 빌드가 필요한 문제인지 다시 판단"
+  description="native Desktop 조직 배포로 해결되지 않는 요구만 남긴 뒤 Paseo의 비용과 통제 범위를 비교한다."
+  href="/paseo-enterprise/00-decision/"
+ />

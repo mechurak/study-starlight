@@ -545,6 +545,7 @@ export const deckDefinitions = [
 			['인증과 인가', ['paseo-enterprise/03-keycloak-login', 'paseo-enterprise/04-oauth2-proxy', 'paseo-enterprise/05-authorization']],
 			['카탈로그와 구현', ['paseo-enterprise/06-catalog-types', 'paseo-enterprise/07-plugin-implementation']],
 			['운영과 도입', ['paseo-enterprise/08-operations', 'paseo-enterprise/09-wrapup']],
+			['대안 검토', ['paseo-enterprise/desktop-plugin-management']],
 		],
 	},
 ];
