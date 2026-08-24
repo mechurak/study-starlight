@@ -1,0 +1,299 @@
+---
+title: "11. 내 앱 계측하기 — 신호는 앱에서 시작된다"
+description: "작은 Flask 앱에 zero-code 계측과 수동 스팬을 직접 붙여 8장의 LGTM 스택에 연결하고, 고정 시나리오로 '언제부터·어디서'를 조사한다"
+reviewedAt: 2026-08-24
+status: stable
+---
+
+import { LinkCard, Steps, FileTree } from '@astrojs/starlight/components';
+import TermIntro from '../../../components/docs/TermIntro.astro';
+import Thesis from '../../../components/docs/Thesis.astro';
+
+<Thesis>스택을 소비하는 쪽에서 신호를 만드는 쪽으로 자리를 바꾼다 — 실행 명령 하나로 자동 계측을 붙이고, 수동 스팬 하나로 비즈니스 구간을 보강한다</Thesis>
+
+<TermIntro
+  terms={[
+    ['zero-code 계측', 'Zero-code Instrumentation', '앱 코드를 고치지 않고 **실행 명령과 환경변수만으로** 자동 계측을 붙이는 방식. [4장](/observability/04-tempo/)의 "자동 계측"을 Python에서는 `opentelemetry-instrument` 명령이 맡는다.'],
+    ['수동 스팬', 'Manual Span', '자동 계측이 못 잡는 구간을 **코드에서 직접 여는 스팬**. 이 실습에서는 재고 예약 구간 `inventory.reserve`가 그것이다.'],
+  ]}
+/>
+
+8~10장의 `rolldice`는 계측이 이미 끝난 공식 앱이었다 — Java agent가 신호를 만들었고
+우리는 소비만 했다. 실무에서 만나는 질문은 반대쪽이다. **"내 서비스는 이 스택에
+어떻게 연결하나."** 이 장은 레포에 들어 있는 작은 Flask `checkout` 앱으로 그 질문을
+직접 밟는다 — 자동 계측을 붙이고, 수동 스팬으로 보강하고, 로그가 `trace_id`를 얻는 것까지.
+
+공식 앱이 못 주던 것도 하나 얻는다. `rolldice`의 오류는 상시 무작위였지만, 이 앱의
+트래픽은 **정상 15초 → 장애 30초 → 회복 15초**로 고정되어 있어 조사의 첫 질문 —
+**"언제부터?"** — 이 처음으로 성립한다.
+
+| | 8~10장 (공식 rolldice) | 이 장 (자체 checkout 앱) |
+|---|---|---|
+| 계측 | Java agent가 이미 붙어 있다 | **우리가 직접 붙인다** |
+| 오류 | 상시 무작위 약 30% | **정상 → 장애 → 회복 고정 구간** |
+| 스팬 | server 스팬 하나 | server 스팬 + **자식 스팬 `inventory.reserve`** |
+| 답하는 질문 | 오류 요청 하나 따라가기 | **언제부터? 그리고 어디서?** |
+
+```mermaid
+flowchart LR
+    TRAFFIC["traffic.py<br/>정상 → 장애 → 회복"] --> APP["checkout 앱 (Flask)<br/>host :8080"]
+    APP -->|"OTLP<br/>port-forward :4318"| COL["OpenTelemetry Collector<br/>kind의 LGTM Pod"]
+    COL --> PROM["Prometheus"]
+    COL --> LOKI["Loki"]
+    COL --> TEMPO["Tempo"]
+    PROM --> GRAF["Grafana"]
+    LOKI --> GRAF
+    TEMPO --> GRAF
+
+    classDef bad  fill:#fee2e2,stroke:#dc2626,color:#7f1d1d
+    classDef key  fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
+    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
+    class APP bad
+    class GRAF key
+    class TRAFFIC,COL,PROM,LOKI,TEMPO mute
+```
+
+## 계측 코드부터 읽는다
+
+실습 파일은 이 레포의 `labs/observability/instrument-your-app/`에 있다.
+쿠버네티스 매니페스트가 없다 — 앱은 host에서 실행하고 8장의 port-forward로 신호를 보낸다.
+
+<FileTree>
+
+- labs/observability/instrument-your-app/
+  - **app.py** 계측이 들어간 Flask 앱 — 이 절에서 읽는다
+  - traffic.py 고정 시나리오 트래픽 (표준 라이브러리만 사용)
+  - requirements.txt Flask와 OpenTelemetry distro 고정 버전
+  - README.md
+
+</FileTree>
+
+`app.py`의 핵심은 `/checkout` 핸들러 안의 수동 스팬 하나다.
+
+```python
+with tracer.start_as_current_span("inventory.reserve") as span:
+    span.set_attribute("order.id", order_id)
+    span.set_attribute("inventory.warehouse", "seoul-1")
+
+    if incident:
+        time.sleep(1.2)
+        span.set_attribute("error.type", "inventory_timeout")
+        span.set_status(Status(StatusCode.ERROR, "inventory timed out"))
+        logger.error("inventory reservation timed out order_id=%s", order_id)
+        return jsonify(error="inventory timeout", order_id=order_id), 503
+```
+
+여기서 넷을 확인한다.
+
+- **`start_as_current_span("inventory.reserve")`** — HTTP server 스팬은 자동 계측이
+  만들지만, "재고 예약"이라는 비즈니스 구간은 앱만 안다. 그래서 이 한 구간만 수동으로
+  연다. [4장](/observability/04-tempo/)의 "자동 계측으로 시작하고 부족한 구간을 SDK로
+  채운다"가 코드로는 이 모양이다
+- **`set_attribute("order.id", order_id)`** — 요청마다 바뀌는 무한 값이지만 **스팬
+  속성에는 넣어도 된다.** 메트릭·로그 라벨이었다면 스택을 죽였을 값이다
+  ([4장](/observability/04-tempo/)의 카디널리티 대비)
+- **`set_status(ERROR)`와 `logger.error(...)`** — 같은 사건이 트레이스와 로그 **양쪽에**
+  남는다. 뒤에서 이 둘이 `trace_id`로 이어지는 것을 확인한다
+- **없는 것** — 엔드포인트·exporter·서비스 이름 설정 코드가 없다. 그건 코드가 아니라
+  **배포 설정(환경변수)의 몫**이고, 그래서 저장소를 바꿔도 앱 코드는 그대로다
+
+## 사전 준비
+
+[8장](/observability/08-lab-setup/)의 kind 클러스터와 **터미널 A의 port-forward**(특히
+`4318`)가 살아 있어야 한다. `rolldice`와 traffic script(터미널 B·C)는 **`8080` 포트가
+겹치므로 `Ctrl+C`로 끝낸다.** Python도 필요하다 — 이 실습은 **Python 3.13**에서 확인했고,
+macOS 시스템 기본 3.9에서는 고정한 OpenTelemetry 의존성이 설치되지 않는다.
+
+```bash
+kubectl --context kind-observability-lab -n default get pod
+python3 --version
+```
+
+## 실행
+
+<Steps>
+
+1. **의존성을 가상 환경에 설치한다**
+
+   ```bash
+   cd study-starlight/labs/observability/instrument-your-app
+   python3 -m venv .venv && source .venv/bin/activate
+   pip install -r requirements.txt
+   opentelemetry-bootstrap -a install
+   ```
+
+   `opentelemetry-bootstrap`은 설치된 라이브러리(여기서는 Flask)를 보고 **거기에 맞는
+   자동 계측 패키지를 찾아 마저 설치**한다. 앱 코드는 여전히 손대지 않았다.
+
+2. **계측 설정을 환경변수로 주고 앱을 실행한다**
+
+   ```bash
+   export OTEL_SERVICE_NAME=checkout-lab
+   export OTEL_RESOURCE_ATTRIBUTES=service.namespace=study,deployment.environment.name=lab
+   export OTEL_EXPORTER_OTLP_ENDPOINT=http://127.0.0.1:4318
+   export OTEL_EXPORTER_OTLP_PROTOCOL=http/protobuf
+   export OTEL_TRACES_EXPORTER=otlp OTEL_METRICS_EXPORTER=otlp OTEL_LOGS_EXPORTER=otlp
+   export OTEL_PYTHON_LOGGING_AUTO_INSTRUMENTATION_ENABLED=true
+   export OTEL_METRIC_EXPORT_INTERVAL=5000
+   export OTEL_PYTHON_EXCLUDED_URLS=health
+
+   opentelemetry-instrument flask --app app run --host 127.0.0.1 --port 8080
+   ```
+
+   | 환경변수 | 정하는 것 |
+   |---|---|
+   | `OTEL_SERVICE_NAME` | 리소스 속성 `service.name`. **안 주면 전부 `unknown_service`가 된다** ([4장](/observability/04-tempo/)의 함정) |
+   | `OTEL_EXPORTER_OTLP_ENDPOINT` | 신호를 보낼 곳 — 터미널 A가 전달 중인 kind 안의 Collector |
+   | `OTEL_PYTHON_LOGGING_AUTO_INSTRUMENTATION_ENABLED` | Python `logging` 레코드를 **`trace_id`가 실린 OTLP 로그로** 내보낸다 |
+   | `OTEL_PYTHON_EXCLUDED_URLS` | `/health`처럼 신호가 소음이 되는 경로 제외 |
+
+3. **한 번씩 눌러 보고 시나리오를 돌린다** (새 터미널에서)
+
+   ```bash
+   curl -s "http://127.0.0.1:8080/checkout"
+   curl -s "http://127.0.0.1:8080/checkout?incident=true"
+
+   cd study-starlight/labs/observability/instrument-your-app
+   python3 traffic.py
+   ```
+
+   `traffic.py`는 표준 라이브러리만 쓰므로 가상 환경 없이 실행해도 된다. 약 1분 뒤:
+
+   ```text
+   [baseline] 200=60, 503=0, connection_error=0
+   [incident] 200=30, 503=90, connection_error=0
+   [recovery] 200=60, 503=0, connection_error=0
+   시나리오 완료 — Grafana에서 최근 5분을 조사하세요.
+   ```
+
+</Steps>
+
+🔎 **관찰 포인트**: 앱 터미널에서 `checkout completed`(INFO)와
+`inventory reservation timed out`(ERROR)이 섞여 흐른다. 계측을 위해 앱이 새로 한 일은
+없다 — 실행 명령과 환경변수가 전부였다.
+
+## 조사 — 이번에는 "언제부터"가 보인다
+
+Grafana([http://127.0.0.1:3000](http://127.0.0.1:3000))에서 시간 범위를 **Last 5 minutes**로
+맞추고 Explore를 연다. 이동 자체는 [9장](/observability/09-first-investigation/)에서 익힌
+그대로다 — 여기서는 **자체 앱이라 새로 보이는 것**만 확인한다.
+
+<Steps>
+
+1. **메트릭 — 503 비율과 p95** (Prometheus)
+
+   ```text
+   sum(rate(http_server_duration_milliseconds_count{
+     service_name="checkout-lab", http_status_code=~"5.."
+   }[1m]))
+   /
+   sum(rate(http_server_duration_milliseconds_count{
+     service_name="checkout-lab"
+   }[1m]))
+   ```
+
+   ```text
+   histogram_quantile(0.95,
+     sum by (le) (
+       rate(http_server_duration_milliseconds_bucket{
+         service_name="checkout-lab"
+       }[1m])
+     )
+   ) / 1000
+   ```
+
+   🔎 두 그래프에 **시작점 · 정점 · 회복**이 있다. 무작위 오류뿐이던 `rolldice`에서는
+   못 하던 "언제부터?"에 처음으로 답했다 — 이제 이 구간이 다음 신호의 검색 범위가 된다.
+   p95 값 자체는 실제 1.2초보다 크게 나올 수 있다 — 히스토그램은 버킷 경계 사이를
+   보간해 추정하기 때문이다 ([2장](/observability/02-prometheus/)의 히스토그램 절).
+
+2. **로그 — 문장 얻기** (Split → Loki)
+
+   ```text
+   {service_name="checkout-lab"} |= "inventory reservation timed out"
+   ```
+
+   로그 한 줄을 펼쳐 `trace_id`가 붙어 있는지 본다. 앱은 `logger.error()` 한 줄을
+   불렀을 뿐인데, logging 자동 계측이 **그 시점의 trace 컨텍스트를 실어 보냈다.**
+   `order_id`는 본문에 있다 — 스트림 라벨이 아니다.
+
+3. **트레이스 — 지점 찍기** (`trace_id`의 Trace 링크)
+
+   워터폴에서 root 스팬 `GET /checkout`(약 1.2초, error) 아래
+   **자식 스팬 `inventory.reserve`가 시간 대부분을 차지하는 것**을 본다. 스팬 속성에서
+   코드로 넣은 값 셋 — `order.id` · `inventory.warehouse=seoul-1` ·
+   `error.type=inventory_timeout` — 을 확인한다. server 스팬 하나뿐이던 `rolldice`와
+   달리 **"어디서?"까지** 답이 나온다.
+
+4. **다시 로그로** — 스팬의 **Logs for this span**으로 돌아온다.
+   메트릭 → 로그 → 트레이스 → 로그 한 바퀴가 자체 앱에서도 끊기지 않았다.
+
+</Steps>
+
+:::caution[함정 — 같은 신호인데 메트릭 이름이 다르다]
+9장의 Java agent는 `http_server_request_duration_seconds_*`(초 단위)를 냈지만, 이 Python
+distro는 `http_server_duration_milliseconds_*`(밀리초 단위)에 `http_status_code` 라벨을
+낸다. 같은 HTTP server 지연 히스토그램이라도 **계측 라이브러리의 semantic convention
+세대에 따라 이름·단위·라벨이 달라진다.** 9장에서 "label browser로 실제 이름을 먼저
+확인한다"고 한 경고가 실제로 벌어진 자리이고, 계측 라이브러리를 올릴 때 대시보드
+질의가 조용히 비는 이유이기도 하다.
+:::
+
+:::tip[핵심 — 카디널리티 원칙은 앱 코드의 선택이었다]
+`order_id`가 어디에 있는지 다시 본다 — **메트릭 라벨에는 없고**, 로그 본문과 스팬
+속성에는 있다. [1장](/observability/01-signals/)부터 반복한 "무한 값은 라벨에 넣지
+않는다"는 운영자의 방어이기 전에 **앱을 계측하는 사람이 코드에서 내리는 결정**이다.
+:::
+
+## 스스로 해볼 과제
+
+1. `traffic.py`의 장애 구간 길이와 `incident_ratio`를 바꿔 다시 돌리고, 그래프의 정점
+   높이와 폭이 어떻게 달라지는지 비교한다.
+2. `app.py`에 두 번째 수동 스팬(예: `payments.charge`)을 열고 워터폴에서 형제 스팬으로
+   나타나는지 확인한다.
+3. TraceQL로 코드에서 넣은 속성을 직접 검색한다 —
+   `{ span.inventory.warehouse = "seoul-1" && status = error }`.
+4. `OTEL_SERVICE_NAME`을 바꿔 재실행하면 Grafana에 **새 서비스로** 잡히는 것을
+   확인한다. 리소스 속성이 코드가 아니라 배포 설정이라는 증거다.
+5. p95 query에서 **Exemplars** 표시를 켜고, 장애 구간의 표본 점에서 Tempo로 건너간다 —
+   Python SDK도 히스토그램에 exemplar를 실어 보냈다.
+
+## 안 될 때 어디를 보나
+
+| 증상 | 확인 |
+|---|---|
+| `No matching distribution found for opentelemetry-distro` | **Python 버전이 낮다** — 3.9에서 재현된다. 3.13으로 venv를 다시 만든다 |
+| `pip install`·`opentelemetry-bootstrap` 실패 | PyPI egress · 사내 proxy와 CA |
+| `opentelemetry-instrument: command not found` | 가상 환경이 활성화됐는지 (`source .venv/bin/activate`) |
+| `Address already in use` (8080) | `rolldice`(터미널 B)가 아직 떠 있는지 |
+| 신호가 하나도 안 들어옴 | 터미널 A의 `4318` port-forward, 앱 터미널의 export 오류 메시지 |
+| 메트릭 이름이 문서와 다름 | label browser에서 실제 이름 확인 — distro 버전이 바뀌면 이름도 바뀐다 |
+| 로그에 `trace_id`가 없음 | `OTEL_PYTHON_LOGGING_AUTO_INSTRUMENTATION_ENABLED=true`를 줬는지 |
+| `traffic.py`가 `connection_error`만 셈 | 앱 프로세스가 살아 있는지, 포트가 8080인지 |
+
+## 마무리 — 실습 환경 지우기
+
+앱과 traffic 터미널에서 `Ctrl+C`를 누르고 `deactivate`로 가상 환경을 빠져나온다.
+`.venv`는 지워도 되고 다음 실습을 위해 둬도 된다. 관측 실습 전체를 끝낸다면
+전용 클러스터만 삭제한다.
+
+```bash
+kind delete cluster --name observability-lab
+```
+
+여기까지가 이 덱의 마지막 실습이다. 내 앱을 연결해 봤으니, 운영 도입은
+[7장 체크리스트](/observability/07-wrapup/#도입-체크리스트--처음-세울-때)의
+`kube-prometheus-stack` → 알림 → Loki·Alloy → 연결 → Tempo 순서로 이어 간다.
+
+## 참고 자료
+
+- [OpenTelemetry Python zero-code instrumentation](https://opentelemetry.io/docs/zero-code/python/) — `opentelemetry-instrument`·`opentelemetry-bootstrap`과 환경변수 방식의 공식 안내
+- [OpenTelemetry OTLP exporter 설정](https://opentelemetry.io/docs/specs/otel/protocol/exporter/) — `OTEL_EXPORTER_OTLP_ENDPOINT`에서 신호별 경로가 만들어지는 규칙
+- [Prometheus exemplars](https://prometheus.io/docs/prometheus/latest/feature_flags/#exemplars-storage) — 히스토그램 관측값에 대표 트레이스를 매다는 저장 기능
+- [Grafana `docker-otel-lgtm` 데이터소스 설정](https://github.com/grafana/docker-otel-lgtm/blob/v0.30.2/docker/grafana-datasources.yaml) — 이 실습의 상관 링크가 이미 켜져 있는 이유
+
+<LinkCard
+  title="운영 도입 체크리스트"
+  description="자체 앱까지 연결해 봤으니, 운영 환경에 세울 때의 순서와 완료 조건으로 이어서 본다."
+  href="/observability/07-wrapup/#도입-체크리스트--처음-세울-때"
+/>

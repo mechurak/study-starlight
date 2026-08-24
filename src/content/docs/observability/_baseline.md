@@ -55,6 +55,25 @@
 
 - 공식 LGTM 설치를 감싸는 Makefile·스크립트·매니페스트·example app 복사본은 레포에 두지 않는다.
   8~10장은 Grafana 공식 저장소를 직접 checkout해 Kubernetes 예제, Java `rolldice`, traffic script를 쓴다.
+- **계측 학습용 자체 앱은 예외다.** 11장의 `labs/observability/instrument-your-app/`(Flask
+  `checkout` 앱 + 고정 시나리오 traffic script)은 계측 코드 자체가 학습 대상이라 공식 소스로
+  대체할 수 없으므로 레포에 둔다. 단 설치 wrapper·쿠버네티스 매니페스트는 여전히 두지 않는다 —
+  앱은 host에서 실행하고 8장의 port-forward(OTLP 4318)로 신호를 보낸다.
+- 11장 앱의 의존성은 `Flask==3.1.3` + `opentelemetry-distro[otlp]==0.65b0`으로 고정한다.
+  버전을 올리면 semantic convention이 바뀌어 메트릭 이름이 달라질 수 있으므로 11장의 질의를
+  다시 검증한다. Python 3.9에서는 이 고정 조합이 설치되지 않는다 — 검증은 Python 3.13.
+- 11장의 host 실행 경로는 **2026-08-24에 실제 실행으로 검증했다** (kind v1.35.5 +
+  공식 `k8s/lgtm.yaml` + port-forward 4318). 확인한 사실: 메트릭
+  `http_server_duration_milliseconds_{bucket,count,sum}` · `http_status_code` 라벨, 문서의
+  503 비율·p95 질의 결과, Loki 오류 로그의 `trace_id`·`span_id`·`severity_text` 구조화
+  메타데이터와 본문 `order_id`, Tempo의 root `GET /checkout`(1.2s error) + 자식
+  `inventory.reserve` 스팬과 `order.id`·`inventory.warehouse`·`error.type` 속성, TraceQL
+  두 질의, Prometheus exemplar 저장(`trace_id` 라벨). Explore UI의 링크 클릭 자체는
+  2026-08-18 구 실습에서 확인했고, 그 전제인 Loki derived field 프로비저닝은 이번에
+  API로 재확인했다.
+- 8장의 클러스터 쪽 절차(고정 digest의 kind 생성 · lgtm.yaml 적용 · rollout · image digest
+  기록 명령 · port-forward)도 2026-08-24에 실행으로 확인했다. **Java example과 traffic
+  script는 Java 미설치 환경이라 미검증** — 8~10장이 `status: review`로 남는 이유다.
 - Docker·kind·kubectl의 운영체제별 준비와 정리는 [실습 환경 덱](/lab-environment/)이 맡는다.
   이 덱에는 관측 실습만의 자원·버전·명령만 남긴다.
 - 첫 실습은 kind의 Kubernetes **v1.35.5**를 고정하고, Grafana `docker-otel-lgtm`

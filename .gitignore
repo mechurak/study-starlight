@@ -18,6 +18,9 @@ pnpm-debug.log*
 local-references/
 
 
+# lab virtualenvs
+.venv/
+
 # environment variables
 .env
 .env.production

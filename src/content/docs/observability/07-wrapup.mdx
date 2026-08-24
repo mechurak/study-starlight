@@ -169,7 +169,7 @@ flowchart LR
    - Loki는 **monolithic으로 시작**. Alloy는 DaemonSet
    - **라벨은 최소로** — `namespace` · `app` · `container`까지. `pod`는 넣지 않는다
    - 앱 로그를 **JSON으로** 바꾼다 — 라벨을 절제할 수 있게 되는 전제다
-   - `ingestion_rate_mb` · `max_streams_per_user`로 폭주 앱 방어선을 친다
+   - `ingestion_rate_mb` · `max_global_streams_per_user`로 폭주 앱 방어선을 친다
 
 5. **연결** ([5장](/observability/05-grafana/)) — **대시보드보다 먼저**
    - 데이터소스 셋을 **프로비저닝 파일로** (UI에서 만들지 않는다)
@@ -314,6 +314,8 @@ kubectl -n observability get pods --field-selector=status.phase!=Running
 개념을 읽었지만 아직 손에 잡히지 않는다면 [8장 실습 준비](/observability/08-lab-setup/)에서
 공식 로컬 스택을 띄우고 [9장 공식 앱 조사](/observability/09-first-investigation/)로 오류를 따라간 뒤,
 [10장 첫 대시보드](/observability/10-first-dashboard/)에서 검증한 query를 반복해서 볼 화면으로 남긴다.
+마지막으로 [11장 내 앱 계측](/observability/11-instrument-your-app/)에서 자체 앱에 계측을
+직접 붙여 같은 스택에 연결한다 — "내 서비스는 어떻게 연결하나"의 답이 거기 있다.
 
 ## 마지막 한 장
 

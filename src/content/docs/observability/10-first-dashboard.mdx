@@ -170,9 +170,9 @@ dashboard는 학습 결과물이다. 처음부터 JSON을 작성하지 말고 UI
 | 로그의 Trace 링크가 없음 | 로그 상세의 `trace_id`와 공식 LGTM 데이터소스 설정 확인 |
 | 다시 접속하니 dashboard가 없음 | LGTM Pod나 kind 클러스터를 다시 만들었는지 확인 — 공식 샘플은 비영속 |
 
-## 다음 단계 — 온프렘 운영 구성
+## 다음 단계 — 운영 구성과 내 앱 계측
 
-이 실습은 공식 LGTM sample에서 끝낸다. 단일 Pod YAML에 PVC·인증·복제본을 덧붙여 운영 구성으로
+공식 sample을 키우는 일은 여기서 끝낸다. 단일 Pod YAML에 PVC·인증·복제본을 덧붙여 운영 구성으로
 키우지 않는다. 온프렘에서는 제품별 공식 Helm chart를 쓰는 별도 경로로 넘어가고, 레포에는 공식
 chart가 렌더한 manifest 대신 환경별 values와 검증 절차만 관리한다.
 
@@ -180,10 +180,16 @@ chart가 렌더한 manifest 대신 환경별 values와 검증 절차만 관리�
 `kube-prometheus-stack` → 알림 → Loki·Alloy → Grafana 연결 → Tempo 순서와 완료 조건을 정리한다.
 배치와 저장소 판단은 [온프렘 관측](/onprem/08-observability/)에서 이어서 본다.
 
-## 마무리 — 실습 환경 지우기
+그 전에 실습이 하나 남았다 — 지금까지는 계측이 끝난 공식 앱의 신호를 소비했고,
+[11장](/observability/11-instrument-your-app/)에서는 **자체 앱에 계측을 직접 붙여** 같은
+스택에 연결한다.
 
-traffic generator, Java example, port-forward 터미널에서 각각 `Ctrl+C`를 누른다. 그다음 전용
-kind 클러스터만 삭제한다.
+## 다음 장에서 환경 재사용하기
+
+11장은 이 kind 클러스터와 터미널 A의 port-forward를 그대로 사용한다. 다만 자체 앱이 같은
+`8080` 포트를 쓰므로 **Java example과 traffic generator(터미널 B·C)는 `Ctrl+C`로 끝낸다.**
+
+여기서 실습을 끝낸다면 세 터미널을 모두 정리한 뒤 전용 클러스터만 삭제한다.
 
 ```bash
 kind delete cluster --name observability-lab
@@ -200,7 +206,7 @@ LGTM의 dashboard·metric·log·trace가 `emptyDir`와 함께 사라진다. chec
 - [공식 Java dashboard JSON](https://github.com/grafana/docker-otel-lgtm/blob/v0.30.2/examples/java/custom-dashboard.json) — request rate와 latency panel의 공식 query
 
 <LinkCard
-  title="운영 도입 체크리스트"
-  description="공식 sample 다음에 제품별 chart로 무엇부터 세우고 어떤 조건을 확인할지 이어서 본다."
-  href="/observability/07-wrapup/#도입-체크리스트--처음-세울-때"
+  title="11. 내 앱 계측하기"
+  description="같은 스택에 자체 Flask 앱을 zero-code 계측과 수동 스팬으로 직접 연결한다."
+  href="/observability/11-instrument-your-app/"
 />
