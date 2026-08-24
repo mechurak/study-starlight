@@ -7,6 +7,7 @@ kind 위에 학습용 LGTM 스택과 작은 결제 앱을 띄우고, 의도적�
 
 - [8. 실습 준비](https://study.upggu.com/observability/08-lab-setup/)
 - [9. 첫 장애 조사](https://study.upggu.com/observability/09-first-investigation/)
+- [10. 첫 대시보드](https://study.upggu.com/observability/10-first-dashboard/)
 
 빠른 명령은 다음과 같다.
 

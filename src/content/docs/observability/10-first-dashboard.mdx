@@ -1,0 +1,203 @@
+---
+title: "10. 첫 대시보드 — 검증한 질문을 화면으로 남기기"
+description: "Explore에서 확인한 PromQL과 LogQL을 Grafana 패널로 옮기고 작은 서비스 대시보드를 만든다"
+reviewedAt: 2026-08-24
+status: review
+---
+
+import { LinkCard, Steps } from '@astrojs/starlight/components';
+import TermIntro from '../../../components/docs/TermIntro.astro';
+import Thesis from '../../../components/docs/Thesis.astro';
+
+<Thesis>Explore에서 답을 확인한 query만 대시보드 패널로 승격한다</Thesis>
+
+<TermIntro
+  terms={[
+    ['panel', '패널', '대시보드 안에서 query 하나와 그 결과를 보여 주는 단위. **질문 하나만 맡긴다.**'],
+    ['visualization', '시각화', 'query 결과를 time series · stat · logs처럼 보여 주는 모양. 데이터의 뜻에 맞춰 고른다.'],
+  ]}
+/>
+
+[9장](/observability/09-first-investigation/)에서는 Explore에서 query를 바꾸며 원인을 찾았다.
+이번에는 그중 반복해서 볼 가치가 있는 질문 넷만 `Checkout Lab` 대시보드로 남긴다.
+
+| 패널 | 답할 질문 | 데이터소스 · 모양 |
+|---|---|---|
+| 요청량 | 지금 트래픽이 들어오는가 | Prometheus · Time series |
+| 503 비율 | 요청 중 얼마가 실패하는가 | Prometheus · Time series |
+| p99 지연 | 느린 요청이 얼마나 느린가 | Prometheus · Time series |
+| 최근 오류 로그 | 그 시각에 무슨 일이 있었나 | Loki · Logs |
+
+:::caution[대시보드는 조사 화면을 대신하지 않는다]
+이 화면은 **이미 알고 있는 질문 넷**을 반복해서 본다. 처음 보는 장애에서 조건과 시간 범위를 바꾸며
+파고드는 일은 여전히 Explore가 맡는다. 대시보드의 로그 패널도 사건의 입구이지 전체 로그 탐색기가 아니다.
+:::
+
+## 준비 상태 확인
+
+8~9장의 클러스터와 Grafana port-forward를 그대로 사용한다. 터널을 닫았다면 다시 연다.
+
+```bash
+cd study-starlight/labs/observability/first-investigation
+make status
+make port-forward
+```
+
+브라우저에서 [http://localhost:3000](http://localhost:3000)을 열고 `admin` / `lab-admin`으로 로그인한다.
+다른 터미널에서 `make scenario`를 다시 실행하고 시간 범위를 **Last 5 minutes**로 맞춘다.
+
+## 빈 대시보드 만들기
+
+<Steps>
+
+1. 왼쪽 메뉴에서 **Dashboards**를 열고 **New → New dashboard**를 고른다.
+
+2. **Add visualization**을 눌러 첫 패널 편집 화면을 연다.
+
+3. 대시보드 이름을 `Checkout Lab`으로 저장한다.
+
+</Steps>
+
+처음부터 패널을 많이 만들지 않는다. 아래 넷을 하나씩 추가하면서 **query → 결과 → 단위 → 제목**을
+확인한 뒤 저장한다.
+
+## 패널 넷 만들기
+
+### 패널 1 — 요청량
+
+데이터소스를 **Prometheus**, 시각화를 **Time series**로 고르고 다음 PromQL을 넣는다.
+
+```text
+sum(rate(http_server_duration_milliseconds_count{
+  service_name="checkout-lab"
+}[1m]))
+```
+
+패널 제목은 `요청량`, Unit은 `requests/sec`로 정한다. 시나리오가 실행되는 동안 0보다 큰 선이
+이어지다가 트래픽이 끝나면 내려와야 한다.
+
+🔎 **관찰 포인트**: 이 패널만으로는 성공과 실패를 구분하지 못한다. 트래픽이 있는지 확인하는
+입구일 뿐이고, 다음 패널에서 상태 코드를 나눈다.
+
+### 패널 2 — 503 비율
+
+새 visualization을 추가하고 Prometheus에 다음 query를 넣는다.
+
+```text
+sum(rate(http_server_duration_milliseconds_count{
+  service_name="checkout-lab", http_status_code=~"5.."
+}[1m]))
+/
+sum(rate(http_server_duration_milliseconds_count{
+  service_name="checkout-lab"
+}[1m]))
+```
+
+제목은 `503 비율`, 시각화는 **Time series**, Unit은 `Percent (0.0-1.0)`으로 정한다.
+Threshold는 5%부터 빨강으로 둔다. 장애 구간에서 값이 올라갔다가 회복 뒤 다시 0으로 내려오면 된다.
+
+:::caution[비율의 단위]
+이 query는 `75`가 아니라 `0.75` 모양의 비율을 반환한다. `Percent (0-100)`을 고르면 0.75%로
+표시되어 백 배 작아 보인다. **0.0-1.0 범위를 받는 percent unit**인지 확인한다.
+:::
+
+### 패널 3 — p99 지연
+
+세 번째 Prometheus Time series에 다음 query를 넣는다.
+
+```text
+histogram_quantile(0.99,
+  sum by (le) (
+    rate(http_server_duration_milliseconds_bucket{
+      service_name="checkout-lab"
+    }[1m])
+  )
+) / 1000
+```
+
+제목은 `p99 지연`, Unit은 `seconds`로 정한다. 503 비율이 오른 구간과 같은 시각에 지연도
+약 1초 이상으로 뛰는지 비교한다. 히스토그램 버킷을 보간한 값이라 앱의 `1.2s`와 정확히 같지는 않다.
+
+### 패널 4 — 최근 오류 로그
+
+네 번째 패널은 데이터소스를 **Loki**, 시각화를 **Logs**로 바꾸고 9장에서 검증한 LogQL을 그대로 쓴다.
+
+```text
+{service_name="checkout-lab"} |= "inventory reservation timed out"
+```
+
+제목은 `최근 재고 예약 오류`로 정한다. 오류 줄을 펼쳐 `severity_text` · `trace_id` · `span_id`가
+보이는지 확인하고, `trace_id`의 **Trace** 링크가 Tempo를 여는지도 다시 확인한다.
+
+:::tip[대시보드 로그 query는 좁게]
+대시보드는 자동 새로고침 때 같은 query를 반복한다. `{service_name="checkout-lab"}`처럼 모든 로그를
+계속 읽기보다 서비스 라벨과 오류 문자열로 범위를 좁힌다. 상세 조사가 필요할 때 패널에서 Explore로
+넘어가 시간 범위와 필터를 바꾼다.
+:::
+
+## 정상-장애-회복을 한 화면에서 읽기
+
+대시보드를 저장하고 시간 범위를 **Last 5 minutes**로 맞춘 뒤 `make scenario`를 한 번 더 실행한다.
+
+<Steps>
+
+1. 요청량이 생기는지 본다 — 시나리오 자체가 실행됐다는 확인이다.
+
+2. 503 비율과 p99 지연이 같은 구간에서 함께 오르는지 본다.
+
+3. 최근 오류 로그에서 `inventory reservation timed out`을 연다.
+
+4. `Trace` 링크로 Tempo에 넘어가 `inventory.reserve`가 대부분의 시간을 쓰는지 확인한다.
+
+</Steps>
+
+이 화면이 답하는 것은 **언제 이상해졌고, 오류 문장은 무엇인가**까지다. 원인을 더 파고들 때는
+대시보드 query를 계속 늘리지 않고 Explore로 넘어간다.
+
+## JSON으로 내보내기
+
+UI에서 만든 대시보드는 이 실습의 `emptyDir` 안에만 있다. Grafana에서 **Export → Export as code**를
+열면 query·레이아웃·단위가 들어간 JSON을 받을 수 있다. 운영에서는 이 파일을 검토해 ConfigMap이나
+Grafana Operator 같은 프로비저닝 경로로 옮긴다 ([5장](/observability/05-grafana/)).
+
+:::caution[UI와 JSON의 역할을 뒤집지 않는다]
+처음부터 JSON을 손으로 작성하지 않는다. UI에서 query와 시각화를 확인하고 내보낸 뒤,
+그때부터 내보낸 파일을 Git의 원본으로 관리한다. 이 실습에서는 export 방법까지만 확인한다.
+:::
+
+## 안 보일 때 어디를 보나
+
+| 증상 | 확인 |
+|---|---|
+| 패널 전체가 `No data` | 시간 범위를 Last 5 minutes로 바꾸고 `make scenario` 재실행 |
+| Prometheus 패널만 비어 있음 | 9장 Explore에서 같은 PromQL이 결과를 내는지 먼저 확인 |
+| 로그 패널만 비어 있음 | Loki Explore에서 넓은 query `{service_name="checkout-lab"}`부터 확인 |
+| 503 비율이 너무 작게 보임 | Unit이 `Percent (0.0-1.0)`인지 확인 |
+| p99가 1.2초보다 큼 | 히스토그램 버킷 보간값인지 확인 |
+| 로그의 Trace 링크가 없음 | 로그 상세의 `trace_id`와 LGTM 데이터소스 설정 확인 |
+| 다시 접속하니 대시보드가 없음 | LGTM Pod나 kind 클러스터를 다시 만들었는지 확인 — 이 실습은 비영속 |
+
+## 마무리 — 실습 환경 지우기
+
+대시보드와 Explore 흐름을 모두 확인했으면 port-forward 터미널에서 `Ctrl+C`를 누르고 실행한다.
+
+```bash
+make down
+```
+
+`observability-lab` kind 클러스터와 그 안의 대시보드·메트릭·로그·트레이스가 함께 삭제된다.
+다른 kind 클러스터와 Docker 이미지는 건드리지 않는다.
+
+## 참고 자료
+
+- [Grafana — Create dashboards](https://grafana.com/docs/grafana/latest/visualizations/dashboards/build-dashboards/create-dashboard/) — 빈 대시보드와 visualization을 만드는 공식 UI 절차
+- [Grafana — Get started with Explore](https://grafana.com/docs/grafana/latest/visualizations/explore/get-started-with-explore/) — query 반복, Split, 대시보드로 넘기는 흐름
+- [Grafana — Logs in Explore](https://grafana.com/docs/grafana/latest/visualizations/explore/logs-integration/) — 로그 상세 필드, context, 데이터 링크
+- [Grafana — Export dashboards](https://grafana.com/docs/grafana/latest/dashboards/share-dashboards-panels/#export-dashboards) — 만든 대시보드를 JSON 코드로 내보내는 절차
+- [Grafana `docker-otel-lgtm`](https://github.com/grafana/docker-otel-lgtm/tree/v0.30.2#add-custom-dashboards) — 개발 이미지에 사용자 대시보드를 프로비저닝하는 공식 예시
+
+<LinkCard
+  title="처음으로 — 덱 개요"
+  description="전체 구성과 두 문장을 다시 보고, 필요한 개념 장을 참조한다."
+  href="/observability/"
+/>
