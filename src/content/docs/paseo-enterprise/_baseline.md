@@ -38,7 +38,14 @@ upstream 추적 비용이 줄어든다.
 
 - 임직원은 회사가 MDM·Software Center로 배포한 **Paseo 사내 빌드 인스톨러 하나**만 설치한다.
   사용자 PC에 Node·npm·사내 npm registry 세팅을 요구하지 않는다
-- 카탈로그 화면은 사내 빌드에 동봉된 plugin이 제공하며 기본 활성화되어 있다
+- 카탈로그 화면은 사내 빌드에 동봉된 plugin이 제공하며 기본 활성화되어 있다.
+  그 외 plugin의 로드는 차단된다
+- agent CLI(Claude Code·Codex 등)는 인스톨러가 설치하고, 로그인은 관리 설정
+  (Claude Code managed settings, Codex `config.toml`)으로 회사 조직·workspace SSO에 고정한다.
+  사용자에게 남는 것은 브라우저 AD SSO 인증 한 번이고, 문서는 예외 상황 FAQ만 맡는다
+- 비개발자에게 폴더를 고르게 하지 않는다 — 인스톨러가 기본 project 폴더를 등록하고,
+  동봉 plugin이 작업 단위 workspace를 자동 생성한다. 기본 홈·사이드바까지 갈아엎는 요구는
+  코어 패치 전환 기준의 발동 사례로 다룬다
 - 사내 CA 신뢰, 프록시 기본값, Catalog API 주소, Keycloak client 설정은 빌드·인스톨러가 프로비저닝한다
 - relay 페어링·모바일 접속·원격 데몬 접속·bundled web UI는 config로 끄고, 페어링 UI 표면은 패치로 제거한다
 - Catalog API는 사내 온프렘 Kubernetes에 배포
@@ -56,7 +63,10 @@ upstream 추적 비용이 줄어든다.
 - upstream **릴리스 태그에 버전을 고정**하고, 회사 변경은 그 위의 패치 세트로 관리한다.
   upstream 자동 업데이트 대신 사내 업데이트 채널을 운영한다
 - 카탈로그 구현은 **동봉 plugin이 기본**이다. plugin API를 쓰면 코어 패치가 얇아진다.
-  코어 직접 통합은 plugin API가 감당 못 하는 요구가 생길 때의 대안으로만 둔다
+  코어 직접 통합은 surface 범위를 넘는 요구(첫 화면 교체, 로그인 전 앱 잠금, 기본 UI 대규모
+  제거)가 생긴 부분에만 쓴다
+- **동봉 plugin 외의 plugin 로드는 allowlist 패치로 차단한다.** config의 전역 plugin 스위치는
+  동봉 plugin까지 함께 꺼서 이 용도로 못 쓴다
 - Keycloak client는 `catalog-web`과 `paseo-catalog`으로 분리한다.
 - `catalog-web`은 oauth2-proxy용 confidential client이며 callback은 사내 HTTPS 주소다.
 - `paseo-catalog`은 client secret이 없는 public client다.
@@ -90,6 +100,10 @@ upstream 추적 비용이 줄어든다.
 | plugin trust | client contribution은 Paseo app, backend contribution은 daemon 옆의 unsandboxed subprocess에서 실행 | Paseo Plugin reference |
 | config.json | `daemon.relay.enabled`·`features.webUi.enabled`·전역 plugin 스위치·listen 주소 등을 파일로 제어, `paseo reload` 적용 | `paseo.sh/docs/configuration` |
 | Paseo SDK | workspace·agent·provider·config API, agent별 `mcpServers`와 `toolPolicy` 지원 | Paseo SDK reference · Providers with the SDK |
+| provider 전제 | native provider(Claude Code·Codex·OpenCode·Pi)는 해당 CLI가 설치·인증된 뒤 동작. Gemini CLI 등은 ACP 카탈로그 | `paseo.sh/docs/supported-providers` |
+| workspace 구조 | project → workspace → session. project는 git repo가 아니어도 되는 임의 디렉터리, workspace는 local·worktree isolation, CLI·SDK로 생성 | `paseo.sh/docs/workspaces` |
+| Claude Code 관리 설정 | managed settings(파일·MDM·서버 관리)의 `forceLoginMethod`·`forceLoginOrgUUID`로 로그인 방식·조직 고정, 사용자 설정보다 우선 | `code.claude.com/docs/en/settings-reference` |
+| Codex 관리 설정 | `config.toml`의 `forced_login_method`·`forced_chatgpt_workspace_id`로 회사 workspace SSO 강제 | `developers.openai.com/codex/auth` |
 | Keycloak | Device Authorization Grant와 native app의 `http://127.0.0.1` loopback redirect 지원 (2026-08-21 확인) | Keycloak Server Administration · Securing applications |
 | oauth2-proxy | Keycloak OIDC, `skip-jwt-bearer-tokens`, audience·group·role 검증 옵션 제공 (2026-08-21 확인) | OAuth2 Proxy Keycloak OIDC · Configuration overview |
 

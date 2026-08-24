@@ -114,6 +114,7 @@ catalog에서 tool을 볼 수 있다는 사실만으로 tool server 호출 권�
 |---|---|---|
 | 임직원 PC | Keycloak HTTPS | Device Flow, token refresh, logout·revocation |
 | 임직원 PC | Catalog ingress HTTPS | catalog 조회, artifact resolve·download |
+| 임직원 PC | agent 서비스 HTTPS (Claude·ChatGPT 또는 사내 LLM gateway) | agent CLI 로그인과 모델 호출 |
 | oauth2-proxy | Keycloak issuer·JWKS | OIDC discovery와 JWT 서명 검증 |
 | Catalog API | 조직·entitlement 저장소 | 사용자별 허용 범위 계산 |
 | Catalog API | artifact store | 승인된 version 제공 |

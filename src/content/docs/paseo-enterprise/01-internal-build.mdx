@@ -1,6 +1,6 @@
 ---
 title: "1. 사내 빌드의 구조"
-description: upstream 릴리스 태그 위의 config·동봉 plugin·최소 패치 세 층과 동봉 plugin의 실행 경계
+description: upstream 태그 위의 세 층 구조, 동봉 plugin의 실행 경계, agent CLI와 workspace 프로비저닝
 reviewedAt: 2026-08-24
 status: review
 ---
@@ -66,7 +66,7 @@ mdm -> pc: "설치 · 업데이트" {
 |---|---|---|
 | 기본 config | relay 비활성, bundled web UI 비활성, listen 주소 `127.0.0.1` 고정, plugin 활성화와 경로, Catalog API 주소·Keycloak client 설정 주입 | 거의 없음 — upstream이 지원하는 파일 |
 | 동봉 plugin | 카탈로그 surface·handler·installer 전체 | 낮음 — plugin API 계약만 따라가면 됨 |
-| 소스 패치 | 페어링·원격 접속 안내처럼 config로 숨겨지지 않는 UI 표면 제거, 업데이트 확인 주소를 사내 채널로 변경, 기본 config 시딩 | 높음 — 버전 올릴 때마다 rebase·충돌 해결 |
+| 소스 패치 | 페어링·원격 접속 안내처럼 config로 숨겨지지 않는 UI 표면 제거, 동봉 plugin 외 plugin 로드 차단(allowlist), 업데이트 확인 주소를 사내 채널로 변경, 기본 config 시딩 | 높음 — 버전 올릴 때마다 rebase·충돌 해결 |
 
 [Paseo configuration 문서](https://paseo.sh/docs/configuration) 기준으로 `daemon.relay.enabled`,
 `features.webUi.enabled`, `daemon.listen`, 전역 plugin 스위치가 모두 `config.json` 필드다.
@@ -90,6 +90,54 @@ mdm -> pc: "설치 · 업데이트" {
 
 둘을 구분해 기록해 두면 upstream rebase 때 "이 패치는 왜 있는가"를 다시 판단할 수 있다.
 비활성만으로 충분해진 패치는 그때 삭제한다.
+
+## agent CLI도 빌드가 프로비저닝한다
+
+Paseo는 coding agent를 내장하지 않는다. [지원 provider](https://paseo.sh/docs/supported-providers)는
+**해당 CLI가 설치되고 인증된 뒤** 동작한다 — Claude Code·Codex 같은 agent CLI가 임직원 PC에
+따로 있어야 한다는 뜻이다. 이 설치와 로그인 설정을 사용자에게 맡기면 인스톨러 하나 원칙이
+무너지므로, 카탈로그와 같은 방식으로 층을 나눠 흡수한다.
+
+| 층 | 하는 일 |
+|---|---|
+| 인스톨러 | 지원할 agent CLI 설치, 사내 CA·프록시 환경 반영 |
+| 관리 설정 | 로그인 방식과 회사 조직을 강제한다 — 아래 표 |
+| 동봉 plugin | 첫 화면의 온보딩 체크리스트가 CLI 인증 상태를 감지하고, 미인증이면 "로그인 시작"으로 브라우저 SSO를 연다 |
+| 사용자 | 브라우저에서 AD SSO 인증 한 번 |
+
+관리 설정은 두 CLI 모두 공식 기능이다.
+
+| CLI | 강제 수단 | 효과 |
+|---|---|---|
+| Claude Code | [managed settings](https://code.claude.com/docs/en/settings)의 [`forceLoginMethod`·`forceLoginOrgUUID`](https://code.claude.com/docs/en/settings-reference) | 로그인 방식과 조직을 고정한다. 사용자 설정으로 덮어쓸 수 없다 |
+| Codex | [`config.toml`의 `forced_login_method`·`forced_chatgpt_workspace_id`](https://developers.openai.com/codex/auth) | 회사 workspace의 SSO 로그인만 허용한다 |
+
+효과는 "email 자리에 회사 도메인 입력" 같은 단계를 없애는 편의만이 아니다. 조직·workspace를
+고정하면 개인 계정 로그인과 개인 API key 우회가 막혀, 사용량이 회사 좌석의 감사·과금으로 모인다.
+
+마지막 남는 브라우저 SSO 로그인은 개인 credential이므로 자동화하지 않는다. 동봉 plugin의
+온보딩이 그 한 번을 안내하고, 문서는 좌석 미배정·세션 만료 같은 예외 상황 FAQ만 맡는다.
+CLI별 로그인 명령과 설정 key 이름은 빠르게 바뀌므로 배포 시점의 공식 문서로 다시 확인한다.
+
+## 비개발자에게 폴더를 고르게 하지 않는다
+
+Paseo의 화면 구조는 [project → workspace → session](https://paseo.sh/docs/workspaces)이다.
+project는 작업 디렉터리의 묶음인데, git repository가 아니어도 아무 디렉터리나 등록할 수 있다.
+개발자에게는 자연스럽지만 비개발자 사용자에게는 "폴더 단위의 프로젝트"라는 개념 자체가 낯설다.
+기본값으로 이 개념을 사용자 앞에서 치운다.
+
+- 인스톨러가 `문서/AI 작업` 같은 관리 폴더를 만들어 기본 project로 등록한다.
+  사용자는 폴더를 고르지 않는다.
+- 카탈로그에서 prompt로 agent를 시작할 때 동봉 plugin이 SDK로 작업 단위 workspace를
+  자동 생성한다. 화면 언어는 폴더가 아니라 "작업"이다.
+- 폴더는 결과가 저장되는 곳으로만 노출한다 — "탐색기에서 결과 열기" 버튼이면 충분하다.
+  비개발자의 산출물은 대부분 문서·표 파일이다.
+
+한계도 기록해 둔다. Paseo의 기본 홈과 사이드바는 여전히 project 목록으로 시작한다. 이 표면까지
+"작업 목록"으로 갈아엎는 요구가 확정되면 surface 하나를 얹는 범위를 넘으므로,
+[0장 결정 3](/paseo-enterprise/00-decision/)의 전환 기준이 발동하는 첫 사례가 된다.
+worktree·diff·터미널 같은 개발자 표면을 어디까지 노출할지는 PoC의 비개발자 시나리오로
+확인한 뒤 결정한다.
 
 ## 동봉 plugin의 실행 경계
 
@@ -152,6 +200,11 @@ plugin backend는 sandbox가 아니므로, 동봉 plugin은 코어와 같은 수
 
 Paseo는 plugin log tail을 유지하고 daemon log에도 structured copy를 남긴다. 따라서 token뿐
 아니라 권한이 있는 catalog item의 원문 자체도 민감하면 로그에 넣지 않는다.
+
+같은 이유로 **동봉 plugin 외의 plugin은 로드하지 않는다.** plugin 스위치를 켠 채 배포하면
+사용자가 임의 plugin을 설치할 수 있는 문도 함께 열리는데, config의 전역 스위치로는 이 구분이
+안 된다 — 끄면 동봉 plugin도 꺼진다. 그래서 동봉 plugin만 허용하는 allowlist는 config 층이
+아니라 최소 패치 세트에 들어간다.
 
 ## 개발 루프는 upstream 방식 그대로
 
