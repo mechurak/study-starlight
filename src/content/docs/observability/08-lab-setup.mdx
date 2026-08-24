@@ -1,34 +1,36 @@
 ---
-title: "8. 실습 준비 — 작은 관측 스택 띄우기"
-description: "kind에 학습용 Prometheus·Loki·Tempo·Grafana와 계측된 결제 앱을 띄우고 첫 장애 조사를 준비한다"
-reviewedAt: 2026-08-18
-status: stable
+title: "8. 실습 준비 — 공식 LGTM 샘플 띄우기"
+description: "전용 kind 클러스터에 Grafana 공식 LGTM 예제를 적용하고 공식 Java rolldice 앱의 OpenTelemetry 신호를 연결한다"
+reviewedAt: 2026-08-24
+status: review
 ---
 
 import { LinkCard, Steps } from '@astrojs/starlight/components';
 import TermIntro from '../../../components/docs/TermIntro.astro';
+import Thesis from '../../../components/docs/Thesis.astro';
 
-> 이 장의 목표는 제품 넷을 운영 수준으로 설치하는 것이 아니라, **한 장애를 끝까지 조사할 작은 세계를 준비하는 것**이다
+<Thesis>우리 설치 코드를 만들지 않고 Grafana 공식 저장소의 Kubernetes 스택과 example app을 그대로 연결한다</Thesis>
 
 <TermIntro
   terms={[
     ['kind', 'Kubernetes IN Docker', 'Docker 컨테이너를 노드로 쓰는 로컬 쿠버네티스. 실습이 끝나면 클러스터째 지울 수 있다.'],
-    ['LGTM', 'Loki · Grafana · Tempo · Mimir/Prometheus', 'Grafana 관측 스택을 짧게 부르는 이름. 이 실습은 메트릭 저장소로 Prometheus를 쓴다.'],
-    ['OTLP', 'OpenTelemetry Protocol', '앱이 메트릭·로그·트레이스를 수집기로 보내는 공통 전송 규약. **신호 셋의 입구를 하나로 만든다.**'],
+    ['LGTM', 'Loki · Grafana · Tempo · Mimir/Prometheus', 'Grafana 관측 스택을 짧게 부르는 이름. 이 공식 개발 이미지는 메트릭 저장소로 Prometheus를 묶는다.'],
+    ['OTLP', 'OpenTelemetry Protocol', '앱이 메트릭·로그·트레이스를 수집기로 보내는 공통 전송 규약. 이번에는 host 앱이 port-forward를 통해 kind 안의 수집기로 보낸다.'],
   ]}
 />
 
-다음 장에서 일부러 `checkout` 서비스의 재고 예약을 느리게 만들고 503을 발생시킨다.
-여기서는 그 사건이 메트릭·로그·트레이스 셋으로 동시에 남도록 환경만 세운다.
+이 장은 Grafana의 [`docker-otel-lgtm` v0.30.2 저장소](https://github.com/grafana/docker-otel-lgtm/tree/v0.30.2)를
+직접 checkout한다. kind에는 그 저장소의 `k8s/lgtm.yaml`만 적용하고, 데이터도 저장소의 Java
+`rolldice` example이 만든다. 우리 레포에는 설치 wrapper·매니페스트·example app을 복제하지 않는다.
 
 ```mermaid
 flowchart LR
-    TRAFFIC["장애 시나리오 Job"] --> APP["checkout 앱<br/>정상 또는 503"]
-    APP -->|"OTLP<br/>메트릭 · 로그 · 트레이스"| COL["OpenTelemetry Collector"]
+    TRAFFIC["공식 traffic script"] --> APP["공식 Java rolldice<br/>host :8080"]
+    APP -->|"OTLP<br/>port-forward :4317 · :4318"| COL["OpenTelemetry Collector<br/>kind의 LGTM Pod"]
     COL --> PROM["Prometheus"]
     COL --> LOKI["Loki"]
     COL --> TEMPO["Tempo"]
-    PROM --> GRAF["Grafana Explore"]
+    PROM --> GRAF["Grafana"]
     LOKI --> GRAF
     TEMPO --> GRAF
 
@@ -40,140 +42,163 @@ flowchart LR
     class TRAFFIC,COL,PROM,LOKI,TEMPO mute
 ```
 
-## 이 실습에서 단순화한 것
+## 공식 샘플이 맡는 범위
 
-실습 스택은 Grafana의 **개발·데모용 `grafana/otel-lgtm` 이미지**다. 한 Pod 안에서
-OpenTelemetry Collector, Prometheus, Loki, Tempo, Grafana가 함께 돌고 데이터는 `emptyDir`에 둔다.
-
-| 실습 | 운영 환경 |
+| 공식 파일 | 이번 실습에서 하는 일 |
 |---|---|
-| 스택 전체가 **Pod 하나** | 제품별 배포와 복제본 · 장애 도메인 분리 |
-| 데이터가 `emptyDir` | PVC 또는 오브젝트 스토리지 |
-| 로컬 `admin` 로그인 | SSO · RBAC · 비밀 관리 |
-| 리텐션·HA 없음 | 용량 계획 · 리텐션 · 백업 · 고가용성 |
-| 모든 트레이스를 저장 | 비용에 맞춘 샘플링 |
+| [`k8s/lgtm.yaml`](https://github.com/grafana/docker-otel-lgtm/blob/v0.30.2/k8s/lgtm.yaml) | LGTM Service와 단일 Pod Deployment 생성 |
+| [`run-example.sh`](https://github.com/grafana/docker-otel-lgtm/blob/v0.30.2/run-example.sh) | Java `rolldice` example 실행 |
+| [`RollController.java`](https://github.com/grafana/docker-otel-lgtm/blob/v0.30.2/examples/java/src/main/java/com/grafana/example/RollController.java) | 임의 지연과 약 30%의 의도적 500 오류 생성 |
+| [`generate-traffic.sh`](https://github.com/grafana/docker-otel-lgtm/blob/v0.30.2/generate-traffic.sh) | example endpoint에 반복 요청 전송 |
+
+공식 앱의 오류는 무작위다. 정상 → 장애 → 회복처럼 구간이 고정되지는 않지만, 메트릭·로그·트레이스가
+같은 요청을 가리키는지 확인하고 Explore와 대시보드를 익히기에는 충분하다.
 
 :::caution[운영에 쓰지 않는다]
-`grafana/otel-lgtm`은 제품 사용법과 신호 연결을 배우는 이미지다. **이 매니페스트를 운영 설치의
-출발점으로 복사하지 않는다.** 운영 배포 판단은 [2장](/observability/02-prometheus/),
-[3장](/observability/03-loki/), [4장](/observability/04-tempo/)이 맡는다.
+공식 설명대로 `grafana/otel-lgtm`은 **development · demo · testing 전용**이다. 단일 Pod,
+`emptyDir`, `admin` 기본 계정, 리텐션·HA 없음이라는 성질은 공식 샘플을 그대로 썼다고 달라지지 않는다.
+이 구성을 온프렘 운영 설치의 출발점으로 복사하지 않는다.
 :::
 
 ## 사전 준비
 
-Docker·kind·kubectl을 처음 준비한다면 [kind 실습 환경](/lab-environment/01-kind/)의 운영체제별 탭을
-먼저 본다. 그 장의 예시 `study`
-클러스터를 미리 만들 필요는 없다. 여기서는 `make up`이 전용 `observability-lab` 클러스터를 만든다.
-
-이 실습은 Docker 런타임에 **CPU 4개 · 메모리 6 GiB 이상**을 할당한다. 이미지와 클러스터를 합쳐
-디스크 여유 공간도 약 10 GiB가 필요하다. `make up`은 메모리가 6 GiB보다 작으면 시작 전에 멈춘다.
-
-필요한 명령은 셋이다.
+Docker·kind·kubectl 준비는 [kind 실습 환경](/lab-environment/01-kind/)을 먼저 따른다. 공식 Java
+example은 **Java 17 이상**, Git, `curl`도 필요하다. 다음 명령이 모두 성공해야 한다.
 
 ```bash
 docker info
 kind version
 kubectl version --client
+git --version
+java -version
+curl --version
 ```
 
-Colima와 Docker Desktop은 런타임에 메모리를 명시해 배정하고, Ubuntu의 Docker Engine은 호스트
-자원을 쓴다. 어느 환경이든 다음 값에서 메모리가 6 GiB 이상인지 확인한다.
+Docker 런타임에는 **CPU 4개 · 메모리 6 GiB 이상**, 디스크 약 10 GiB의 여유를 둔다.
 
 ```bash
 docker info --format 'CPUs={{.NCPU}} Memory={{.MemTotal}}'
 ```
 
-## 실습 파일 받기
+공식 traffic script는 `watch` 명령을 사용한다. macOS처럼 `watch`가 기본으로 없는 환경에서는
+설치한 뒤 공식 script를 쓰거나, 아래의 `curl` 반복 대안을 사용한다.
 
-저장소가 없다면 clone하고, 이미 이 저장소 안이라면 `cd`만 한다.
+## 공식 저장소 받기
+
+작업할 빈 디렉터리에서 태그를 지정해 clone한다.
 
 ```bash
-git clone https://github.com/mechurak/study-starlight.git
-cd study-starlight/labs/observability/first-investigation
+git clone --depth 1 --branch v0.30.2 \
+  https://github.com/grafana/docker-otel-lgtm.git
+cd docker-otel-lgtm
 ```
 
-파일은 역할별로 나뉜다.
+:::caution[태그와 이미지 버전은 다르다]
+checkout한 소스는 v0.30.2지만 공식 Kubernetes YAML의 이미지는 `grafana/otel-lgtm:latest`다.
+재현 가능한 고정 이미지 설치로 오해하지 말고, 아래에서 실제 image digest를 기록한다.
+:::
 
-```text
-first-investigation/
-├── Makefile             # up · status · scenario · down 진입점
-├── app/                 # 세 신호를 OTLP로 내보내는 작은 Flask 앱
-└── k8s/
-    ├── namespace.yaml   # 실습 전용 namespace
-    ├── lgtm.yaml        # 학습용 관측 스택
-    ├── app.yaml         # checkout Deployment와 Service
-    └── scenario.yaml    # 다음 장의 정상 → 장애 → 회복 트래픽
-```
-
-`Makefile`의 모든 `kubectl` 명령은 context를 `kind-observability-lab`으로 고정한다.
-현재 사용 중인 다른 클러스터에 잘못 적용하지 않는다.
-
-## 스택 띄우기
+## 스택과 example app 실행
 
 <Steps>
 
-1. **클러스터와 앱을 만든다**
+1. **전용 kind 클러스터를 만든다**
 
    ```bash
-   make up
+   kind create cluster \
+     --name observability-lab \
+     --image kindest/node:v1.35.5@sha256:ce977ae6d65918d0b58a5f8b5e940429c2ce42fa3a5619ec2bbc60b949c0ac95
    ```
 
-   처음에는 kind 노드와 LGTM 이미지를 받으므로 몇 분 걸릴 수 있다. 이 명령은 순서대로
-   전용 kind 클러스터 생성 → 앱 이미지 빌드 → 노드에 이미지 적재 → 매니페스트 적용 → 준비 대기를 한다.
-
-2. **Pod 둘이 준비됐는지 본다**
-
-   ```text
-   pod/checkout-…   1/1   Running
-   pod/lgtm-…       1/1   Running
-   ```
-
-   다시 보고 싶을 때는 다음 명령만 실행한다.
+2. **공식 Kubernetes 예제를 적용한다**
 
    ```bash
-   make status
+   kubectl --context kind-observability-lab -n default apply -f k8s/lgtm.yaml
+   kubectl --context kind-observability-lab -n default rollout status \
+     deployment/lgtm --timeout=300s
    ```
 
-3. **Grafana로 터널을 연다**
+   첫 명령은 공식 README의 `kubectl apply -f k8s/lgtm.yaml`에 안전한 context와 namespace만
+   명시한 것이다. YAML은 수정하지 않는다.
+
+3. **상태와 실제 image digest를 기록한다**
 
    ```bash
-   make port-forward
+   kubectl --context kind-observability-lab -n default get pod,service
+   kubectl --context kind-observability-lab -n default get pod -l app=lgtm \
+     -o jsonpath='LGTM image={.items[0].spec.containers[0].image}{"\n"}LGTM imageID={.items[0].status.containerStatuses[0].imageID}{"\n"}'
    ```
 
-   이 터미널은 점유된다. 그대로 두고 브라우저에서 [http://localhost:3000](http://localhost:3000)을 연다.
-   로그인은 `admin` / `lab-admin`이다.
+4. **터미널 A에서 공식 port-forward를 연다**
 
-4. **데이터소스 셋을 확인한다**
+   ```bash
+   kubectl --context kind-observability-lab -n default port-forward service/lgtm \
+     3000:3000 3200:3200 4040:4040 4317:4317 4318:4318 9090:9090
+   ```
 
-   Grafana 왼쪽 메뉴에서 **Connections → Data sources**를 열면 Prometheus·Loki·Tempo가 보인다.
-   각 데이터소스를 만들 필요는 없다. LGTM 이미지가 신호 사이의 링크까지 미리 프로비저닝한다.
+   Grafana뿐 아니라 OTLP gRPC·HTTP 포트도 전달한다. host에서 실행하는 example app이 이 경로로
+   kind 안의 OpenTelemetry Collector에 신호를 보낸다.
+
+5. **터미널 B에서 공식 Java example을 실행한다**
+
+   ```bash
+   cd docker-otel-lgtm
+   ./run-example.sh
+   ```
+
+   처음에는 Maven dependency와 OpenTelemetry Java agent를 받으므로 시간이 걸린다. 준비되면
+   [http://127.0.0.1:8080/rolldice](http://127.0.0.1:8080/rolldice)가 열린다.
+
+6. **터미널 C에서 공식 traffic script를 실행한다**
+
+   ```bash
+   cd docker-otel-lgtm
+   ./generate-traffic.sh
+   ```
+
+   이 script는 여러 언어 example의 포트를 함께 호출한다. Java example만 실행했다면 `8080`의
+   응답만 보이는 것이 정상이다. `watch`가 없다면 다음 대안으로 Java endpoint만 반복 호출한다.
+
+   ```bash
+   while true; do
+     curl -s http://127.0.0.1:8080/rolldice
+     sleep 1
+   done
+   ```
+
+7. **Grafana에서 데이터소스를 확인한다**
+
+   [http://127.0.0.1:3000](http://127.0.0.1:3000)을 열고 `admin` / `admin`으로 로그인한다.
+   **Connections → Data sources**에 Prometheus·Loki·Tempo가 있으면 된다.
 
 </Steps>
 
-🔎 **관찰 포인트**: 아직 장애 시나리오를 실행하지 않았으므로 앱 데이터는 거의 없다.
-스택이 떴다는 것과 조사할 사건이 있다는 것은 다른 상태다. 다음 장에서 사건을 만든다.
+🔎 **관찰 포인트**: `rolldice`는 일부 요청을 약간 기다리게 하고 약 30%에서 500을 반환한다.
+브라우저의 숫자 하나보다 터미널 B의 성공 로그와 오류 stack trace가 섞여 나오는지를 먼저 본다.
 
 ## 안 뜰 때 어디를 보나
 
 | 증상 | 먼저 볼 것 |
 |---|---|
-| `Docker에 메모리를 6GiB 이상` | Docker Desktop/Colima의 VM 할당량을 늘리고 다시 `make up` |
-| `ImagePullBackOff` | 인터넷 연결과 `docker pull grafana/otel-lgtm:0.30.2` |
-| LGTM rollout timeout | `kubectl --context kind-observability-lab -n observability-lab logs deploy/lgtm` |
-| checkout가 `ErrImageNeverPull` | `make build load deploy wait`로 로컬 이미지를 노드에 다시 적재 |
-| 3000 포트가 사용 중 | 점유 프로세스를 끄거나 Makefile의 port-forward를 `3001:3000`으로 직접 실행 |
+| Docker 연결 실패 | Docker Desktop 또는 Colima가 실행 중인지 `docker info`로 확인 |
+| 공식 YAML 다운로드·image pull 실패 | GitHub·Docker Hub egress, proxy, 사내 CA 확인 |
+| LGTM rollout timeout | `kubectl --context kind-observability-lab -n default logs deploy/lgtm` |
+| `run-example.sh`가 바로 종료 | Java 17 이상과 Maven dependency·Java agent 다운로드 경로 확인 |
+| 앱은 뜨지만 신호가 없음 | 터미널 A에서 `4317`·`4318` port-forward가 열려 있는지 확인 |
+| `generate-traffic.sh: watch: command not found` | `watch`를 설치하거나 위 `while` 대안 사용 |
+| 3000·4317·4318 포트 충돌 | 점유 프로세스를 종료한 뒤 공식 port-forward 다시 실행 |
 
-지금은 `make down`을 실행하지 않는다. 다음 장이 이 클러스터를 그대로 사용한다.
+지금은 세 터미널과 클러스터를 유지한다. 다음 장에서 공식 앱의 무작위 오류를 세 신호로 조사한다.
 
 ## 참고 자료
 
-- [Grafana `docker-otel-lgtm`](https://github.com/grafana/docker-otel-lgtm) — 이미지의 목적, 포함된 백엔드, Kubernetes 실행과 OTLP 기본값
-- [kind Quick Start](https://kind.sigs.k8s.io/docs/user/quick-start/) — 클러스터 생성, 로컬 이미지 적재, 삭제
-- [실습 환경 — kind](/lab-environment/01-kind/) — macOS와 Ubuntu에서 runtime 준비부터 클러스터 정리까지
-- [OpenTelemetry OTLP exporter 설정](https://opentelemetry.io/docs/specs/otel/protocol/exporter/) — 한 endpoint에서 신호별 `/v1/*` 경로를 만드는 규칙
+- [Grafana `docker-otel-lgtm` — Run lgtm in Kubernetes](https://github.com/grafana/docker-otel-lgtm/tree/v0.30.2#run-lgtm-in-kubernetes) — 공식 apply와 port-forward 절차
+- [Grafana `docker-otel-lgtm` — Build and run the example app](https://github.com/grafana/docker-otel-lgtm/tree/v0.30.2#build-and-run-the-example-app) — 공식 앱 실행과 traffic 생성 절차
+- [kind Quick Start](https://kind.sigs.k8s.io/docs/user/quick-start/) — 전용 클러스터 생성과 삭제
+- [OpenTelemetry OTLP exporter 설정](https://opentelemetry.io/docs/specs/otel/protocol/exporter/) — endpoint에서 신호별 경로를 만드는 규칙
 
 <LinkCard
-  title="9. 첫 장애 조사"
-  description="정상 → 장애 → 회복 트래픽을 만들고 메트릭·로그·트레이스를 직접 오간다."
+  title="9. 공식 앱 조사"
+  description="rolldice의 무작위 오류와 지연을 메트릭·로그·트레이스로 직접 오간다."
   href="/observability/09-first-investigation/"
 />

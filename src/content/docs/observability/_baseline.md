@@ -53,17 +53,25 @@
 8~10장은 개념 장과 분리된 **hands-on 경로**다. 사용자가 직접 명령을 실행하고, 문서는
 `실행 → 🔎 관찰 포인트 → 해석 → 스스로 해볼 과제 → cleanup` 순서로 안내한다.
 
-- 실습 파일은 `labs/observability/first-investigation/`에 둔다. MDX에 긴 매니페스트를 복제하지 않는다.
+- 공식 LGTM 설치를 감싸는 Makefile·스크립트·매니페스트·example app 복사본은 레포에 두지 않는다.
+  8~10장은 Grafana 공식 저장소를 직접 checkout해 Kubernetes 예제, Java `rolldice`, traffic script를 쓴다.
 - Docker·kind·kubectl의 운영체제별 준비와 정리는 [실습 환경 덱](/lab-environment/)이 맡는다.
   이 덱에는 관측 실습만의 자원·버전·명령만 남긴다.
-- 첫 실습은 kind의 Kubernetes **v1.35.5**와 `grafana/otel-lgtm` **0.30.2**를 고정했다.
-  2026-08-18에 macOS arm64 · kind v0.32.0 · Docker 메모리 8 GiB로 전체 흐름을 검증했다.
+- 첫 실습은 kind의 Kubernetes **v1.35.5**를 고정하고, Grafana `docker-otel-lgtm`
+  **v0.30.2 공식 저장소**의 Kubernetes 예제와 Java example을 수정 없이 사용한다.
+- 공식 v0.30.2 예제도 `grafana/otel-lgtm:latest`를 사용한다. 재현 가능한 고정 버전 실습으로 오해하지 않고,
+  문서의 `kubectl ... jsonpath` 명령으로 실제 image digest와 실행 날짜를 검증 기록에 남긴다.
 - LGTM 이미지는 **개발·데모 전용**이다. 단일 Pod · `emptyDir` · 로컬 admin을 운영 설치법처럼
   서술하지 않는다. 각 실습 장 첫부분에 운영 구성과의 차이를 밝힌다.
-- 실습은 `kind-observability-lab` context와 `observability-lab` namespace만 조작한다.
-  `kubectl`이 사용자의 현재 context에 암묵적으로 적용되지 않게 모든 자동화 명령에 context를 고정한다.
-- cleanup은 `make down`으로 전용 kind 클러스터만 삭제한다. 다른 클러스터·이미지·볼륨은 건드리지 않는다.
-- 질의와 UI 절차는 추측으로 쓰지 않는다. 시나리오를 실행해 실제 메트릭 이름·Loki 필드·Tempo 스팬과
+- 실습은 새로 만든 `kind-observability-lab` context의 `default` namespace만 사용한다. 공식 예제가 namespace를
+  지정하지 않기 때문이다. 모든 문서 명령은 context를 명시하고, 다른 cluster의 `default`를 건드리지 않는다.
+- Java example은 host에서 실행하고 공식 port-forward의 OTLP 4317·4318을 통해 kind 안의 Collector로 보낸다.
+  공식 앱의 임의 지연과 약 30% 오류를 쓰므로 고정된 정상 → 장애 → 회복 구간을 약속하지 않는다.
+- cleanup은 `kind delete cluster --name observability-lab`으로 전용 kind 클러스터만 삭제한다.
+  다른 클러스터·이미지·볼륨은 건드리지 않는다.
+- 온프렘 운영 실습은 이 단일 Pod 샘플을 확장하지 않는다. 제품별 공식 Helm 차트를 쓰는 별도 경로로
+  분리하고, 레포에는 공식 차트의 렌더 결과가 아니라 환경별 values와 검증 절차만 둔다.
+- 질의와 UI 절차는 추측으로 쓰지 않는다. 공식 example을 실행해 실제 메트릭 이름·Loki 필드·Tempo 스팬과
   상관 링크를 확인한 뒤 갱신한다.
 - Explore에서 query와 신호 이동을 먼저 검증하고, 반복해서 볼 질문만 대시보드 패널로 옮긴다.
   대시보드를 조사보다 먼저 만들거나 모든 로그를 자동 새로고침하는 넓은 LogQL을 넣지 않는다.
