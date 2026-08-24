@@ -1,8 +1,8 @@
 ---
 title: "참고. Desktop 조직 plugin 관리"
-description: 기존 skill 모노레포와 npm 설치기를 유지하면서 Claude Desktop·ChatGPT Desktop의 조직용 plugin 배포 경로를 연결하는 방법
-aliases: [Claude Desktop 조직 plugin, ChatGPT Desktop workspace plugin, 사내 skill 배포]
-reviewedAt: 2026-08-24
+description: 기존 skill 모노레포와 npm 설치기를 유지하면서 임직원 제작물을 승인해 Claude Desktop·ChatGPT Desktop 조직 plugin으로 배포하는 방법
+aliases: [Claude Desktop 조직 plugin, ChatGPT Desktop workspace plugin, 사내 skill 배포, 임직원 제작 skill 승인]
+reviewedAt: 2026-08-25
 status: review
 ---
 
@@ -11,11 +11,11 @@ import SourceFigure from '../../../components/docs/SourceFigure.astro';
 import TermIntro from '../../../components/docs/TermIntro.astro';
 import Thesis from '../../../components/docs/Thesis.astro';
 
-<Thesis>skill의 정본과 개발자용 npm 설치기는 유지하되, 비개발자에게는 각 Desktop 앱의 조직 Plugin Directory를 설치 화면으로 제공한다</Thesis>
+<Thesis>skill의 정본과 개발자용 npm 설치기는 유지하고, 임직원 제작물은 사내 스토어에서 승인한 뒤 각 Desktop 앱의 조직 Plugin Directory로 배포한다</Thesis>
 
 <TermIntro
   terms={[
-    ['조직 marketplace', 'Organization plugin marketplace', '관리자가 승인한 plugin만 조직 사용자에게 보여 주고 기본 설치·필수 설치·차단 정책을 적용하는 배포 채널이다.'],
+    ['조직 marketplace', 'Organization plugin marketplace', '조직 사용자에게 plugin이나 skill을 보여 주고 설치 정책을 적용하는 배포 채널이다. 조직에 보인다는 사실만으로 관리자 승인품이라는 뜻은 아니다.'],
     ['vendor package', 'Provider-specific plugin package', '같은 skill 원본을 Claude와 ChatGPT가 각각 읽는 manifest·디렉터리 구조로 조립한 산출물이다.'],
     ['workspace publish', 'Workspace plugin publishing', '로컬에서 검증한 plugin을 특정 ChatGPT workspace와 역할에만 비공개로 배포하는 절차다.'],
   ]}
@@ -143,6 +143,47 @@ npm source는 client 환경을 요구한다. npm은 release pipeline 안에 남�
 plugin만 전달해야 두 제품에서 같은 비개발자 경험을 만들 수 있다.
 :::
 
+## 임직원 작성과 조직 승인은 분리한다
+
+임직원이 직접 skill을 만드는 것과 전사 Directory에 배포하는 것은 별도 권한으로 다뤄야 한다.
+두 제품의 공식 관리 모델은 이 지점에서 다르다.
+
+| 구분 | Claude | ChatGPT plugin |
+|---|---|---|
+| 개인 작성·시험 | 기본적으로 사용자가 personal skill을 만들거나 ZIP을 업로드할 수 있음 | personal·local marketplace에서 plugin을 만들고 시험할 수 있음 |
+| 조직 공개 | 관리자가 공유를 허용하면 사용자가 동료·group·조직에 직접 공유 가능 | **workspace admin만** local plugin을 workspace에 publish 가능 |
+| 관리자 통제 | `User-created skills`, 조직·group 공유 toggle, Enterprise custom role의 `Create skills` capability | publish할 workspace role 지정, cloud-managed requirement로 plugin sharing 차단 가능 |
+| 내장 승인 단계 | **없음** — 조직 공유가 켜져 있으면 검토 없이 바로 Directory에 게시 | OpenAI Docs는 admin의 직접 publish만 설명하며 별도 직원 제출·승인 queue는 제시하지 않음 |
+| 승인제가 필요할 때 | 조직 공유를 끄고 사용자가 Owner에게 제출한 뒤 Owner가 provision | 사내 스토어에서 승인한 bundle만 workspace admin이 publish |
+
+Claude의 [조직 skill provisioning 문서](https://support.claude.com/en/articles/13119606-provision-and-manage-skills-for-your-organization)에
+따르면 사용자의 skill 작성·업로드는 기본 허용이며 관리자가 끌 수 있다. 조직 전체 또는 group
+공유도 관리자가 별도로 활성화할 수 있다. 하지만 조직 전체 공유에는 Owner 승인 단계가 없다.
+기능을 켜면 허용된 사용자가 만든 skill이 검토 없이 조직 Directory에 게시된다.
+
+:::caution[Claude의 조직 공유는 승인제가 아니다]
+`Share with organization`을 승인 요청 기능처럼 쓰면 안 된다. 검토가 필요하면 이 기능을 끄고,
+사용자가 사내 스토어에 제출한 skill을 Owner가 확인한 뒤 organization skill로 provision한다.
+Owner-provisioned skill은 Owner만 추가·제거할 수 있다.
+:::
+
+ChatGPT에서는 [OpenAI Docs의 workspace publish 절차](https://developers.openai.com/plugins/build/plugins#publish-a-local-plugin-to-your-workspace)가
+`workspace admin` 권한을 명시한다. admin이 자신의 `Personal` 영역에서 plugin을 선택해 publish하고,
+사용할 workspace role을 지정한다. 일반 임직원의 plugin 제출을 admin이 UI에서 받아 승인하는
+queue는 공식 절차에 없으므로, 제출과 검토는 사내 스토어가 맡아야 한다.
+
+권장 흐름은 다음과 같다.
+
+```text
+임직원 작성 → 사내 스토어에 제출 → 자동 검사 → 담당자 승인
+            → Claude용·ChatGPT용 bundle 생성 → 각 조직 Directory에 게시
+```
+
+사내 스토어의 `main`에는 승인된 skill만 두고 contribution은 PR이나 제출 API로 받는다. 최소한
+`submittedBy`, `owner`, `version`, `capabilities`, `reviewedBy`, `approvedAt`, source commit과 검사
+결과를 receipt로 남긴다. vendor Directory에서 보이는 상태는 배포 결과이지 승인 기록의 정본이
+아니다.
+
 ## 모노레포는 한 번 관리하고 두 번 조립한다
 
 공통 `SKILL.md`와 asset은 하나만 유지하고 provider manifest와 provider 전용 기능만 분리한다.
@@ -194,6 +235,7 @@ skills-store/
 | 공통 범위 | instructions·references·assets 중심 | Desktop별 hooks·subagents·connector 차이로 공통 원본이 갈라지는 것을 늦춘다. |
 | Claude 업데이트 | GitHub automatic sync + release branch 보호 | 사용자 재설치 없이 조직 marketplace를 갱신하되 승인되지 않은 commit 유입을 막는다. |
 | ChatGPT 업데이트 | staging 검증 후 workspace publish | workspace 공개 범위와 role을 관리자가 마지막에 확인할 수 있다. |
+| 임직원 제출 | PR·제출 API → 검사 → 담당자 승인 | Claude에는 내장 승인 단계가 없고 ChatGPT publish는 admin만 할 수 있으므로 사내 스토어가 공통 workflow를 맡는다. |
 | 권한 모델 | 설치 가용성과 runtime 인가를 분리 | 이미 설치된 파일을 숨기는 것만으로 민감한 API·데이터 접근은 회수되지 않는다. |
 
 첫 PoC는 read-only skill 두세 개로 충분하다. 양쪽 Desktop에서 같은 질문을 했을 때 skill이
@@ -217,6 +259,7 @@ Paseo 사내 빌드는 다음 요구가 실제로 남을 때 다시 선택한다
 ## 확인한 공식 문서
 
 - [Manage plugins for your organization](https://support.claude.com/en/articles/13837433-manage-plugins-for-your-organization) — Claude 조직 marketplace 생성, GitHub sync, 설치 정책과 group override.
+- [Provision and manage skills for your organization](https://support.claude.com/en/articles/13119606-provision-and-manage-skills-for-your-organization) — 사용자 skill 작성·공유 통제, Owner provisioning과 조직 공유의 승인 부재.
 - [Browse skills, connectors, and plugins in one directory](https://support.claude.com/en/articles/14328846-browse-skills-connectors-and-plugins-in-one-directory) — Claude Desktop 사용자의 통합 Directory 경로.
 - [Plugins](https://learn.chatgpt.com/docs/plugins) — ChatGPT Plugin Directory와 사용자 설치 흐름.
 - [Build plugins](https://developers.openai.com/plugins/build/plugins) — ChatGPT local marketplace, npm source 조건, workspace publish와 plugin 구조.
