@@ -1,7 +1,7 @@
 ---
 title: "0. 이 구조가 맞는 문제"
-description: Paseo plugin을 사내 카탈로그 프런트엔드로 쓸 때의 적합한 범위와 책임 경계
-reviewedAt: 2026-08-21
+description: 사내 카탈로그를 Paseo 안에 두는 이유와, plugin 개별 배포 대신 사내 빌드를 채택한 결정
+reviewedAt: 2026-08-24
 status: review
 ---
 
@@ -9,12 +9,13 @@ import { Card, CardGrid, LinkCard } from '@astrojs/starlight/components';
 import TermIntro from '../../../components/docs/TermIntro.astro';
 import Thesis from '../../../components/docs/Thesis.astro';
 
-<Thesis>코딩 agent를 쓰는 순간 필요한 작은 사내 화면이라면 Paseo plugin이 맞고, 범용 업무 포털이라면 별도 웹 앱이 맞다</Thesis>
+<Thesis>카탈로그는 코딩 agent를 쓰는 Paseo 안에 두되, 배포는 plugin 개별 설치가 아니라 회사가 빌드한 Paseo 사내 빌드 하나로 한다</Thesis>
 
 <TermIntro
   terms={[
-    ['surface', 'Plugin surface', 'Paseo가 route와 header를 제공하고 plugin이 본문을 그리는 React Native 화면이다.'],
-    ['local BFF', 'Local Backend for Frontend', 'Paseo daemon 옆에서 client surface 대신 token과 사내 API 호출을 처리하는 plugin subprocess다.'],
+    ['사내 빌드', 'Internal build', 'upstream Paseo 릴리스 태그에 최소 패치를 얹어 회사가 빌드·서명·배포하는 데스크톱 앱이다.'],
+    ['동봉 plugin', 'Bundled plugin', '사내 빌드에 포함되어 기본 활성화되는 회사 카탈로그 plugin으로, 사용자가 따로 설치하지 않는다.'],
+    ['local BFF', 'Local Backend for Frontend', 'Paseo daemon 옆에서 카탈로그 화면 대신 token과 사내 API 호출을 처리하는 plugin subprocess다.'],
     ['Catalog API', 'Catalog application programming interface', '로그인한 사용자의 entitlement를 계산해 허용된 항목만 반환하는 사내 백엔드다.'],
   ]}
  />
@@ -29,14 +30,13 @@ import Thesis from '../../../components/docs/Thesis.astro';
 찾기 → 설명과 권한 확인 → 현재 작업에 붙이기 → 실행 결과를 Paseo에서 계속 보기
 ```
 
-Paseo plugin은 이 흐름의 첫 세 단계를 같은 sidebar 안에 둘 수 있다. 일반 Paseo 작업은
-`usePaseo()` SDK로 수행하고, 사내 API나 credential이 필요한 작업은 daemon-side RPC handler로
-보낸다. 이 분리는 [Paseo가 공식적으로 제시하는 plugin 사용 모델](https://paseo.sh/docs/plugins/reference)과 맞는다.
+이 흐름의 첫 세 단계를 Paseo sidebar 안에 둘 수 있다. 다만 PC의 화면만으로는 AD 로그인,
+부서별 권한, 회수와 감사가 해결되지 않는다 — 그 몫은 사내 백엔드가 가진다.
 
-## 잘 맞는 범위와 경계
+## 결정 1 — 별도 포털이 아니라 Paseo 안의 카탈로그
 
 <CardGrid>
-<Card title="Paseo plugin이 잘 맞는다" icon="approve-check">
+<Card title="Paseo 안의 카탈로그가 잘 맞는다" icon="approve-check">
 회사 prompt를 검색해 새 agent를 시작한다.
 
 승인된 skill 버전과 설명을 보고 로컬에 설치한다.
@@ -60,28 +60,69 @@ Paseo를 쓰지 않는 임직원도 같은 기능을 써야 한다.
 </Card>
 </CardGrid>
 
-Paseo client contribution이 import할 수 있는 runtime module은 React, React Native, TanStack Query,
-Zod와 plugin API 등으로 제한된다. 따라서 기존 웹 dashboard를 그대로 embed할 수 있다고 가정하지
+카탈로그 화면이 import할 수 있는 runtime module은 React, React Native, TanStack Query, Zod와
+plugin API 등으로 제한된다. 따라서 기존 웹 dashboard를 그대로 embed할 수 있다고 가정하지
 않는다. 작은 dashboard는 surface로 그리고, 복잡한 기존 화면은 SSO가 적용된 URL을 기본 browser로 연다.
+
+## 결정 2 — plugin 개별 배포가 아니라 사내 빌드
+
+처음 검토한 구조는 upstream Paseo를 그대로 쓰고 회사 카탈로그 plugin을 따로 배포하는 것이었다.
+비개발자 사용자를 기준으로 두 배포 형태의 설치 부담을 비교하면 차이가 크다.
+
+| 사용자가 해야 하는 일 | plugin 개별 배포 | 사내 빌드 |
+|---|---|---|
+| Paseo 설치 | 직접 다운로드·설치 | 인스톨러 하나에 포함 |
+| Node.js·npm 설치 | 필요 (plugin이 로컬 `npm install` 기반) | 불필요 |
+| 사내 npm registry 세팅 | 프록시·인증서 포함 직접 설정 | 불필요 |
+| 카탈로그 plugin 설치 | 경로 지정 후 설치·활성화 | 동봉·기본 활성화 |
+| 사내 CA·프록시 설정 | 안내 문서 따라 직접 | 빌드·인스톨러가 프로비저닝 |
+
+이 차이는 우연이 아니다. [Paseo plugin 공식 문서](https://paseo.sh/docs/plugins)는 plugin이
+**아직 배포용으로 설계되지 않았다고 명시한다** ("experimental", "not designed for
+distribution yet") — 개인이 자기 PC에서
+로컬 코드를 돌리는 용도로 설계되었고, 조직 단위 배포 채널이 아직 없다. 반면 Paseo 데스크톱 앱은
+데몬을 번들해 "별도로 설치할 것이 없다"고 안내한다. 배포 단위를 **회사가 빌드한 앱 하나**로
+바꾸면 이 성질을 그대로 물려받는다.
+
+사내 빌드가 배포 시점에 해결하는 것은 설치 부담만이 아니다.
+
+- **보안 환경 프로비저닝** — 사설 CA 신뢰, 사내 프록시 기본값, Catalog API 주소,
+  Keycloak client 설정을 사용자 손을 거치지 않고 굽는다.
+- **쓰지 않을 표면 제거** — relay 페어링·모바일 접속·원격 데몬 접속·bundled web UI는
+  지원하지 않기로 했다. config로 끌 수 있는 것은 config로 끄고, 페어링 안내처럼
+  화면에 남는 표면만 패치로 제거한다.
+- **버전 통제** — upstream 자동 업데이트 대신 사내 업데이트 채널로 검증된 버전만 배포한다.
+
+카탈로그 **구현**은 여전히 plugin API를 쓴다. plugin을 사용자에게 설치시키는 대신 빌드에
+동봉하면, 카탈로그 코드가 코어 소스를 건드리지 않으므로 upstream을 따라가는 패치가 얇게 유지된다.
+plugin 형식을 버린 것이 아니라 **배포 형식만** 바꾼 것이다.
+
+:::caution[선결 조건 — AGPLv3]
+Paseo는 [AGPLv3](https://github.com/getpaseo/paseo/blob/main/LICENSE)로 배포된다. 같은 법인
+임직원 PC에 배포하는 내부 사용이라도, 소스를 수정해 배포하는 이상 사내 오픈소스 컴플라이언스
+검토를 먼저 통과해야 한다. 계열사·협력사로 배포 범위를 넓히는 것은 별도 재검토 대상이다.
+이 덱은 기술 구조만 다루고 라이선스 해석은 컴플라이언스 조직의 판단을 따른다.
+:::
 
 ## 책임을 다섯 곳에 나눈다
 
 | 구성 요소 | 소유하는 것 | 소유하지 않는 것 |
 |---|---|---|
-| plugin surface | 탐색 UI, loading·error·재로그인 상태 | 최종 권한 판정, 장기 token |
-| plugin handler | OIDC 흐름, token 갱신, Catalog API 호출 | 조직정보의 정본, 전사 배포 정책 |
+| 카탈로그 surface (동봉 plugin) | 탐색 UI, loading·error·재로그인 상태 | 최종 권한 판정, 장기 token |
+| catalog handler (동봉 plugin) | OIDC 흐름, token 갱신, Catalog API 호출 | 조직정보의 정본, 전사 배포 정책 |
 | Keycloak | 사용자 인증, AD identity·group claim | catalog 항목별 정책 |
 | oauth2-proxy | cookie/JWT 검증, 서비스 1차 진입 통제 | 개인·부서별 항목 조합 |
 | Catalog API | entitlement 계산, 허용된 metadata·artifact | PC의 agent 실행 생명주기 |
 
 :::tip[핵심 원칙]
-Paseo plugin은 권한을 **표현**하지만 권한의 정본은 아니다. 개발자 도구에서 버튼을 숨기는 것과
+사내 빌드는 권한을 **표현**하지만 권한의 정본은 아니다. 화면에서 버튼을 숨기는 것과
 API 요청을 거부하는 것은 다른 통제다.
 :::
 
 ## 도입 전에 답할 질문
 
-- 회사가 배포할 plugin의 owner와 release channel은 누구인가
+- 사내 빌드의 owner, 빌드 파이프라인과 업데이트 채널은 누가 운영하는가
+- AGPLv3 수정·사내 배포에 대한 컴플라이언스 검토는 통과했는가
 - 사용자 identity는 Keycloak의 어떤 realm과 client에서 발급되는가
 - 개인·부서·직무 권한은 Keycloak role인가, 별도 entitlement DB인가
 - skill과 prompt를 내려받은 뒤 권한이 회수되면 무엇을 할 수 있어야 하는가
@@ -91,7 +132,7 @@ API 요청을 거부하는 것은 다른 통제다.
 이 질문에 답하지 않은 채 UI부터 만들면 catalog는 보여도 통제 가능한 사내 제품은 되지 않는다.
 
 <LinkCard
-  title="1. Paseo plugin의 실행 모델"
-  description="화면과 backend handler가 어디서 실행되고 어떤 통신 경계를 갖는지 살펴본다."
-  href="/paseo-enterprise/01-plugin-model/"
+  title="1. 사내 빌드의 구조"
+  description="upstream의 어디를 패치하고 어디를 config로 끄는지, 동봉 plugin이 어디서 실행되는지 본다."
+  href="/paseo-enterprise/01-internal-build/"
 />

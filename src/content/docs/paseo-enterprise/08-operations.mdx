@@ -1,7 +1,7 @@
 ---
-title: "8. 배포·회수·운영"
-description: Paseo plugin과 catalog artifact의 사내 배포, token 보관, 관측, rollback과 권한 회수
-reviewedAt: 2026-08-21
+title: "8. 빌드·배포·운영"
+description: upstream 태그를 추적하는 사내 빌드 파이프라인, 업데이트 채널, token 보관, 관측과 권한 회수
+reviewedAt: 2026-08-24
 status: review
 ---
 
@@ -9,42 +9,64 @@ import { Card, CardGrid, LinkCard, Steps } from '@astrojs/starlight/components';
 import TermIntro from '../../../components/docs/TermIntro.astro';
 import Thesis from '../../../components/docs/Thesis.astro';
 
-<Thesis>plugin은 회사 software로, catalog item은 서명된 data로 배포하고, 권한 회수는 실행 server에서 완성한다</Thesis>
+<Thesis>사내 빌드는 upstream 태그를 추적하는 파이프라인과 사내 업데이트 채널로, catalog item은 서명된 data로 배포하고, 권한 회수는 실행 server에서 완성한다</Thesis>
 
 <TermIntro
   terms={[
-    ['release channel', 'Software release channel', 'stable·pilot처럼 사용자 집단별로 plugin version을 나누어 배포하는 경로다.'],
+    ['release channel', 'Software release channel', 'stable·pilot처럼 사용자 집단별로 사내 빌드 version을 나누어 배포하는 경로다.'],
     ['canary', 'Canary rollout', '소수 PC에 먼저 배포해 로그인·API·설치 실패를 확인한 뒤 범위를 넓히는 방식이다.'],
     ['reconcile', 'Desired versus actual reconciliation', 'catalog의 최신 정책·version과 PC에 설치된 receipt·파일 상태를 비교하는 과정이다.'],
     ['revocation', 'Access revocation', '사용자·token·catalog item 또는 tool 실행 권한을 더 이상 사용할 수 없게 만드는 조치다.'],
   ]}
  />
 
-## plugin과 item의 배포를 분리한다
+## upstream을 추적하는 빌드 파이프라인
+
+사내 빌드의 버전은 두 축으로 움직인다. **upstream 릴리스 태그**(코어 기능·보안 수정)와
+**회사 층의 변경**(동봉 plugin·config·패치)이다. 파이프라인은 두 축 모두에서 같은 절차를 탄다.
+
+<Steps>
+1. upstream 릴리스 태그를 고르고 changelog에서 config 필드·plugin API 변경을 확인한다.
+2. 패치 세트를 새 태그 위에 rebase한다. 충돌이 난 패치는 "아직 필요한가"부터 다시 판단한다.
+3. 동봉 plugin을 typecheck·테스트하고 번들을 만든다.
+4. 기본 config(relay off, `127.0.0.1` listen, Catalog API 주소, Keycloak client)를 굽는다.
+5. 지원 OS별 인스톨러를 만들고 회사 서명을 한다.
+6. 사내 업데이트 채널에 올린다 — upstream 자동 업데이트는 빌드에서 사내 채널로 바꿔 두었다.
+</Steps>
+
+upstream의 보안 수정은 이 절차를 통해서만 임직원 PC에 도달하므로, upstream release 공지를
+구독하고 보안 태그는 우선 처리하는 담당을 정해 둔다.
+
+:::caution[AGPLv3 의무]
+수정한 소스의 제공 의무는 배포 형태에 따라 달라진다. 컴플라이언스 검토에서 정한 범위(법인 내부
+배포)를 파이프라인이 벗어나지 않게 하고, 패치 세트와 대응 upstream 태그를 언제든 제출할 수 있는
+형태로 보관한다.
+:::
+
+## 사내 빌드와 item의 배포를 분리한다
 
 | 대상 | 변경 빈도 | 권장 배포 | 검증 |
 |---|---:|---|---|
-| company Paseo plugin | 낮음 | MDM·Software Center·사내 package repository | publisher signature, checksum, typecheck, canary |
+| Paseo 사내 빌드 (동봉 plugin 포함) | 낮음 | MDM·Software Center·사내 업데이트 채널 | 회사 signature, checksum, typecheck, canary |
 | catalog metadata | 높음 | Catalog API/DB | schema, approval workflow, audit |
 | prompt·skill artifact | 중간 | immutable artifact store | version, SHA-256, signature, malware·secret scan |
 | tool connection | 중간 | resolve된 MCP manifest | endpoint allowlist, capability review, runtime auth |
 
-plugin이 catalog에서 새 JavaScript를 내려받아 실행하게 만들면 중앙 데이터 배포가 곧 PC code execution이
-된다. plugin binary/source update는 회사 software 배포 절차를 따르고, catalog는 선언적인 item data만 제공한다.
+카탈로그 화면이 catalog에서 새 JavaScript를 내려받아 실행하게 만들면 중앙 데이터 배포가 곧 PC
+code execution이 된다. 코드 변경은 반드시 사내 빌드 파이프라인을 거치고, catalog는 선언적인
+item data만 제공한다. 카탈로그 항목이 자주 바뀌어도 빌드를 다시 배포할 일이 없는 이유이기도 하다.
 
 ## rollout 순서
 
 <Steps>
-1. 개발 PC에서 generated declaration과 맞춰 typecheck하고 local daemon에 설치한다.
-2. test realm·test Catalog API로 Device Flow와 token refresh를 검증한다.
-3. 지원 OS별 package와 signature를 만든다.
-4. pilot group에 배포해 oauth2-proxy audience·사내 CA·VPN·proxy 경로를 확인한다.
-5. dashboard에서 login success, catalog latency, RPC error, install failure를 확인한다.
-6. stable channel로 넓히고 이전 version과 rollback package를 유지한다.
+1. test realm·test Catalog API로 Device Flow와 token refresh를 검증한다.
+2. pilot channel에 배포해 oauth2-proxy audience·사내 CA·프록시 경로를 실제 사내망에서 확인한다.
+3. dashboard에서 login success, catalog latency, RPC error, install failure를 확인한다.
+4. stable channel로 넓히고 이전 version 인스톨러와 rollback 절차를 유지한다.
 </Steps>
 
-Paseo plugin reload 실패는 이전 bundle을 자동 복원하지 않으므로 installer가 이전 package와 재설치
-절차를 가져야 한다.
+rollback은 "이전 인스톨러 재배포"다. 데몬 config schema가 버전 간에 달라졌을 수 있으므로
+이전 version 인스톨러가 현재 config를 만나도 동작하는지 rollback 경로도 canary에서 확인한다.
 
 ## credential 운영
 
@@ -84,7 +106,7 @@ login.begin/poll/refresh
 
 | signal | 필요한 label | 보지 말아야 할 값 |
 |---|---|---|
-| login 결과와 latency | plugin version, OS, realm, error class | token, user code |
+| login 결과와 latency | 사내 빌드 version, OS, realm, error class | token, user code |
 | proxy 401·403 | issuer, audience result, route | raw Authorization header |
 | authorization decision | decision ID, item ID, action, policy version | 필요 이상의 개인 claim |
 | install 결과 | item ID, version, adapter, error class | artifact content와 local path 전체 |
@@ -96,12 +118,12 @@ login.begin/poll/refresh
 
 | 회수 대상 | 즉시 할 일 | 이후 reconcile |
 |---|---|---|
-| 사용자 계정 | Keycloak session·refresh token revoke | plugin 재로그인 차단 |
+| 사용자 계정 | Keycloak session·refresh token revoke | 카탈로그 재로그인 차단 |
 | catalog entitlement | backend deny 반영 | UI 목록에서 제거 |
 | tool | tool server execute 차단 | local MCP config에 revoked 표시·선택적 제거 |
 | dashboard | dashboard API 차단 | 즐겨찾기와 catalog item 상태 갱신 |
 | prompt·skill | 새 resolve 차단, 위험 공지 | local receipt에 revoked 표시, 필요 시 회사 정책으로 제거 |
-| plugin version | 배포 channel 차단·rollback | 지원 최소 version 상향 |
+| 사내 빌드 version | 업데이트 channel 차단·rollback | 지원 최소 version 상향 |
 
 이미 공개된 prompt·skill의 지식 자체는 기술적으로 회수하기 어렵다. secret이나 실시간 production data를
 정적 artifact 안에 넣지 않는 이유다.
@@ -113,7 +135,8 @@ login.begin/poll/refresh
 - **Paseo login만 실패:** Device Grant 활성화, public client, polling interval과 PC의 Keycloak 접근을 확인한다.
 - **특정 부서만 빈 목록:** token claim과 entitlement policy version·decision ID를 비교한다.
 - **특정 OS만 설치 실패:** credential store와 path·permission adapter를 확인한다.
-- **reload 뒤 sidebar 없음:** `paseo plugin ls`와 retained plugin log를 확인한다.
+- **업데이트 뒤 카탈로그 sidebar 없음:** 해당 빌드의 plugin 번들 포함 여부와 config의 plugin 활성 설정,
+  `paseo plugin ls`·retained plugin log를 확인한다.
 
 :::tip[운영 경계]
 oauth2-proxy가 인증에 성공했다는 사실과 Catalog API가 item action을 허용했다는 사실을 서로 다른

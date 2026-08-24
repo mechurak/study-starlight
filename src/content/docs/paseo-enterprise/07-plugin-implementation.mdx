@@ -1,7 +1,7 @@
 ---
-title: "7. plugin 구현 골격"
-description: Paseo surface와 daemon-side RPC handler를 로그인·카탈로그·resolve 기능으로 나누는 TypeScript 구조
-reviewedAt: 2026-08-21
+title: "7. 동봉 plugin 구현 골격"
+description: 사내 빌드에 동봉되는 카탈로그 plugin을 로그인·카탈로그·resolve 기능으로 나누는 TypeScript 구조
+reviewedAt: 2026-08-24
 status: review
 ---
 
@@ -21,6 +21,10 @@ import Thesis from '../../../components/docs/Thesis.astro';
  />
 
 ## 내부를 역할별로 나눈다
+
+카탈로그 코드는 사내 빌드에 동봉되지만 형식은 upstream plugin API를 그대로 따른다 — 그래야
+[1장](/paseo-enterprise/01-internal-build/)에서 정한 대로 코어 패치가 얇게 유지된다. 배포와
+빌드 파이프라인은 [8장](/paseo-enterprise/08-operations/)의 몫이고, 이 장은 코드 구조만 다룬다.
 
 Paseo가 생성하는 entry point는 `index.tsx` 하나지만 회사 코드는 작은 module로 나누는 편이 테스트와
 보안 review에 유리하다.
@@ -143,6 +147,10 @@ export default function contribute(plugin: PluginContext) {
 위 코드는 구조를 보여 주는 skeleton이다. `createDeviceAuth`, secure storage, HTTP timeout·retry와 error
 mapping은 회사 구현이며 production에서 빠뜨리면 안 된다. access token 자체는 surface output에 포함하지 않는다.
 
+issuer·client ID·Catalog API 주소 같은 설정값은 사용자가 입력하지 않는다 — 사내 빌드가
+기본 config로 굽고 handler는 읽기만 한다. 값이 비어 있으면 시작 시점에 명확한 오류로 실패시켜,
+잘못 빌드된 package가 조용히 로그인 실패로 이어지지 않게 한다.
+
 ## surface는 상태를 그린다
 
 ```tsx
@@ -194,11 +202,12 @@ prompt로 agent를 시작하거나 tool을 session에 붙이는 동작도 resolv
 - surface: loading·empty·error·권한별 action과 compact layout
 - lifecycle: reload 중 pending polling과 socket 정리
 
-`npm run typecheck` 뒤 `paseo plugin reload <id>`를 실행하고 status와 log를 확인하는 흐름은
-[Paseo Plugin quickstart](https://paseo.sh/docs/plugins)에 맞춘다.
+개발자 PC에서 `npm run typecheck` 뒤 `paseo plugin reload <id>`를 실행하고 status와 log를
+확인하는 흐름은 [Paseo Plugin quickstart](https://paseo.sh/docs/plugins)에 맞춘다. 이 개발
+루프는 개발자에게만 있고, 임직원 PC에는 검증이 끝난 번들이 사내 빌드로 배포된다.
 
 <LinkCard
-  title="8. 배포·회수·운영"
-  description="개인 PC에 trusted code를 배포하고 token·artifact·version을 운영하는 방법을 정리한다."
+  title="8. 빌드·배포·운영"
+  description="사내 빌드 파이프라인과 업데이트 채널, token·artifact·권한 회수 운영을 정리한다."
   href="/paseo-enterprise/08-operations/"
 />

@@ -22,14 +22,15 @@ import Thesis from '../../../components/docs/Thesis.astro';
 ## 전체 요청 경로
 
 직원마다 daemon이 따로 있으므로 Paseo 자체에 중앙 사용자 계정을 억지로 넣을 필요가 없다.
-대신 plugin이 Keycloak에서 그 PC 사용자의 token을 얻고, 같은 token으로 Catalog API를 호출한다.
+대신 사내 빌드의 catalog handler가 Keycloak에서 그 PC 사용자의 token을 얻고, 같은 token으로
+Catalog API를 호출한다.
 
 ```d2 layout=elk pad=40 title="임직원 PC와 온프렘 Kubernetes 카탈로그의 인증·인가·artifact 경로"
 direction: right
 
-pc: "임직원 PC · 신뢰하지 않는 client 경계" {
-  ui: "Paseo surface\n검색 · 선택 · 상태"
-  bff: "plugin handler\nOIDC · API · 설치"
+pc: "임직원 PC의 사내 빌드 · 신뢰하지 않는 client 경계" {
+  ui: "카탈로그 surface\n검색 · 선택 · 상태"
+  bff: "catalog handler\nOIDC · API · 설치"
   cred: "OS credential store\nrefresh token"
   local: "local agent config\nskill · MCP"
 
@@ -117,8 +118,9 @@ catalog에서 tool을 볼 수 있다는 사실만으로 tool server 호출 권�
 | Catalog API | 조직·entitlement 저장소 | 사용자별 허용 범위 계산 |
 | Catalog API | artifact store | 승인된 version 제공 |
 
-사내 CA를 쓰면 browser만 아니라 Paseo daemon의 Node runtime도 CA chain을 신뢰해야 한다. VPN·DNS가
-browser에는 되고 daemon subprocess에는 안 되는 경우도 있으므로 PC 기준 connectivity test를 따로 둔다.
+사내 CA와 프록시 기본값은 사내 빌드 인스톨러가 프로비저닝한다. 이때 browser만 아니라 번들된
+daemon의 Node runtime도 같은 CA chain을 신뢰하는지 확인해야 한다. VPN·DNS가 browser에는 되고
+daemon subprocess에는 안 되는 경우도 있으므로 PC 기준 connectivity test를 따로 둔다.
 
 :::caution[함정]
 Ingress가 외부에서 받은 `X-Forwarded-User`, `X-Forwarded-Groups`, `X-Forwarded-Access-Token`을
@@ -132,7 +134,7 @@ Ingress가 외부에서 받은 `X-Forwarded-User`, `X-Forwarded-Groups`, `X-Forw
 - oauth2-proxy 장애: browser와 Paseo API 진입이 함께 막힌다.
 - Catalog API 장애: 기존 local skill은 남지만 새 목록·권한·version 확인은 실패한다.
 - artifact store 장애: metadata는 보여도 설치·update가 실패한다.
-- 개인 daemon/plugin 장애: 해당 직원만 영향을 받고 중앙 서비스는 정상이다.
+- 개인 PC의 사내 빌드 장애: 해당 직원만 영향을 받고 중앙 서비스는 정상이다.
 
 이 분리가 관측 dashboard와 runbook의 기준이 된다.
 

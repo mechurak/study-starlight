@@ -1,0 +1,176 @@
+---
+title: "1. 사내 빌드의 구조"
+description: upstream 릴리스 태그 위의 config·동봉 plugin·최소 패치 세 층과 동봉 plugin의 실행 경계
+reviewedAt: 2026-08-24
+status: review
+---
+
+import { LinkCard } from '@astrojs/starlight/components';
+import TermIntro from '../../../components/docs/TermIntro.astro';
+import Thesis from '../../../components/docs/Thesis.astro';
+
+<Thesis>사내 빌드는 upstream 태그 위의 얇은 층 세 개 — config, 동봉 plugin, 최소 패치 — 로 만들고, 카탈로그 코드는 plugin에 격리해 코어를 거의 건드리지 않는다</Thesis>
+
+<TermIntro
+  terms={[
+    ['릴리스 태그', 'Upstream release tag', 'upstream이 검증해 공개한 특정 버전의 소스 기준점으로, 사내 빌드가 고정하는 출발점이다.'],
+    ['패치 세트', 'Patch set', '릴리스 태그 위에 얹는 회사 소스 변경의 목록으로, upstream 버전을 올릴 때마다 다시 적용(rebase)한다.'],
+    ['contribution', 'Plugin contribution', 'plugin이 Paseo에 surface·sidebar item·RPC handler·attachment source를 등록하는 단위다.'],
+    ['RPC', 'Remote Procedure Call', 'surface가 daemon의 plugin handler를 schema가 검증하는 함수처럼 호출하는 통신이다.'],
+  ]}
+ />
+
+## 큰 그림
+
+upstream Paseo는 monorepo다. `packages/` 아래에 데스크톱 셸(`desktop`), 공용 앱 UI(`app`),
+daemon(`server`), 통신 계약(`protocol`), plugin API(`plugin`), 원격 페어링용 `relay` 등이
+나뉘어 있고, 공식 데스크톱 앱은 daemon을 번들해 별도 설치 없이 실행된다. 사내 빌드는 이
+구조를 바꾸지 않고 **릴리스 태그 하나를 고른 뒤 회사 층을 얹어 다시 빌드**한다.
+
+```d2 layout=elk pad=40 title="upstream 릴리스 태그에 config·동봉 plugin·패치를 얹어 사내 빌드를 만들고 MDM으로 배포하는 흐름"
+direction: right
+
+upstream: "upstream Paseo\n릴리스 태그 vX.Y.Z"
+
+company: "회사 층" {
+  config: "기본 config\nrelay off · 127.0.0.1"
+  plugin: "동봉 plugin\n카탈로그 코드"
+  patches: "최소 패치\n표면 제거 · 업데이트 채널"
+}
+
+build: "사내 빌드\n서명된 인스톨러"
+mdm: "MDM · Software Center"
+pc: "임직원 PC"
+
+upstream -> company: "버전 고정" {
+  style.animated: true
+}
+company -> build: "빌드 · 서명" {
+  style.animated: true
+}
+build -> mdm
+mdm -> pc: "설치 · 업데이트" {
+  style.animated: true
+}
+```
+
+이 장이 답할 질문은 두 가지다. **회사 변경을 어느 층에 두는가**, 그리고 **동봉 plugin은
+어디에서 실행되는가**.
+
+## 변경을 세 층으로 나눈다
+
+같은 요구라도 어느 층에서 해결하느냐에 따라 upstream 추적 비용이 다르다. 아래로 갈수록
+비싸므로, 위 층에서 해결되는 것을 아래 층으로 내리지 않는다.
+
+| 층 | 여기서 해결하는 것 | 비용 |
+|---|---|---|
+| 기본 config | relay 비활성, bundled web UI 비활성, listen 주소 `127.0.0.1` 고정, plugin 활성화와 경로, Catalog API 주소·Keycloak client 설정 주입 | 거의 없음 — upstream이 지원하는 파일 |
+| 동봉 plugin | 카탈로그 surface·handler·installer 전체 | 낮음 — plugin API 계약만 따라가면 됨 |
+| 소스 패치 | 페어링·원격 접속 안내처럼 config로 숨겨지지 않는 UI 표면 제거, 업데이트 확인 주소를 사내 채널로 변경, 기본 config 시딩 | 높음 — 버전 올릴 때마다 rebase·충돌 해결 |
+
+[Paseo configuration 문서](https://paseo.sh/docs/configuration) 기준으로 `daemon.relay.enabled`,
+`features.webUi.enabled`, `daemon.listen`, 전역 plugin 스위치가 모두 `config.json` 필드다.
+버전을 올릴 때는 이 필드 이름이 유지되는지부터 확인한다 — config 필드가 사라지면 그 요구가
+패치 층으로 내려와 비용이 갑자기 커진다.
+
+:::tip[핵심 원칙]
+패치 세트의 크기가 이 구조의 유지비다. 새 요구가 생기면 "코어를 고치면 되는데"가 아니라
+"config나 plugin으로 안 되는 이유가 무엇인가"부터 묻는다.
+:::
+
+## 제거와 비활성을 구분한다
+
+원격 접속·모바일 페어링을 지원하지 않기로 한 결정을 층에 대응시키면 이렇다.
+
+- **config 비활성:** relay와 bundled web UI를 끄고 daemon을 `127.0.0.1`에만 listen시킨다.
+  네트워크 표면이 닫히므로 보안 요구는 여기서 대부분 충족된다.
+- **패치 제거:** 설정 화면의 페어링 메뉴처럼 꺼져 있어도 화면에 남아 사용자를 혼란시키는
+  표면만 소스에서 뺀다. 목적은 보안이 아니라 비개발자 사용자가 쓰지 않을 기능을 보지 않게
+  하는 것이다.
+
+둘을 구분해 기록해 두면 upstream rebase 때 "이 패치는 왜 있는가"를 다시 판단할 수 있다.
+비활성만으로 충분해진 패치는 그때 삭제한다.
+
+## 동봉 plugin의 실행 경계
+
+카탈로그 코드는 plugin contribution으로 작성하고 빌드에 동봉한다. 실행 위치는 upstream
+plugin과 같다 — client surface는 Paseo 앱 안에서, backend contribution은 daemon 옆의
+subprocess에서 실행되고, 둘은 `defineRpc()`로 선언한 Zod 계약으로 통신한다.
+
+```d2 layout=elk pad=40 title="사내 빌드 안에서 카탈로그 surface와 daemon-side handler가 실행되는 경계"
+direction: right
+
+pc: "임직원 PC의 사내 빌드" {
+  app: "Paseo 앱\n카탈로그 surface"
+  daemon: "번들된 daemon" {
+    route: "plugin route · query cache"
+    handler: "catalog handler\nplugin subprocess"
+    sdk: "Paseo API\nworkspace · agent · config"
+
+    route -> handler: "typed RPC" {
+      style.animated: true
+    }
+    handler -> sdk: "daemon session"
+  }
+
+  app -> daemon.route: "surface bundle"
+}
+
+internal: "사내 API · 파일 · credential"
+
+pc.daemon.handler -> internal: "Node.js network · OS access" {
+  style.animated: true
+}
+```
+
+[Paseo Plugin reference](https://paseo.sh/docs/plugins/reference) 기준으로 backend
+contribution은 sandbox 없이 Node API, 파일·process·credential·network에 접근한다. upstream은
+browser·mobile client에도 surface를 제공하지만, 사내 빌드는 그 접속 경로 자체를 껐으므로
+데스크톱 앱 하나만 남는다.
+
+| contribution | 이 덱에서 맡길 일 | 사용하지 않을 자리 |
+|---|---|---|
+| surface + sidebar item | 로그인 상태, catalog 검색·상세·실행 버튼 | 최종 권한 판정 |
+| RPC handler | Device Flow, token 갱신, Catalog API, artifact 설치 | 일반 Paseo agent 작업 |
+| Paseo SDK | workspace·agent 생성, prompt 전달, session MCP 설정 | 사내 Catalog API 호출 |
+| attachment source | prompt·문서 검색 결과를 composer에 text snapshot으로 첨부 | 실행 가능한 code bundle 전달 |
+
+surface에서 일반 Paseo 동작은 `usePaseo()`를 쓰고, 회사 backend가 필요한 동작은 `useRpc()`로
+handler에 보낸다. access token은 surface로 넘기지 않고 handler가 소유한다 — 구현 골격은
+[7장](/paseo-enterprise/07-plugin-implementation/)에서 다룬다.
+
+## trusted local code라는 뜻
+
+plugin backend는 sandbox가 아니므로, 동봉 plugin은 코어와 같은 수준의 보안 review를 받는
+회사 소프트웨어로 다룬다. 다음을 금지한다.
+
+- catalog 응답의 임의 JavaScript를 내려받아 실행
+- access token·refresh token을 `console.log()`에 출력
+- 사용자의 전체 home directory를 자동 탐색
+- 확인 없이 global Paseo config나 provider config를 변경
+- artifact hash와 publisher를 확인하지 않고 설치
+
+Paseo는 plugin log tail을 유지하고 daemon log에도 structured copy를 남긴다. 따라서 token뿐
+아니라 권한이 있는 catalog item의 원문 자체도 민감하면 로그에 넣지 않는다.
+
+## 개발 루프는 upstream 방식 그대로
+
+동봉은 배포 형식이고, 개발 중에는 upstream처럼 로컬 plugin으로 돌린다. plugin 개발자 PC에서만
+Node와 로컬 경로 설치가 필요하다 — 임직원 PC에는 이 루프가 존재하지 않는다.
+
+```text
+npm run typecheck
+paseo plugin reload company-catalog
+paseo plugin ls
+paseo plugin logs company-catalog
+```
+
+reload가 실패해도 이전 bundle을 자동 복원하지 않으므로, 검증을 통과한 plugin 번들만 빌드
+파이프라인에 넣는다. 명령과 lifecycle의 최신 계약은
+[Plugin quickstart](https://paseo.sh/docs/plugins)에서 확인한다.
+
+<LinkCard
+  title="2. 개인 PC와 온프렘 K8s의 경계"
+  description="사내 빌드, Keycloak, oauth2-proxy와 Catalog API를 한 요청 경로에 놓는다."
+  href="/paseo-enterprise/02-architecture/"
+/>

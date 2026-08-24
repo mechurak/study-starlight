@@ -82,12 +82,12 @@ tool server의 OIDC 검증으로 실제 호출자를 확인한다.
 <Card title="Paseo surface" icon="analytics">
 작은 status, 최근 배포, 개인 quota처럼 카드·목록으로 끝나는 화면에 적합하다.
 
-plugin handler가 dashboard API를 호출하고 필요한 JSON만 surface에 반환한다.
+catalog handler가 dashboard API를 호출하고 필요한 JSON만 surface에 반환한다.
 </Card>
 <Card title="기존 web dashboard" icon="external">
 복잡한 table·chart·form은 Keycloak SSO가 적용된 browser URL을 연다.
 
-plugin 안에 임의 WebView를 embed할 수 있다고 가정하지 않는다.
+surface 안에 임의 WebView를 embed할 수 있다고 가정하지 않는다.
 </Card>
 </CardGrid>
 
@@ -128,7 +128,7 @@ mutable `latest`만 저장하지 않고 설치 시 선택된 정확한 version�
 item id · version · sha256 · installedAt · subject · target provider · target path
 ```
 
-plugin은 catalog를 다시 열 때 receipt와 현재 catalog를 비교해 update·deprecated·revoked 상태를 보여
+카탈로그 화면은 다시 열릴 때 receipt와 현재 catalog를 비교해 update·deprecated·revoked 상태를 보여
 준다. 자동 삭제는 사용자 작업을 망가뜨릴 수 있으므로 기본 동작으로 삼지 않는다. 고위험 tool은
 local config를 지우는 것보다 server-side execute 권한을 즉시 차단하는 것이 우선이다.
 
@@ -138,7 +138,7 @@ catalog item의 공통점은 **찾는 방법**이고 차이는 **효과가 발�
 :::
 
 <LinkCard
-  title="7. plugin 구현 골격"
+  title="7. 동봉 plugin 구현 골격"
   description="Zod RPC와 query를 사용해 로그인 상태·목록·resolve·실행을 연결한다."
   href="/paseo-enterprise/07-plugin-implementation/"
 />

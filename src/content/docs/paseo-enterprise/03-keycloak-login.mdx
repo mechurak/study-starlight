@@ -22,12 +22,12 @@ import Thesis from '../../../components/docs/Thesis.astro';
 
 ## 두 client를 분리한다
 
-하나의 Keycloak client를 oauth2-proxy와 PC plugin이 같이 쓰면 confidential secret을 PC에 배포하거나,
-서로 다른 callback·flow·audience 정책을 한 설정에 섞게 된다. 역할에 맞춰 분리한다.
+하나의 Keycloak client를 oauth2-proxy와 PC의 사내 빌드가 같이 쓰면 confidential secret을 PC에
+배포하거나, 서로 다른 callback·flow·audience 정책을 한 설정에 섞게 된다. 역할에 맞춰 분리한다.
 
 | 설정 | `catalog-web` | `paseo-catalog` |
 |---|---|---|
-| 실행 위치 | Kubernetes의 oauth2-proxy | 임직원 PC의 plugin handler |
+| 실행 위치 | Kubernetes의 oauth2-proxy | 임직원 PC의 catalog handler |
 | client 종류 | confidential | public |
 | Client authentication | On | Off |
 | 기본 flow | Authorization Code + PKCE | Device Authorization Grant |
@@ -41,11 +41,11 @@ proxy client의 redirect URL을 서비스의 `/oauth2/callback`으로 등록한�
 
 ## Device Flow의 시간 순서
 
-```d2 layout=elk pad=40 title="Paseo plugin의 Keycloak Device Authorization Grant 로그인 순서"
+```d2 layout=elk pad=40 title="사내 빌드의 Keycloak Device Authorization Grant 로그인 순서"
 shape: sequence_diagram
 
-surface: "Paseo surface"
-handler: "plugin handler"
+surface: "카탈로그 surface"
+handler: "catalog handler"
 keycloak: "Keycloak"
 browser: "system browser"
 api: "Catalog API"
@@ -63,11 +63,11 @@ handler -> api: "Authorization: Bearer access_token"
 ```
 
 Keycloak은 Device Authorization Grant endpoint와 polling 흐름을 공식 지원한다. 사용자는 browser에서
-AD·MFA 정책을 그대로 통과하고, plugin surface는 비밀번호를 보지 않는다.
+AD·MFA 정책을 그대로 통과하고, 카탈로그 surface는 비밀번호를 보지 않는다.
 [Keycloak Server Administration Guide](https://www.keycloak.org/docs/latest/server_admin/)
 
 <Steps>
-1. plugin handler가 `device_authorization_endpoint`에 `client_id=paseo-catalog`과 scope를 보낸다.
+1. catalog handler가 `device_authorization_endpoint`에 `client_id=paseo-catalog`과 scope를 보낸다.
 2. surface는 `verification_uri_complete`를 열거나 URL과 `user_code`를 보여 준다.
 3. handler는 서버가 준 `interval`보다 자주 요청하지 않고 token endpoint를 polling한다.
 4. `authorization_pending`은 계속 기다리고, `slow_down`은 간격을 늘리며, 만료·거절은 UI 상태로 바꾼다.
@@ -95,12 +95,12 @@ Keycloak의 subject인 `sub`를 기본 사용자 key로 둔다.
 
 <Tabs>
 <TabItem label="Device Flow · 기본">
-redirect URI가 없다. plugin은 verification URL을 browser로 열고 token endpoint를 polling한다.
+redirect URI가 없다. catalog handler는 verification URL을 browser로 열고 token endpoint를 polling한다.
 
-Paseo plugin runtime에 custom deep link나 callback route를 추가하지 않아도 되어 구현이 단순하다.
+custom deep link나 callback route를 추가하지 않아도 되어 구현이 단순하다.
 </TabItem>
 <TabItem label="Authorization Code + PKCE · 대안">
-plugin handler가 loopback HTTP listener를 열고 system browser가 authorization code를 돌려준다.
+catalog handler가 loopback HTTP listener를 열고 system browser가 authorization code를 돌려준다.
 
 이 경우에만 Keycloak native application용 redirect URI로 `http://127.0.0.1`을 등록한다. Keycloak은
 임의 port를 허용하는 이 특수 URI를 지원하고, `localhost` hostname보다 IPv4 literal을 권장한다.
@@ -113,12 +113,12 @@ loopback URI를 둔다. production에서 `*` 같은 광범위한 redirect URI는
 
 ## token 생명주기
 
-| 사건 | plugin handler의 동작 |
+| 사건 | catalog handler의 동작 |
 |---|---|
 | access token 만료 임박 | refresh token으로 갱신한 뒤 요청 재시도 |
 | refresh token 만료·회수 | credential 삭제, UI를 다시 로그인 상태로 전환 |
 | logout | Keycloak revoke/logout 호출 후 local credential 삭제 |
-| plugin disable·reload | memory token과 polling timer 정리, durable credential 정책은 유지 |
+| 앱 종료·plugin reload | memory token과 polling timer 정리, durable credential 정책은 유지 |
 | PC 사용자 변경 | 이전 사용자 credential을 자동 재사용하지 않도록 OS 계정 경계 확인 |
 
 `offline_access`는 장기 편의보다 회사 session·device 정책을 우선해 필요할 때만 요청한다.
