@@ -1,0 +1,185 @@
+---
+title: "16. agentgateway — Agent 트래픽의 데이터 평면"
+description: kagent와 같은 생태계의 트래픽 층 agentgateway가 이 덱의 세 권한 경계·LiteLLM의 model 입구와 어디서 겹치고 무엇을 맡을 수 있는지 확인한다
+aliases: [agentgateway, AI gateway, MCP gateway, A2A gateway, Agentic AI Foundation]
+reviewedAt: 2026-08-24
+---
+
+import { LinkCard } from '@astrojs/starlight/components';
+import TermIntro from '../../../components/docs/TermIntro.astro';
+import Thesis from '../../../components/docs/Thesis.astro';
+
+<Thesis>agentgateway는 Agent가 model·tool·다른 Agent와 통신하는 경로에 정책을 거는 데이터 평면 후보다 — 이 덱의 세 권한 검사와 LiteLLM의 model 입구 자리를 대신하지 않는다</Thesis>
+
+<TermIntro
+  terms={[
+    ['데이터 평면', 'Data Plane', '요청·응답 트래픽이 실제로 지나가는 층이다. 무엇을 허용할지 결정하는 control plane과 구분한다.'],
+    ['egress', 'Egress Traffic', 'workload에서 바깥으로 나가는 통신이다. Agent가 model·tool에 닿는 경로를 통제할 때 쓰는 말이다.'],
+    ['guardrail', 'Guardrail', 'prompt와 응답 내용을 트래픽 층에서 검사해 유출·위험 요소를 차단하는 정책이다.'],
+    ['AAIF', 'Agentic AI Foundation', 'Linux Foundation 산하의 agentic AI 오픈소스 재단이다. agentgateway가 여기 소속이다.'],
+  ]}
+/>
+
+8~13장이 실행 어댑터 후보를, 14장과 15장이 그 운영을 다뤘다. 이 장과 다음 장은 kagent를 만든 같은
+생태계 — Solo.io에서 시작해 재단으로 넘어가는 중인 프로젝트군 — 의 인접 층 두 개를 이 덱의 계약과
+대조한다. 목적은 채택이 아니라 **경계 확인**이다. 이 덱은 이미 여러 자리를 회사 소유로 정했으므로
+(등록·승인·ACL은 portal backend, model 입구는 [LiteLLM](/litellm/)), 새 프로젝트를 볼 때의 질문은
+"좋은 물건인가"가 아니라 "이미 정한 자리와 어디서 겹치는가"다.
+
+## 전체 중 이 두 장의 자리
+
+```d2 layout=elk pad=40 title="agentregistry 유통·agentgateway 트래픽·kagent 실행의 세 인접 층이 이 덱이 회사 소유로 정한 portal backend·LiteLLM과 어디서 겹치는지 보여주는 지도"
+direction: down
+
+classes: {
+  key: {
+    style: {
+      fill: "#dbeafe"
+      stroke: "#2563eb"
+      font-color: "#1e3a8a"
+    }
+  }
+  zone: {
+    style: {
+      fill: "#ede9fe"
+      stroke: "#7c3aed"
+      font-color: "#4c1d95"
+    }
+  }
+  ok: {
+    style: {
+      fill: "#dcfce7"
+      stroke: "#16a34a"
+      font-color: "#14532d"
+    }
+  }
+  warn: {
+    style: {
+      fill: "#fef3c7"
+      stroke: "#d97706"
+      font-color: "#78350f"
+    }
+  }
+}
+
+reg: "agentregistry\n유통 · catalog — 17장" { class: warn }
+gw: "agentgateway\n트래픽 데이터 평면 — 이 장" { class: key }
+kag: "kagent\n실행 — 8~11장의 결정 A 후보" { class: ok }
+portal: "Portal Backend\n이 덱이 소유로 정한 등록 · 승인 · ACL" { class: zone }
+litellm: "LiteLLM\n이미 맡고 있는 model API 입구" { class: zone }
+
+reg -> gw: "MCP 연합"
+reg -> kag: "Kubernetes 배포"
+gw -> kag: "MCP · A2A 트래픽"
+portal -- reg: "등록·배포 계약이 겹친다" { style.stroke-dash: 3 }
+litellm -- gw: "LLM gateway 기능이 겹친다" { style.stroke-dash: 3 }
+```
+
+세 층의 분업은 명확하다 — agentregistry가 아티팩트를 등록·유통하고, agentgateway가 트래픽에 정책을
+걸고, kagent가 실행한다. 이 덱은 실행 층의 kagent만 결정 A 후보로 검토해 왔는데, 나머지 두 층은
+비어 있는 자리가 아니라 **이 덱이 이미 주인을 정한 자리와 부분적으로 겹친다.** 점선 두 개가 그
+겹침이고, 이 장과 다음 장은 각각 하나씩을 판정한다.
+
+## agentgateway는 무엇인가
+
+agentgateway는 Rust로 쓰인 오픈소스 프록시로, Solo.io가 만들어
+[2025년 8월 Linux Foundation에 기증했고](https://www.linuxfoundation.org/press/linux-foundation-welcomes-agentgateway-project-to-accelerate-ai-agent-adoption-while-maintaining-security-observability-and-governance)
+[2026년 4월 Agentic AI Foundation(AAIF)의 정식 프로젝트가 됐다](https://aaif.io/blog/agentgateway-joins-aaif-as-an-open-gateway-for-agentic-ai-infrastructure).
+라이선스는 Apache 2.0이고, 검토 시점 버전은 v1.4.1이다(2026년 8월 24일 확인).
+
+일반 API gateway와 다른 점은 Agent 통신의 세 경로를 한 데이터 평면에서 다룬다는 것이다.
+
+| 경로 | protocol | agentgateway가 거는 정책 |
+|---|---|---|
+| Agent ↔ LLM | OpenAI 호환 API 등 | provider 라우팅·failover, token 사용량·비용 추적, guardrail |
+| Agent ↔ tool | MCP | 여러 MCP server를 단일 endpoint로 연합, tool 노출 통제, 호출 audit |
+| Agent ↔ Agent | A2A | framework가 다른 Agent 간 라우팅과 capability 협상 |
+
+공통 기반으로 JWT·OIDC 인증, mTLS, RBAC, OpenTelemetry 계측을 제공한다. 상세 기능 목록은
+[공식 사이트](https://agentgateway.dev/)와 [GitHub 저장소](https://github.com/agentgateway/agentgateway)에 있다.
+
+## 세 권한의 문과 gateway의 자리
+
+[5장](/agent-platform/05-authorization/#세-개의-문)은 권한을 세 개의 문 — 만들 권한(control plane),
+호출할 권한(invocation), Agent가 tool로 행사하는 권한(action) — 으로 나눴다. agentgateway의 인증·RBAC
+기능을 보면 이 문들을 gateway에 맡기고 싶어지는데, 그 유혹이 이 장에서 가장 조심할 부분이다.
+
+gateway가 **맡을 수 있는 것**은 문 아래의 트래픽 층이다.
+
+- 승인된 MCP server들을 단일 endpoint 뒤에 연합하고, Agent가 임의 tool endpoint로 직접 나가는
+  경로를 막는다 — [9장에서 discovery를 label로 제외하고 통제된 경로로만 노출한다](/agent-platform/09-kagent-resources/)고
+  한 그 "통제된 경로"의 구현 후보다.
+- Agent workload의 egress를 model·MCP host allowlist로 좁힌다. NetworkPolicy가 IP·port 수준이라면
+  gateway는 protocol을 이해하는 층에서 자른다.
+- model·tool 호출의 audit trail과 token 비용을 트래픽 층에서 일괄 수집한다.
+
+gateway가 **맡을 수 없는 것**은 문 자체다. 어느 부서의 누가 이 Agent를 호출할 수 있는지는
+`(issuer, subject)` principal과 `Grant`를 아는 portal backend만 판정할 수 있고, 이 tool action이 이
+사용자의 업무 권한 안인지는 [OBO·HITL을 아는 action policy](/agent-platform/05-authorization/#tool-action-authorization)의
+일이다. gateway의 JWT 검증·RBAC는 "유효한 토큰을 가진 트래픽인가"를 보는 것이지 회사의 Grant
+모델을 아는 것이 아니다.
+
+:::caution[함정]
+"gateway를 넣으면 권한이 해결된다"는 결론은 세 문을 트래픽 정책 하나로 뭉개는 것이다.
+[kagent 실습 덱](/kagent-lab/14-cleanup/)에서도 같은 경계를 확인했다 — kagent와 agentgateway를 함께 쓰는
+공식 example은 model 호출 경로에 정책을 거는 것이지, A2A invocation ACL과 MCP action 권한을
+대신하지 않는다. gateway는 문이 뚫렸을 때를 대비한 depth지, 문이 아니다.
+:::
+
+## LiteLLM과 겹치는 자리
+
+세 경로 중 Agent ↔ LLM 경로는 이 회사에서 이미 주인이 있다. [LiteLLM 덱](/litellm/)이 정리했듯
+여러 LLM 앞의 단일 제어 지점 — 인증·라우팅·비용·장애 — 은 LiteLLM이 맡는다. agentgateway의 LLM
+gateway 기능을 그 앞뒤에 겹쳐 두면 model 접근 정책의 원본이 두 곳이 되고, 비용·rate limit 집계가
+갈라진다.
+
+그래서 이 덱에서 agentgateway의 검토 범위는 **Agent ↔ tool(MCP)과 Agent ↔ Agent(A2A) 경로로
+한정한다.** model 입구를 LiteLLM에서 agentgateway로 옮기는 것은 이 덱의 결정이 아니라 LiteLLM 덱
+범위의 별도 결정이고, 옮길 근거가 생기기 전에는 두 gateway의 역할을 protocol로 나눈다 — LLM 경로는
+LiteLLM, MCP·A2A 경로는 (검토를 통과한다면) agentgateway.
+
+## kagent와는 선택 구성이다
+
+같은 생태계에서 나왔지만 agentgateway는 kagent 설치의 필수 구성이 아니다.
+[공식 example](https://kagent.dev/docs/kagent/examples/agentgateway/)은 kmcp가 배포한 MCP server 앞에
+agentgateway를 두면 Agent–tool 트래픽이 gateway를 경유하도록 라우팅되는 선택 구성을 보여준다.
+
+이 독립성은 결정 구조에 중요하다. agentgateway 검토는 [결정 A](/agent-platform/12-durable-execution/#runtime-결정은-둘로-나뉜다)의
+결과와 무관하다 — kagent가 PoC를 통과하든 맨 Kubernetes 기준선으로 돌아가든, MCP server 앞에
+gateway를 두는 구성은 양쪽 모두에서 성립한다. 반대로 kagent를 채택한다고 agentgateway가 따라올
+이유도 없다. 층마다 따로 판정한다.
+
+## 언제 검토를 여는가
+
+지금 승인된 MCP가 몇 개뿐이라면 gateway 층은 선납이다. 다음 신호가 실제로 나타나면 검토를 연다.
+
+- 승인된 MCP server가 늘어 Agent별 연결·자격증명 관리가 반복 비용이 될 때 — 연합 단일 endpoint의 가치
+- tool 트래픽의 egress 통제·audit를 workload별 NetworkPolicy보다 세밀한 protocol 수준에서 걸어야 할 때
+- framework가 다른 Agent 간 A2A 호출이 늘어 경로 표준화가 필요할 때
+
+검토를 열면 기능 목록이 아니라 경계를 검증한다. portal의 세 권한 검사와 역할이 겹치지 않게 정의됐는지,
+모든 tool 트래픽이 지나는 단일 실패 지점이 되는 데 대한 HA·장애 격리 설계가 있는지, 그리고 이
+데이터 평면의 운영 owner가 누구인지다.
+
+## 16장 요약
+
+- agentgateway는 Agent ↔ LLM·tool·Agent 세 경로를 한 데이터 평면에서 다루는 AAIF 오픈소스 프록시다
+  (Apache 2.0, 검토 기준 v1.4.1).
+- 트래픽 층의 MCP 연합·egress 통제·audit는 맡을 수 있지만, 5장의 세 권한 문 — Grant 기반 invocation
+  ACL과 tool action policy — 은 대신하지 못한다.
+- Agent ↔ LLM 경로는 LiteLLM이 이미 맡은 자리이므로 검토 범위를 MCP·A2A 경로로 한정한다.
+- kagent와는 선택 구성이라 결정 A와 독립적으로, MCP 규모·egress 요구가 실제로 나타났을 때 판정한다.
+
+## 참고 자료
+
+- [agentgateway 공식 사이트](https://agentgateway.dev/) — 지원 protocol과 기능, 현재 버전.
+- [agentgateway GitHub](https://github.com/agentgateway/agentgateway) — Rust 구현과 Apache 2.0 라이선스.
+- [Linux Foundation 발표](https://www.linuxfoundation.org/press/linux-foundation-welcomes-agentgateway-project-to-accelerate-ai-agent-adoption-while-maintaining-security-observability-and-governance) — 2025년 8월 기증과 프로젝트 배경.
+- [AAIF 합류 발표](https://aaif.io/blog/agentgateway-joins-aaif-as-an-open-gateway-for-agentic-ai-infrastructure) — 2026년 4월 Agentic AI Foundation 정식 프로젝트 편입.
+- [Using agentgateway with kagent](https://kagent.dev/docs/kagent/examples/agentgateway/) — kagent와의 선택 구성 example.
+
+<LinkCard
+  title="17. agentregistry — 등록·배포와 겹치는 유통 층"
+  description="같은 생태계의 registry 층이 자체 backend에 둔 등록·승인·배포 계약과 어디서 겹치는지 판정한다."
+  href="/agent-platform/17-agentregistry/"
+/>

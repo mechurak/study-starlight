@@ -1,0 +1,196 @@
+---
+title: "17. agentregistry — 등록·배포와 겹치는 유통 층"
+description: agentregistry의 catalog·배포 모델을 이 덱의 domain model과 대응시키고, 자체 backend가 소유한 등록·승인·배포 계약과의 겹침을 대체 후보 관점에서 판정한다
+aliases: [agentregistry, aregistry, arctl, agent registry, Agent Skills registry]
+reviewedAt: 2026-08-24
+---
+
+import { LinkCard } from '@astrojs/starlight/components';
+import TermIntro from '../../../components/docs/TermIntro.astro';
+import Thesis from '../../../components/docs/Thesis.astro';
+
+<Thesis>agentregistry는 이 덱이 자체 backend에 두기로 한 등록·배포 lifecycle과 같은 자리를 노리는 유통 층이다 — 나란히 쓰는 시너지가 아니라 겹침이므로 대체 후보로만 검토한다</Thesis>
+
+<TermIntro
+  terms={[
+    ['arctl', '', 'agentregistry의 CLI다. 아티팩트 scaffold·build·등록·로컬 실행·배포를 한 도구로 묶는다.'],
+    ['server.json', 'MCP Server Manifest', 'MCP 커뮤니티 registry가 쓰는 server 기술 형식이다. agentregistry가 MCP server 등록에 그대로 쓴다.'],
+    ['AgentCard', 'A2A Agent Card', 'A2A protocol이 Agent의 이름·능력·endpoint를 기술하는 표준 문서다.'],
+    ['Agent Skills', '', 'Anthropic이 공개한 재사용 지침 폴더 형식이다. agent가 절차 지식을 LLM 호출 없이 참조하게 한다.'],
+  ]}
+/>
+
+[앞 장의 지도](/agent-platform/16-agentgateway/#전체-중-이-두-장의-자리)에서 남은 점선 하나가 이 장이다.
+agentregistry는 Solo.io가 2025년 11월 공개한 유통 층으로, kagent(실행)·agentgateway(트래픽)와 함께
+"에이전트 인프라 풀스택"을 이루도록 설계됐다. 문제는 이 층이 노리는 자리 — Agent와 MCP의 등록·버전·
+승인된 것만 배포 — 가 [이 덱이 자체 backend 소유로 못 박은 바로 그 계약](/agent-platform/03-domain-model/)이라는
+점이다. 그래서 이 장의 질문은 "함께 쓰면 시너지가 나는가"가 아니라 "**우리가 만들기로 한 것을 이
+프로젝트가 대신할 수 있는가, 그 검토를 언제 여는가**"다.
+
+## 무엇을 하는 물건인가
+
+agentregistry는 조직이 신뢰하는 에이전트 아티팩트만 담는 큐레이션된 catalog와, 거기서 바로 실행
+환경까지 보내는 배포 경로를 함께 제공한다. [Go로 쓰인 Apache 2.0 오픈소스](https://github.com/agentregistry-dev/agentregistry)이고,
+검토 시점 최신 릴리스는 [v0.4.0(2026년 8월 3일)](https://github.com/agentregistry-dev/agentregistry/releases)이다.
+
+```d2 layout=elk pad=40 title="creator가 arctl로 아티팩트를 등록하면 catalog가 버전을 관리하고 로컬 또는 Kubernetes로 배포된 MCP가 agentgateway 뒤에 연합되어 AI client에 닿는 흐름"
+direction: down
+
+classes: {
+  key: {
+    style: {
+      fill: "#dbeafe"
+      stroke: "#2563eb"
+      font-color: "#1e3a8a"
+    }
+  }
+  zone: {
+    style: {
+      fill: "#ede9fe"
+      stroke: "#7c3aed"
+      font-color: "#4c1d95"
+    }
+  }
+  ok: {
+    style: {
+      fill: "#dcfce7"
+      stroke: "#16a34a"
+      font-color: "#14532d"
+    }
+  }
+  warn: {
+    style: {
+      fill: "#fef3c7"
+      stroke: "#d97706"
+      font-color: "#78350f"
+    }
+  }
+}
+
+creator: "creator\narctl init · build · apply" { class: key }
+reg: "agentregistry\ncatalog · version · 선언형 리소스" { class: zone }
+src: "기존 아티팩트 원천\nnpm · PyPI · OCI · remote endpoint" { class: warn }
+
+deploy: "배포 target" {
+  local: "로컬\narctl run" { class: ok }
+  k8s: "Kubernetes\nkagent · kmcp 리소스 생성" { class: ok }
+}
+
+gw: "agentgateway\n연합 endpoint" { class: zone }
+client: "AI client · Agent" { class: key }
+
+creator -> reg: "등록"
+src -> reg: "가져와 등록"
+reg -> deploy: "배포"
+deploy.k8s -> gw: "뒤에 연합"
+client -> gw
+```
+
+핵심 성격 세 가지가 이 덱의 판정에 중요하다.
+
+- **binary registry의 대체가 아니라 상위 catalog다.** npm·PyPI·OCI registry에 있는 MCP server를
+  가져와 등록하는 구조라, 공급망의 아래층은 그대로 두고 "우리 팀이 승인한 것"의 목록과 유통만 맡는다
+  ([Solo.io 설명](https://www.solo.io/blog/understanding-the-agentregistry-project-and-the-problems-it-solves)).
+- **열린 표준 위에 있다.** Agent는 A2A AgentCard, MCP server는 커뮤니티 registry의 server.json,
+  skill은 Anthropic Agent Skills 형식을 그대로 쓴다
+  ([발표문](https://www.solo.io/press-releases/agent-skills-kubernetes-ecosystem)). 자체 형식 lock-in이 얕다.
+- **v0.4.0에서 선언형 control plane이 됐다.** Agents·MCP servers·Skills·Prompts·Plugins·Models·
+  Runtimes·Deployments를 Kubernetes 스타일 리소스로 선언하고 controller가 비동기로 수렴시킨다.
+
+## 이 덱의 계약과 겹쳐 보기
+
+v0.4.0의 리소스 종류를 [3장의 제품 중립 domain model](/agent-platform/03-domain-model/)과 나란히 놓으면
+겹침이 정확히 보인다.
+
+| agentregistry 리소스 | 이 덱의 대응 계약 | 차이 |
+|---|---|---|
+| Agents | `Agent` + `AgentVersion` | 이 덱은 정체성과 불변 snapshot을 다른 객체로 분리한다 |
+| MCP servers | `Tool` + `ToolVersion` | 이 덱은 discovery schema 고정과 capability 단위 승인을 요구한다 |
+| Skills · Prompts | `AgentVersion`의 구성 요소 | 이 덱은 독립 유통 단위가 아니라 version에 고정되는 입력으로 본다 |
+| Models | model policy | 이 덱에서 model 접근은 LiteLLM 경계의 일이다 |
+| Runtimes | `DeploymentTarget` | 배치 가능한 실행 환경의 선언이라는 발상이 같다 |
+| Deployments | `Deployment` | 정체성과 실행 복사본을 나누는 구분이 같다 |
+
+이 대응이 말해 주는 것이 두 가지다. 첫째, 3장의 domain model은 우리만의 발명이 아니라 생태계가
+같은 모양으로 수렴하는 중인 구조라는 방증이다. 둘째, 겹침이 이만큼 정확하다는 것은 **병행이 아니라
+택일**이라는 뜻이다 — 같은 Agent가 portal DB와 agentregistry catalog에 따로 등록되는 순간, 이 덱의
+두 번째 축(제품 상태를 진실의 원본으로 삼지 않는다)이 깨지고 어느 쪽이 원본인지부터 다시 정해야 한다.
+
+반대로 이 덱의 계약에 있고 agentregistry에서 **검증해야 확인되는** 것들이 도입 검토의 체크리스트가 된다.
+`(issuer, subject)` principal 기반의 부서·개인 Grant, 승인 workflow와 구성형·코드형의 risk tier 분리,
+`AgentVersion`·`Deployment`·`Publication` 상태 머신의 분리, invocation·tool action 감사가 그것이다.
+이 덱의 [불변조건](/agent-platform/03-domain-model/)을 fixture로 삼아 검증하기 전에는 "registry가
+있으니 등록 문제가 풀렸다"고 말할 수 없다.
+
+## 자체 backend 결정과의 관계
+
+이 덱의 기준 환경은 명확하다 — 사내 포털 backend가 이미 떠 있고, **Agent의 등록·승인·접근 제어는 이
+backend가 소유하며, 이슈로 남는 것은 runtime이다.** agentregistry를 들이는 것은 이 결정을 다시 여는
+일이지, 결정 위에 층을 하나 얹는 일이 아니다.
+
+다시 연다면 갈래는 둘이다.
+
+- **대체 후보로.** 등록·버전·배포 lifecycle을 agentregistry가 맡고 portal backend는 회사 ACL·승인
+  workflow·감사를 그 위에 얹는 구조. 자체 구현량이 줄지만, 위 체크리스트가 확장점으로 뚫려 있어야
+  하고 진실의 원본이 registry로 넘어간다.
+- **어댑터의 배포 경로로.** 등록·승인은 지금대로 portal이 소유하고, 승인된 아티팩트를 실행 환경으로
+  보내는 유통 구간만 agentregistry를 쓰는 구조. 소유권 변화는 없지만 catalog가 형식적으로 이중화되어
+  drift 관리가 새 일로 생긴다.
+
+어느 갈래든 "함께 두면 좋다"는 없다. 겹치는 층은 주인을 하나로 정해야 하고, 지금의 주인은 자체
+backend다.
+
+## 성숙도와 오픈소스의 경계
+
+:::caution[함정]
+v0.4.0은 v0.3.x와 **호환되지 않는 새 설치**를 요구하는 아키텍처 개편이었다. 공개 1년이 안 된
+프로젝트가 아직 계약을 갈아엎는 중이라는 뜻이다. 이 위에 회사 등록 계약을 얹으면 upgrade마다 이
+덱의 불변조건을 다시 검증해야 하므로, 안정된 계약이 나오기 전의 채택은 그 자체가 비용이다.
+:::
+
+경계 하나가 더 있다. 오픈소스 버전의 배포 target은 로컬과 Kubernetes(kagent·kmcp 경유)까지고,
+[AWS Bedrock AgentCore 같은 추가 runtime 배포와 Azure에서 이미 실행 중인 Agent discovery는 enterprise
+기능이다](https://www.solo.io/blog/understanding-the-agentregistry-project-and-the-problems-it-solves).
+이 덱의 target 구도(온프렘 Kubernetes + AWS AgentCore)와 정확히 맞물리는 그림 — 한 registry에서 두
+target으로 배포 — 의 절반이 유료 벽 뒤에 있다는 뜻이다. 오픈소스만으로 검토한다면 AgentCore 쪽
+유통은 여전히 [13장](/agent-platform/13-agentcore/)의 어댑터가 직접 맡는다.
+
+## 언제 다시 보는가
+
+[12장의 보류한 결정](/agent-platform/12-durable-execution/)과 같은 규칙을 적용한다 — "있으면 좋겠다"는
+재개 조건이 아니다. 다음 신호가 나타나면 검토를 연다.
+
+- [18장 walking skeleton](/agent-platform/18-adoption/)에서 등록·배포 lifecycle의 자체 구현·유지 비용이
+  예상을 크게 넘을 때 — 대체 후보 갈래를 연다
+- 승인된 아티팩트를 여러 조직·cluster로 유통하는 요구가 생겨 OCI 패키징·catalog 동기화가 반복
+  작업이 될 때 — 배포 경로 갈래를 연다
+- 프로젝트가 안정 계약에 도달하고 외부 IdP·ACL 확장점이 문서화될 때 — 체크리스트 검증이 가능해진다
+
+검토 방식도 kagent와 같다. 18장의 PoC fixture — 두 Agent와 사용자 MCP 하나 — 를 자체 backend 경로와
+agentregistry 경로로 각각 통과시키고, acceptance test 통과율과 남는 구현량·운영량을 수치로 비교한다.
+기능 목록 비교로 결론 내지 않는다.
+
+## 17장 요약
+
+- agentregistry는 Agent·MCP·skill의 큐레이션 catalog와 배포 경로를 제공하는 유통 층이다
+  (Apache 2.0, 검토 기준 v0.4.0). AgentCard·server.json·Agent Skills 등 열린 표준 위에 있다.
+- v0.4.0의 선언형 리소스는 이 덱의 domain model과 거의 일대일로 겹친다 — 병행이 아니라 택일 대상이다.
+- 등록·승인·접근 제어는 자체 backend가 소유한다는 이 덱의 결정이 유지되는 동안 agentregistry는
+  채택된 구성 요소가 아니라 대체 후보다.
+- 오픈소스 배포 target은 로컬·Kubernetes까지고 AgentCore 배포는 enterprise 기능이다.
+- 자체 구현 비용 초과, 다조직 유통 요구, 프로젝트의 계약 안정화가 재검토 신호이고, 판정은 18장의
+  같은 PoC fixture로 한다.
+
+## 참고 자료
+
+- [agentregistry GitHub](https://github.com/agentregistry-dev/agentregistry) — Go 구현, Apache 2.0, arctl CLI.
+- [agentregistry releases](https://github.com/agentregistry-dev/agentregistry/releases) — v0.4.0 선언형 개편과 v0.3.x 비호환 고지.
+- [Understanding the agentregistry Project](https://www.solo.io/blog/understanding-the-agentregistry-project-and-the-problems-it-solves) — 상위 catalog 성격, kagent·kmcp·agentgateway 통합, enterprise 경계.
+- [Solo.io Agent Skills 발표](https://www.solo.io/press-releases/agent-skills-kubernetes-ecosystem) — AgentCard·server.json·Agent Skills 표준 채택.
+- [aregistry.ai](https://aregistry.ai) — 공식 사이트와 문서.
+
+<LinkCard
+  title="18. 두 Agent로 시작하기"
+  description="기본 target 하나와 검증 Agent 두 개로 adapter·ACL·publication 전환의 가장 위험한 가정을 시험한다."
+  href="/agent-platform/18-adoption/"
+/>

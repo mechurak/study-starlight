@@ -126,7 +126,10 @@ Runtime target 상자로 드나드는 화살표는 상자 전체에 걸린다 �
     { label: '14~15장', href: '/agent-platform/14-hybrid/', title: '하이브리드 운영', tone: 'bad',
       desc: 'data zone별 target 선택 · network · 감사 · SLO · 장애 격리와 복구',
       note: '온프렘과 AWS를 한 control plane에서 어떻게 운영하는가' },
-    { label: '16~17장', href: '/agent-platform/16-adoption/', title: '도입과 마무리', tone: 'mute',
+    { label: '16~17장', href: '/agent-platform/16-agentgateway/', title: '생태계의 인접 층', tone: 'zone',
+      desc: 'agentgateway 트래픽 데이터 평면 · agentregistry 유통 catalog · 자체 backend·LiteLLM과의 겹침 경계',
+      note: '같은 생태계의 인접 층 중 무엇이 이미 회사 소유로 정한 자리와 겹치는가' },
+    { label: '18~19장', href: '/agent-platform/18-adoption/', title: '도입과 마무리', tone: 'mute',
       desc: '두 Agent와 사용자 MCP로 검증하는 PoC · 선택 기준 · 용어 사전 · production checklist' },
   ]}
 />
@@ -149,7 +152,8 @@ Runtime target 상자로 드나드는 화살표는 상자 전체에 걸린다 �
 
 ## 기준 시점
 
-**2026년 8월 21일 기준**이며 kagent 검토 기준은 v0.9.9다. kagent의 인증·인가 경계, AWS Agent Registry의 Preview 상태,
+**2026년 8월 21일 기준**이며 kagent 검토 기준은 v0.9.9다(16~17장의 agentgateway v1.4.1·agentregistry
+v0.4.0은 2026년 8월 24일 확인). kagent의 인증·인가 경계, AWS Agent Registry의 Preview 상태,
 Temporal·Dapr Agents 후보의 라이선스·통합 상태처럼 변화가 빠른 항목은 실제 도입 시 선택한
 release와 region 문서를 다시 확인한다.
 

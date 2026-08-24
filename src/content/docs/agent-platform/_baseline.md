@@ -33,7 +33,7 @@
   Agent·사용자 제작 MCP의
   등록·승인·배포 lifecycle, 세 단계 권한, adapter contract, kagent(아키텍처·resource·사내 연결·adapter 4장),
   맨 Kubernetes 기준선, kagent Agent Substrate의 선택 runtime 판정, 보류한 durable execution 층(재개 조건과 Temporal·Dapr Agents 후보), AgentCore,
-  hybrid target 선택, 운영·도입 검증.
+  hybrid target 선택, 운영·도입 검증, 같은 생태계 인접 층(agentgateway·agentregistry)과 이 덱 계약의 겹침 경계.
 - **다루지 않는다:** Agent framework 사용법, prompt engineering, 모델 학습·평가, GPU 모델 서빙 상세,
   MCP 서버 구현 튜토리얼, Kubernetes 설치, AWS 계정·VPC 구축 절차.
 - 모델 API 입구는 [LiteLLM 덱](/litellm/), LLM trace와 평가는 [Langfuse 덱](/langfuse/),
@@ -77,7 +77,7 @@ workload target과 조합한다.
 | 결정 | 상태 | 현재 결론 | 다음 판정 |
 |---|---|---|---|
 | 제품 중립 control plane | `ADOPTED` | 회사 ID·ACL·승인·감사와 세 lifecycle을 포털이 소유 | provider 기능을 추가해도 이 불변조건을 지킨다 |
-| 결정 A — 온프렘 workload lifecycle | `CANDIDATE` | 맨 Kubernetes가 기준선, kagent v0.9.9가 challenger | 11장 기준선 비교와 16장 PoC에서 유지 비용·남는 가치를 측정 |
+| 결정 A — 온프렘 workload lifecycle | `CANDIDATE` | 맨 Kubernetes가 기준선, kagent v0.9.9가 challenger | 11장 기준선 비교와 18장 PoC에서 유지 비용·남는 가치를 측정 |
 | 결정 A 확장 — kagent Agent Substrate | `CANDIDATE` | 기본 `Agent`가 기준선, Substrate v0.0.6은 suspendable·gVisor가 필요한 Agent class의 challenger | kagent-lab 11~13장에서 idle 절감·restore 지연·WorkerPool 장애·고정 운영비를 측정 |
 | 결정 A — AWS workload lifecycle | `CANDIDATE` | AWS target이 필요할 때 AgentCore를 검증 | 대상 account·region을 고정하고 private network·quota·artifact contract를 시험 |
 | 결정 B — execution durability | `DEFERRED` | `none` | 12장의 재개 조건을 실제 Agent가 충족하면 후보 평가를 시작 |
@@ -113,20 +113,22 @@ server·SDK·chart version을 새로 고른다. 아래 상태는 변화가 빠�
 | kagent | v0.9.9 검토 기준. `Agent` API는 `kagent.dev/v1alpha2`, 선언형과 BYO Agent 지원 | [API reference](https://kagent.dev/docs/kagent/resources/api-ref/) | 2, 8~11 |
 | kagent 인증 | v0.9에서 oauth2-proxy 기반 OIDC 인증 추가. application access control은 미구현 | [release notes](https://kagent.dev/docs/kagent/resources/release-notes/) | 5, 10~11 |
 | kagent BYO | 사용자 image를 배포하며 A2A server 계약을 기대 | [BYO Agent](https://kagent.dev/docs/kagent/examples/a2a-byo/) | 2, 8~11 |
-| kagent 실행 형태 | 일반 `Agent`는 Deployment, `SandboxAgent`는 Agent Substrate actor, `AgentHarness`는 장기 coding sandbox | [API reference](https://kagent.dev/docs/kagent/resources/api-ref/), [Agent Substrate](https://kagent.dev/docs/kagent/concepts/agent-substrate/), [Agent Harness](https://kagent.dev/docs/kagent/concepts/agent-harness/) | 2, 8~11, 16 |
+| kagent 실행 형태 | 일반 `Agent`는 Deployment, `SandboxAgent`는 Agent Substrate actor, `AgentHarness`는 장기 coding sandbox | [API reference](https://kagent.dev/docs/kagent/resources/api-ref/), [Agent Substrate](https://kagent.dev/docs/kagent/concepts/agent-substrate/), [Agent Harness](https://kagent.dev/docs/kagent/concepts/agent-harness/) | 2, 8~11, 18 |
 | kagent engine runtime | Python ADK(문서상 기본, 약 15초)와 Go ADK(약 2초). alpha schema의 기본값 변화에 기대지 않고 `runtime`을 명시 | [Agents](https://www.kagent.dev/docs/kagent/concepts/agents/), [API reference](https://kagent.dev/docs/kagent/resources/api-ref/) | 8~10 |
-| kagent 통합 지점 | 관리 계약은 Kubernetes CRD·status, 호출 계약은 controller `8083`의 `/api/a2a/{namespace}/{agent-name}/`. dashboard 내부 HTTP API와 CLI shell은 backend 계약이 아님 | [API reference](https://kagent.dev/docs/kagent/resources/api-ref/), [A2A 예제](https://kagent.dev/docs/kagent/examples/a2a-agents/) | 8, 10~11, 16 |
-| Agent Substrate 실습 pair | 공식 kind walkthrough는 kagent v0.9.9·Substrate v0.0.6, Go Declarative `SandboxAgent`, WorkerPool·snapshot/restore를 사용. sandbox outbound는 allowlist가 없으면 기본 거부 | [walkthrough](https://kagent.dev/docs/kagent/examples/agent-substrate/), [API reference](https://kagent.dev/docs/kagent/resources/api-ref/) | 8, 11, 16 |
+| kagent 통합 지점 | 관리 계약은 Kubernetes CRD·status, 호출 계약은 controller `8083`의 `/api/a2a/{namespace}/{agent-name}/`. dashboard 내부 HTTP API와 CLI shell은 backend 계약이 아님 | [API reference](https://kagent.dev/docs/kagent/resources/api-ref/), [A2A 예제](https://kagent.dev/docs/kagent/examples/a2a-agents/) | 8, 10~11, 18 |
+| Agent Substrate 실습 pair | 공식 kind walkthrough는 kagent v0.9.9·Substrate v0.0.6, Go Declarative `SandboxAgent`, WorkerPool·snapshot/restore를 사용. sandbox outbound는 allowlist가 없으면 기본 거부 | [walkthrough](https://kagent.dev/docs/kagent/examples/agent-substrate/), [API reference](https://kagent.dev/docs/kagent/resources/api-ref/) | 8, 11, 18 |
 | kagent tool 선언 | `toolNames`가 allowlist, 자격증명은 `headersFrom` reference, 자동 discovery는 label로 제외 | [Tools](https://kagent.dev/docs/kagent/concepts/tools/) | 7, 9~11 |
 | kagent memory | 대화에서 정보를 추출해 embedding으로 저장·검색. knowledge corpus ingestion 계약과는 별개 | [Agent Memory](https://kagent.dev/docs/kagent/concepts/agent-memory/) | 3, 9 |
 | Dapr Agents | v1.0 GA Python framework. `Agent` 실행은 ephemeral이지만 memory는 persistent store를 쓸 수 있음. `DurableAgent`가 권장 | [core concepts](https://docs.dapr.io/developing-ai/dapr-agents/dapr-agents-core-concepts/) | 2, 12 |
 | Dapr 배포·activity | 일반 Pod에 sidecar를 주입하며 activity는 at-least-once라 side effect에 idempotency 필요 | [sidecar](https://docs.dapr.io/concepts/dapr-services/sidecar/), [Workflow activity](https://docs.dapr.io/developing-applications/building-blocks/workflow/workflow-features-concepts/) | 12 |
 | Temporal | server·SDK는 MIT이고 worker는 일반 process지만 self-host는 persistence·보안·관측·upgrade·archival을 운영해야 함 | [LICENSE](https://github.com/temporalio/temporal/blob/main/LICENSE), [self-hosted guide](https://docs.temporal.io/self-hosted-guide) | 12 |
 | Temporal agent 통합 | OpenAI Agents SDK 통합이 2026-03-23 GA | [Temporal announcement](https://temporal.io/blog/announcing-openai-agents-sdk-integration) | 12 |
-| AgentCore Runtime | 임의 framework·model과 HTTP·MCP·A2A·AG-UI contract 지원. artifact는 Container와 CodeZip을 지원하며 runtime은 ARM64 | [Runtime CLI](https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/runtime-get-started-cli.html), [direct code](https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/runtime-get-started-code-deploy.html) | 2, 6, 13, 16 |
+| AgentCore Runtime | 임의 framework·model과 HTTP·MCP·A2A·AG-UI contract 지원. artifact는 Container와 CodeZip을 지원하며 runtime은 ARM64 | [Runtime CLI](https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/runtime-get-started-cli.html), [direct code](https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/runtime-get-started-code-deploy.html) | 2, 6, 13, 18 |
 | AgentCore 격리 | runtime session별 전용 microVM. user와 session ID 매핑은 client backend 책임 | [session](https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/runtime-sessions.html) | 2, 5, 13 |
-| AgentCore private network | VPC ENI와 PrivateLink를 지원하고 VPC에 연결된 온프렘 private resource 접근 가능 | [VPC 연결](https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/agentcore-vpc.html) | 13~16 |
+| AgentCore private network | VPC ENI와 PrivateLink를 지원하고 VPC에 연결된 온프렘 private resource 접근 가능 | [VPC 연결](https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/agentcore-vpc.html) | 13~15, 18 |
 | Agent Registry·Policy | Registry는 Preview인 catalog 보조 기능이고 Policy는 Cedar로 Gateway tool action을 통제 | [Registry](https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/registry-create-manage.html), [Policy](https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/policy.html) | 5, 7, 13 |
+| agentgateway | Rust·Apache 2.0. Solo.io가 만들어 2025-08 Linux Foundation 기증, 2026-04 AAIF 정식 프로젝트. MCP·A2A·LLM 세 경로의 데이터 평면, v1.4.1(2026-08-24 확인). kagent와는 선택 구성 | [agentgateway.dev](https://agentgateway.dev/), [AAIF 발표](https://aaif.io/blog/agentgateway-joins-aaif-as-an-open-gateway-for-agentic-ai-infrastructure), [kagent example](https://kagent.dev/docs/kagent/examples/agentgateway/) | 16 |
+| agentregistry | Go·Apache 2.0, Solo.io가 2025-11 공개. v0.4.0(2026-08-03)이 선언형 아키텍처로 개편되며 v0.3.x와 비호환. 오픈소스 배포 target은 로컬·Kubernetes(kagent·kmcp 경유)이고 AgentCore 배포·Azure discovery는 enterprise(2026-08-24 확인) | [GitHub releases](https://github.com/agentregistry-dev/agentregistry/releases), [Solo.io blog](https://www.solo.io/blog/understanding-the-agentregistry-project-and-the-problems-it-solves) | 17 |
 
 ## 서술 규칙
 
@@ -155,3 +157,7 @@ server·SDK·chart version을 새로 고른다. 아래 상태는 변화가 빠�
 - UI에서 Agent를 숨기는 것을 authorization으로 보지 않는다. 매 invocation과 tool action에서 서버가 검사한다.
 - code형 Agent와 구성형 Agent의 risk tier를 구분한다. 임직원의 임의 code를 platform process 안에서 실행하지 않는다.
 - 제품 API 예제보다 adapter가 입력·출력·실패를 어떻게 정규화하는지에 집중한다.
+- agentgateway를 5장 세 권한의 대체로 쓰지 않는다. 트래픽 층의 depth이고, LLM gateway 기능은 LiteLLM이
+  이미 맡은 자리와 겹치므로 검토 범위를 MCP·A2A 경로로 한정한다.
+- agentregistry를 채택된 구성 요소처럼 쓰지 않는다. 자체 backend가 소유한 등록·승인·배포 계약과 겹치는
+  **대체 후보**로만 쓰고, "함께 쓰면 시너지"라는 서술을 두지 않는다.

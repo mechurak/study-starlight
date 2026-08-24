@@ -307,7 +307,7 @@ export const deckDefinitions = [
 		label: 'Agent 배포 플랫폼',
 		title: '사내 Agent 배포 플랫폼',
 		icon: 'setting',
-		aliases: ['AI Agent Platform', 'Agent Runtime', 'kagent', 'Amazon Bedrock AgentCore', 'Temporal', 'Dapr Agents'],
+		aliases: ['AI Agent Platform', 'Agent Runtime', 'kagent', 'Amazon Bedrock AgentCore', 'Temporal', 'Dapr Agents', 'agentgateway', 'agentregistry'],
 		description: 'Agent·권한·배포 계약을 제품 밖에 둔다 — kagent·AgentCore를 교체 가능한 실행 어댑터로 연결하고 durable execution 층은 보류한 결정으로 관리하는 설계.',
 		category: 'ai',
 		tags: ['agent', 'k8s', 'auth', 'onprem', 'cloud'],
@@ -326,7 +326,8 @@ export const deckDefinitions = [
 			['보류한 결정', ['agent-platform/12-durable-execution']],
 			['AWS 실행 어댑터', ['agent-platform/13-agentcore']],
 			['하이브리드 운영', ['agent-platform/14-hybrid', 'agent-platform/15-operations']],
-			['도입과 마무리', ['agent-platform/16-adoption', 'agent-platform/reference-glossary', 'agent-platform/17-wrapup']],
+			['생태계의 인접 층', ['agent-platform/16-agentgateway', 'agent-platform/17-agentregistry']],
+			['도입과 마무리', ['agent-platform/18-adoption', 'agent-platform/reference-glossary', 'agent-platform/19-wrapup']],
 		],
 	},
 	{
