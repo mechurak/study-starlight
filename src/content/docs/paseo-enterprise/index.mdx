@@ -50,9 +50,13 @@ cookie와 API Bearer token을 검증한다. Catalog API는 `sub`와 조직 entit
     { label: '8~9장', href: '/paseo-enterprise/08-operations/', title: '회사 제품으로 운영하기', tone: 'bad',
       desc: 'upstream 추적 빌드 · 사내 업데이트 채널 · token 보관 · 관측 · 권한 회수 · 도입 체크리스트',
       note: 'PoC 뒤에도 통제 가능한 상태를 어떻게 유지하는가' },
-    { label: '참고', href: '/paseo-enterprise/desktop-plugin-management/', title: 'Desktop 조직 배포 비교', tone: 'mute',
-      desc: '기존 skill 모노레포·npm 설치기를 Claude Desktop과 ChatGPT Desktop의 조직 plugin 채널에 연결',
-      note: '비개발자에게 Paseo와 coding agent CLI를 설치시키지 않고도 충분한가' },
+    { label: '대안', href: '/paseo-enterprise/enterprise-capability-store/', title: '비개발자용 native 배포', tone: 'mute',
+      desc: 'Claude·ChatGPT의 조직 배포 비교 · Gemini를 포함한 통합 AI Capability Store control plane',
+      note: '이미 보유한 Enterprise 앱을 실행 화면으로 유지하면서 진입점을 하나로 모을 수 있는가',
+      items: [
+        ['Desktop 조직 plugin 관리', '/paseo-enterprise/desktop-plugin-management/'],
+        ['통합 AI Capability Store', '/paseo-enterprise/enterprise-capability-store/'],
+      ] },
   ]}
  />
 

@@ -1,0 +1,261 @@
+---
+title: "참고. 통합 AI Capability Store"
+description: ChatGPT·Claude·Gemini Enterprise를 실행 화면으로 유지하면서 사내 skill·MCP의 탐색·승인·배포를 한 진입점으로 묶는 대안
+aliases: [사내 AI Capability Store, 사내 스킬 스토어, 통합 MCP 스토어, federated AI store]
+reviewedAt: 2026-08-25
+status: review
+---
+
+import { LinkCard, Steps } from '@astrojs/starlight/components';
+import TermIntro from '../../../components/docs/TermIntro.astro';
+import Thesis from '../../../components/docs/Thesis.astro';
+
+<Thesis>이미 보유한 ChatGPT·Claude·Gemini Enterprise를 실행 화면으로 쓰고, 사내 Store는 세 제품의 탐색·승인·배포 상태를 통합하는 control plane으로 둔다</Thesis>
+
+<TermIntro
+  terms={[
+    ['AI Capability Store', 'AI Capability Store', 'skill뿐 아니라 connector·MCP와 이들을 묶은 업무 bundle을 비개발자가 찾고 요청하는 사내 포털이다.'],
+    ['control plane', 'Control plane', 'AI 작업을 직접 실행하지 않고 승인, 사용 권한, 배포 목표와 실제 상태를 관리하는 제어 계층이다.'],
+    ['provider adapter', 'Provider adapter', '공통 원본을 Claude·ChatGPT·Gemini가 받는 형식과 관리자 절차로 변환하고 배포 결과를 되돌려 주는 연결부다.'],
+  ]}
+ />
+
+:::note[이 페이지의 위치]
+앞 페이지는 Claude와 ChatGPT가 각각 제공하는 조직 Directory를 비교했다. 여기서는 임직원이
+세 제품의 Enterprise 라이선스를 이미 갖고 있다는 조건에서, **사내 Store 하나를 공통 진입점으로
+만드는 대안**을 검토한다. Paseo를 비개발자용 실행 앱으로 배포하는 방식과는 별개의 선택지다.
+:::
+
+## 진입점 하나와 실행 앱 하나를 구분한다
+
+사용자가 모든 AI 작업을 한 앱에서 실행해야만 진입점이 하나인 것은 아니다. 사내 Store가
+업무 기능을 찾고 승인받는 시작점이 되고, 실제 대화는 사용자가 이미 익숙한 Enterprise 앱에서
+계속할 수 있다.
+
+| 사내 Store가 맡는 것 | 각 Enterprise 앱이 맡는 것 |
+|---|---|
+| 업무 목적 중심의 검색·추천 | 대화, 파일 첨부와 결과 생성 |
+| 임직원 제출·검토·승인 | 설치된 skill의 선택과 실행 |
+| 부서·직무별 사용 권한 | connector 인증과 사용자 동의 |
+| 세 제품의 배포 목표와 상태 | 실행 시 tool 승인과 제품별 sandbox |
+| version·owner·감사 receipt | 모델 선택, 대화 기록과 제품 내 UX |
+
+이 경계를 잡으면 새 chat runtime을 만들 필요가 없다. 새로 만드는 것은 **AI 실행기가 아니라
+federated distribution control plane**이다.
+
+```d2 layout=elk pad=40 title="사내 AI Capability Store가 공통 원본과 승인을 관리하고 세 Enterprise 앱으로 배포하는 구조"
+direction: down
+
+source: "제작과 공통 원본\n임직원 제출 · skill monorepo"
+store: "AI Capability Store\ncatalog · 승인 · entitlement\nversion · desired state · receipt"
+release: "provider adapters\nClaude package · ChatGPT plugin · Gemini skill"
+mcp: "공통 remote MCP gateway\nOAuth · scope · audit"
+claude: "Claude Enterprise"
+chatgpt: "ChatGPT Enterprise"
+gemini: "Gemini Enterprise"
+
+source -> store: "제출 · 동기화"
+store -> release: "승인 version 배포"
+release -> claude: "조직 provision"
+release -> chatgpt: "workspace publish"
+release -> gemini: "skill 공유 · 승인"
+mcp -> claude: "같은 tool endpoint"
+mcp -> chatgpt
+mcp -> gemini
+```
+
+## 비개발자에게는 업무 기능만 보여 준다
+
+Store 카드의 제목은 기술 이름이 아니라 해결할 업무여야 한다.
+
+```text
+주간보고서 작성
+회의록과 업무 시스템의 작업 내역으로 주간보고서를 작성합니다.
+
+지원: Claude · ChatGPT · Gemini
+접근 데이터: Google Drive · Jira
+관리 부서: 업무혁신팀
+
+[Claude에서 사용] [ChatGPT에서 사용] [Gemini에서 사용]
+```
+
+`SKILL.md`, plugin manifest, MCP transport와 npm version은 상세 정보나 운영자 화면으로 내린다.
+사용자에게 보이는 행동은 현재 상태에 따라 달라진다.
+
+| 상태 | Store의 주 행동 | 사용자가 겪는 일 |
+|---|---|---|
+| 조직에서 이미 배포함 | `<제품>에서 사용` | 선택한 Enterprise 앱을 열어 바로 요청한다. |
+| 제품 안에서 설치 필요 | `<제품>에서 설치` | 해당 제품의 Directory로 이동해 설치를 마친다. |
+| 외부 서비스 인증 필요 | `사내 시스템 연결` | OAuth 동의 뒤 원래 업무 카드로 돌아온다. |
+| 대상 group이 아님 | `사용 권한 요청` | 사유를 제출하고 승인 상태를 Store에서 확인한다. |
+| 새 version 배포 중 | `관리자 배포 중` | 검증된 version이 반영될 때까지 이전 version을 유지한다. |
+
+제품을 고르기 어려운 사용자를 위해 Store가 기본 제품 하나를 추천할 수는 있다. 하지만 업무마다
+지원 기능과 데이터 경계가 다르므로, 지원하지 않는 제품 버튼은 숨기기보다 **호환되지 않는 이유**를
+짧게 표시한다.
+
+## 공통 상품과 제품별 산출물을 분리한다
+
+Store의 상품 단위를 `skill` 하나로 고정하면 connector가 필요한 업무와 여러 기능을 함께 배포하는
+경우를 표현하기 어렵다. 사용자 관점의 상품은 세 종류면 충분하다.
+
+| Store 상품 | 의미 | 제품별 변환 예 |
+|---|---|---|
+| Skill | 반복 업무의 지침·참고 자료·helper script | Claude skill · ChatGPT plugin skill · Gemini skill |
+| Connector | Jira·Drive·사내 API 같은 데이터와 action 연결 | Claude connector · ChatGPT app/connector · Gemini custom MCP |
+| Bundle | 업무 하나에 필요한 Skill과 Connector의 조합 | 직무별 plugin 또는 skill·MCP 배포 묶음 |
+
+공통 `SKILL.md`와 asset은 모노레포에서 한 번 관리하고, provider manifest와 지원하지 않는 기능만
+adapter가 분기한다. 한 제품에서 되는 기능이 다른 제품에서도 된다고 가정하지 않는다. 예를 들어
+[Gemini Enterprise Skills 문서](https://docs.cloud.google.com/gemini/enterprise/docs/skills)는
+skill과 agent를 같은 prompt에서 함께 호출할 수 없다고 명시한다.
+
+Store manifest에는 최소한 다음을 둔다.
+
+- `id`, `version`, `owner`, source commit과 승인자
+- 상품 종류와 Claude·ChatGPT·Gemini 호환 상태
+- 읽는 데이터, write action, OAuth scope와 위험 등급
+- 대상 group과 제품별 배포 방식(`required`, `default`, `self-service`, `manual`)
+- 제품별 artifact reference와 마지막 배포 receipt
+
+기존 npm 패키지는 없애지 않는다. 개발자 설치와 release CI에 남기되, 비개발자 PC에서는 npm이나
+private registry 인증을 요구하지 않는다.
+
+## 세 제품의 배포 차이는 adapter가 흡수한다
+
+| 제품 | 조직 배포의 권장 경로 | Store 버튼의 현실적인 동작 |
+|---|---|---|
+| Claude Enterprise | 조직 skill provision 또는 group별 plugin 정책 | 기본·필수 배포가 끝났으면 Claude를 열고, 선택 설치 항목만 Claude Directory로 보낸다. |
+| ChatGPT Enterprise | workspace admin이 plugin을 publish하고 role별 가용성을 지정 | workspace Directory로 보내 사용자가 설치하게 한다. |
+| Gemini Enterprise | Skills를 활성화하고 공유 요청에 관리자 승인을 적용 | Gemini Skills의 설치·새 chat 흐름으로 보낸다. |
+
+Claude는 조직 plugin에 `Required`, `Installed by default`, `Available for install`, `Not available`
+정책을 적용하고 Enterprise group별로 덮어쓸 수 있다. 조직에 provision한 skill도 사용자별 업로드
+없이 기본 제공된다. 따라서 Store가 배포 완료를 확인한 뒤 바로 Claude를 여는 경험을 만들기 가장
+쉽다. [Claude 조직 plugin 관리](https://support.claude.com/en/articles/13837433-manage-plugins-for-your-organization)와
+[조직 skill provisioning](https://support.claude.com/en/articles/13119606-provision-and-manage-skills-for-your-organization)을
+기준으로 한다.
+
+ChatGPT는 workspace admin이 local plugin을 비공개로 publish하고 접근할 workspace role을 지정할
+수 있다. 사용자는 ChatGPT의 workspace Plugin Directory에서 항목을 찾아 설치한다. OpenAI Docs는
+외부 Store가 사용자를 대신해 workspace plugin을 자동 설치하는 범용 API를 설명하지 않으므로,
+PoC에서는 Directory로 넘기는 guided handoff를 기준으로 잡는다.
+[OpenAI Docs의 workspace publish 절차](https://developers.openai.com/plugins/build/plugins#publish-a-local-plugin-to-your-workspace)와
+[Plugin Directory 설치 흐름](https://learn.chatgpt.com/docs/plugins)에서 이 경계를 확인한다.
+
+Gemini Enterprise는 사용자가 Markdown·ZIP으로 skill을 만들고 공유할 수 있으며, 관리자가 공유
+요청을 승인·거절하도록 설정할 수 있다. 세 제품 중 **임직원 작성 → 관리자 승인 → 사용자 설치**가
+제품 안에 가장 직접적으로 들어 있다. 그래도 세 제품의 승인 기록을 합쳐야 한다면 사내 Store를
+승인의 정본으로 두고 Gemini의 승인 상태를 배포 결과로 기록한다.
+[Gemini Enterprise skill 관리](https://docs.cloud.google.com/gemini/enterprise/docs/manage-skills)와
+[skill 작성·설치](https://docs.cloud.google.com/gemini/enterprise/docs/skills)를 기준으로 한다.
+
+:::caution[Gemini 라이선스 이름을 먼저 확인한다]
+여기서 말하는 승인·Skills·custom MCP 기능은 Google Cloud의 **Gemini Enterprise** 문서를 기준으로
+한다. 회사가 보유한 것이 Google Workspace Enterprise에 포함된 일반 Gemini 앱 라이선스라면 같은
+관리 화면과 기능이 제공된다고 가정하지 말고 별도로 확인한다.
+:::
+
+## 완전한 공통 설치 버튼은 목표에서 뺀다
+
+공식 문서가 설명하는 설치·배포 surface는 제품마다 다르다. 따라서 Store의 버튼 한 번으로 세
+제품에 모두 조용히 설치하는 것을 초기 계약으로 잡으면, 비공개 API나 UI 자동화에 의존하게 된다.
+지원 가능한 공통 범위는 다음과 같다.
+
+- **통합 가능:** 검색, 추천, 승인 요청, group entitlement, 호환성, version과 배포 상태
+- **가능한 곳부터 자동화:** Claude 기본·필수 배포, 제품별 admin publish와 상태 동기화
+- **제품으로 넘겨야 함:** ChatGPT Directory 설치, Gemini Skills 설치, 제품별 최초 OAuth 동의
+- **실행 때 다시 확인:** 사용자의 실제 데이터 권한, write action 승인과 서버 측 인가
+
+Store는 `설치됨`을 막연히 저장하지 않고 제품별 desired state와 receipt를 비교한다. adapter가
+자동 배포 API를 쓸 수 없으면 `manual` 상태로 운영자 작업을 만들고, 사용자가 제품 안에서 해야 할
+단계가 남으면 `self-service`로 표시한다. 이 eventual consistency 모델이 세 vendor의 기능 변화에도
+가장 안정적이다.
+
+## MCP 서버는 하나로 운영하고 등록만 나눈다
+
+같은 사내 API를 위해 MCP 서버를 세 벌 만들 필요는 없다. 공통 remote MCP gateway 하나가 tool
+schema, OAuth scope, entitlement와 audit log의 정본이 되고, provider adapter가 같은 endpoint를
+세 제품의 connector로 등록한다.
+
+다만 연결 token은 제품 사이에서 복사하지 않는다. 각 제품이 사용자 동의와 token을 별도로
+관리하므로 Store가 연결을 시작해 줄 수는 있어도, 한 제품에서 한 OAuth 동의가 다른 두 제품의
+동의를 자동으로 대신한다고 가정하면 안 된다.
+
+Claude의 remote MCP connector는 Team·Enterprise Owner가 조직에 먼저 등록하고 사용자가 개별
+연결하며, 호출은 로컬 PC가 아니라 Anthropic cloud에서 시작된다. Gemini Enterprise custom MCP도
+HTTPS와 `StreamableHTTP` transport를 요구하고 OAuth 2.0을 지원한다. 그러므로 gateway는 순수
+사내망 주소가 아니라 vendor cloud에서 도달 가능한 보호된 endpoint여야 한다. IP allowlist,
+OAuth audience·scope, 짧은 token, 서버 측 entitlement와 action audit을 함께 둔다.
+[Claude remote MCP connector](https://support.claude.com/en/articles/11175166-get-started-with-custom-connectors-using-remote-mcp)와
+[Gemini Enterprise custom MCP](https://docs.cloud.google.com/gemini/enterprise/docs/connectors/custom-mcp-server/set-up-custom-mcp-server)를
+기준으로 한다.
+
+:::caution[설치 권한과 실행 권한은 계속 분리한다]
+Store에서 항목을 숨기거나 provider plugin을 제거해도 이미 발급된 connector token과 서버 API
+권한이 바로 사라진다고 가정하지 않는다. 민감한 tool은 요청마다 사용자, scope와 entitlement를
+MCP gateway에서 다시 검사한다.
+:::
+
+## 임직원 제작은 Store에서 한 번 승인한다
+
+Claude는 조직 전체 공유에 내장 승인 단계가 없고 ChatGPT의 조직 publish는 admin 작업이다.
+Gemini Enterprise에는 공유 승인 기능이 있지만 그 기록만으로 다른 두 제품의 배포를 승인할 수는
+없다. 따라서 cross-provider 운영에서는 Store가 공통 제출·승인 workflow를 맡는다.
+
+<Steps>
+1. **업무 목적을 제출한다**
+
+   임직원이 폼이나 작성 wizard에서 예시 입력·기대 결과·사용 데이터·담당 owner를 적고,
+   `SKILL.md`를 직접 쓸 수 있는 사용자는 ZIP이나 저장소 경로를 함께 낸다.
+
+2. **자동 검사와 담당자 검토를 거친다**
+
+   secret, 외부 URL, script, write action과 과도한 OAuth scope를 검사하고 업무 owner와 보안 담당자가
+   승인 version을 고정한다.
+
+3. **provider별 산출물을 만든다**
+
+   release CI가 공통 원본에서 Claude package, ChatGPT plugin, Gemini skill과 connector 등록 요청을
+   만든다. 지원하지 않는 제품은 실패로 위장하지 않고 `호환 안 됨`으로 기록한다.
+
+4. **배포 결과를 Store에 되돌린다**
+
+   provider, artifact version, 대상 group, 게시자, 배포 시각과 수동 작업을 receipt로 남긴다.
+   사용자는 `내 도구`에서 제품별 사용 가능·연결 필요·승인 대기 상태를 확인한다.
+</Steps>
+
+## PoC는 설치 자동화보다 사용 시작 시간을 잰다
+
+첫 PoC는 read-only 업무 세 개와 pilot group 하나로 시작한다.
+
+- Store SSO와 업무 목적 중심 카드
+- Claude·ChatGPT·Gemini 호환 badge와 제품 열기
+- Claude 기본 배포, ChatGPT Directory handoff, Gemini Skills 승인 흐름
+- 공통 `SKILL.md`에서 만든 provider별 artifact version 표시
+- 필요하면 read-only remote MCP 하나와 제품별 OAuth 연결
+
+성공 기준은 `모든 제품에 한 번에 설치됨`이 아니다. 비개발자가 터미널·npm·로컬 경로 없이
+승인된 기능을 찾아 첫 실행까지 도달하는 시간, 중간 이탈률, 중복 인증 횟수와 관리자 수동 작업량을
+잰다.
+
+## 판단
+
+임직원이 이미 세 Enterprise 앱을 쓸 수 있다면 **사내 AI Capability Store + provider adapter +
+공통 remote MCP gateway**가 비개발자용 우선 대안이다. 발견·승인·권한·배포 상태는 하나로 모으고,
+대화와 실행은 각 vendor 앱에 맡긴다.
+
+Paseo는 다음 범위에 남기는 것이 자연스럽다.
+
+- 개발자가 여러 coding agent와 local workspace를 한곳에서 전환한다.
+- 파일 시스템·CLI·로컬 tool처럼 Desktop 조직 배포가 다루지 못하는 실행이 필요하다.
+- provider 앱과 독립된 단일 실행 surface 자체가 요구사항이다.
+
+마지막 항목이 반드시 필요해지면 그때는 Store가 아니라 별도 AI portal/runtime을 검토한다. 다만
+그 선택은 이미 구매한 Enterprise 앱의 native UX와 관리 기능을 다시 구현하는 비용을 포함한다.
+
+<LinkCard
+  title="참고. Desktop 조직 plugin 관리"
+  description="통합 Store 아래에서 Claude와 ChatGPT의 실제 조직 배포 채널이 어떻게 다른지 비교한다."
+  href="/paseo-enterprise/desktop-plugin-management/"
+ />
