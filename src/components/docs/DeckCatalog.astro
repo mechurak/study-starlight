@@ -4,8 +4,10 @@
 
   카드 보기는 덱을 카테고리로 묶어 처음 둘러보기 좋게 하고,
   테이블 보기는 덱이 많을 때 전체를 빠르게 비교하게 한다.
-  테이블의 카테고리와 최근 수정일 제목행은 버튼이며, 누를 때마다 오름차순과
-  내림차순을 바꾼다. 현재 보기는 localStorage에 저장한다.
+  기본 보기는 테이블이고 최근 수정일 내림차순으로 렌더한다 — "최근에 뭘 봤지"가
+  이 사이트의 첫 질문이라서다. 테이블의 카테고리와 최근 수정일 제목행은 버튼이며,
+  누를 때마다 오름차순과 내림차순을 바꾼다. 현재 보기는 localStorage에 저장한다.
+  좁은 화면에서는 카테고리·분량 열을 접어 가로 스크롤 없이 덱과 최근 수정일만 남긴다.
 
   카테고리는 굵은 묶음이고, 카테고리를 가로지르는 축(온프렘·실습·인증 같은)은
   태그가 맡는다. 필터는 교집합(AND)이다 — 덱 23개에서 합집합은 대부분을 남겨
@@ -96,13 +98,17 @@ const sectionsWithDates = sections.map((section) => ({
   }),
 }));
 
-const tableDecks = sectionsWithDates.flatMap((section) =>
-  section.decks.map((deck) => ({
-    ...deck,
-    category: section.title,
-    tone: section.tone,
-  })),
-);
+// 초기 렌더가 곧 기본 정렬이다 — 최근 수정일 내림차순, 수정일 없는 덱은 마지막.
+// sort는 안정 정렬이라 동률(같은 날짜·둘 다 없음)은 manifest 순서를 유지한다.
+const tableDecks = sectionsWithDates
+  .flatMap((section) =>
+    section.decks.map((deck) => ({
+      ...deck,
+      category: section.title,
+      tone: section.tone,
+    })),
+  )
+  .sort((a, b) => (b.updatedAt?.getTime() ?? 0) - (a.updatedAt?.getTime() ?? 0));
 
 const formatDate = (date: Date) =>
   date.toLocaleDateString('ko-KR', {
@@ -140,7 +146,7 @@ const tagIds = (deck: { tags: Tag[] }) => deck.tags.map((tag) => tag.id).join(' 
   <div class="catalog__toolbar" role="group" aria-label="덱 표시 방식" data-pagefind-ignore>
     <span class="catalog__toolbar-label">보기</span>
     <div class="catalog__view-switch">
-      <button class="catalog__view-button" type="button" data-view-button="cards" aria-pressed="true">
+      <button class="catalog__view-button" type="button" data-view-button="cards" aria-pressed="false">
         <svg viewBox="0 0 16 16" aria-hidden="true">
           <rect x="1.5" y="1.5" width="5" height="5" rx="1"></rect>
           <rect x="9.5" y="1.5" width="5" height="5" rx="1"></rect>
@@ -149,7 +155,7 @@ const tagIds = (deck: { tags: Tag[] }) => deck.tags.map((tag) => tag.id).join(' 
         </svg>
         카드
       </button>
-      <button class="catalog__view-button" type="button" data-view-button="table" aria-pressed="false">
+      <button class="catalog__view-button" type="button" data-view-button="table" aria-pressed="true">
         <svg viewBox="0 0 16 16" aria-hidden="true">
           <path d="M2 3.5h12M2 8h12M2 12.5h12"></path>
         </svg>
@@ -158,7 +164,9 @@ const tagIds = (deck: { tags: Tag[] }) => deck.tags.map((tag) => tag.id).join(' 
     </div>
   </div>
 
-  <div data-catalog-view="cards">
+  {/* 기본 보기가 테이블이라 카드 패널은 hidden으로 시작한다. Pagefind는 hidden이어도
+      빌드된 HTML을 읽으므로 랜딩 색인은 여전히 이쪽(카드)이 담당한다. */}
+  <div data-catalog-view="cards" hidden>
     {sectionsWithDates.map((section) => (
       <section class="catalog__section" data-tone={section.tone}>
         <header class="catalog__head">
@@ -201,7 +209,7 @@ const tagIds = (deck: { tags: Tag[] }) => deck.tags.map((tag) => tag.id).join(' 
 
   {/* 테이블 보기는 카드 보기와 같은 제목·설명을 한 번 더 실을 뿐이라 통째로 색인에서 뺀다.
       hidden이어도 Pagefind는 빌드된 HTML을 그대로 읽으므로 붙이지 않으면 두 번 실린다. */}
-  <div class="catalog-table-wrap" data-catalog-view="table" hidden data-pagefind-ignore>
+  <div class="catalog-table-wrap" data-catalog-view="table" data-pagefind-ignore>
     <table class="catalog-table">
       <thead>
         <tr>
@@ -213,10 +221,11 @@ const tagIds = (deck: { tags: Tag[] }) => deck.tags.map((tag) => tag.id).join(' 
             </button>
           </th>
           <th scope="col">분량</th>
-          <th scope="col" data-sort-header="updated" aria-sort="none">
+          {/* 초기 행 순서(서버 정렬)와 같은 상태로 시작한다 — 첫 클릭은 오름차순이 된다 */}
+          <th scope="col" data-sort-header="updated" aria-sort="descending">
             <button class="catalog-table__sort" type="button" data-sort="updated">
               최근 수정일
-              <span class="catalog-table__sort-icon" aria-hidden="true">↕</span>
+              <span class="catalog-table__sort-icon" aria-hidden="true">↓</span>
             </button>
           </th>
         </tr>
@@ -310,9 +319,9 @@ const tagIds = (deck: { tags: Tag[] }) => deck.tags.map((tag) => tag.id).join(' 
 
     try {
       const savedView = localStorage.getItem(VIEW_STORAGE_KEY);
-      if (savedView === 'table') setView(savedView);
+      if (savedView === 'cards') setView(savedView);
     } catch {
-      // localStorage를 읽을 수 없으면 기본 카드 보기를 유지한다.
+      // localStorage를 읽을 수 없으면 기본 테이블 보기를 유지한다.
     }
 
     // ── 태그 필터 ────────────────────────────────────────────────────────────
@@ -948,6 +957,23 @@ const tagIds = (deck: { tags: Tag[] }) => deck.tags.map((tag) => tag.id).join(' 
     clip: rect(0, 0, 0, 0);
     white-space: nowrap;
     border: 0;
+  }
+
+  /* 콘텐츠 폭이 min-width(43rem) 아래로 내려가는 구간부터는 가로 스크롤 대신
+     카테고리·분량 열을 접는다 — 스크롤에 밀려 안 보이던 최근 수정일이 항상 남는다.
+     카테고리는 덱 아이콘의 tone 색이, 분량은 덱 페이지가 대신 말해 준다. */
+  @media (max-width: 48rem) {
+    .catalog-table {
+      min-width: 0;
+    }
+    .catalog-table tr > :nth-child(2),
+    .catalog-table tr > :nth-child(3) {
+      display: none;
+    }
+    /* 두 열 레이아웃에서 52% 고정은 날짜 열만 절반을 차지하게 만든다 */
+    .catalog-table tbody th {
+      width: auto;
+    }
   }
 
   @media (max-width: 30rem) {
