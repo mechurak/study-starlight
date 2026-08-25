@@ -5,8 +5,9 @@ description: "MDX의 해부와 remark·rehype 변환 파이프라인, 마크다�
 
 import { LinkCard } from '@astrojs/starlight/components';
 import TermIntro from '../../../components/docs/TermIntro.astro';
+import Thesis from '../../../components/docs/Thesis.astro';
 
-> MDX 파일은 문서인 척하는 **프로그램 소스**다 — 그래서 빌드가 문법을 잡아 주고, 그래서 문법에 함정이 있다
+<Thesis>MDX 파일은 문서인 척하는 프로그램 소스다 — 그래서 빌드가 문법을 잡아 주고, 그래서 문법에 함정이 있다</Thesis>
 
 <TermIntro
   terms={[
@@ -62,19 +63,43 @@ MDX에서는 **배포 전에 에러로 잡힌다.**
 
 `.mdx` 하나가 HTML이 되기까지 —
 
-```mermaid
-flowchart LR
-    SRC["*.mdx"] --> R1["remark<br/>마크다운 파싱<br/>(mermaid 펜스를 여기서 가로챈다)"]
-    R1 --> R2["rehype<br/>HTML 트리 변환<br/>(제목 → 앵커 id 생성)"]
-    R2 --> J["JSX 평가<br/>import 해석 · 컴포넌트 렌더"]
-    J --> OUT["정적 HTML"]
+```d2 title="MDX 파일이 remark 파싱과 rehype 변환, JSX 평가를 차례로 거쳐 정적 HTML이 되는 변환 파이프라인"
+direction: down
 
-    classDef key  fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
-    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
-    classDef ok   fill:#dcfce7,stroke:#16a34a,color:#14532d
-    class SRC key
-    class R1,R2,J mute
-    class OUT ok
+classes: {
+  key: {
+    style: {
+      fill: "#dbeafe"
+      stroke: "#2563eb"
+      font-color: "#1e3a8a"
+    }
+  }
+  mute: {
+    style: {
+      fill: "#f1f5f9"
+      stroke: "#94a3b8"
+      font-color: "#334155"
+    }
+  }
+  ok: {
+    style: {
+      fill: "#dcfce7"
+      stroke: "#16a34a"
+      font-color: "#14532d"
+    }
+  }
+}
+
+src: "*.mdx" { class: key }
+remark: "remark\n마크다운 파싱\nD2·Mermaid 펜스를 여기서 가로챈다" { class: mute }
+rehype: "rehype\nHTML 트리 변환\n제목 → 앵커 id 생성" { class: mute }
+jsx: "JSX 평가\nimport 해석 · 컴포넌트 렌더" { class: mute }
+out: "정적 HTML" { class: ok }
+
+src -> remark
+remark -> rehype
+rehype -> jsx
+jsx -> out
 ```
 
 이 그림의 실용적 가치는 **에러 메시지의 소속 파악**이다 —
@@ -160,6 +185,6 @@ grep -rho '\*\*[^<*]\{0,45\}' dist --include=index.html | sort -u
 
 <LinkCard
   title="5. 내장 컴포넌트"
-  description="Steps · Tabs · Card · aside · mermaid — 무엇을 어디에 쓰고 어디에 쓰지 않는지, 역할 분담의 규칙."
+  description="Steps · Tabs · Card · aside · D2 — 무엇을 어디에 쓰고 어디에 쓰지 않는지, 역할 분담의 규칙."
   href="/starlight/05-components/"
 />

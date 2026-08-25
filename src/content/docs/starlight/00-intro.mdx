@@ -5,8 +5,9 @@ description: "이 덱의 대상과 범위, 왜 노션이 아니라 문서 사이
 
 import { Card, CardGrid, LinkCard } from '@astrojs/starlight/components';
 import TermIntro from '../../../components/docs/TermIntro.astro';
+import Thesis from '../../../components/docs/Thesis.astro';
 
-> 이 덱의 예제는 전부 **지금 보고 있는 이 사이트**다 — 읽다가 궁금하면 레포를 열면 된다
+<Thesis>이 덱의 예제는 전부 지금 보고 있는 이 사이트다 — 읽다가 궁금하면 레포를 열면 된다</Thesis>
 
 <TermIntro
   terms={[
@@ -68,7 +69,7 @@ Starlight 전체 API 레퍼런스 — 공식 문서로 링크만 한다.
 |---|---|---|
 | 본문의 소유 | 그 서비스 안의 데이터 | **내 레포의 마크다운 파일** |
 | 버전 관리 | 페이지 히스토리 (제한적) | git — diff · 되돌리기 · 브랜치 |
-| 코드 블록 · 다이어그램 | 되지만 이식 불가 | 하이라이트 · mermaid가 표준 문법 |
+| 코드 블록 · 다이어그램 | 되지만 이식 불가 | 하이라이트 · D2 같은 텍스트 다이어그램이 표준 문법 |
 | 대량 리팩터링 | 페이지 단위 수작업 | `grep` · 일괄 치환 · 빌드가 검증 |
 | AI 에이전트와 협업 | API 통해 간접 | **파일이라서 직접 읽고 쓴다** |
 | 진입 장벽 | 없음 — 누구나 바로 | 마크다운 · git을 알아야 한다 |
@@ -86,19 +87,43 @@ Starlight 전체 API 레퍼런스 — 공식 문서로 링크만 한다.
 
 이 사이트에서 무언가를 고칠 때, 손대는 파일은 항상 셋 중 한 층에 있다.
 
-```mermaid
-flowchart LR
-    C["콘텐츠<br/>src/content/docs/<br/>(마크다운 · MDX)"] --> B["검사 · 빌드<br/>pnpm check"]
-    S["구조<br/>src/data/decks.mjs · astro.config.mjs<br/>(덱 manifest · 사이트 설정)"] --> B
-    P["표현<br/>src/components/ · custom.css<br/>(컴포넌트 · 스타일)"] --> B
-    B --> D["dist/<br/>정적 HTML + 검색 인덱스"]
+```d2 title="콘텐츠·구조·표현 세 층이 각각 pnpm check를 거쳐 정적 산출물 dist/가 되는 흐름"
+direction: right
 
-    classDef key  fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
-    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
-    classDef ok   fill:#dcfce7,stroke:#16a34a,color:#14532d
-    class C key
-    class S,P mute
-    class B,D ok
+classes: {
+  key: {
+    style: {
+      fill: "#dbeafe"
+      stroke: "#2563eb"
+      font-color: "#1e3a8a"
+    }
+  }
+  mute: {
+    style: {
+      fill: "#f1f5f9"
+      stroke: "#94a3b8"
+      font-color: "#334155"
+    }
+  }
+  ok: {
+    style: {
+      fill: "#dcfce7"
+      stroke: "#16a34a"
+      font-color: "#14532d"
+    }
+  }
+}
+
+content: "콘텐츠\nsrc/content/docs/\n마크다운 · MDX" { class: key }
+structure: "구조\nsrc/data/decks.mjs · astro.config.mjs\n덱 manifest · 사이트 설정" { class: mute }
+presentation: "표현\nsrc/components/ · custom.css\n컴포넌트 · 스타일" { class: mute }
+check: "검사 · 빌드\npnpm check" { class: ok }
+dist: "dist/\n정적 HTML + 검색 인덱스" { class: ok }
+
+content -> check
+structure -> check
+presentation -> check
+check -> dist
 ```
 
 - **콘텐츠** — 글을 쓰고 고치는 일의 거의 전부. 마크다운만 만지면 되고, 이 덱의 4~7장이 여기다

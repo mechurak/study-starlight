@@ -5,8 +5,9 @@ description: "zero-JS 기본값, 아일랜드 아키텍처, .astro 컴포넌트�
 
 import { LinkCard } from '@astrojs/starlight/components';
 import TermIntro from '../../../components/docs/TermIntro.astro';
+import Thesis from '../../../components/docs/Thesis.astro';
 
-> Starlight에서 막힌 문제의 절반은 사실 **Astro 층의 문제**다 — 한 층 아래를 알면 에러 메시지가 읽힌다
+<Thesis>Starlight에서 막힌 문제의 절반은 사실 Astro 층의 문제다 — 한 층 아래를 알면 에러 메시지가 읽힌다</Thesis>
 
 <TermIntro
   terms={[
@@ -148,19 +149,43 @@ export default defineConfig({
 
 빌드 흐름으로 보면 이 장의 개념들이 한 줄에 꿰인다 —
 
-```mermaid
-flowchart LR
-    MD["*.mdx<br/>(콘텐츠 컬렉션이 검증)"] --> T["remark · rehype 변환<br/>(D2 · mermaid가 여기 끼어든다)"]
-    T --> A[".astro 템플릿 렌더<br/>(빌드 시점 · 서버)"]
-    A --> H["정적 HTML"]
-    A --> J["필요한 JS만 번들<br/>(검색 · 탭 · 확대 · mermaid)"]
+```d2 title="MDX 파일이 remark·rehype 변환과 .astro 템플릿 렌더를 거쳐 정적 HTML과 최소한의 JS 번들이 되는 빌드 흐름"
+direction: down
 
-    classDef key  fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
-    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
-    classDef ok   fill:#dcfce7,stroke:#16a34a,color:#14532d
-    class MD key
-    class T,A mute
-    class H,J ok
+classes: {
+  key: {
+    style: {
+      fill: "#dbeafe"
+      stroke: "#2563eb"
+      font-color: "#1e3a8a"
+    }
+  }
+  mute: {
+    style: {
+      fill: "#f1f5f9"
+      stroke: "#94a3b8"
+      font-color: "#334155"
+    }
+  }
+  ok: {
+    style: {
+      fill: "#dcfce7"
+      stroke: "#16a34a"
+      font-color: "#14532d"
+    }
+  }
+}
+
+mdx: "*.mdx\n콘텐츠 컬렉션이 검증" { class: key }
+transform: "remark · rehype 변환\nD2 · Mermaid가 여기 끼어든다" { class: mute }
+render: ".astro 템플릿 렌더\n빌드 시점 · 서버" { class: mute }
+html: "정적 HTML" { class: ok }
+js: "필요한 JS만 번들\n검색 · 탭 · 확대 · Mermaid" { class: ok }
+
+mdx -> transform
+transform -> render
+render -> html
+render -> js
 ```
 
 ## 2장 요약

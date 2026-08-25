@@ -10,9 +10,9 @@
 |---|---|---|
 | 덱 = topic 사이드바 | 단일 덱 manifest + `starlight-sidebar-topics` | `src/data/decks.mjs` · `astro.config.mjs` |
 | 테마 (Vitesse 계열) | `starlight-theme-rapide` 플러그인 | `astro.config.mjs` |
-| mermaid 펜스 렌더 | `astro-mermaid` 통합 (**starlight보다 먼저**) | `astro.config.mjs` |
+| D2 펜스 렌더 (다이어그램 기본값) | `astro-d2` 통합 + D2.js (**starlight보다 먼저**) | `astro.config.mjs` |
+| mermaid 펜스 렌더 (남은 그림용) | `astro-mermaid` 통합 (**starlight보다 먼저**) | `astro.config.mjs` |
 | mermaid 카드·확대 | 렌더 후 SVG를 보강하는 `MermaidZoom` | `MarkdownContent.astro` · `MermaidZoom.astro` |
-| D2 펜스 렌더 | `astro-d2` 통합 + D2.js (**starlight보다 먼저**) | `astro.config.mjs` |
 | 이미지 클릭 확대 | `starlight-image-zoom` 플러그인 + 기존 override 합성 | `astro.config.mjs` · `MarkdownContent.astro` · `SourceFigure.astro` |
 | Markdown 프로세서 | 이미지 확대 호환을 위해 `unified()` 명시 | `astro.config.mjs` |
 | 검색 결과에 덱 이름 표시 | `MarkdownContent` 컴포넌트 override | `src/components/layout/MarkdownContent.astro` |
@@ -28,18 +28,19 @@
 
 ## 다이어그램과 이미지 확대
 
-- **Mermaid**는 기존 관계·상태·시퀀스의 기본 수단이다. 클라이언트에서 렌더하므로 문법과
-  라이트/다크 모드는 브라우저에서 판정한다. 전역 폰트는 `astro.config.mjs`에서 Pretendard로
-  맞추고, 렌더러 로그는 끈다.
+- **D2가 다이어그램 기본값이다** (규칙은 [content-authoring.md](content-authoring.md)의 D2 절).
+  `astro-d2`가 빌드 시 SVG 파일을 만들고 `<img>`로 넣으므로 문법 오류를 빌드가 잡는다.
+  `inline: false` 기본값을 유지해야 다크 모드와 자동 확대가 함께 안정적으로 동작한다.
+  인라인 SVG가 필요한 링크·툴팁은 별도 검토 대상이다.
+- **Mermaid**는 D2 미지원 타입(timeline 등)과 아직 변환하지 않은 기존 다이어그램에만 남는다 —
+  종착점은 통합 제거다. 클라이언트에서 렌더하므로 문법과 라이트/다크 모드는 브라우저에서
+  판정한다. 전역 폰트는 `astro.config.mjs`에서 Pretendard로 맞추고, 렌더러 로그는 끈다.
 - **`MermaidZoom.astro`**는 렌더러와 분리된 표시·확대 층이다. 모든 Mermaid를 공통 카드로 감싸고
   가로 스크롤과 확대 버튼을 제공한다. SVG나 버튼을 누르면 화면에 맞춰 커진 native dialog가 열리며
   ESC·닫기 버튼·바깥 영역 클릭으로 닫는다.
 - astro-mermaid는 테마 전환 때 SVG의 `innerHTML`을 교체한다. `MermaidZoom`은 컨테이너에 클릭 이벤트를
   위임하고 `MutationObserver`로 확대 버튼 상태를 다시 맞춘다. Mermaid 내부 DOM 구조를 분석하는
   hover 강조나 점선 애니메이션은 두지 않는다.
-- **D2**는 레이아웃과 시각적 흐름을 더 강조할 때 선택한다. `astro-d2`가 빌드 시 SVG 파일을
-  만들고 `<img>`로 넣는다. `inline: false` 기본값을 유지해야 다크 모드와 자동 확대가 함께
-  안정적으로 동작한다. 인라인 SVG가 필요한 링크·툴팁은 별도 검토 대상이다.
 - D2 생성은 `experimental.useD2js: true`로 D2.js/WASM을 사용한다. Cloudflare Pages에 D2
   바이너리를 설치할 필요가 없는 대신 `tala` 레이아웃은 쓸 수 없어서 기본을 `elk`로 고정했다.
 - 생성된 `public/d2/`는 빌드 산출물이므로 `.gitignore`에서 제외한다.

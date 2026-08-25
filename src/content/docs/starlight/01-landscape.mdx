@@ -5,8 +5,9 @@ description: "문서를 두는 곳 세 부류 — SaaS 위키, 호스팅 서비�
 
 import { Card, CardGrid, LinkCard } from '@astrojs/starlight/components';
 import TermIntro from '../../../components/docs/TermIntro.astro';
+import Thesis from '../../../components/docs/Thesis.astro';
 
-> 도구 비교의 첫 질문은 기능이 아니라 **"누가 편집하는가"** 다
+<Thesis>도구 비교의 첫 질문은 기능이 아니라 "누가 편집하는가"다</Thesis>
 
 <TermIntro
   terms={[
@@ -65,24 +66,53 @@ git 연동은 되지만 렌더링·검색·테마를 서비스가 쥔다.
 
 ## 갈림길이 되는 질문들
 
-```mermaid
-flowchart LR
-    Q1{"편집자가<br/>개발 도구를 쓰는가"} -->|"아니오"| SAAS["Notion · GitBook"]
-    Q1 -->|"예"| Q2{"문서가 기존 앱의<br/>일부인가"}
-    Q2 -->|"예 (Next.js 앱 등)"| NEXTRA["Nextra · Fumadocs"]
-    Q2 -->|"아니오 — 독립 사이트"| Q3{"API 레퍼런스<br/>자동 생성이 핵심인가"}
-    Q3 -->|"예"| SPHINX["Sphinx · MkDocs"]
-    Q3 -->|"아니오 — 사람이 쓰는 문서"| Q4{"특정 프레임워크<br/>생태계에 묶여 있나"}
-    Q4 -->|"React · 문서 버전 관리"| DOCU["Docusaurus"]
-    Q4 -->|"Vue"| VITE["VitePress"]
-    Q4 -->|"아니오"| STAR["Starlight"]
+```d2 title="편집자·앱 소속·API 자동 생성·프레임워크 생태계 네 질문을 통과해 Starlight에 도착하는 문서 도구 결정 트리"
+direction: down
 
-    classDef key  fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
-    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
-    classDef ok   fill:#dcfce7,stroke:#16a34a,color:#14532d
-    class Q1,Q2,Q3,Q4 mute
-    class SAAS,NEXTRA,SPHINX,DOCU,VITE key
-    class STAR ok
+classes: {
+  key: {
+    style: {
+      fill: "#dbeafe"
+      stroke: "#2563eb"
+      font-color: "#1e3a8a"
+    }
+  }
+  mute: {
+    style: {
+      fill: "#f1f5f9"
+      stroke: "#94a3b8"
+      font-color: "#334155"
+    }
+  }
+  ok: {
+    style: {
+      fill: "#dcfce7"
+      stroke: "#16a34a"
+      font-color: "#14532d"
+    }
+  }
+}
+
+q1: "편집자가\n개발 도구를 쓰는가" { shape: diamond; class: mute }
+q2: "문서가 기존 앱의\n일부인가" { shape: diamond; class: mute }
+q3: "API 레퍼런스\n자동 생성이 핵심인가" { shape: diamond; class: mute }
+q4: "특정 프레임워크\n생태계에 묶여 있나" { shape: diamond; class: mute }
+saas: "Notion · GitBook" { class: key }
+nextra: "Nextra · Fumadocs" { class: key }
+sphinx: "Sphinx · MkDocs" { class: key }
+docusaurus: "Docusaurus" { class: key }
+vitepress: "VitePress" { class: key }
+starlight: "Starlight" { class: ok }
+
+q1 -> saas: "아니오"
+q1 -> q2: "예"
+q2 -> nextra: "예 — Next.js 앱 등"
+q2 -> q3: "아니오 — 독립 사이트"
+q3 -> sphinx: "예"
+q3 -> q4: "아니오 — 사람이 쓰는 문서"
+q4 -> docusaurus: "React · 문서 버전 관리"
+q4 -> vitepress: "Vue"
+q4 -> starlight: "아니오"
 ```
 
 이 레포는 질문 네 개를 전부 오른쪽 아래로 통과했다 — 편집자는 개발 도구를 쓰고,
@@ -149,7 +179,7 @@ Fumadocs는 "문서 사이트를 조립하는 부품 세트"에 가깝다. React
 
 - **본문이 Starlight 문법에 물려 있다** — `:::tip` aside, `<Steps>`·`<Tabs>` 내장 컴포넌트를 전 페이지가 쓴다
 - **커스텀 컴포넌트 전부 재작성** — `TermIntro`·`DeckMap`·사이드바 override는 Astro 컴포넌트라 React로 다시 써야 한다
-- **파이프라인 재구축** — mermaid 통합, topics 기반 덱 구조, Pagefind 검색(대체제인 Orama는 한국어 토크나이징을 따로 설정해야 한다)
+- **파이프라인 재구축** — D2·Mermaid 다이어그램 통합, topics 기반 덱 구조, Pagefind 검색(대체제인 Orama는 한국어 토크나이징을 따로 설정해야 한다)
 
 :::tip[재사용할 판정 절차]
 새 도구 추천은 두 단계로 판정한다 — ① 위 갈림길 트리에 다시 넣어 **처음부터라도 그걸

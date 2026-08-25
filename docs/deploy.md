@@ -11,6 +11,11 @@
 둘 다 살아 있지만 `astro.config.mjs`의 `site`가 커스텀 도메인이라
 **양쪽 모두 canonical이 `study.upggu.com`을 가리킨다** — 검색엔진이 한 주소로 모은다.
 
+이 문서는 이 레포의 실제 배포(Cloudflare Pages) 기록이다. 다른 정적 호스팅으로 옮길 때의
+일반 원칙(base path · CI 빌드 환경 · `site` 값 · preview 유무)은
+[starlight 덱 8장](../src/content/docs/starlight/08-pipeline.mdx)의
+"Cloudflare Pages가 아니라면" 절에 있다.
+
 ## 최초 연결 (대시보드에서 한 번만)
 
 Git 연결은 OAuth 승인이 필요해서 **대시보드에서만** 할 수 있다 (CLI/API 불가).

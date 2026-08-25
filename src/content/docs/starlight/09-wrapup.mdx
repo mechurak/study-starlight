@@ -2,13 +2,14 @@
 title: "9. 마무리 — 지식베이스 설계와 치트시트"
 description: "Starlight로 학습 지식베이스를 설계할 때의 판단, 새 덱 추가 절차, 명령 치트시트, 빌드가 못 잡는 함정 목록"
 aliases: [개인 지식베이스, 학습 노트 구조, PKM]
-reviewedAt: 2026-08-12
+reviewedAt: 2026-08-25
 status: stable
 ---
 
 import { Steps, CardGrid, LinkCard } from '@astrojs/starlight/components';
+import Thesis from '../../../components/docs/Thesis.astro';
 
-> 이 덱이 남기려는 것은 Starlight 지식이 아니라 **이 사이트를 계속 고칠 수 있는 상태**다
+<Thesis>이 덱이 남기려는 것은 Starlight 지식이 아니라 이 사이트를 계속 고칠 수 있는 상태다</Thesis>
 
 ## 덱을 관통한 한 문장
 
@@ -76,7 +77,7 @@ import { Steps, CardGrid, LinkCard } from '@astrojs/starlight/components';
 | [2. Astro](/starlight/02-astro/) | 기본값이 zero-JS — 컴포넌트는 빌드 시점 템플릿, JS는 섬만 |
 | [3. 구조](/starlight/03-starlight/) | 파일 경로 = slug = URL, 덱 구조의 원본은 manifest 한 곳 |
 | [4. MDX](/starlight/04-mdx/) | 문서인 척하는 소스 코드 — 중괄호 · 들여쓰기 · 닫는 `**`가 지뢰 |
-| [5. 내장 컴포넌트](/starlight/05-components/) | 절차는 Steps, 갈래는 Tabs, 분류는 Card — 색 여섯 개의 약속 |
+| [5. 내장 컴포넌트](/starlight/05-components/) | 절차는 Steps, 갈래는 Tabs, 분류는 Card — 다이어그램 기본값은 D2, 색 여섯 개의 약속 |
 | [6. 커스텀](/starlight/06-custom/) | 사다리 아래 칸부터 — 만들면 머리 주석에 "왜"를 남긴다 |
 | [7. 글쓰기](/starlight/07-writing/) | 독자는 검색으로 착지한다 — 제목이 목차, 문제가 먼저 |
 | [8. 파이프라인](/starlight/08-pipeline/) | 빌드가 못 잡는 것들은 브라우저와 grep이 판정한다 |
@@ -90,7 +91,7 @@ import { Steps, CardGrid, LinkCard } from '@astrojs/starlight/components';
 1. `src/content/docs/<덱이름>/` 을 만들고 `index.mdx`(개요)와 본문 페이지를 넣는다
 
    장 파일명은 `00-intro.mdx` 부터 번호로. 처음부터 전부 `.mdx`로 만든다.
-   덱 index의 "구성" 절은 mermaid가 아니라 `<DeckMap>`으로.
+   덱 index의 "구성" 절은 다이어그램이 아니라 `<DeckMap>`으로.
 
 2. `src/data/decks.mjs`에 덱을 등록한다
 
@@ -104,7 +105,7 @@ import { Steps, CardGrid, LinkCard } from '@astrojs/starlight/components';
    기준 버전 고정, 서술 규칙, "왜 이렇게 쓰였는가" — AGENTS.md가 아니라 여기에.
    `_` 파일이라 빌드에는 안 잡힌다.
 
-4. `pnpm check`로 판정하고, 장의 리듬(인용구 → TermIntro → h2 5~9개 → 요약 → LinkCard)을 유지한다
+4. `pnpm check`로 판정하고, 장의 리듬(Thesis → TermIntro → h2 5~9개 → 요약 → LinkCard)을 유지한다
 
 </Steps>
 
@@ -114,7 +115,7 @@ import { Steps, CardGrid, LinkCard } from '@astrojs/starlight/components';
 
 | 하려는 것 | 명령 |
 |---|---|
-| dev 서버 (백그라운드) | `astro dev --background` → `astro dev stop` / `status` / `logs` |
+| dev 서버 (백그라운드) | `pnpm astro dev --background` → `pnpm astro dev stop` / `status` / `logs` |
 | 전 페이지 판정 | `pnpm build` |
 | 배포와 같은 물건 확인 | `npx serve dist -l 4323` |
 | 깨진 굵게 찾기 | `grep -rho '\*\*[^<*]\{0,45\}' dist --include=index.html \| sort -u` |
@@ -136,6 +137,7 @@ import { Steps, CardGrid, LinkCard } from '@astrojs/starlight/components';
 | 절 링크가 조용히 죽음 | 제목 수정으로 앵커 slug 변경 | 7 |
 | 제목 옆 Badge 후 링크 변경 | `<Badge>` 앞에 공백 — slug 끝에 `-` | 5 |
 | 검색에 새 글이 안 나옴 (배포) | 인덱스는 빌드 산출물 — 배포가 안 된 것 | 8 |
+| 하위 경로 배포에서 본문 링크만 깨짐 | 본문 절대 경로 링크에 base 미적용 | 8 |
 
 ## 더 읽을 것
 

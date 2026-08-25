@@ -15,8 +15,8 @@ Astro Starlight 기반 개인 스터디 노트 사이트. 슬라이드가 아니
 ## 작업 방식
 
 소유자 1인이 혼자 쓰는 레포다. `main`에 직접 커밋하며, 커밋·푸시는 요청받았을 때만 한다.
-dev 서버는 백그라운드 모드로 띄운다: `astro dev --background`
-(`astro dev stop` / `astro dev status` / `astro dev logs`).
+dev 서버는 백그라운드 모드로 띄운다: `pnpm astro dev --background`
+(`pnpm astro dev stop` / `status` / `logs`). `astro`는 로컬 의존성이라 맨 명령으로는 못 부른다.
 
 작업을 마치면 `pnpm check`를 실행한다. 브라우저 확인 범위는 `docs/verification.md`에서 변경 종류에 맞춰 고른다.
 
