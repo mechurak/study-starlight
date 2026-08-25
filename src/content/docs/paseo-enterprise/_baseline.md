@@ -38,11 +38,17 @@ upstream 추적 비용이 줄어든다.
 
 - 임직원은 회사가 MDM·Software Center로 배포한 **Paseo 사내 빌드 인스톨러 하나**만 설치한다.
   사용자 PC에 Node·npm·사내 npm registry 세팅을 요구하지 않는다
+- 지원 환경은 **native Windows 11 24H2+의 x64와 ARM64**다. Software Center에는 항목 하나를
+  노출하되 아키텍처별 서명 package를 따로 만들고 배포 규칙으로 선택한다. WSL과 x64 emulation은
+  production 지원 경로로 두지 않는다
 - 카탈로그 화면은 사내 빌드에 동봉된 plugin이 제공하며 기본 활성화되어 있다.
   그 외 plugin의 로드는 차단된다
-- agent CLI(Claude Code·Codex 등)는 인스톨러가 설치하고, 로그인은 관리 설정
-  (Claude Code managed settings, Codex `config.toml`)으로 회사 조직·workspace SSO에 고정한다.
-  사용자에게 남는 것은 브라우저 AD SSO 인증 한 번이고, 문서는 예외 상황 FAQ만 맡는다
+- Paseo가 쓸 **선택된 provider CLI를 하나 이상** 인스톨러가 설치한다. Claude Code·Codex·Gemini
+  CLI를 모두 설치할 의무는 없다. native binary를 우선하고, Gemini처럼 Node가 필요한 provider는
+  host 아키텍처용 app-local runtime과 pinned bundle을 함께 넣는다
+- provider 로그인은 관리 설정(Claude Code managed settings, Codex `config.toml`)으로 회사
+  조직·workspace에 고정한다. Catalog Keycloak 로그인과 각 provider 로그인은 별도 인증 흐름이며,
+  같은 AD IdP browser session이 재사용되어도 token과 만료 상태를 하나로 취급하지 않는다
 - 비개발자에게 폴더를 고르게 하지 않는다 — 인스톨러가 기본 project 폴더를 등록하고,
   동봉 plugin이 작업 단위 workspace를 자동 생성한다. 기본 홈·사이드바까지 갈아엎는 요구는
   코어 패치 전환 기준의 발동 사례로 다룬다
@@ -62,6 +68,8 @@ upstream 추적 비용이 줄어든다.
   배포 범위는 같은 법인 임직원 PC로 한정한다. 계열사·협력사 확대는 별도 재검토 사항이다
 - upstream **릴리스 태그에 버전을 고정**하고, 회사 변경은 그 위의 패치 세트로 관리한다.
   upstream 자동 업데이트 대신 사내 업데이트 채널을 운영한다
+- Windows x64·ARM64 release를 같은 version으로 만들되 architecture별 설치·업데이트·rollback·제거와
+  provider 로그인·sandbox smoke test를 통과한 산출물만 stable channel로 승격한다
 - 카탈로그 구현은 **동봉 plugin이 기본**이다. plugin API를 쓰면 코어 패치가 얇아진다.
   코어 직접 통합은 surface 범위를 넘는 요구(첫 화면 교체, 로그인 전 앱 잠금, 기본 UI 대규모
   제거)가 생긴 부분에만 쓴다
@@ -81,7 +89,7 @@ upstream 추적 비용이 줄어든다.
 
 - **다룬다:** 사내 빌드의 패치·config 경계, 동봉 plugin surface·RPC·attachment source·SDK,
   Keycloak Device Flow, oauth2-proxy Bearer 검증, audience·claim, Catalog API 계약,
-  artifact 설치, 빌드 파이프라인·업데이트 채널·운영·회수.
+  artifact 설치, Windows x64·ARM64 provider packaging, 빌드 파이프라인·업데이트 채널·운영·회수.
 - **깊게 다루지 않는다:** Keycloak/AD 최초 구축, oauth2-proxy Helm 설치 전체,
   Paseo daemon 프로토콜 내부 구현, 각 coding agent의 skill 포맷 전체, 범용 사내 포털 개발,
   AGPL 법률 해석 자체(검토 주체는 사내 컴플라이언스).
@@ -89,7 +97,7 @@ upstream 추적 비용이 줄어든다.
 
 ## 기준 시점과 공식 원문
 
-**2026년 8월 24일** 기준으로 다음을 확인했다. Paseo는 빠르게 바뀌므로 upstream 버전을 올릴 때
+**2026년 8월 25일** 기준으로 다음을 확인했다. Paseo는 빠르게 바뀌므로 upstream 버전을 올릴 때
 사용 중인 태그의 문서·config schema를 다시 확인한다.
 
 | 영역 | 기준으로 삼은 사실 | 공식 출처 |
@@ -101,6 +109,11 @@ upstream 추적 비용이 줄어든다.
 | config.json | `daemon.relay.enabled`·`features.webUi.enabled`·전역 plugin 스위치·listen 주소 등을 파일로 제어, `paseo reload` 적용 | `paseo.sh/docs/configuration` |
 | Paseo SDK | workspace·agent·provider·config API, agent별 `mcpServers`와 `toolPolicy` 지원 | Paseo SDK reference · Providers with the SDK |
 | provider 전제 | native provider(Claude Code·Codex·OpenCode·Pi)는 해당 CLI가 설치·인증된 뒤 동작. Gemini CLI 등은 ACP 카탈로그 | `paseo.sh/docs/supported-providers` |
+| Windows desktop | Paseo download는 Windows x64·ARM64 artifact를 분리해 제공 | `paseo.sh/download` |
+| Codex Windows | native Windows와 Windows 11 권장 sandbox를 지원. 공식 docs에는 CPU architecture 장기 지원표가 없으므로 release별 ARM64 artifact와 smoke test를 gate로 둠 | `learn.chatgpt.com/docs/codex/cli` · Windows sandbox |
+| Claude Code Windows | x64·ARM64 native binary 제공. native Windows sandbox는 미지원이고 WSL2에서 지원 | `code.claude.com/docs/en/installation` · Sandboxing |
+| Claude Code 동봉 | 제품에 preinstall하려면 Commercial Terms, unmodified binary, built-in 인증 유지, 사용자별 credential 조건을 따라야 함 | `code.claude.com/docs/en/legal-and-compliance` |
+| Gemini CLI Windows | Windows 11 24H2+·Node.js 20+ 권장. CPU별 지원표가 없어 ARM64 app-local Node와 bundle을 end-to-end pilot | Gemini CLI installation · sandbox |
 | workspace 구조 | project → workspace → session. project는 git repo가 아니어도 되는 임의 디렉터리, workspace는 local·worktree isolation, CLI·SDK로 생성 | `paseo.sh/docs/workspaces` |
 | Claude Code 관리 설정 | managed settings(파일·MDM·서버 관리)의 `forceLoginMethod`·`forceLoginOrgUUID`로 로그인 방식·조직 고정, 사용자 설정보다 우선 | `code.claude.com/docs/en/settings-reference` |
 | Codex 관리 설정 | `config.toml`의 `forced_login_method`·`forced_chatgpt_workspace_id`로 회사 workspace SSO 강제 | `developers.openai.com/codex/auth` |
@@ -117,4 +130,8 @@ upstream 추적 비용이 줄어든다.
 - 브라우저 cookie flow와 Paseo Bearer flow를 항상 함께 보여 준다.
 - `X-Forwarded-*` 헤더를 사용할 때는 직접 접근 차단과 입력 헤더 제거 조건을 같이 적는다.
 - 설정 예시는 출발점으로 표시하고, 배포 중인 제품 버전의 옵션 이름을 확인하도록 안내한다.
+- “인스톨러 하나”는 사용자 경험을 뜻한다. x64·ARM64 package와 provider payload까지 단일 binary라고
+  쓰지 않는다.
+- Catalog Keycloak SSO와 provider SSO를 한 번의 로그인이라고 합치지 않는다. 관리 설정은 허용
+  조직을 고정하지만 provider의 사용자 인증을 없애지 않는다.
 - local skill 파일의 삭제를 권한 회수로 설명하지 않는다. 민감한 실행 경로의 서버 측 재인가를 강조한다.

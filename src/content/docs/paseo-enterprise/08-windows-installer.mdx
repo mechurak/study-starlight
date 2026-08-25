@@ -1,0 +1,228 @@
+---
+title: "8. Windows 인스톨러와 provider CLI"
+description: 비개발자용 단일 설치 경험을 Windows 11 x64·ARM64에서 구현하는 package 구조, provider 선택, npm 경계와 보안 gate
+aliases: [Windows ARM64, provider CLI 동봉, Paseo 인스톨러, Claude Code 재배포, Codex ARM64, Gemini CLI 설치]
+reviewedAt: 2026-08-25
+status: review
+---
+
+import { LinkCard, Steps } from '@astrojs/starlight/components';
+import TermIntro from '../../../components/docs/TermIntro.astro';
+import Thesis from '../../../components/docs/Thesis.astro';
+
+<Thesis>지원 범위는 native Windows 11 24H2+의 x64·ARM64로 고정하고, 사용자에게는 설치 항목 하나를 보여 주되 내부적으로는 아키텍처별 package와 선택된 provider CLI를 함께 배포한다</Thesis>
+
+<TermIntro
+  terms={[
+    ['provider CLI', 'Coding agent command-line interface', 'Paseo가 subprocess로 실행하는 실제 agent다. Paseo 자체에는 agent가 들어 있지 않다.'],
+    ['native artifact', 'Architecture-native executable', 'x64 PC에는 x64, ARM64 PC에는 ARM64 instruction으로 빌드된 실행 파일이다.'],
+    ['app-local runtime', 'Application-local runtime', '사용자의 PATH나 전역 package manager에 설치하지 않고 제품 폴더 안에서 해당 provider만 실행하는 runtime이다.'],
+    ['smoke test', 'Installation smoke test', '설치 직후 version·로그인·최소 실행·제거 같은 핵심 경로가 동작하는지 짧게 확인하는 검사다.'],
+  ]}
+ />
+
+## 큰 그림
+
+Paseo는 agent를 내장하지 않고 이미 설치·인증된 외부 CLI를 실행한다. 따라서 비개발자에게
+Paseo만 배포하면 화면은 열려도 실제 agent session은 시작할 수 없다. 반대로 Claude Code·Codex·
+Gemini CLI를 **모두** 설치해야 하는 것도 아니다. 회사가 지원하기로 한 provider가 하나 이상 있으면
+되고, 인스톨러는 그 선택된 목록만 프로비저닝한다.
+
+[Paseo provider 문서](https://paseo.sh/docs/providers)는 native provider와 ACP provider 모두 실제
+CLI가 PC에 있어야 한다고 명시한다. [Paseo download](https://paseo.sh/download)는 Windows x64와
+ARM64 데스크톱 artifact를 따로 제공한다. 이 두 사실을 배포 구조로 옮기면 다음과 같다.
+
+```d2 layout=elk pad=40 title="Software Center의 설치 항목 하나가 PC 아키텍처에 맞는 Paseo와 provider payload를 선택하는 구조"
+direction: down
+
+store: "Software Center\nPaseo 사내 빌드"
+detect: "배포 규칙\nOS · architecture 감지"
+
+packages: "서명된 package" {
+  direction: right
+  x64: "Windows x64\nPaseo · provider x64"
+  arm64: "Windows ARM64\nPaseo · provider ARM64"
+}
+
+pc: "임직원 PC" {
+  direction: right
+  app: "Paseo 사내 빌드"
+  providers: "선택된 provider CLI"
+  runtime: "Gemini용 app-local Node\n선택한 경우에만"
+}
+
+store -> detect: "사용자 설치 1회" {
+  style.animated: true
+}
+detect -> packages.x64: "x64 PC"
+detect -> packages.arm64: "ARM64 PC"
+packages -> pc: "설치 · 설정 · 등록" {
+  style.animated: true
+}
+```
+
+사용자에게 보이는 설치 항목은 하나지만 실제 산출물은 둘이다. Intune·Software Center의 detection
+rule이 x64 package와 ARM64 package 중 하나를 고른다. 하나의 universal binary를 억지로 만드는 것이
+아니며, MSI·MSIX 같은 최종 형식은 회사의 Windows 배포 표준에 맞춘다.
+
+## 지원 범위를 native Windows로 고정한다
+
+| 요구 | 결정 | 이유 |
+|---|---|---|
+| OS | Windows 11 24H2+ | 비개발자용 지원·테스트 matrix를 줄이고, Gemini CLI의 권장 Windows 기준과 맞춘다 |
+| CPU | x64와 ARM64 | Snapdragon X 계열을 포함한 Windows on Arm 노트북을 1급 지원한다 |
+| 실행 환경 | native Windows | WSL 설치·Linux filesystem·shell 교육을 사용자 요구로 만들지 않는다 |
+| emulation | 지원 경로 아님 | x64 binary가 ARM에서 우연히 실행되는 것과 ARM64 지원은 다르다 |
+
+[Microsoft 문서](https://learn.microsoft.com/en-us/windows/arm/apps-on-arm-x86-emulation)에 따르면
+Windows 11 on Arm은 x86·x64 user-mode app을 emulation할 수 있고 24H2의 Prism이 성능을 개선한다.
+그러나 driver는 emulation되지 않으며, Microsoft도 native ARM build의 이점을 별도로 설명한다.
+따라서 x64 emulation은 장애 진단이나 짧은 전환 기간의 fallback일 뿐 production acceptance
+기준이 아니다.
+
+:::caution[Windows ARM64는 별도 테스트 대상이다]
+Paseo 하나가 ARM64여도 provider CLI, shell, credential store adapter, 사내 보안 agent와 installer
+custom action 중 하나가 x64-only면 전체 경로는 native ARM64가 아니다. package 안의 실행 파일
+목록과 실제 process architecture를 함께 검사한다.
+:::
+
+## provider는 전부가 아니라 승인된 것만 넣는다
+
+| 구성 요소 | Windows ARM64 근거 | 이 설계의 배포 방식 | production 전 gate |
+|---|---|---|---|
+| Paseo | upstream download가 x64·ARM64를 명시 | 사내 패치를 적용해 아키텍처별로 빌드·서명 | 동봉 daemon·plugin까지 ARM64인지 확인 |
+| Codex | [공식 OpenAI 문서](https://learn.chatgpt.com/docs/windows/windows-sandbox)는 native Windows를 지원하지만 CPU architecture matrix는 별도로 보장하지 않음 | 고정한 upstream release의 native executable을 app 경로에 설치 | 해당 release의 ARM64 artifact 존재, `codex --version`, 로그인·sandbox smoke test |
+| Claude Code | [공식 설치 문서](https://code.claude.com/docs/en/installation)가 x64·ARM64 processor와 `win32-arm64` binary를 명시 | 수정하지 않은 vendor native binary를 app 경로에 설치 | Commercial Terms 검토, 사용자별 인증, native Windows sandbox 부재에 대한 보안 판단 |
+| Gemini CLI | [공식 설치 문서](https://github.com/google-gemini/gemini-cli/blob/main/docs/get-started/installation.mdx)는 Windows 11 24H2+와 Node.js 20+를 요구하지만 CPU별 지원표는 없음 | pinned Gemini bundle과 host 아키텍처용 app-local Node를 함께 설치 | ARM64 Node·native dependency·Windows sandbox·로그인 end-to-end pilot |
+
+Codex의 [공식 CLI 문서](https://learn.chatgpt.com/docs/codex/cli)는 Windows 설치와 browser 로그인을
+지원하고, [Windows sandbox 문서](https://learn.chatgpt.com/docs/windows/windows-sandbox)는 Windows 11을
+기업 표준 배포의 권장 기준으로 둔다. 다만 문서가 CPU architecture를 장기 지원 계약으로 명시하지는
+않으므로, 새 Codex version을 받았다는 사실만으로 ARM64 package를 자동 승격하지 않는다.
+
+Gemini CLI는 Paseo의 ACP 또는 custom provider 경로로 붙인다. [custom provider 설정](https://paseo.sh/docs/custom-providers)은
+실행 command를 바꿀 수 있으므로, 전역 `gemini` 대신 회사 제품 폴더의 launcher를 가리킬 수 있다.
+이 launcher가 app-local `node.exe`와 pinned `gemini.js`를 함께 실행하게 한다.
+
+## npm은 CI 안에서만 쓴다
+
+“npm으로 배포되는 CLI”와 “사용자 PC에서 npm을 실행한다”는 다른 결정이다. 최종 사용자에게
+Node·npm·registry 인증·PATH 설정을 요구하지 않는 원칙은 유지한다.
+
+| 단계 | npm·Node 사용 | 결과 |
+|---|---|---|
+| release CI | 허용 | version lock, package resolve, license·SBOM 수집, Gemini bundle 조립 |
+| installer build | 필요할 때만 사용 | 검증된 native binary와 app-local runtime을 architecture별 payload로 고정 |
+| 임직원 PC 설치 | global npm 금지 | 서명된 package가 완성된 파일과 absolute provider command를 설치 |
+| 임직원 PC 실행 | Gemini의 app-local Node만 허용 | 사용자의 PATH·전역 `node_modules`·npm cache에 의존하지 않음 |
+
+Claude Code는 npm package도 같은 native binary를 설치하지만 공식 문서는 native install을 기본으로
+두며, 설치된 binary가 실행 시 Node를 사용하지 않는다고 설명한다. Codex도 배포 version의 native
+artifact를 직접 고정한다. Gemini는 JavaScript bundle이므로 Node가 필요하지만
+[Node.js 공식 배포본](https://nodejs.org/en/download/archive/v22.22.0)은 Windows x64와 ARM64 binary·MSI를
+제공한다. 이 runtime을 제품 내부 전용으로 두면 사용자에게 Node 개발 환경을 노출할 이유가 없다.
+
+```text
+C:\Program Files\Company\Paseo\
+├─ paseo\                  # 사내 빌드와 daemon
+├─ providers\
+│  ├─ codex\codex.exe      # 선택한 경우
+│  ├─ claude\claude.exe    # 선택한 경우
+│  └─ gemini\
+│     ├─ node.exe          # app-local, host architecture
+│     └─ bundle\gemini.js
+└─ licenses\               # upstream·third-party notice
+```
+
+각 provider의 version·경로·checksum은 설치 receipt에 기록한다. 사용자가 별도로 설치한 동명 command가
+PATH 앞에 있어도 Paseo가 그것을 우연히 실행하지 않도록 provider command는 absolute path로 고정한다.
+
+## 인스톨러 포함은 제품별 조건을 확인한다
+
+“사내에서만 쓰니 모두 자유롭게 재배포할 수 있다”로 결론 내리면 안 된다. 코드 license와 모델 서비스
+이용 약관, 상표·로그인 조건은 서로 다른 층이다.
+
+| 대상 | installer 포함 판단 | 해야 할 일 |
+|---|---|---|
+| Paseo | AGPLv3 사내 수정·배포 검토가 선결 | upstream source·patch set·license와 배포 법인 범위를 보관 |
+| Codex | [upstream CLI는 Apache-2.0](https://github.com/openai/codex/blob/main/LICENSE) | LICENSE·NOTICE 의무를 installer notice에 반영하고, 서비스 계정·좌석 정책은 별도 확인 |
+| Gemini CLI | [upstream CLI는 Apache-2.0](https://github.com/google-gemini/gemini-cli/blob/main/LICENSE) | LICENSE·NOTICE와 Google 서비스 이용 조건을 함께 검토 |
+| Claude Code | blanket OSS 재배포가 아니라 Anthropic 조건부 허용 | Commercial Terms에 동의하고 binary를 수정하지 않으며, built-in 인증을 제거·제한하지 않고 각 사용자가 자기 credential로 인증 |
+
+[Claude Code legal and compliance](https://code.claude.com/docs/en/legal-and-compliance)는 제품·서비스에
+Claude Code를 미리 설치하는 경우 Commercial Terms와 별도 조건을 명시한다. 따라서 managed settings로
+회사 조직을 고정하는 것과 binary의 built-in 인증 수단을 제거하는 것을 혼동하지 않는다. 실제 installer
+구성은 사내 OSS·구매·법무 검토의 승인 항목으로 남긴다.
+
+:::caution[provider 로그인 token을 대신 보관하지 않는다]
+인스톨러가 회사 조직·workspace를 선택하게 만들 수는 있어도, 사용자의 Claude·ChatGPT·Google
+credential이나 session token을 중계해 심을 수는 없다. 최초 provider 인증은 각 vendor의 공식 흐름으로
+완료한다.
+:::
+
+## 로그인은 한 화면에서 안내하되 별도 흐름이다
+
+Paseo 사내 카탈로그의 Keycloak Device Flow와 agent provider 로그인은 issuer·token·용도가 다르다.
+브라우저가 같은 회사 IdP session을 재사용하면 암호나 MFA 입력이 생략될 수 있지만, 기술적으로
+“한 번의 로그인으로 모든 token이 생긴다”는 뜻은 아니다.
+
+| 로그인 | 얻는 것 | 관리 설정이 하는 일 |
+|---|---|---|
+| Catalog Keycloak | Catalog API용 access·refresh token | realm·client·API 주소를 회사 값으로 고정 |
+| Codex | ChatGPT workspace 또는 API 조직 credential | `forced_login_method`와 `forced_chatgpt_workspace_id`로 허용 경로를 제한 |
+| Claude Code | Claude 조직 또는 cloud provider credential | `forceLoginMethod`와 `forceLoginOrgUUID`로 허용 조직을 제한 |
+| Gemini CLI | Google account·Cloud project에 맞는 provider credential | 회사가 선택한 auth method와 project policy를 별도 provision |
+
+비개발자 화면에는 “카탈로그 연결”과 “AI provider 연결”을 순서대로 보여 주고 각 상태를 독립적으로
+저장한다. provider를 둘 이상 지원하면 provider마다 연결 상태가 하나씩 늘어난다. 문서는 정상 로그인
+절차를 길게 복제하지 않고 좌석 미배정·조직 불일치·세션 만료 같은 예외 FAQ를 맡는다.
+
+## sandbox 차이를 production gate로 둔다
+
+| provider | native Windows 실행 격리 | 이 설계의 판단 |
+|---|---|---|
+| Codex | `elevated`와 `unelevated` native sandbox 지원 | `elevated`를 기본으로 하고 local user·firewall·logon right를 막는 회사 정책을 pilot에서 확인 |
+| Claude Code | 공식 문서상 native Windows sandbox 미지원, WSL2에서 지원 | 이 덱은 WSL을 지원하지 않으므로 동일한 통제가 필요하면 production provider에서 제외하거나 별도 보완 통제를 승인 |
+| Gemini CLI | Windows native sandbox가 Low Mandatory Level·ACL을 사용 | 기본값과 side effect를 보안 pilot에서 검증한 뒤 승인 |
+
+비개발자는 shell command의 위험을 판단하기 어렵고 반복 승인은 approval fatigue를 만든다. 그래서
+“실행되었다”만 확인하지 않고 작업 폴더 밖 write, network 차단, 권한 상승과 회사 endpoint allowlist까지
+acceptance test에 넣는다. 특히 [Codex Windows sandbox](https://learn.chatgpt.com/docs/windows/windows-sandbox)는
+강한 `elevated` mode가 관리자 승인 setup과 group policy의 영향을 받는다고 설명한다.
+
+## package별 acceptance test
+
+<Steps>
+1. **산출물 고정**
+
+   Paseo·provider·Node version과 source URL, checksum·signature, license·NOTICE, SBOM을 release manifest에 기록한다.
+
+2. **x64와 ARM64를 각각 설치**
+
+   깨끗한 Windows 11 24H2 VM과 실제 Snapdragon X canary에서 silent install, upgrade, rollback, uninstall을 실행한다.
+
+3. **실행 경로 확인**
+
+   Paseo가 absolute path의 올바른 architecture provider를 발견하고 각 `--version` health check를 통과하는지 확인한다.
+
+4. **인증을 분리해 확인**
+
+   Catalog Keycloak 로그인과 선택된 provider 로그인을 각각 최초·만료·재로그인 상태로 검증한다.
+
+5. **최소 agent session 실행**
+
+   기본 workspace에서 읽기, 작업 폴더 안 쓰기, 폴더 밖 차단, 승인된 network만 접근하는 smoke task를 실행한다.
+
+6. **장애와 복구 확인**
+
+   provider 누락·좌석 미배정·프록시·CA·sandbox setup 실패를 사용자 메시지와 support log의 error class로 구분한다.
+</Steps>
+
+ARM64 canary는 x64 VM으로 대체하지 않는다. architecture별 acceptance test가 모두 통과한 version만 stable
+channel로 승격하고, 하나가 실패하면 그 architecture의 이전 승인 version을 유지한다.
+
+<LinkCard
+  title="9. 빌드·배포·운영"
+  description="검증된 두 Windows package를 canary·stable channel로 배포하고 token·artifact·권한 회수를 운영한다."
+  href="/paseo-enterprise/09-operations/"
+/>

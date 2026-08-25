@@ -544,7 +544,7 @@ export const deckDefinitions = [
 			['큰 그림', ['paseo-enterprise/00-decision', 'paseo-enterprise/01-internal-build', 'paseo-enterprise/02-architecture']],
 			['인증과 인가', ['paseo-enterprise/03-keycloak-login', 'paseo-enterprise/04-oauth2-proxy', 'paseo-enterprise/05-authorization']],
 			['카탈로그와 구현', ['paseo-enterprise/06-catalog-types', 'paseo-enterprise/07-plugin-implementation']],
-			['운영과 도입', ['paseo-enterprise/08-operations', 'paseo-enterprise/09-wrapup']],
+			['운영과 도입', ['paseo-enterprise/08-windows-installer', 'paseo-enterprise/09-operations', 'paseo-enterprise/10-wrapup']],
 			['대안 검토', ['paseo-enterprise/desktop-plugin-management', 'paseo-enterprise/enterprise-capability-store']],
 		],
 	},

@@ -1,7 +1,7 @@
 ---
-title: "9. 도입 체크리스트"
+title: "10. 도입 체크리스트"
 description: Paseo 사내 빌드 카탈로그의 최종 구조, PoC·pilot·production 완료 조건과 보안 점검
-reviewedAt: 2026-08-24
+reviewedAt: 2026-08-25
 status: review
 ---
 
@@ -51,14 +51,18 @@ identity -> runtime: "issuer · JWKS"
 
 - 배포 단위는 회사가 빌드·서명한 **Paseo 사내 빌드 인스톨러 하나**다. 사용자 PC에
   Node·npm·plugin 설치를 요구하지 않는다.
+- 지원 환경은 native Windows 11 24H2+의 x64와 ARM64다. Software Center에는 설치 항목 하나를
+  보여 주되 배포 규칙이 아키텍처별 서명 package를 선택한다.
 - AGPLv3 컴플라이언스 검토가 선결 조건이고, 배포 범위는 법인 내부로 한정한다.
 - upstream 릴리스 태그에 버전을 고정하고 회사 변경은 최소 패치 세트로 관리한다.
   config로 끌 수 있는 것은 패치하지 않는다.
 - 카탈로그 구현은 사내 빌드에 동봉한 plugin이다 — plugin API를 써서 코어 패치를 얇게 유지하고,
   동봉 plugin 외의 plugin 로드는 allowlist 패치로 차단한다.
 - relay·모바일 페어링·원격 데몬 접속·bundled web UI는 끄거나 제거하고, 업데이트는 사내 채널로만 받는다.
-- agent CLI는 인스톨러가 설치하고, 로그인은 관리 설정(Claude Code managed settings,
-  Codex `config.toml`)으로 회사 조직·workspace에 고정한다. 사용자에게 남는 것은 AD SSO 인증 한 번이다.
+- Paseo가 실제로 쓸 **선택된 provider CLI만** 인스톨러가 설치한다. Claude Code·Codex·Gemini CLI
+  셋을 모두 설치할 의무는 없다.
+- Catalog Keycloak 로그인과 provider 로그인은 별도 흐름이다. 관리 설정은 회사 조직·workspace를
+  강제하지만 인증 자체를 없애지는 않으며, 브라우저의 IdP session이 남아 있으면 입력이 줄어들 뿐이다.
 - 비개발자에게 폴더를 고르게 하지 않는다 — 기본 project와 작업 단위 workspace를 자동 생성한다.
 - oauth2-proxy용 `catalog-web`과 Paseo용 `paseo-catalog` Keycloak client를 분리한다.
 - Paseo는 client secret 없는 Device Authorization Grant를 기본으로 한다.
@@ -117,7 +121,10 @@ prompt 선택 후 agent가 정확한 workspace에 생성된다.
 - [ ] AGPLv3 컴플라이언스 검토 결과와 허용된 배포 범위가 문서화되어 있다.
 - [ ] 배포 빌드에서 relay·bundled web UI·원격 접속이 꺼져 있고 daemon이 `127.0.0.1`에만 listen한다.
 - [ ] 동봉 plugin 외의 plugin 로드가 allowlist 패치로 차단된다.
+- [ ] Windows 11 24H2 x64와 ARM64에서 설치·업데이트·rollback·제거 smoke test가 각각 통과한다.
+- [ ] 설치된 Paseo와 provider CLI가 host 아키텍처용 native artifact이며 x64 emulation에 기대지 않는다.
 - [ ] agent CLI 로그인이 관리 설정으로 회사 조직에 고정되어 개인 계정·개인 API key 우회가 차단된다.
+- [ ] Catalog Keycloak과 각 provider의 최초 로그인·만료·재로그인을 서로 다른 상태로 안내한다.
 - [ ] oauth2-proxy client secret이 Kubernetes Secret 밖과 직원 PC에 존재하지 않는다.
 - [ ] refresh token은 지원 OS의 credential store에 저장되고 logout·회수된다.
 - [ ] token과 device code가 plugin·proxy·backend log에 남지 않는다.
@@ -135,6 +142,9 @@ prompt 선택 후 agent가 정확한 workspace에 생성된다.
 |---|---|
 | Paseo를 사내 catalog frontend처럼 쓸 수 있는가 | 가능하다. surface와 RPC가 이 역할에 맞는다. |
 | plugin을 사용자에게 따로 설치시키는가 | 아니다. 사내 빌드에 동봉해 인스톨러 하나로 배포한다. |
+| Claude Code·Codex·Gemini CLI를 모두 설치해야 하는가 | 아니다. Paseo는 agent를 내장하지 않으므로 사용할 provider가 하나 이상 필요할 뿐, 회사가 승인한 provider만 배포하면 된다. |
+| 사용자 PC에서 npm으로 provider를 설치하는가 | 아니다. CI에서 version을 고정해 payload를 만들고, native binary 또는 app-local Node runtime과 Gemini bundle을 설치한다. |
+| Windows ARM64를 x64 emulation으로 지원해도 되는가 | 기본 지원 경로로 두지 않는다. host 아키텍처용 artifact를 배포하고 emulation은 장애 진단용 fallback으로만 본다. |
 | 카탈로그 UI를 코어에 직접 구현하는가 | 아니다. 동봉 plugin으로 격리해 코어 패치를 얇게 유지한다. |
 | upstream과 끊어진 포크인가 | 아니다. 릴리스 태그 위 최소 패치로 upstream을 추적한다. |
 | Keycloak 로그인 정보를 권한에 쓸 수 있는가 | 가능하다. token identity와 backend entitlement를 결합한다. |
@@ -149,6 +159,13 @@ prompt 선택 후 agent가 정확한 workspace에 생성된다.
 - [Paseo configuration](https://paseo.sh/docs/configuration) — relay·web UI·listen 주소·plugin 스위치 등 config 필드의 현재 이름.
 - [Paseo Plugin reference](https://paseo.sh/docs/plugins/reference) — surface·RPC·SDK·attachment·lifecycle의 현재 계약.
 - [Paseo SDK reference](https://paseo.sh/docs/sdk/reference) — agent config, `mcpServers`, `toolPolicy`, config API.
+- [Paseo providers](https://paseo.sh/docs/providers) — Paseo가 agent를 내장하지 않고 설치된 외부 CLI를 실행한다는 provider 전제.
+- [Paseo download](https://paseo.sh/download) — Windows x64·ARM64 데스크톱 artifact.
+- [Codex CLI](https://learn.chatgpt.com/docs/codex/cli) — Windows 설치와 별도 browser 로그인 흐름.
+- [Codex Windows sandbox](https://learn.chatgpt.com/docs/windows/windows-sandbox) — Windows 11 권장 기준과 native sandbox 정책.
+- [Claude Code 설치](https://code.claude.com/docs/en/installation) — Windows x64·ARM64 native binary와 native Windows sandbox 제약.
+- [Claude Code legal and compliance](https://code.claude.com/docs/en/legal-and-compliance) — 제품에 미리 설치할 때의 Commercial Terms와 unmodified binary·사용자별 인증 조건.
+- [Gemini CLI 설치](https://github.com/google-gemini/gemini-cli/blob/main/docs/get-started/installation.mdx) — Windows 11 24H2+, Node.js 20+ 요구와 npm 배포 형태.
 - [Claude Code settings reference](https://code.claude.com/docs/en/settings-reference) — `forceLoginMethod`·`forceLoginOrgUUID` 등 managed settings key.
 - [Codex authentication](https://developers.openai.com/codex/auth) — `forced_login_method`·`forced_chatgpt_workspace_id`와 로그인 방식.
 - [Keycloak Server Administration](https://www.keycloak.org/docs/latest/server_admin/) — Device Authorization Grant와 client 설정.

@@ -1,7 +1,7 @@
 ---
-title: "8. 빌드·배포·운영"
+title: "9. 빌드·배포·운영"
 description: upstream 태그를 추적하는 사내 빌드 파이프라인, 업데이트 채널, token 보관, 관측과 권한 회수
-reviewedAt: 2026-08-24
+reviewedAt: 2026-08-25
 status: review
 ---
 
@@ -30,7 +30,7 @@ import Thesis from '../../../components/docs/Thesis.astro';
 2. 패치 세트를 새 태그 위에 rebase한다. 충돌이 난 패치는 "아직 필요한가"부터 다시 판단한다.
 3. 동봉 plugin을 typecheck·테스트하고 번들을 만든다.
 4. 기본 config(relay off, `127.0.0.1` listen, Catalog API 주소, Keycloak client)를 굽는다.
-5. 지원 OS별 인스톨러를 만들고 회사 서명을 한다.
+5. Windows x64·ARM64 인스톨러를 각각 만들고 회사 서명을 한다.
 6. 사내 업데이트 채널에 올린다 — upstream 자동 업데이트는 빌드에서 사내 채널로 바꿔 두었다.
 </Steps>
 
@@ -134,7 +134,8 @@ login.begin/poll/refresh
 - **browser만 성공:** `skip-jwt-bearer-tokens`, Ingress Authorization header 전달을 확인한다.
 - **Paseo login만 실패:** Device Grant 활성화, public client, polling interval과 PC의 Keycloak 접근을 확인한다.
 - **특정 부서만 빈 목록:** token claim과 entitlement policy version·decision ID를 비교한다.
-- **특정 OS만 설치 실패:** credential store와 path·permission adapter를 확인한다.
+- **특정 아키텍처만 설치 실패:** x64·ARM64 payload 선택, provider 실행 파일과 app-local runtime,
+  credential store와 path·permission adapter를 확인한다.
 - **업데이트 뒤 카탈로그 sidebar 없음:** 해당 빌드의 plugin 번들 포함 여부와 config의 plugin 활성 설정,
   `paseo plugin ls`·retained plugin log를 확인한다.
 
@@ -144,7 +145,7 @@ audit event로 남긴다. 그래야 "로그인은 됐는데 왜 목록이 비었
 :::
 
 <LinkCard
-  title="9. 도입 체크리스트"
+  title="10. 도입 체크리스트"
   description="PoC부터 production까지 단계별 완료 조건과 최종 설계 결정을 한 장에 모은다."
-  href="/paseo-enterprise/09-wrapup/"
+  href="/paseo-enterprise/10-wrapup/"
 />

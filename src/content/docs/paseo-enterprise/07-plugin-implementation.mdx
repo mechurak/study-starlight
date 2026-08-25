@@ -23,8 +23,9 @@ import Thesis from '../../../components/docs/Thesis.astro';
 ## 내부를 역할별로 나눈다
 
 카탈로그 코드는 사내 빌드에 동봉되지만 형식은 upstream plugin API를 그대로 따른다 — 그래야
-[1장](/paseo-enterprise/01-internal-build/)에서 정한 대로 코어 패치가 얇게 유지된다. 배포와
-빌드 파이프라인은 [8장](/paseo-enterprise/08-operations/)의 몫이고, 이 장은 코드 구조만 다룬다.
+[1장](/paseo-enterprise/01-internal-build/)에서 정한 대로 코어 패치가 얇게 유지된다. Windows
+provider package는 [8장](/paseo-enterprise/08-windows-installer/), 전체 빌드 파이프라인은
+[9장](/paseo-enterprise/09-operations/)의 몫이고, 이 장은 코드 구조만 다룬다.
 
 Paseo가 생성하는 entry point는 `index.tsx` 하나지만 회사 코드는 작은 module로 나누는 편이 테스트와
 보안 review에 유리하다.
@@ -207,7 +208,7 @@ prompt로 agent를 시작하거나 tool을 session에 붙이는 동작도 resolv
 루프는 개발자에게만 있고, 임직원 PC에는 검증이 끝난 번들이 사내 빌드로 배포된다.
 
 <LinkCard
-  title="8. 빌드·배포·운영"
-  description="사내 빌드 파이프라인과 업데이트 채널, token·artifact·권한 회수 운영을 정리한다."
-  href="/paseo-enterprise/08-operations/"
+  title="8. Windows 인스톨러와 provider CLI"
+  description="비개발자에게 설치 항목 하나를 제공하면서 Windows x64·ARM64와 provider payload를 관리하는 기준."
+  href="/paseo-enterprise/08-windows-installer/"
 />
