@@ -13,32 +13,70 @@ import DeckMap from '../../../components/docs/DeckMap.astro';
 
 ## 먼저 보는 전체 지도
 
-```mermaid
-flowchart TB
-    subgraph use["1 · 이용자에게 보이는 층"]
-        APP["사내 앱 · 사용자"] --> LITE["LiteLLM<br/>key · quota · 공개 model name"]
-    end
-    subgraph serve["2 · 모델 서빙을 관리하는 층"]
-        LITE --> GW["Gateway · Service<br/>TLS · route"]
-        GW --> MODEL["vLLM · FastAPI Pod<br/>실제 추론"]
-        KS["KServe controller"] -. "생성 · 복구" .-> GW
-        KS -. "replica · rollout" .-> MODEL
-        GIT["Git · InferenceService"] --> KS
-    end
-    subgraph infra["3 · GPU 노드를 준비하는 층"]
-        K8S["Kubernetes<br/>schedule · restart"] --> MODEL
-        OP["GPU Operator<br/>driver · toolkit · device plugin"] --> GPU["GPU node<br/>Spark · A100 · B300"]
-        GPU --> MODEL
-    end
+```d2 layout=elk pad=40 title="이용자에게 보이는 층의 앱과 LiteLLM, 모델 서빙을 관리하는 층의 Gateway·모델 Pod·KServe controller·Git, GPU 노드를 준비하는 층의 Kubernetes·GPU Operator·GPU 노드를 세 층으로 나눈 전체 구조"
+direction: down
 
-    classDef key fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
-    classDef zone fill:#ede9fe,stroke:#7c3aed,color:#4c1d95
-    classDef ok fill:#dcfce7,stroke:#16a34a,color:#14532d
-    classDef warn fill:#fef3c7,stroke:#d97706,color:#78350f
-    class APP,LITE,GIT key
-    class KS,GW zone
-    class MODEL ok
-    class K8S,OP,GPU warn
+classes: {
+  key: {
+    style: {
+      fill: "#dbeafe"
+      stroke: "#2563eb"
+      font-color: "#1e3a8a"
+    }
+  }
+  zone: {
+    style: {
+      fill: "#ede9fe"
+      stroke: "#7c3aed"
+      font-color: "#4c1d95"
+    }
+  }
+  ok: {
+    style: {
+      fill: "#dcfce7"
+      stroke: "#16a34a"
+      font-color: "#14532d"
+    }
+  }
+  warn: {
+    style: {
+      fill: "#fef3c7"
+      stroke: "#d97706"
+      font-color: "#78350f"
+    }
+  }
+}
+
+use: 1 · 이용자에게 보이는 층 {
+  app: 사내 앱 · 사용자 { class: key }
+  lite: "LiteLLM\nkey · quota · 공개 model name" { class: key }
+
+  app -> lite
+}
+
+serve: 2 · 모델 서빙을 관리하는 층 {
+  gw: "Gateway · Service\nTLS · route" { class: zone }
+  model: "vLLM · FastAPI Pod\n실제 추론" { class: ok }
+  ks: KServe controller { class: zone }
+  git: "Git · InferenceService" { class: key }
+
+  gw -> model
+  ks -> gw: 생성 · 복구 { style.stroke-dash: 3 }
+  ks -> model: replica · rollout { style.stroke-dash: 3 }
+  git -> ks
+}
+
+infra: 3 · GPU 노드를 준비하는 층 {
+  k8s: "Kubernetes\nschedule · restart" { class: warn }
+  op: "GPU Operator\ndriver · toolkit · device plugin" { class: warn }
+  gpu: "GPU node\nSpark · A100 · B300" { class: warn }
+
+  op -> gpu
+}
+
+use.lite -> serve.gw
+infra.k8s -> serve.model
+infra.gpu -> serve.model
 ```
 
 그림을 위에서 아래로 읽는다. 요청은 `앱 → LiteLLM → Gateway/Service → 모델 Pod`로 흐른다. 반면

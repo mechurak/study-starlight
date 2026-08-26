@@ -11,27 +11,66 @@ import { LinkCard } from '@astrojs/starlight/components';
 
 ## 전체 지도
 
-```mermaid
-flowchart LR
-    APP["애플리케이션<br/>virtual key · 공개 model"] --> EDGE["Gateway API<br/>DNS · TLS"]
-    EDGE --> AUTH["LiteLLM<br/>auth · access · budget · limit"]
-    AUTH --> ROUTER["Router<br/>balance · retry · cooldown · fallback"]
-    ROUTER --> EXT["외부 provider"]
-    ROUTER --> INT["사내 vLLM / KServe / GPUStack"]
+```d2 layout=elk pad=40 title="애플리케이션이 Gateway API를 거쳐 LiteLLM의 인증·접근·예산 계층과 Router를 지나 외부 provider와 사내 모델로 나가고, Postgres·Redis에 상태를 두며 Prometheus와 Langfuse로 관측 신호를 보내는 덱 전체 요약도"
+direction: down
 
-    AUTH --- PG[("Postgres<br/>key · team · spend · config")]
-    AUTH --- REDIS[("Redis<br/>limit · router · cache · lock")]
-    AUTH -.-> PROM["Prometheus · 로그"]
-    ROUTER -.-> LF["Langfuse"]
+classes: {
+  key: {
+    style: {
+      fill: "#dbeafe"
+      stroke: "#2563eb"
+      font-color: "#1e3a8a"
+    }
+  }
+  zone: {
+    style: {
+      fill: "#ede9fe"
+      stroke: "#7c3aed"
+      font-color: "#4c1d95"
+    }
+  }
+  ok: {
+    style: {
+      fill: "#dcfce7"
+      stroke: "#16a34a"
+      font-color: "#14532d"
+    }
+  }
+  warn: {
+    style: {
+      fill: "#fef3c7"
+      stroke: "#d97706"
+      font-color: "#78350f"
+    }
+  }
+}
 
-    classDef key  fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
-    classDef zone fill:#ede9fe,stroke:#7c3aed,color:#4c1d95
-    classDef ok   fill:#dcfce7,stroke:#16a34a,color:#14532d
-    classDef warn fill:#fef3c7,stroke:#d97706,color:#78350f
-    class APP,EDGE,AUTH key
-    class ROUTER zone
-    class EXT,INT ok
-    class PG,REDIS,PROM,LF warn
+app: "애플리케이션\nvirtual key · 공개 model" { class: key }
+edge: "Gateway API\nDNS · TLS" { class: key }
+auth: "LiteLLM\nauth · access · budget · limit" { class: key }
+router: "Router\nbalance · retry · cooldown · fallback" { class: zone }
+ext: 외부 provider { class: ok }
+int: 사내 vLLM / KServe / GPUStack { class: ok }
+pg: "Postgres\nkey · team · spend · config" {
+  shape: cylinder
+  class: warn
+}
+redis: "Redis\nlimit · router · cache · lock" {
+  shape: cylinder
+  class: warn
+}
+prom: Prometheus · 로그 { class: warn }
+lf: Langfuse { class: warn }
+
+app -> edge
+edge -> auth
+auth -> router
+router -> ext
+router -> int
+auth -- pg
+auth -- redis
+auth -> prom: { style.stroke-dash: 3 }
+router -> lf: { style.stroke-dash: 3 }
 ```
 
 이 그림에서 장애를 읽는 순서는 왼쪽에서 오른쪽이다. 연결이 됐는지, 정책을 통과했는지, 어느 deployment를

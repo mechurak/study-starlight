@@ -29,17 +29,45 @@ import TermIntro from '../../../components/docs/TermIntro.astro';
 | **포맷** | 겉모양 불일치 | Prettier, Biome | 저장할 때 |
 | **테스트** | 동작이 틀린 코드 | Vitest, Playwright | 수시 + CI |
 
-```mermaid
-flowchart LR
-    C["코드"] --> T["타입<br/>형태가 맞나"] --> L["린트<br/>위험한 패턴 없나"] --> F["포맷<br/>모양 통일"] --> X["테스트<br/>동작이 맞나"] --> M["머지"]
+```d2 layout=elk pad=40 title="코드가 타입·린트·포맷·테스트를 차례로 통과해야 머지에 이르는 품질 검사 파이프라인"
+direction: down
 
-    classDef key  fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
-    classDef ok   fill:#dcfce7,stroke:#16a34a,color:#14532d
-    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
-    class C,M mute
-    class T,L key
-    class F ok
-    class X key
+classes: {
+  key: {
+    style: {
+      fill: "#dbeafe"
+      stroke: "#2563eb"
+      font-color: "#1e3a8a"
+    }
+  }
+  ok: {
+    style: {
+      fill: "#dcfce7"
+      stroke: "#16a34a"
+      font-color: "#14532d"
+    }
+  }
+  mute: {
+    style: {
+      fill: "#f1f5f9"
+      stroke: "#94a3b8"
+      font-color: "#334155"
+    }
+  }
+}
+
+c: 코드 { class: mute }
+t: "타입\n형태가 맞나" { class: key }
+l: "린트\n위험한 패턴 없나" { class: key }
+f: "포맷\n모양 통일" { class: ok }
+x: "테스트\n동작이 맞나" { class: key }
+m: 머지 { class: mute }
+
+c -> t
+t -> l
+l -> f
+f -> x
+x -> m
 ```
 
 :::tip[핵심]

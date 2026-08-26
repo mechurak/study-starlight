@@ -30,23 +30,54 @@ import TermIntro from '../../../components/docs/TermIntro.astro';
 | 컨테이너 / 상시 서버 | 항상 떠 있음 | Docker 이미지 등 | Railway, Fly.io | 시간 과금 |
 | IaaS | 항상 (전부 내 몫) | VM부터 직접 | AWS EC2 | 시간 과금 + 인건비 |
 
-```mermaid
-flowchart TB
-    Q1["서버 코드가 있는가?"] -->|"없음 — SSG·SPA"| ST["정적 호스팅<br/>CDN에 파일만"]
-    Q1 -->|"있음"| Q2["선택한 함수 플랫폼의 한계를 넘는가?<br/>연결 · 실행 시간 · 상태 · 작업 모델"]
-    Q2 -->|"아니오"| SL["serverless<br/>Vercel 등"]
-    Q2 -->|"예"| Q3["인프라를 직접<br/>다루고 싶은가?"]
-    Q3 -->|"아니오"| PA["PaaS 컨테이너<br/>Railway · Fly.io"]
-    Q3 -->|"예 — 규모·규제"| IA["IaaS<br/>AWS 직접"]
+```d2 layout=elk pad=40 title="서버 코드가 없으면 정적 호스팅, 있으면 함수 플랫폼의 한계를 넘는지 보고 넘지 않으면 serverless, 넘으면 인프라를 직접 다루고 싶은지에 따라 PaaS 컨테이너와 IaaS로 갈리는 배포 선택 흐름"
+direction: down
 
-    classDef ok   fill:#dcfce7,stroke:#16a34a,color:#14532d
-    classDef key  fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
-    classDef warn fill:#fef3c7,stroke:#d97706,color:#78350f
-    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
-    class ST ok
-    class SL key
-    class PA warn
-    class IA,Q1,Q2,Q3 mute
+classes: {
+  ok: {
+    style: {
+      fill: "#dcfce7"
+      stroke: "#16a34a"
+      font-color: "#14532d"
+    }
+  }
+  key: {
+    style: {
+      fill: "#dbeafe"
+      stroke: "#2563eb"
+      font-color: "#1e3a8a"
+    }
+  }
+  warn: {
+    style: {
+      fill: "#fef3c7"
+      stroke: "#d97706"
+      font-color: "#78350f"
+    }
+  }
+  mute: {
+    style: {
+      fill: "#f1f5f9"
+      stroke: "#94a3b8"
+      font-color: "#334155"
+    }
+  }
+}
+
+q1: 서버 코드가 있는가? { class: mute }
+q2: "선택한 함수 플랫폼의 한계를 넘는가?\n연결 · 실행 시간 · 상태 · 작업 모델" { class: mute }
+q3: "인프라를 직접\n다루고 싶은가?" { class: mute }
+st: "정적 호스팅\nCDN에 파일만" { class: ok }
+sl: "serverless\nVercel 등" { class: key }
+pa: "PaaS 컨테이너\nRailway · Fly.io" { class: warn }
+ia: "IaaS\nAWS 직접" { class: mute }
+
+q1 -> st: 없음 — SSG·SPA
+q1 -> q2: 있음
+q2 -> sl: 아니오
+q2 -> q3: 예
+q3 -> pa: 아니오
+q3 -> ia: 예 — 규모·규제
 ```
 
 한 서비스가 여러 형태를 섞는 게 보통이다 — Next.js를 Vercel에 올리면 정적 자산과

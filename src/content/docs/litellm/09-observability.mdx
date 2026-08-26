@@ -21,22 +21,53 @@ import TermIntro from '../../../components/docs/TermIntro.astro';
 
 ## 관측을 세 층으로 나눈다
 
-```mermaid
-flowchart LR
-    HEALTH["플랫폼 건강<br/>Pod · DB · Redis · queue"] --> PROM["Prometheus · 로그"]
-    REQ["요청 성능<br/>rate · error · latency · routing"] --> PROM
-    LLM["LLM 행동<br/>prompt · generation · token · 평가"] --> LF["Langfuse"]
-    COST["정산 기록<br/>key · team · spend"] --> PG["LiteLLM Postgres"]
-    REQ -.->|"call_id · trace_id"| LLM
+```d2 layout=elk pad=40 title="플랫폼 건강과 요청 성능은 Prometheus·로그로, LLM 행동은 Langfuse로, 정산 기록은 LiteLLM Postgres로 나뉘어 흐르고 요청 성능과 LLM 행동이 call_id·trace_id로 이어지는 관측 구획"
+direction: down
 
-    classDef key  fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
-    classDef ok   fill:#dcfce7,stroke:#16a34a,color:#14532d
-    classDef zone fill:#ede9fe,stroke:#7c3aed,color:#4c1d95
-    classDef warn fill:#fef3c7,stroke:#d97706,color:#78350f
-    class HEALTH,REQ key
-    class PROM ok
-    class LLM,LF zone
-    class COST,PG warn
+classes: {
+  key: {
+    style: {
+      fill: "#dbeafe"
+      stroke: "#2563eb"
+      font-color: "#1e3a8a"
+    }
+  }
+  ok: {
+    style: {
+      fill: "#dcfce7"
+      stroke: "#16a34a"
+      font-color: "#14532d"
+    }
+  }
+  zone: {
+    style: {
+      fill: "#ede9fe"
+      stroke: "#7c3aed"
+      font-color: "#4c1d95"
+    }
+  }
+  warn: {
+    style: {
+      fill: "#fef3c7"
+      stroke: "#d97706"
+      font-color: "#78350f"
+    }
+  }
+}
+
+health: "플랫폼 건강\nPod · DB · Redis · queue" { class: key }
+req: "요청 성능\nrate · error · latency · routing" { class: key }
+prom: Prometheus · 로그 { class: ok }
+llm: "LLM 행동\nprompt · generation · token · 평가" { class: zone }
+lf: Langfuse { class: zone }
+cost: "정산 기록\nkey · team · spend" { class: warn }
+pg: LiteLLM Postgres { class: warn }
+
+health -> prom
+req -> prom
+llm -> lf
+cost -> pg
+req -> llm: "call_id · trace_id" { style.stroke-dash: 3 }
 ```
 
 Prometheus를 Langfuse로 대체하지 않고, Langfuse를 LiteLLM spend ledger로 대체하지 않는다. 서로 답하는 질문이

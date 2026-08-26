@@ -87,22 +87,38 @@ import helper from 'transitive-helper'; // 하위 의존성이 우연히 최상�
 
 pnpm(performant npm)은 두 문제를 구조로 푼다.
 
-```mermaid
-flowchart LR
-    S["내용 주소 기반 저장소<br/>같은 패키지 파일은 한 번 저장"]
-    subgraph P1["프로젝트 A의 node_modules"]
-        A1["react → 링크"]
-    end
-    subgraph P2["프로젝트 B의 node_modules"]
-        B1["react → 링크"]
-    end
-    S --- A1
-    S --- B1
+```d2 layout=elk pad=40 title="내용 주소 기반 저장소가 같은 패키지 파일을 한 번만 저장하고, 프로젝트 A와 B의 node_modules에 있는 react가 모두 그 저장소로 링크되는 구조"
+direction: right
 
-    classDef key  fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
-    classDef ok   fill:#dcfce7,stroke:#16a34a,color:#14532d
-    class S key
-    class A1,B1 ok
+classes: {
+  key: {
+    style: {
+      fill: "#dbeafe"
+      stroke: "#2563eb"
+      font-color: "#1e3a8a"
+    }
+  }
+  ok: {
+    style: {
+      fill: "#dcfce7"
+      stroke: "#16a34a"
+      font-color: "#14532d"
+    }
+  }
+}
+
+s: "내용 주소 기반 저장소\n같은 패키지 파일은 한 번 저장" { class: key }
+
+p1: 프로젝트 A의 node_modules {
+  a1: react → 링크 { class: ok }
+}
+
+p2: 프로젝트 B의 node_modules {
+  b1: react → 링크 { class: ok }
+}
+
+s -- p1.a1
+s -- p2.b1
 ```
 
 - **전역 저장소 + 링크** — 패키지 실체는 머신 전체에서 한 벌만 저장하고,

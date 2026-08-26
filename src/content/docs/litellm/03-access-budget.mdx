@@ -43,21 +43,47 @@ master key는 관리자 API 호출과 UI 로그인에 쓰인다. 애플리케이
 
 ## key·user·team의 소유 관계
 
-```mermaid
-flowchart TB
-    TEAM["team<br/>공유 model access · budget"] --> MEMBER["user / service account<br/>팀 안의 주체"]
-    MEMBER --> KEY1["virtual key A<br/>서비스 production"]
-    MEMBER --> KEY2["virtual key B<br/>개발·실험"]
-    TEAM --> LIMIT["team RPM · TPM · budget"]
-    KEY1 --> K1["key 만료 · 허용 모델 · 개별 limit"]
-    KEY2 --> K2["더 작은 개발 limit"]
+```d2 layout=elk pad=40 title="team 아래 user와 service account가 있고 그 아래 production·개발용 virtual key 두 개가 각각 자기 제한을 갖는 계층과, team 자체의 RPM·TPM·budget을 함께 보여 주는 그림"
+direction: down
 
-    classDef key  fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
-    classDef zone fill:#ede9fe,stroke:#7c3aed,color:#4c1d95
-    classDef warn fill:#fef3c7,stroke:#d97706,color:#78350f
-    class TEAM,MEMBER zone
-    class KEY1,KEY2 key
-    class LIMIT,K1,K2 warn
+classes: {
+  zone: {
+    style: {
+      fill: "#ede9fe"
+      stroke: "#7c3aed"
+      font-color: "#4c1d95"
+    }
+  }
+  key: {
+    style: {
+      fill: "#dbeafe"
+      stroke: "#2563eb"
+      font-color: "#1e3a8a"
+    }
+  }
+  warn: {
+    style: {
+      fill: "#fef3c7"
+      stroke: "#d97706"
+      font-color: "#78350f"
+    }
+  }
+}
+
+team: "team\n공유 model access · budget" { class: zone }
+member: "user / service account\n팀 안의 주체" { class: zone }
+key1: "virtual key A\n서비스 production" { class: key }
+key2: "virtual key B\n개발·실험" { class: key }
+limit: team RPM · TPM · budget { class: warn }
+k1: key 만료 · 허용 모델 · 개별 limit { class: warn }
+k2: 더 작은 개발 limit { class: warn }
+
+team -> member
+member -> key1
+member -> key2
+team -> limit
+key1 -> k1
+key2 -> k2
 ```
 
 공식 문서의 상속 규칙은 릴리스에서 달라진 적이 있다. 특히 team key에 user budget이 어떻게 적용되는지

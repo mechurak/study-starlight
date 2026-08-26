@@ -21,19 +21,43 @@ import TermIntro from '../../../components/docs/TermIntro.astro';
 
 ## 이름과 구현을 분리한다
 
-```mermaid
-flowchart LR
-    APP["model: chat-general"] --> GROUP["공개 model group<br/>chat-general"]
-    GROUP --> A["deployment A<br/>외부 provider"]
-    GROUP --> B["deployment B<br/>사내 vLLM"]
-    GROUP -.-> FALL["fallback group<br/>chat-small"]
+```d2 layout=elk pad=40 title="애플리케이션이 요청한 model 이름이 공개 model group으로 이어지고 그 아래에 외부 provider와 사내 vLLM deployment 두 개, 그리고 점선으로 fallback group이 달린 그림"
+direction: right
 
-    classDef key  fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
-    classDef ok   fill:#dcfce7,stroke:#16a34a,color:#14532d
-    classDef warn fill:#fef3c7,stroke:#d97706,color:#78350f
-    class APP,GROUP key
-    class A,B ok
-    class FALL warn
+classes: {
+  key: {
+    style: {
+      fill: "#dbeafe"
+      stroke: "#2563eb"
+      font-color: "#1e3a8a"
+    }
+  }
+  ok: {
+    style: {
+      fill: "#dcfce7"
+      stroke: "#16a34a"
+      font-color: "#14532d"
+    }
+  }
+  warn: {
+    style: {
+      fill: "#fef3c7"
+      stroke: "#d97706"
+      font-color: "#78350f"
+    }
+  }
+}
+
+app: "model: chat-general" { class: key }
+group: "공개 model group\nchat-general" { class: key }
+a: "deployment A\n외부 provider" { class: ok }
+b: "deployment B\n사내 vLLM" { class: ok }
+fall: "fallback group\nchat-small" { class: warn }
+
+app -> group
+group -> a
+group -> b
+group -> fall: { style.stroke-dash: 3 }
 ```
 
 같은 `model_name`을 두 번 등록하면 같은 공개 이름 뒤의 두 deployment가 된다. 반면 fallback은

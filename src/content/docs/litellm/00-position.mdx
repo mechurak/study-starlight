@@ -55,22 +55,52 @@ Proxy도 내부에서 LiteLLM SDK를 사용해 공통 요청을 provider 형식�
 
 ## 주변 도구와의 경계
 
-```mermaid
-flowchart TB
-    USER["이용자 · 애플리케이션"] --> EDGE["일반 Gateway<br/>TLS · WAF · 외부 인증"]
-    EDGE --> LITE["LiteLLM<br/>model access · quota · routing"]
-    LITE --> SERVE["모델 서빙 플랫폼<br/>KServe · GPUStack"]
-    SERVE --> MODEL["vLLM · 모델 프로세스 · GPU"]
-    LITE -.-> OBS["Langfuse · 관측 스택"]
+```d2 layout=elk pad=40 title="이용자 요청이 일반 Gateway를 지나 LiteLLM, 모델 서빙 플랫폼, vLLM 모델 프로세스로 내려가고 LiteLLM이 관측 스택으로 trace를 보내는 계층 그림"
+direction: down
 
-    classDef key  fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
-    classDef zone fill:#ede9fe,stroke:#7c3aed,color:#4c1d95
-    classDef ok   fill:#dcfce7,stroke:#16a34a,color:#14532d
-    classDef warn fill:#fef3c7,stroke:#d97706,color:#78350f
-    class USER,EDGE key
-    class LITE zone
-    class SERVE,MODEL ok
-    class OBS warn
+classes: {
+  key: {
+    style: {
+      fill: "#dbeafe"
+      stroke: "#2563eb"
+      font-color: "#1e3a8a"
+    }
+  }
+  zone: {
+    style: {
+      fill: "#ede9fe"
+      stroke: "#7c3aed"
+      font-color: "#4c1d95"
+    }
+  }
+  ok: {
+    style: {
+      fill: "#dcfce7"
+      stroke: "#16a34a"
+      font-color: "#14532d"
+    }
+  }
+  warn: {
+    style: {
+      fill: "#fef3c7"
+      stroke: "#d97706"
+      font-color: "#78350f"
+    }
+  }
+}
+
+user: 이용자 · 애플리케이션 { class: key }
+edge: "일반 Gateway\nTLS · WAF · 외부 인증" { class: key }
+lite: "LiteLLM\nmodel access · quota · routing" { class: zone }
+serve: "모델 서빙 플랫폼\nKServe · GPUStack" { class: ok }
+model: vLLM · 모델 프로세스 · GPU { class: ok }
+obs: Langfuse · 관측 스택 { class: warn }
+
+user -> edge
+edge -> lite
+lite -> serve
+serve -> model
+lite -> obs: { style.stroke-dash: 3 }
 ```
 
 LiteLLM이 TLS termination이나 JWT 인증을 지원할 수 있어도 조직의 공용 Gateway를 없앤다는 뜻은 아니다.

@@ -22,22 +22,39 @@ import TermIntro from '../../../components/docs/TermIntro.astro';
 
 webpack 시절의 dev 서버는 **시작하려면 일단 전부 번들해야** 했다.
 
-```mermaid
-flowchart LR
-    subgraph W["webpack dev — 번들 먼저"]
-        direction LR
-        W1["모듈 3000개<br/>전부 번들"] --> W2["그제서야<br/>서버 시작"]
-    end
-    subgraph V["Vite dev — 요청 먼저"]
-        direction LR
-        V1["서버 즉시 시작"] --> V2["브라우저가 요청한<br/>파일만 즉석 변환"]
-    end
-    W ~~~ V
+```d2 layout=elk pad=40 title="webpack dev는 모듈 3000개를 전부 번들한 뒤에야 서버를 시작하는 반면, Vite dev는 서버를 즉시 시작하고 브라우저가 요청한 파일만 즉석 변환한다는 대비"
+direction: right
 
-    classDef bad  fill:#fee2e2,stroke:#dc2626,color:#7f1d1d
-    classDef ok   fill:#dcfce7,stroke:#16a34a,color:#14532d
-    class W1,W2 bad
-    class V1,V2 ok
+classes: {
+  bad: {
+    style: {
+      fill: "#fee2e2"
+      stroke: "#dc2626"
+      font-color: "#7f1d1d"
+    }
+  }
+  ok: {
+    style: {
+      fill: "#dcfce7"
+      stroke: "#16a34a"
+      font-color: "#14532d"
+    }
+  }
+}
+
+w: webpack dev — 번들 먼저 {
+  w1: "모듈 3000개\n전부 번들" { class: bad }
+  w2: "그제서야\n서버 시작" { class: bad }
+
+  w1 -> w2
+}
+
+v: Vite dev — 요청 먼저 {
+  v1: 서버 즉시 시작 { class: ok }
+  v2: "브라우저가 요청한\n파일만 즉석 변환" { class: ok }
+
+  v1 -> v2
+}
 ```
 
 프로젝트가 크면 `dev` 한 번에 수십 초~분 단위. 수정 반영도 느려졌다.

@@ -42,21 +42,47 @@ SSO·JWT·SCIM·audit 같은 기능의 제공 범위는 사용 중인 LiteLLM �
 
 ## Secret 생명주기
 
-```mermaid
-flowchart LR
-    VAULT["Secret manager"] --> SYNC["CSI / secret sync"]
-    SYNC --> KS["Kubernetes Secret"]
-    KS --> POD["LiteLLM Pod"]
-    POD --> PROVIDER["provider"]
-    ROTATE["rotation"] --> VAULT
-    ROTATE --> VERIFY["새 credential 검증 후<br/>옛 credential 폐기"]
+```d2 layout=elk pad=40 title="Secret manager에서 CSI·secret sync를 거쳐 Kubernetes Secret과 LiteLLM Pod, provider로 이어지는 자격 증명 경로와 rotation이 Secret manager 갱신·검증 후 옛 credential 폐기로 이어지는 그림"
+direction: down
 
-    classDef key  fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
-    classDef zone fill:#ede9fe,stroke:#7c3aed,color:#4c1d95
-    classDef ok   fill:#dcfce7,stroke:#16a34a,color:#14532d
-    class VAULT,SYNC,KS key
-    class POD,PROVIDER zone
-    class ROTATE,VERIFY ok
+classes: {
+  key: {
+    style: {
+      fill: "#dbeafe"
+      stroke: "#2563eb"
+      font-color: "#1e3a8a"
+    }
+  }
+  zone: {
+    style: {
+      fill: "#ede9fe"
+      stroke: "#7c3aed"
+      font-color: "#4c1d95"
+    }
+  }
+  ok: {
+    style: {
+      fill: "#dcfce7"
+      stroke: "#16a34a"
+      font-color: "#14532d"
+    }
+  }
+}
+
+rotate: rotation { class: ok }
+vault: Secret manager { class: key }
+sync: CSI / secret sync { class: key }
+ks: Kubernetes Secret { class: key }
+pod: LiteLLM Pod { class: zone }
+provider: provider { class: zone }
+verify: "새 credential 검증 후\n옛 credential 폐기" { class: ok }
+
+vault -> sync
+sync -> ks
+ks -> pod
+pod -> provider
+rotate -> vault
+rotate -> verify
 ```
 
 credential 원문이 Helm values, ConfigMap, Pod spec diff, exception log에 남지 않는지 확인한다. provider별 key를

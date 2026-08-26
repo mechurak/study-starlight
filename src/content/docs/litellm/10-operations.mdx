@@ -36,22 +36,46 @@ client 오류와 platform 오류도 나눈다. 만료 key와 허용하지 않은
 
 ## 용량은 네 곳을 함께 본다
 
-```mermaid
-flowchart LR
-    POD["LiteLLM Pod<br/>CPU · in-flight"] --> DB["Postgres<br/>connection · write"]
-    POD --> REDIS["Redis<br/>latency · connection"]
-    POD --> MODEL["model endpoint<br/>quota · queue · GPU"]
-    SCALE["HPA maxReplicas"] --> POD
-    SCALE -.->|"상한을 함께 키움"| DB
-    SCALE -.->|"동시 요청 증가"| REDIS
-    SCALE -.->|"upstream 부하 증가"| MODEL
+```d2 layout=elk pad=40 title="LiteLLM Pod가 Postgres·Redis·model endpoint에 의존하고, HPA maxReplicas를 키우면 그 세 의존 대상의 부하도 함께 커진다는 것을 점선으로 보여 주는 그림"
+direction: right
 
-    classDef key  fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
-    classDef warn fill:#fef3c7,stroke:#d97706,color:#78350f
-    classDef bad  fill:#fee2e2,stroke:#dc2626,color:#7f1d1d
-    class POD,SCALE key
-    class DB,REDIS warn
-    class MODEL bad
+classes: {
+  key: {
+    style: {
+      fill: "#dbeafe"
+      stroke: "#2563eb"
+      font-color: "#1e3a8a"
+    }
+  }
+  warn: {
+    style: {
+      fill: "#fef3c7"
+      stroke: "#d97706"
+      font-color: "#78350f"
+    }
+  }
+  bad: {
+    style: {
+      fill: "#fee2e2"
+      stroke: "#dc2626"
+      font-color: "#7f1d1d"
+    }
+  }
+}
+
+scale: HPA maxReplicas { class: key }
+pod: "LiteLLM Pod\nCPU · in-flight" { class: key }
+db: "Postgres\nconnection · write" { class: warn }
+redis: "Redis\nlatency · connection" { class: warn }
+model: "model endpoint\nquota · queue · GPU" { class: bad }
+
+pod -> db
+pod -> redis
+pod -> model
+scale -> pod
+scale -> db: 상한을 함께 키움 { style.stroke-dash: 3 }
+scale -> redis: 동시 요청 증가 { style.stroke-dash: 3 }
+scale -> model: upstream 부하 증가 { style.stroke-dash: 3 }
 ```
 
 HPA max를 높이는 것은 DB connection과 Redis connection, provider 동시 호출 상한도 높이는 일이다. 한 계층만

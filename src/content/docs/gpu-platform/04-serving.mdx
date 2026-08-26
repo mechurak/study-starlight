@@ -21,28 +21,58 @@ import TermIntro from '../../../components/docs/TermIntro.astro';
 
 ## 요청 경로와 제어 경로
 
-```mermaid
-flowchart TB
-    subgraph request["요청 경로"]
-        direction LR
-        APP["사용자 · 앱"] --> LITE["LiteLLM"]
-        LITE --> GW["Gateway API · Service"]
-        GW --> POD["KServe predictor<br/>vLLM · FastAPI"]
-    end
-    subgraph control["제어 경로"]
-        direction LR
-        PR["Git pull request"] --> ARGO["Argo CD"]
-        ARGO --> ISVC["InferenceService"]
-        ISVC --> DEP["Deployment · Service"]
-    end
-    DEP -.-> POD
+```d2 layout=elk pad=40 title="사용자 앱에서 LiteLLM과 Gateway를 거쳐 KServe predictor로 가는 요청 경로와, Git pull request에서 Argo CD·InferenceService·Deployment로 이어져 그 predictor를 만들어 내는 제어 경로를 나눠 놓은 그림"
+direction: down
 
-    classDef key  fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
-    classDef zone fill:#ede9fe,stroke:#7c3aed,color:#4c1d95
-    classDef ok   fill:#dcfce7,stroke:#16a34a,color:#14532d
-    class APP,LITE,PR,ARGO key
-    class GW,ISVC zone
-    class DEP,POD ok
+classes: {
+  key: {
+    style: {
+      fill: "#dbeafe"
+      stroke: "#2563eb"
+      font-color: "#1e3a8a"
+    }
+  }
+  zone: {
+    style: {
+      fill: "#ede9fe"
+      stroke: "#7c3aed"
+      font-color: "#4c1d95"
+    }
+  }
+  ok: {
+    style: {
+      fill: "#dcfce7"
+      stroke: "#16a34a"
+      font-color: "#14532d"
+    }
+  }
+}
+
+request: 요청 경로 {
+
+  app: 사용자 · 앱 { class: key }
+  lite: LiteLLM { class: key }
+  gw: Gateway API · Service { class: zone }
+  pod: "KServe predictor\nvLLM · FastAPI" { class: ok }
+
+  app -> lite
+  lite -> gw
+  gw -> pod
+}
+
+control: 제어 경로 {
+
+  pr: Git pull request { class: key }
+  argo: Argo CD { class: key }
+  isvc: InferenceService { class: zone }
+  dep: Deployment · Service { class: ok }
+
+  pr -> argo
+  argo -> isvc
+  isvc -> dep
+}
+
+control.dep -> request.pod: { style.stroke-dash: 3 }
 ```
 
 LiteLLM에는 KServe service endpoint와 내부 model name을 등록한다. Pod IP·node port·Spark 주소는 넣지

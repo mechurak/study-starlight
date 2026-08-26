@@ -129,22 +129,52 @@ proxy_config:
 Argo CD가 Helm hook을 다루는 방식과 chart의 migration hook annotation을 실제로 확인한다. sync wave나 PreSync
 Job으로 순서를 고정하되, 실패한 migration Job을 자동 반복해 DB를 계속 두드리지 않게 한다.
 
-```mermaid
-flowchart LR
-    GIT["Git revision"] --> RENDER["render · policy check"]
-    RENDER --> MIG["migration Job"]
-    MIG -->|"성공"| ROLL["serving rollout"]
-    MIG -->|"실패"| STOP["중단 · DB 복구 판단"]
-    ROLL --> VERIFY["synthetic request · telemetry"]
+```d2 layout=elk pad=40 title="Git revision이 render와 policy check를 거쳐 migration Job으로 가고, 성공하면 serving rollout과 검증으로, 실패하면 중단하고 DB 복구를 판단하는 배포 흐름"
+direction: down
 
-    classDef key  fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
-    classDef warn fill:#fef3c7,stroke:#d97706,color:#78350f
-    classDef bad  fill:#fee2e2,stroke:#dc2626,color:#7f1d1d
-    classDef ok   fill:#dcfce7,stroke:#16a34a,color:#14532d
-    class GIT,RENDER key
-    class MIG warn
-    class STOP bad
-    class ROLL,VERIFY ok
+classes: {
+  key: {
+    style: {
+      fill: "#dbeafe"
+      stroke: "#2563eb"
+      font-color: "#1e3a8a"
+    }
+  }
+  warn: {
+    style: {
+      fill: "#fef3c7"
+      stroke: "#d97706"
+      font-color: "#78350f"
+    }
+  }
+  bad: {
+    style: {
+      fill: "#fee2e2"
+      stroke: "#dc2626"
+      font-color: "#7f1d1d"
+    }
+  }
+  ok: {
+    style: {
+      fill: "#dcfce7"
+      stroke: "#16a34a"
+      font-color: "#14532d"
+    }
+  }
+}
+
+git: Git revision { class: key }
+render: render · policy check { class: key }
+mig: migration Job { class: warn }
+roll: serving rollout { class: ok }
+stop: 중단 · DB 복구 판단 { class: bad }
+verify: synthetic request · telemetry { class: ok }
+
+git -> render
+render -> mig
+mig -> roll: 성공
+mig -> stop: 실패
+roll -> verify
 ```
 
 ## rollback의 실제 경계

@@ -22,31 +22,75 @@ import TermIntro from '../../../components/docs/TermIntro.astro';
 
 ## 전체 지도
 
-```mermaid
-flowchart TB
-    subgraph prepare["A · 노드를 준비한다"]
-        OP["GPU Operator"] --> STACK["driver · toolkit · device plugin<br/>GFD · MIG · DCGM"]
-        STACK --> GPU["Spark · A100 · B300 node"]
-    end
-    subgraph deploy["B · 모델을 배포한다"]
-        GIT["Git"] --> ISVC["InferenceService"] --> KS["KServe controller"]
-        RT["ServingRuntime"] --> KS
-        KS --> KOBJ["Deployment · Service · HTTPRoute"]
-        KOBJ --> POD["vLLM · FastAPI Pod"]
-    end
-    subgraph request["C · 요청이 지나간다"]
-        APP["사내 앱"] --> LITE["LiteLLM"] --> GW["Gateway · Service"] --> POD
-        POD --> GPU
-    end
+```d2 layout=elk pad=40 title="GPU Operator가 노드를 준비하는 A, Git과 ServingRuntime이 KServe controller를 거쳐 모델 Pod를 배포하는 B, 사내 앱이 LiteLLM과 Gateway를 지나 그 Pod와 GPU로 닿는 C를 한데 모은 덱 전체 요약도"
+direction: down
 
-    classDef key fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
-    classDef zone fill:#ede9fe,stroke:#7c3aed,color:#4c1d95
-    classDef ok fill:#dcfce7,stroke:#16a34a,color:#14532d
-    classDef warn fill:#fef3c7,stroke:#d97706,color:#78350f
-    class GIT,RT,APP,LITE key
-    class ISVC,KS,GW zone
-    class KOBJ,POD ok
-    class OP,STACK,GPU warn
+classes: {
+  key: {
+    style: {
+      fill: "#dbeafe"
+      stroke: "#2563eb"
+      font-color: "#1e3a8a"
+    }
+  }
+  zone: {
+    style: {
+      fill: "#ede9fe"
+      stroke: "#7c3aed"
+      font-color: "#4c1d95"
+    }
+  }
+  ok: {
+    style: {
+      fill: "#dcfce7"
+      stroke: "#16a34a"
+      font-color: "#14532d"
+    }
+  }
+  warn: {
+    style: {
+      fill: "#fef3c7"
+      stroke: "#d97706"
+      font-color: "#78350f"
+    }
+  }
+}
+
+prepare: A · 노드를 준비한다 {
+  op: GPU Operator { class: warn }
+  stack: "driver · toolkit · device plugin\nGFD · MIG · DCGM" { class: warn }
+  gpu: Spark · A100 · B300 node { class: warn }
+
+  op -> stack
+  stack -> gpu
+}
+
+deploy: B · 모델을 배포한다 {
+  git: Git { class: key }
+  isvc: InferenceService { class: zone }
+  ks: KServe controller { class: zone }
+  rt: ServingRuntime { class: key }
+  kobj: Deployment · Service · HTTPRoute { class: ok }
+  pod: vLLM · FastAPI Pod { class: ok }
+
+  git -> isvc
+  isvc -> ks
+  rt -> ks
+  ks -> kobj
+  kobj -> pod
+}
+
+request: C · 요청이 지나간다 {
+  app: 사내 앱 { class: key }
+  lite: LiteLLM { class: key }
+  gw: Gateway · Service { class: zone }
+
+  app -> lite
+  lite -> gw
+}
+
+request.gw -> deploy.pod
+deploy.pod -> prepare.gpu
 ```
 
 - A가 깨지면 Pod가 GPU를 요청하지 못하거나 CUDA가 실패한다.
@@ -71,22 +115,55 @@ GPU Operator가 **아래에서 실행 가능성을 만들고**, KServe가 **위�
 
 ## KServe 선택표
 
-```mermaid
-flowchart TD
-    START["새 model serving"] --> FIT{"한 Pod · 한 node에<br/>model이 들어가는가?"}
-    FIT -->|"예"| STD["Standard InferenceService"]
-    FIT -->|"아니오"| MULTI["LLMInferenceService<br/>LeaderWorkerSet 검토"]
-    STD --> SLO{"실제 부하에서<br/>SLO를 만족하는가?"}
-    SLO -->|"예"| KEEP["Standard 유지"]
-    SLO -->|"아니오 · routing 병목"| EPP["Inference Extension · EPP 검토"]
-    SLO -->|"아니오 · prefill 간섭"| PD["prefill · decode 분리 검토"]
+```d2 layout=elk pad=40 title="새 model serving이 한 Pod·한 node에 들어가면 Standard InferenceService로 가고 아니면 LeaderWorkerSet을 검토하며, Standard가 실제 부하에서 SLO를 못 맞추면 병목 종류에 따라 Inference Extension이나 prefill·decode 분리로 가는 판단 흐름"
+direction: down
 
-    classDef ok fill:#dcfce7,stroke:#16a34a,color:#14532d
-    classDef warn fill:#fef3c7,stroke:#d97706,color:#78350f
-    classDef zone fill:#ede9fe,stroke:#7c3aed,color:#4c1d95
-    class START,STD,KEEP ok
-    class FIT,SLO warn
-    class MULTI,EPP,PD zone
+classes: {
+  ok: {
+    style: {
+      fill: "#dcfce7"
+      stroke: "#16a34a"
+      font-color: "#14532d"
+    }
+  }
+  warn: {
+    style: {
+      fill: "#fef3c7"
+      stroke: "#d97706"
+      font-color: "#78350f"
+    }
+  }
+  zone: {
+    style: {
+      fill: "#ede9fe"
+      stroke: "#7c3aed"
+      font-color: "#4c1d95"
+    }
+  }
+}
+
+start: 새 model serving { class: ok }
+fit: "한 Pod · 한 node에\nmodel이 들어가는가?" {
+  shape: diamond
+  class: warn
+}
+std: Standard InferenceService { class: ok }
+multi: "LLMInferenceService\nLeaderWorkerSet 검토" { class: zone }
+slo: "실제 부하에서\nSLO를 만족하는가?" {
+  shape: diamond
+  class: warn
+}
+keep: Standard 유지 { class: ok }
+epp: Inference Extension · EPP 검토 { class: zone }
+pd: prefill · decode 분리 검토 { class: zone }
+
+start -> fit
+fit -> std: 예
+fit -> multi: 아니오
+std -> slo
+slo -> keep: 예
+slo -> epp: 아니오 · routing 병목
+slo -> pd: 아니오 · prefill 간섭
 ```
 
 | serving 요구 | 기본 객체·방식 | GPU 단위 |

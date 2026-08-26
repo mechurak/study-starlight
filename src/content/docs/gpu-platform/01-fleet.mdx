@@ -76,23 +76,49 @@ KServe runtime template가 맞는 toleration을 가진다. 이 장치는 CPU 앱
 
 ## 하나의 운영 모델, 두 실행 cluster
 
-```mermaid
-flowchart TB
-    GIT["GitOps · policy · runtime catalog"] --> SC["Spark cluster<br/>ARM64 · inference"]
-    GIT --> DC["Datacenter GPU cluster<br/>A100 · B300"]
-    OBS["공통 관측 · registry · identity"] --> SC
-    OBS --> DC
-    LITE["LiteLLM"] --> SKS["Spark KServe endpoint"]
-    LITE --> DKS["Datacenter KServe endpoint"]
-    SC --> SKS
-    DC --> DKS
+```d2 layout=elk pad=40 title="GitOps와 공통 관측·registry·identity가 Spark cluster와 Datacenter GPU cluster 둘 다에 적용되고, 두 cluster가 각각 KServe endpoint를 내보내며 LiteLLM이 그 두 endpoint를 함께 바라보는 fleet 구조"
+direction: down
 
-    classDef key  fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
-    classDef zone fill:#ede9fe,stroke:#7c3aed,color:#4c1d95
-    classDef ok   fill:#dcfce7,stroke:#16a34a,color:#14532d
-    class GIT,OBS,LITE key
-    class SC,DC zone
-    class SKS,DKS ok
+classes: {
+  key: {
+    style: {
+      fill: "#dbeafe"
+      stroke: "#2563eb"
+      font-color: "#1e3a8a"
+    }
+  }
+  zone: {
+    style: {
+      fill: "#ede9fe"
+      stroke: "#7c3aed"
+      font-color: "#4c1d95"
+    }
+  }
+  ok: {
+    style: {
+      fill: "#dcfce7"
+      stroke: "#16a34a"
+      font-color: "#14532d"
+    }
+  }
+}
+
+git: GitOps · policy · runtime catalog { class: key }
+obs: 공통 관측 · registry · identity { class: key }
+lite: LiteLLM { class: key }
+sc: "Spark cluster\nARM64 · inference" { class: zone }
+dc: "Datacenter GPU cluster\nA100 · B300" { class: zone }
+sks: Spark KServe endpoint { class: ok }
+dks: Datacenter KServe endpoint { class: ok }
+
+git -> sc
+git -> dc
+obs -> sc
+obs -> dc
+lite -> sks
+lite -> dks
+sc -> sks
+dc -> dks
 ```
 
 권장 기본안은 Spark와 datacenter GPU를 별도 실행 cluster로 두는 것이다. KServe controller는 각

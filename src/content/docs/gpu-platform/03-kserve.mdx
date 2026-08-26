@@ -23,23 +23,52 @@ import SourceFigure from '../../../components/docs/SourceFigure.astro';
 
 ## 전체에서 KServe의 자리
 
-```mermaid
-flowchart LR
-    OP["운영자"] --> ISVC["InferenceService<br/>원하는 상태"]
-    RT["ServingRuntime<br/>실행 방법"] --> KS["KServe controller"]
-    ISVC --> KS
-    KS --> DEP["Deployment<br/>replica · rollout"]
-    KS --> SVC["Service · HTTPRoute<br/>안정된 endpoint"]
-    DEP --> POD["vLLM · FastAPI Pod<br/>실제 추론"]
-    MODEL["model artifact"] --> POD
-    USER["LiteLLM · 앱"] --> SVC --> POD
+```d2 layout=elk pad=40 title="운영자가 선언한 InferenceService와 ServingRuntime을 KServe controller가 받아 Deployment와 Service·HTTPRoute를 만들고, model artifact를 실은 vLLM·FastAPI Pod로 LiteLLM과 앱의 요청이 닿는 구조"
+direction: down
 
-    classDef key fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
-    classDef zone fill:#ede9fe,stroke:#7c3aed,color:#4c1d95
-    classDef ok fill:#dcfce7,stroke:#16a34a,color:#14532d
-    class OP,MODEL,USER key
-    class ISVC,RT,KS zone
-    class DEP,SVC,POD ok
+classes: {
+  key: {
+    style: {
+      fill: "#dbeafe"
+      stroke: "#2563eb"
+      font-color: "#1e3a8a"
+    }
+  }
+  zone: {
+    style: {
+      fill: "#ede9fe"
+      stroke: "#7c3aed"
+      font-color: "#4c1d95"
+    }
+  }
+  ok: {
+    style: {
+      fill: "#dcfce7"
+      stroke: "#16a34a"
+      font-color: "#14532d"
+    }
+  }
+}
+
+op: 운영자 { class: key }
+isvc: "InferenceService\n원하는 상태" { class: zone }
+rt: "ServingRuntime\n실행 방법" { class: zone }
+ks: KServe controller { class: zone }
+dep: "Deployment\nreplica · rollout" { class: ok }
+svc: "Service · HTTPRoute\n안정된 endpoint" { class: ok }
+pod: "vLLM · FastAPI Pod\n실제 추론" { class: ok }
+model: model artifact { class: key }
+user: LiteLLM · 앱 { class: key }
+
+op -> isvc
+rt -> ks
+isvc -> ks
+ks -> dep
+ks -> svc
+dep -> pod
+model -> pod
+user -> svc
+svc -> pod
 ```
 
 KServe가 request를 받아 직접 추론하지 않는다. controller는 운영 경로에 있고, 실제 request는 이미 만들어진
@@ -152,24 +181,55 @@ Standard path가 model Pod의 배포와 endpoint를 푼다면, `LLMInferenceServ
 | 긴 prompt와 token 생성을 다른 pool로 분리 | prefill·decode workload와 그 사이의 KV 전달 |
 | prefix cache·부하를 고려한 endpoint 선택 | scheduler plugin과 pod metric |
 
-```mermaid
-flowchart LR
-    NEED{"Standard로<br/>SLO를 만족하는가?"}
-    NEED -->|"예"| STANDARD["InferenceService 유지"]
-    NEED -->|"아니오"| WHY{"어떤 병목인가?"}
-    WHY -->|"prefix · replica 부하"| ROUTE["Inference Extension · EPP"]
-    WHY -->|"model이 한 node에 안 들어감"| LWS["LeaderWorkerSet 다중 노드 추론"]
-    WHY -->|"prefill이 decode를 방해"| PD["prefill · decode 분리"]
-    ROUTE --> LLMISVC["LLMInferenceService"]
-    LWS --> LLMISVC
-    PD --> LLMISVC
+```d2 layout=elk pad=40 title="Standard InferenceService로 SLO를 만족하면 그대로 두고, 아니라면 prefix·replica 부하는 Inference Extension, 모델이 한 노드에 안 들어가면 LeaderWorkerSet, prefill이 decode를 방해하면 분리로 가서 모두 LLMInferenceService로 모이는 판단 흐름"
+direction: down
 
-    classDef ok fill:#dcfce7,stroke:#16a34a,color:#14532d
-    classDef warn fill:#fef3c7,stroke:#d97706,color:#78350f
-    classDef zone fill:#ede9fe,stroke:#7c3aed,color:#4c1d95
-    class STANDARD ok
-    class NEED,WHY warn
-    class ROUTE,LWS,PD,LLMISVC zone
+classes: {
+  ok: {
+    style: {
+      fill: "#dcfce7"
+      stroke: "#16a34a"
+      font-color: "#14532d"
+    }
+  }
+  warn: {
+    style: {
+      fill: "#fef3c7"
+      stroke: "#d97706"
+      font-color: "#78350f"
+    }
+  }
+  zone: {
+    style: {
+      fill: "#ede9fe"
+      stroke: "#7c3aed"
+      font-color: "#4c1d95"
+    }
+  }
+}
+
+need: "Standard로\nSLO를 만족하는가?" {
+  shape: diamond
+  class: warn
+}
+standard: InferenceService 유지 { class: ok }
+why: 어떤 병목인가? {
+  shape: diamond
+  class: warn
+}
+route: Inference Extension · EPP { class: zone }
+lws: LeaderWorkerSet 다중 노드 추론 { class: zone }
+pd: prefill · decode 분리 { class: zone }
+llmisvc: LLMInferenceService { class: zone }
+
+need -> standard: 예
+need -> why: 아니오
+why -> route: prefix · replica 부하
+why -> lws: model이 한 node에 안 들어감
+why -> pd: prefill이 decode를 방해
+route -> llmisvc
+lws -> llmisvc
+pd -> llmisvc
 ```
 
 고급 경로에는 Gateway API CRD·Inference Extension·Gateway provider·LeaderWorkerSet 같은 의존성이

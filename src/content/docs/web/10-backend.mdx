@@ -114,26 +114,49 @@ JOIN·트랜잭션·제약 조건은 그 관계를 **DB가 강제로 지켜 주�
 
 3장의 "경계가 흐린" 스택을 데이터 관점에서 다시 그리면 이렇게 된다.
 
-```mermaid
-flowchart TB
-    B["브라우저 (Next.js 앱)"]
-    S["Supabase<br/>Auth · Storage · Realtime"]
-    N["별도 API 서버 (필요해지면)<br/>복잡한 로직 · 트랜잭션 · 배치"]
-    P["Postgres"]
+```d2 layout=elk pad=40 title="브라우저의 Next.js 앱이 단순 CRUD는 RLS가 방어하는 Supabase로, 복잡한 작업은 서버 코드가 인가를 방어하는 별도 API 서버로 보내고 둘 다 Postgres에 닿는 두 경로"
+direction: down
 
-    B -->|"경로 ① 단순 CRUD<br/>RLS가 행 단위로 방어"| S
-    B -->|"경로 ② 복잡한 작업<br/>서버 코드가 인가를 방어"| N
-    S --- P
-    N --> P
+classes: {
+  key: {
+    style: {
+      fill: "#dbeafe"
+      stroke: "#2563eb"
+      font-color: "#1e3a8a"
+    }
+  }
+  ok: {
+    style: {
+      fill: "#dcfce7"
+      stroke: "#16a34a"
+      font-color: "#14532d"
+    }
+  }
+  warn: {
+    style: {
+      fill: "#fef3c7"
+      stroke: "#d97706"
+      font-color: "#78350f"
+    }
+  }
+  mute: {
+    style: {
+      fill: "#f1f5f9"
+      stroke: "#94a3b8"
+      font-color: "#334155"
+    }
+  }
+}
 
-    classDef key  fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
-    classDef ok   fill:#dcfce7,stroke:#16a34a,color:#14532d
-    classDef warn fill:#fef3c7,stroke:#d97706,color:#78350f
-    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
-    class B key
-    class S ok
-    class N warn
-    class P mute
+b: "브라우저 (Next.js 앱)" { class: key }
+s: "Supabase\nAuth · Storage · Realtime" { class: ok }
+n: "별도 API 서버 (필요해지면)\n복잡한 로직 · 트랜잭션 · 배치" { class: warn }
+p: Postgres { class: mute }
+
+b -> s: "경로 ① 단순 CRUD\nRLS가 행 단위로 방어"
+b -> n: "경로 ② 복잡한 작업\n서버 코드가 인가를 방어"
+s -- p
+n -> p
 ```
 
 단순한 읽기·쓰기는 브라우저가 BaaS에 직접(경로 ①, DB의 행 단위 보안 규칙 RLS가 지킨다),

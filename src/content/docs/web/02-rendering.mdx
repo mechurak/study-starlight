@@ -91,16 +91,39 @@ SSR이 보낸 HTML은 **보이기만 하고 아직 동작하지 않는다.** JS�
 이 비용을 줄이려는 시도들 — 필요한 부분만 하이드레이션(아일랜드), 서버 컴포넌트 — 이
 최근 프레임워크 경쟁의 중심이다.
 
-```mermaid
-flowchart LR
-    A["HTML 도착<br/>화면은 보임"] --> B["JS 다운로드·실행"] --> C["하이드레이션 완료<br/>상호작용 가능"]
+```d2 layout=elk pad=40 title="HTML이 도착해 화면은 보이지만 JS를 다운로드·실행해 하이드레이션이 끝나야 상호작용이 가능해지는 세 단계"
+direction: right
 
-    classDef ok   fill:#dcfce7,stroke:#16a34a,color:#14532d
-    classDef warn fill:#fef3c7,stroke:#d97706,color:#78350f
-    classDef key  fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
-    class A ok
-    class B warn
-    class C key
+classes: {
+  ok: {
+    style: {
+      fill: "#dcfce7"
+      stroke: "#16a34a"
+      font-color: "#14532d"
+    }
+  }
+  warn: {
+    style: {
+      fill: "#fef3c7"
+      stroke: "#d97706"
+      font-color: "#78350f"
+    }
+  }
+  key: {
+    style: {
+      fill: "#dbeafe"
+      stroke: "#2563eb"
+      font-color: "#1e3a8a"
+    }
+  }
+}
+
+a: "HTML 도착\n화면은 보임" { class: ok }
+b: JS 다운로드·실행 { class: warn }
+c: "하이드레이션 완료\n상호작용 가능" { class: key }
+
+a -> b
+b -> c
 ```
 
 ### 서버 컴포넌트 — 갈래의 최신 진화
@@ -111,23 +134,54 @@ React 서버 컴포넌트(RSC)는 "컴포넌트 단위로 서버/브라우저 �
 
 ## 결정 트리
 
-```mermaid
-flowchart TB
-    Q1["검색 노출이나<br/>첫 화면 속도가 중요한가?"] -->|"아니오 — 내부 도구"| CSR["CSR (SPA)<br/>Vite + React 등"]
-    Q1 -->|"예"| Q2["내용이 사용자마다<br/>다른가?"]
-    Q2 -->|"아니오"| Q3["자주 바뀌는가?"]
-    Q2 -->|"예"| SSR["SSR<br/>(+ 페이지 일부는 정적으로)"]
-    Q3 -->|"거의 안 바뀜"| SSG["SSG<br/>블로그 · 문서 · 랜딩"]
-    Q3 -->|"가끔 바뀜"| ISR["ISR<br/>주기적 재생성"]
+```d2 layout=elk pad=40 title="검색 노출과 첫 화면 속도가 중요하지 않으면 CSR, 중요하면 내용이 사용자마다 다른지로 SSR과 정적 계열을 가르고, 정적 계열은 다시 바뀌는 빈도에 따라 SSG와 ISR로 나뉘는 선택 흐름"
+direction: down
 
-    classDef key  fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
-    classDef ok   fill:#dcfce7,stroke:#16a34a,color:#14532d
-    classDef warn fill:#fef3c7,stroke:#d97706,color:#78350f
-    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
-    class Q1,Q2,Q3 mute
-    class SSG ok
-    class ISR warn
-    class SSR,CSR key
+classes: {
+  key: {
+    style: {
+      fill: "#dbeafe"
+      stroke: "#2563eb"
+      font-color: "#1e3a8a"
+    }
+  }
+  ok: {
+    style: {
+      fill: "#dcfce7"
+      stroke: "#16a34a"
+      font-color: "#14532d"
+    }
+  }
+  warn: {
+    style: {
+      fill: "#fef3c7"
+      stroke: "#d97706"
+      font-color: "#78350f"
+    }
+  }
+  mute: {
+    style: {
+      fill: "#f1f5f9"
+      stroke: "#94a3b8"
+      font-color: "#334155"
+    }
+  }
+}
+
+q1: "검색 노출이나\n첫 화면 속도가 중요한가?" { class: mute }
+q2: "내용이 사용자마다\n다른가?" { class: mute }
+q3: 자주 바뀌는가? { class: mute }
+csr: "CSR (SPA)\nVite + React 등" { class: key }
+ssr: "SSR\n(+ 페이지 일부는 정적으로)" { class: key }
+ssg: "SSG\n블로그 · 문서 · 랜딩" { class: ok }
+isr: "ISR\n주기적 재생성" { class: warn }
+
+q1 -> csr: 아니오 — 내부 도구
+q1 -> q2: 예
+q2 -> q3: 아니오
+q2 -> ssr: 예
+q3 -> ssg: 거의 안 바뀜
+q3 -> isr: 가끔 바뀜
 ```
 
 :::caution[함정]

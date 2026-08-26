@@ -67,18 +67,41 @@ React와 Next.js는 경쟁 관계가 아니고, Vite와 pnpm은 서로 대체재
 각 도구는 **자기 층**이 있다 — UI 라이브러리 / 프레임워크 / 번들러 / 패키지 매니저 / 런타임.
 비교는 같은 층 안에서만 성립한다. 3장의 지형도가 이 층을 그린다.
 
-```mermaid
-flowchart TB
-    Q["새 도구를 만났을 때"] --> L["어느 층의 물건인가?"]
-    L --> P["무슨 통증을 풀었는가?"]
-    P --> R["같은 층의 기존 도구와<br/>무엇이 다른가?"]
+```d2 layout=elk pad=40 title="새 도구를 만났을 때 어느 층의 물건인지, 무슨 통증을 풀었는지, 같은 층의 기존 도구와 무엇이 다른지를 차례로 묻는 세 단계"
+direction: down
 
-    classDef key  fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
-    classDef ok   fill:#dcfce7,stroke:#16a34a,color:#14532d
-    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
-    class Q mute
-    class L key
-    class P,R ok
+classes: {
+  key: {
+    style: {
+      fill: "#dbeafe"
+      stroke: "#2563eb"
+      font-color: "#1e3a8a"
+    }
+  }
+  ok: {
+    style: {
+      fill: "#dcfce7"
+      stroke: "#16a34a"
+      font-color: "#14532d"
+    }
+  }
+  mute: {
+    style: {
+      fill: "#f1f5f9"
+      stroke: "#94a3b8"
+      font-color: "#334155"
+    }
+  }
+}
+
+q: 새 도구를 만났을 때 { class: mute }
+l: 어느 층의 물건인가? { class: key }
+p: 무슨 통증을 풀었는가? { class: ok }
+r: "같은 층의 기존 도구와\n무엇이 다른가?" { class: ok }
+
+q -> l
+l -> p
+p -> r
 ```
 
 :::tip[핵심]

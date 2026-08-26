@@ -21,27 +21,32 @@ import TermIntro from '../../../components/docs/TermIntro.astro';
 
 `https://myapp.com/memos`를 입력했을 때 일어나는 일:
 
-```mermaid
-sequenceDiagram
-    participant B as 브라우저
-    participant E as CDN 엣지
-    participant O as 오리진 서버
-    participant D as DB
+```d2 pad=40 title="브라우저가 DNS 조회와 연결 협상을 마치고 CDN 엣지에 GET을 보내, 캐시에 있으면 즉시 응답받고 없으면 오리진과 DB를 거쳐 응답받은 뒤 HTML 파싱과 JS 로드로 이어지는 순서도"
+shape: sequence_diagram
 
-    B->>B: ① DNS 조회 — myapp.com은 어느 IP인가
-    B->>E: ② 연결 협상<br/>HTTP/1.1·2는 TCP+TLS, HTTP/3는 QUIC
-    B->>E: ③ GET /memos
-    alt 캐시에 있음 — 정적 파일, 미리 만든 페이지
-        E-->>B: ④ 즉시 응답 (오리진까지 안 감)
-    else 캐시에 없음
-        E->>O: ⑤ 오리진으로 전달
-        O->>D: ⑥ SQL 실행
-        D-->>O: 결과
-        O-->>E: ⑦ HTML 또는 JSON으로 응답
-        E-->>B: 응답 (필요하면 캐시에 저장)
-    end
-    B->>B: ⑧ HTML 파싱 → CSS/JS/이미지 추가 요청 (①~④ 반복)
-    B->>B: ⑨ JS 로드 → 이후 상호작용은 API 호출로
+b: 브라우저
+e: CDN 엣지
+o: 오리진 서버
+d: DB
+
+b -> b: ① DNS 조회 — myapp.com은 어느 IP인가
+b -> e: "② 연결 협상\nHTTP/1.1·2는 TCP+TLS, HTTP/3는 QUIC"
+b -> e: "③ GET /memos"
+
+"캐시에 있음 — 정적 파일, 미리 만든 페이지": {
+  e -> b: ④ 즉시 응답 (오리진까지 안 감) { style.stroke-dash: 3 }
+}
+
+캐시에 없음: {
+  e -> o: ⑤ 오리진으로 전달
+  o -> d: ⑥ SQL 실행
+  d -> o: 결과 { style.stroke-dash: 3 }
+  o -> e: ⑦ HTML 또는 JSON으로 응답 { style.stroke-dash: 3 }
+  e -> b: 응답 (필요하면 캐시에 저장) { style.stroke-dash: 3 }
+}
+
+b -> b: "⑧ HTML 파싱 → CSS/JS/이미지 추가 요청 (①~④ 반복)"
+b -> b: ⑨ JS 로드 → 이후 상호작용은 API 호출로
 ```
 
 여기 나오는 등장인물 — 브라우저 · CDN · 오리진 · DB — 이 웹의 전부다.

@@ -22,24 +22,56 @@ import TermIntro from '../../../components/docs/TermIntro.astro';
 
 ## 느린 요청이 지나온 전체 경로
 
-```mermaid
-flowchart LR
-    APP["사내 앱"] --> LITE["LiteLLM<br/>quota · deadline"]
-    LITE --> GW["Gateway · Service<br/>TLS · route"]
-    GW --> POD["KServe predictor<br/>readiness · replica"]
-    POD --> VLLM["vLLM<br/>queue · prefill · decode"]
-    VLLM --> GPU["GPU<br/>HBM · compute · link"]
-    KS["KServe controller"] -. "원하는 replica 유지" .-> POD
-    OP["GPU Operator · DCGM"] -. "장치 · health" .-> GPU
+```d2 layout=elk pad=40 title="사내 앱에서 LiteLLM·Gateway·KServe predictor·vLLM을 거쳐 GPU에 닿는 요청 경로 옆에, KServe controller가 replica를 유지하고 GPU Operator·DCGM이 장치와 health를 맡는 것을 점선으로 붙인 그림"
+direction: down
 
-    classDef key fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
-    classDef zone fill:#ede9fe,stroke:#7c3aed,color:#4c1d95
-    classDef ok fill:#dcfce7,stroke:#16a34a,color:#14532d
-    classDef warn fill:#fef3c7,stroke:#d97706,color:#78350f
-    class APP,LITE key
-    class GW,KS,OP zone
-    class POD,VLLM ok
-    class GPU warn
+classes: {
+  key: {
+    style: {
+      fill: "#dbeafe"
+      stroke: "#2563eb"
+      font-color: "#1e3a8a"
+    }
+  }
+  zone: {
+    style: {
+      fill: "#ede9fe"
+      stroke: "#7c3aed"
+      font-color: "#4c1d95"
+    }
+  }
+  ok: {
+    style: {
+      fill: "#dcfce7"
+      stroke: "#16a34a"
+      font-color: "#14532d"
+    }
+  }
+  warn: {
+    style: {
+      fill: "#fef3c7"
+      stroke: "#d97706"
+      font-color: "#78350f"
+    }
+  }
+}
+
+app: 사내 앱 { class: key }
+lite: "LiteLLM\nquota · deadline" { class: key }
+gw: "Gateway · Service\nTLS · route" { class: zone }
+pod: "KServe predictor\nreadiness · replica" { class: ok }
+vllm: "vLLM\nqueue · prefill · decode" { class: ok }
+gpu: "GPU\nHBM · compute · link" { class: warn }
+ks: KServe controller { class: zone }
+op: GPU Operator · DCGM { class: zone }
+
+app -> lite
+lite -> gw
+gw -> pod
+pod -> vllm
+vllm -> gpu
+ks -> pod: 원하는 replica 유지 { style.stroke-dash: 3 }
+op -> gpu: 장치 · health { style.stroke-dash: 3 }
 ```
 
 KServe controller는 request path 바깥에 있다. controller가 predictor replica를 유지하고, 실제 요청은
@@ -51,20 +83,45 @@ request ID와 시간 축으로 이어야 한다.
 LLM 요청 비용은 요청 개수보다 token 양에 크게 좌우된다. 긴 prompt는 prefill 시간을, 긴 답변은 decode
 시간과 KV cache를 오래 사용한다.
 
-```mermaid
-flowchart LR
-    IN["요청 도착"] --> Q["vLLM queue<br/>GPU 차례를 기다림"]
-    Q --> PF["prefill<br/>입력 token 계산"]
-    PF --> FIRST["첫 token<br/>TTFT"]
-    FIRST --> DE["decode<br/>한 token씩 생성"]
-    DE --> DONE["응답 완료<br/>ITL · 전체 시간"]
+```d2 layout=elk pad=40 title="요청이 도착해 vLLM queue에서 GPU 차례를 기다리고, prefill로 입력 token을 계산해 첫 token(TTFT)이 나온 뒤 decode로 한 token씩 생성해 응답이 끝나는 단계"
+direction: down
 
-    classDef key fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
-    classDef warn fill:#fef3c7,stroke:#d97706,color:#78350f
-    classDef ok fill:#dcfce7,stroke:#16a34a,color:#14532d
-    class IN,FIRST,DONE key
-    class Q,PF warn
-    class DE ok
+classes: {
+  key: {
+    style: {
+      fill: "#dbeafe"
+      stroke: "#2563eb"
+      font-color: "#1e3a8a"
+    }
+  }
+  warn: {
+    style: {
+      fill: "#fef3c7"
+      stroke: "#d97706"
+      font-color: "#78350f"
+    }
+  }
+  ok: {
+    style: {
+      fill: "#dcfce7"
+      stroke: "#16a34a"
+      font-color: "#14532d"
+    }
+  }
+}
+
+in: 요청 도착 { class: key }
+q: "vLLM queue\nGPU 차례를 기다림" { class: warn }
+pf: "prefill\n입력 token 계산" { class: warn }
+first: "첫 token\nTTFT" { class: key }
+de: "decode\n한 token씩 생성" { class: ok }
+done: "응답 완료\nITL · 전체 시간" { class: key }
+
+in -> q
+q -> pf
+pf -> first
+first -> de
+de -> done
 ```
 
 TTFT가 길다고 모두 GPU 연산이 느린 것은 아니다. queue에서 오래 기다렸을 수도 있고, 긴 prompt의
@@ -261,20 +318,48 @@ GPU utilization 95% 자체는 장애가 아니다. **이용자 SLO 악화, queue
 뜻이 아니다. 동기식 LLM 요청에서는 model별 실행 상한 `C`, 대기 상한 `Q`, 대기 시간 budget `Wq`를
 정하고 넘친 요청을 429나 503으로 빠르게 돌려주는 admission control이 먼저다.
 
-```mermaid
-flowchart LR
-    USER["이용자"] --> LITE["LiteLLM<br/>key · team quota"]
-    LITE --> ADMIT{"Gateway admission<br/>실행 C · 대기 Q"}
-    ADMIT -->|"C 안쪽"| VQ["vLLM waiting<br/>짧게 유지"]
-    ADMIT -->|"Q도 가득 참"| REJECT["429 · 503<br/>빠른 실패"]
-    VQ --> GPU["prefill · decode"]
+```d2 layout=elk pad=40 title="이용자 요청이 LiteLLM의 key·team quota를 지나 Gateway admission에서 실행 C 안쪽이면 짧게 유지되는 vLLM waiting을 거쳐 prefill·decode로 가고, 대기 Q까지 가득 차면 429·503으로 빠르게 실패하는 흐름"
+direction: down
 
-    classDef key fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
-    classDef warn fill:#fef3c7,stroke:#d97706,color:#78350f
-    classDef ok fill:#dcfce7,stroke:#16a34a,color:#14532d
-    class LITE,ADMIT key
-    class VQ,GPU ok
-    class REJECT warn
+classes: {
+  key: {
+    style: {
+      fill: "#dbeafe"
+      stroke: "#2563eb"
+      font-color: "#1e3a8a"
+    }
+  }
+  warn: {
+    style: {
+      fill: "#fef3c7"
+      stroke: "#d97706"
+      font-color: "#78350f"
+    }
+  }
+  ok: {
+    style: {
+      fill: "#dcfce7"
+      stroke: "#16a34a"
+      font-color: "#14532d"
+    }
+  }
+}
+
+user: 이용자
+lite: "LiteLLM\nkey · team quota" { class: key }
+admit: "Gateway admission\n실행 C · 대기 Q" {
+  shape: diamond
+  class: key
+}
+vq: "vLLM waiting\n짧게 유지" { class: ok }
+reject: "429 · 503\n빠른 실패" { class: warn }
+gpu: prefill · decode { class: ok }
+
+user -> lite
+lite -> admit
+admit -> vq: C 안쪽
+admit -> reject: Q도 가득 참
+vq -> gpu
 ```
 
 ### 세 제어점을 섞지 않는다

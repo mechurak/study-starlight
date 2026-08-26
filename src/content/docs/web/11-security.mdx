@@ -47,16 +47,17 @@ curl로는 재현이 안 되고, 서버끼리는 CORS가 없고, "CORS 우회"�
 정당한 요청인데, 도메인이 달라서 SOP에 걸린다. 그래서 **서버가 허락을 선언하는** 표준이
 CORS다.
 
-```mermaid
-sequenceDiagram
-    participant B as 브라우저 (myapp.com의 JS)
-    participant S as api.myapp.com
+```d2 pad=40 title="브라우저가 다른 출처의 API에 PATCH를 보내기 전에 OPTIONS 프리플라이트로 허락을 묻고, 서버가 Allow-Origin과 Allow-Methods로 답한 뒤에야 진짜 요청과 응답이 오가는 CORS 순서도"
+shape: sequence_diagram
 
-    Note over B: fetch('https://api.myapp.com/memos', { method: 'PATCH', … })
-    B->>S: ① 프리플라이트 — OPTIONS /memos<br/>"myapp.com이 PATCH를 보내려는데 되나?"
-    S-->>B: ② Access-Control-Allow-Origin: https://myapp.com<br/>Access-Control-Allow-Methods: PATCH
-    B->>S: ③ 진짜 요청 — PATCH /memos
-    S-->>B: ④ 응답 (①의 허락 덕에 JS가 읽을 수 있음)
+b: "브라우저 (myapp.com의 JS)"
+s: api.myapp.com
+
+b.note: "fetch('https://api.myapp.com/memos', { method: 'PATCH', … })"
+b -> s: "① 프리플라이트 — OPTIONS /memos\n\"myapp.com이 PATCH를 보내려는데 되나?\""
+s -> b: "② Access-Control-Allow-Origin: https://myapp.com\nAccess-Control-Allow-Methods: PATCH" { style.stroke-dash: 3 }
+b -> s: "③ 진짜 요청 — PATCH /memos"
+s -> b: "④ 응답 (①의 허락 덕에 JS가 읽을 수 있음)" { style.stroke-dash: 3 }
 ```
 
 - 단순한 요청(GET, 일반 POST)은 프리플라이트 없이 바로 가고, 응답 헤더만 검사한다.
@@ -94,18 +95,19 @@ Google이 인증한 사용자 신원을 검증 가능한 ID Token으로 받는 �
 
 흐름의 뼈대(인가 코드 방식)는 이렇다 —
 
-```mermaid
-sequenceDiagram
-    participant U as 사용자
-    participant A as 내 앱 (myapp.com)
-    participant G as Google
+```d2 pad=40 title="사용자가 Google로 로그인을 누르면 앱이 Google 로그인 페이지로 보내고, 동의 뒤 인가 코드를 들고 앱으로 돌아와 그 코드를 ID Token으로 교환하는 순서도"
+shape: sequence_diagram
 
-    U->>A: "Google로 로그인" 클릭
-    A->>G: ① Google 로그인 페이지로 이동시킴
-    U->>G: ② Google에서 로그인 + "myapp에 허용?" 동의
-    G->>A: ③ 인가 코드를 들려서 내 앱으로 돌려보냄<br/>(redirect: myapp.com/callback?code=abc123)
-    A->>G: ④ 코드를 토큰으로 교환
-    G-->>A: ⑤ ID Token (+ 필요하면 액세스 토큰)
+u: 사용자
+a: "내 앱 (myapp.com)"
+g: Google
+
+u -> a: "\"Google로 로그인\" 클릭"
+a -> g: ① Google 로그인 페이지로 이동시킴
+u -> g: "② Google에서 로그인 + \"myapp에 허용?\" 동의"
+g -> a: "③ 인가 코드를 들려서 내 앱으로 돌려보냄\n(redirect: myapp.com/callback?code=abc123)"
+a -> g: ④ 코드를 토큰으로 교환
+g -> a: "⑤ ID Token (+ 필요하면 액세스 토큰)" { style.stroke-dash: 3 }
 ```
 
 비밀번호는 ②에서 Google 화면에만 입력된다 — 내 앱은 구경도 못 한다.

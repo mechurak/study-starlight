@@ -20,27 +20,65 @@ import TermIntro from '../../../components/docs/TermIntro.astro';
 
 ## 같은 플랫폼에 두 개의 흐름이 있다
 
-```mermaid
-flowchart LR
-    subgraph request["요청의 길 · 매 API 호출마다"]
-        direction LR
-        APP["앱"] --> LITE["LiteLLM"] --> SVC["Gateway · Service"] --> POD["vLLM · FastAPI"] --> GPU["GPU"]
-    end
-    subgraph control["운영의 길 · 배포와 복구 때"]
-        direction LR
-        GIT["Git"] --> ISVC["InferenceService"] --> KS["KServe controller"] --> K8S["Deployment · Service · Pod"]
-    end
-    K8S -. "실행 상태를 만든다" .-> POD
-    OP["GPU Operator"] -. "GPU 사용 기반을 만든다" .-> GPU
+```d2 layout=elk pad=40 title="매 API 호출마다 앱에서 LiteLLM·Gateway·모델 Pod·GPU로 이어지는 요청의 길과, 배포·복구 때 Git에서 InferenceService·KServe controller·쿠버네티스 객체로 이어지는 운영의 길을 나란히 놓은 그림"
+direction: down
 
-    classDef key fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
-    classDef zone fill:#ede9fe,stroke:#7c3aed,color:#4c1d95
-    classDef ok fill:#dcfce7,stroke:#16a34a,color:#14532d
-    classDef warn fill:#fef3c7,stroke:#d97706,color:#78350f
-    class APP,LITE,GIT key
-    class ISVC,KS,SVC zone
-    class POD,GPU ok
-    class K8S,OP warn
+classes: {
+  key: {
+    style: {
+      fill: "#dbeafe"
+      stroke: "#2563eb"
+      font-color: "#1e3a8a"
+    }
+  }
+  zone: {
+    style: {
+      fill: "#ede9fe"
+      stroke: "#7c3aed"
+      font-color: "#4c1d95"
+    }
+  }
+  ok: {
+    style: {
+      fill: "#dcfce7"
+      stroke: "#16a34a"
+      font-color: "#14532d"
+    }
+  }
+  warn: {
+    style: {
+      fill: "#fef3c7"
+      stroke: "#d97706"
+      font-color: "#78350f"
+    }
+  }
+}
+
+request: 요청의 길 · 매 API 호출마다 {
+
+  app: 앱 { class: key }
+  lite: LiteLLM { class: key }
+  svc: Gateway · Service { class: zone }
+  pod: vLLM · FastAPI { class: ok }
+  gpu: GPU { class: ok }
+
+  app -> lite -> svc -> pod -> gpu
+}
+
+control: 운영의 길 · 배포와 복구 때 {
+
+  git: Git { class: key }
+  isvc: InferenceService { class: zone }
+  ks: KServe controller { class: zone }
+  k8s: Deployment · Service · Pod { class: warn }
+
+  git -> isvc -> ks -> k8s
+}
+
+op: GPU Operator { class: warn }
+
+control.k8s -> request.pod: 실행 상태를 만든다 { style.stroke-dash: 3 }
+op -> request.gpu: GPU 사용 기반을 만든다 { style.stroke-dash: 3 }
 ```
 
 사용자 요청은 KServe controller를 거치지 않는다. 이미 만들어진 Service와 모델 Pod로 간다. 반대로

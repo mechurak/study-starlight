@@ -21,20 +21,49 @@ import TermIntro from '../../../components/docs/TermIntro.astro';
 
 ## 추론 Pod에는 두 가지가 들어온다
 
-```mermaid
-flowchart LR
-    REG["사내 image registry"] --> IC["node image cache"] --> POD["vLLM · FastAPI Pod"]
-    OBJ["model object store · HF mirror"] --> MC["node model cache"] --> POD
-    USER["LiteLLM · Gateway"] -->|"API 요청"| POD
-    POD --> GPU["GPU"]
-    POD --> METRIC["metric · log · trace"]
+```d2 layout=elk pad=40 title="사내 image registry와 model object store가 각각 node image cache와 node model cache를 거쳐 vLLM·FastAPI Pod에 닿고, LiteLLM·Gateway의 API 요청이 그 Pod로 들어가며 Pod가 GPU와 관측 신호로 이어지는 데이터 경로"
+direction: down
 
-    classDef key fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
-    classDef zone fill:#ede9fe,stroke:#7c3aed,color:#4c1d95
-    classDef ok fill:#dcfce7,stroke:#16a34a,color:#14532d
-    class REG,OBJ,USER key
-    class IC,MC zone
-    class POD,GPU,METRIC ok
+classes: {
+  key: {
+    style: {
+      fill: "#dbeafe"
+      stroke: "#2563eb"
+      font-color: "#1e3a8a"
+    }
+  }
+  zone: {
+    style: {
+      fill: "#ede9fe"
+      stroke: "#7c3aed"
+      font-color: "#4c1d95"
+    }
+  }
+  ok: {
+    style: {
+      fill: "#dcfce7"
+      stroke: "#16a34a"
+      font-color: "#14532d"
+    }
+  }
+}
+
+reg: 사내 image registry { class: key }
+obj: model object store · HF mirror { class: key }
+user: LiteLLM · Gateway { class: key }
+ic: node image cache { class: zone }
+mc: node model cache { class: zone }
+pod: vLLM · FastAPI Pod { class: ok }
+gpu: GPU { class: ok }
+metric: metric · log · trace { class: ok }
+
+reg -> ic
+ic -> pod
+obj -> mc
+mc -> pod
+user -> pod: API 요청
+pod -> gpu
+pod -> metric
 ```
 
 왼쪽 두 줄은 **서버를 준비하는 길**이고, 아래 한 줄은 **준비된 서버를 호출하는 길**이다. model download가
@@ -87,21 +116,46 @@ RDMA와 Network Operator는 모든 serving의 필수 구성요소가 아니다. 
 
 ## 다중 노드 추론은 node 수보다 연결이 중요하다
 
-```mermaid
-flowchart LR
-    GW["Inference route"] --> LEADER["leader Pod<br/>request coordination"]
-    LEADER <-->|"NCCL · RDMA"| WORKER["worker Pod"]
-    LEADER --> G1["GPU group · node A"]
-    WORKER --> G2["GPU group · node B"]
-    CACHE["model cache"] --> LEADER
-    CACHE --> WORKER
+```d2 layout=elk pad=40 title="Inference route가 leader Pod로 요청을 보내고 leader와 worker Pod가 NCCL·RDMA로 오가며 각각 노드 A와 노드 B의 GPU group을 쓰고, model cache가 두 Pod에 모두 연결된 다중 노드 추론 구조"
+direction: down
 
-    classDef key fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
-    classDef zone fill:#ede9fe,stroke:#7c3aed,color:#4c1d95
-    classDef ok fill:#dcfce7,stroke:#16a34a,color:#14532d
-    class GW,CACHE key
-    class LEADER,WORKER zone
-    class G1,G2 ok
+classes: {
+  key: {
+    style: {
+      fill: "#dbeafe"
+      stroke: "#2563eb"
+      font-color: "#1e3a8a"
+    }
+  }
+  zone: {
+    style: {
+      fill: "#ede9fe"
+      stroke: "#7c3aed"
+      font-color: "#4c1d95"
+    }
+  }
+  ok: {
+    style: {
+      fill: "#dcfce7"
+      stroke: "#16a34a"
+      font-color: "#14532d"
+    }
+  }
+}
+
+gw: Inference route { class: key }
+cache: model cache { class: key }
+leader: "leader Pod\nrequest coordination" { class: zone }
+worker: worker Pod { class: zone }
+g1: GPU group · node A { class: ok }
+g2: GPU group · node B { class: ok }
+
+gw -> leader
+leader <-> worker: NCCL · RDMA
+leader -> g1
+worker -> g2
+cache -> leader
+cache -> worker
 ```
 
 두 node의 GPU 개수만 맞아도 통신 topology·NIC·MTU·RDMA resource가 다르면 시작 실패나 낮은 처리량이 난다.

@@ -21,24 +21,55 @@ import TermIntro from '../../../components/docs/TermIntro.astro';
 
 ## 네 동작의 순서
 
-```mermaid
-flowchart LR
-    REQ["chat-general 요청"] --> PICK["① 같은 group에서<br/>deployment 선택"]
-    PICK --> CALL["② 호출"]
-    CALL -->|"일시 오류"| RETRY["③ 제한된 retry"]
-    RETRY -->|"반복 실패"| COOL["④ deployment cooldown"]
-    RETRY -->|"group 실패"| FALL["⑤ 다른 model group fallback"]
-    CALL -->|"성공"| OK["응답"]
-    FALL --> OK
+```d2 layout=elk pad=40 title="chat-general 요청이 deployment 선택과 호출을 거쳐 성공하면 응답으로, 일시 오류면 제한된 retry로 가고 반복 실패는 cooldown, group 실패는 다른 model group fallback으로 이어지는 흐름"
+direction: down
 
-    classDef key  fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
-    classDef warn fill:#fef3c7,stroke:#d97706,color:#78350f
-    classDef bad  fill:#fee2e2,stroke:#dc2626,color:#7f1d1d
-    classDef ok   fill:#dcfce7,stroke:#16a34a,color:#14532d
-    class REQ,PICK key
-    class CALL,RETRY warn
-    class COOL,FALL bad
-    class OK ok
+classes: {
+  key: {
+    style: {
+      fill: "#dbeafe"
+      stroke: "#2563eb"
+      font-color: "#1e3a8a"
+    }
+  }
+  warn: {
+    style: {
+      fill: "#fef3c7"
+      stroke: "#d97706"
+      font-color: "#78350f"
+    }
+  }
+  bad: {
+    style: {
+      fill: "#fee2e2"
+      stroke: "#dc2626"
+      font-color: "#7f1d1d"
+    }
+  }
+  ok: {
+    style: {
+      fill: "#dcfce7"
+      stroke: "#16a34a"
+      font-color: "#14532d"
+    }
+  }
+}
+
+req: chat-general 요청 { class: key }
+pick: "① 같은 group에서\ndeployment 선택" { class: key }
+call: ② 호출 { class: warn }
+retry: ③ 제한된 retry { class: warn }
+cool: ④ deployment cooldown { class: bad }
+fall: ⑤ 다른 model group fallback { class: bad }
+ok: 응답 { class: ok }
+
+req -> pick
+pick -> call
+call -> retry: 일시 오류
+retry -> cool: 반복 실패
+retry -> fall: group 실패
+call -> ok: 성공
+fall -> ok
 ```
 
 같은 모델명 두 항목은 load balancing 후보다. `chat-general → chat-small`은 fallback이다. 이 둘을

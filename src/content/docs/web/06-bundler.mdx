@@ -45,17 +45,39 @@ import TermIntro from '../../../components/docs/TermIntro.astro';
 
 </Steps>
 
-```mermaid
-flowchart LR
-    A["src/<br/>TS · JSX<br/>모듈 수백 개"] --> B["번들러<br/>그래프 → 변환 → 묶기 → 다이어트"]
-    B --> C["dist/<br/>JS 몇 개 + CSS<br/>브라우저가 바로 실행"]
+```d2 layout=elk pad=40 title="모듈 수백 개인 src의 TS·JSX를 번들러가 그래프 구성·변환·묶기·다이어트를 거쳐 브라우저가 바로 실행하는 dist의 JS 몇 개와 CSS로 만드는 흐름"
+direction: down
 
-    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
-    classDef key  fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
-    classDef ok   fill:#dcfce7,stroke:#16a34a,color:#14532d
-    class A mute
-    class B key
-    class C ok
+classes: {
+  mute: {
+    style: {
+      fill: "#f1f5f9"
+      stroke: "#94a3b8"
+      font-color: "#334155"
+    }
+  }
+  key: {
+    style: {
+      fill: "#dbeafe"
+      stroke: "#2563eb"
+      font-color: "#1e3a8a"
+    }
+  }
+  ok: {
+    style: {
+      fill: "#dcfce7"
+      stroke: "#16a34a"
+      font-color: "#14532d"
+    }
+  }
+}
+
+a: "src/\nTS · JSX\n모듈 수백 개" { class: mute }
+b: "번들러\n그래프 → 변환 → 묶기 → 다이어트" { class: key }
+c: "dist/\nJS 몇 개 + CSS\n브라우저가 바로 실행" { class: ok }
+
+a -> b
+b -> c
 ```
 
 `pnpm build`가 만들어 내는 `dist/` 폴더가 이 결과물이고, 배포(12장)란 이 폴더를

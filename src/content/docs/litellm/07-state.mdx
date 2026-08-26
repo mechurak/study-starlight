@@ -80,22 +80,55 @@ response cache를 쓰지 않더라도 coordination 용도의 Redis는 필요할 
 
 ## 장애 정책
 
-```mermaid
-flowchart TB
-    FAIL["의존성 장애"] --> Q{"무엇이 끊겼나"}
-    Q -->|"Postgres"| PG["새 key/cache miss · budget · 관리 기능 영향"]
-    Q -->|"Redis"| RD["전역 limit · cooldown · cache 일관성 영향"]
-    PG --> SAFE{"격리된 내부망이며<br/>승인된 fail-open인가"}
-    SAFE -->|"아니오"| CLOSE["fail-closed · 명확한 5xx/503"]
-    SAFE -->|"예"| DEG["제한된 모델만 degraded serving"]
-    RD --> SINGLE["필요하면 replica/worker를 1로 축소<br/>한도 의미 보존"]
+```d2 layout=elk pad=40 title="의존성 장애가 Postgres인지 Redis인지로 갈리고, Postgres 쪽은 승인된 fail-open 여부에 따라 fail-closed 또는 degraded serving으로, Redis 쪽은 replica 축소로 이어지는 판단 흐름"
+direction: down
 
-    classDef bad  fill:#fee2e2,stroke:#dc2626,color:#7f1d1d
-    classDef warn fill:#fef3c7,stroke:#d97706,color:#78350f
-    classDef ok   fill:#dcfce7,stroke:#16a34a,color:#14532d
-    class FAIL,PG,RD bad
-    class Q,SAFE warn
-    class CLOSE,DEG,SINGLE ok
+classes: {
+  bad: {
+    style: {
+      fill: "#fee2e2"
+      stroke: "#dc2626"
+      font-color: "#7f1d1d"
+    }
+  }
+  warn: {
+    style: {
+      fill: "#fef3c7"
+      stroke: "#d97706"
+      font-color: "#78350f"
+    }
+  }
+  ok: {
+    style: {
+      fill: "#dcfce7"
+      stroke: "#16a34a"
+      font-color: "#14532d"
+    }
+  }
+}
+
+fail: 의존성 장애 { class: bad }
+q: 무엇이 끊겼나 {
+  shape: diamond
+  class: warn
+}
+pg: "새 key/cache miss · budget · 관리 기능 영향" { class: bad }
+rd: "전역 limit · cooldown · cache 일관성 영향" { class: bad }
+safe: "격리된 내부망이며\n승인된 fail-open인가" {
+  shape: diamond
+  class: warn
+}
+close: "fail-closed · 명확한 5xx/503" { class: ok }
+deg: 제한된 모델만 degraded serving { class: ok }
+single: "필요하면 replica/worker를 1로 축소\n한도 의미 보존" { class: ok }
+
+fail -> q
+q -> pg: Postgres
+q -> rd: Redis
+pg -> safe
+safe -> close: 아니오
+safe -> deg: 예
+rd -> single
 ```
 
 LiteLLM에는 DB unavailable 상태에서 요청을 허용하는 설정이 있지만, 공식 문서도 public internet에서 접근할 수

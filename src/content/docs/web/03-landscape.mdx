@@ -46,28 +46,54 @@ import TermIntro from '../../../components/docs/TermIntro.astro';
 
 교과서의 3계층(프론트 / 백 / DB)이 그대로 안 지켜지는 게 요즘 스택의 특징이다.
 
-```mermaid
-flowchart LR
-    subgraph F["전통적 구분"]
-        direction TB
-        F1["프론트엔드"] --- F2["백엔드"] --- F3["DB"]
-    end
-    subgraph M["2026년의 현실"]
-        direction TB
-        M1["Next.js<br/>화면 + 서버 코드까지"]
-        M2["Supabase<br/>DB + 인증 + 파일 + 실시간"]
-        M3["별도 백엔드<br/>필요해지면 그때"]
-        M1 --- M2
-        M2 --- M3
-    end
-    F -.->|"경계가 흐려짐"| M
+```d2 layout=elk pad=40 title="프론트엔드·백엔드·DB로 나누던 전통적 구분과, Next.js가 화면과 서버 코드를 함께 맡고 Supabase가 DB·인증·파일·실시간을 맡으며 별도 백엔드는 필요해질 때 두는 2026년의 현실을 나란히 놓고 경계가 흐려졌음을 표시한 그림"
+direction: down
 
-    classDef key  fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
-    classDef ok   fill:#dcfce7,stroke:#16a34a,color:#14532d
-    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
-    class M1 key
-    class M2 ok
-    class F1,F2,F3,M3 mute
+classes: {
+  key: {
+    style: {
+      fill: "#dbeafe"
+      stroke: "#2563eb"
+      font-color: "#1e3a8a"
+    }
+  }
+  ok: {
+    style: {
+      fill: "#dcfce7"
+      stroke: "#16a34a"
+      font-color: "#14532d"
+    }
+  }
+  mute: {
+    style: {
+      fill: "#f1f5f9"
+      stroke: "#94a3b8"
+      font-color: "#334155"
+    }
+  }
+}
+
+f: 전통적 구분 {
+
+  f1: 프론트엔드 { class: mute }
+  f2: 백엔드 { class: mute }
+  f3: DB { class: mute }
+
+  f1 -- f2
+  f2 -- f3
+}
+
+m: 2026년의 현실 {
+
+  m1: "Next.js\n화면 + 서버 코드까지" { class: key }
+  m2: "Supabase\nDB + 인증 + 파일 + 실시간" { class: ok }
+  m3: "별도 백엔드\n필요해지면 그때" { class: mute }
+
+  m1 -- m2
+  m2 -- m3
+}
+
+f -> m: 경계가 흐려짐 { style.stroke-dash: 3 }
 ```
 
 - **메타 프레임워크는 프론트만이 아니다.** Next.js는 서버에서 코드를 실행하고 API도 만든다.

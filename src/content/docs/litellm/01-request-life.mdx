@@ -21,28 +21,31 @@ import TermIntro from '../../../components/docs/TermIntro.astro';
 
 ## 전체 순서
 
-```mermaid
-sequenceDiagram
-    participant A as 애플리케이션
-    participant L as LiteLLM
-    participant R as Redis
-    participant P as Postgres
-    participant M as LLM endpoint
-    participant O as Langfuse · 로그
+```d2 pad=40 title="애플리케이션 요청이 LiteLLM에서 Redis 캐시 조회, Postgres 정책 조회, 판정, deployment 선택을 거쳐 LLM endpoint로 가고 응답과 함께 spend 기록·callback이 나가는 순서도"
+shape: sequence_diagram
 
-    A->>L: Bearer key + 공개 model + prompt
-    L->>R: key cache · rate-limit counter
-    alt key cache miss
-        L->>P: key · team · budget 조회
-        P-->>L: 정책
-    end
-    L->>L: model access · budget · rate limit 판정
-    L->>L: deployment 선택 · retry/fallback 계획
-    L->>M: provider 형식으로 변환한 요청
-    M-->>L: 응답 또는 stream
-    L-->>A: 공통 형식 응답 + x-litellm-call-id
-    L-->>P: spend 기록
-    L-->>O: success/failure callback
+a: 애플리케이션
+l: LiteLLM
+r: Redis
+p: Postgres
+m: LLM endpoint
+o: Langfuse · 로그
+
+a -> l: Bearer key + 공개 model + prompt
+l -> r: key cache · rate-limit counter
+
+key cache miss: {
+  l -> p: key · team · budget 조회
+  p -> l: 정책 { style.stroke-dash: 3 }
+}
+
+l -> l: model access · budget · rate limit 판정
+l -> l: deployment 선택 · retry/fallback 계획
+l -> m: provider 형식으로 변환한 요청
+m -> l: 응답 또는 stream { style.stroke-dash: 3 }
+l -> a: 공통 형식 응답 + x-litellm-call-id { style.stroke-dash: 3 }
+l -> p: spend 기록 { style.stroke-dash: 3 }
+l -> o: success/failure callback { style.stroke-dash: 3 }
 ```
 
 앞부분은 **들여보낼지**, 가운데는 **어디로 보낼지**, 끝부분은 **무슨 일이 있었는지 남길지**를 결정한다.

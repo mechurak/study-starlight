@@ -9,35 +9,89 @@ import { Card, CardGrid, LinkCard } from '@astrojs/starlight/components';
 
 ## 전체 지도 — 한 번에 접기
 
-```mermaid
-flowchart TB
-    subgraph REQ["요청의 길 (1~2장)"]
-        direction LR
-        R1["브라우저"] --> R2["CDN"] --> R3["오리진"] --> R4["DB"]
-    end
-    subgraph TOOL["도구 사슬 (4~7장)"]
-        direction LR
-        T1["런타임<br/>Node 24"] --> T2["패키지<br/>pnpm"] --> T3["빌드<br/>Vite 8"]
-    end
-    subgraph QUAL["지키는 것 (8~9장)"]
-        direction LR
-        Q1["타입·린트·테스트"] --> Q2["CI"]
-    end
-    subgraph SHIP["서비스로 (10~13장)"]
-        direction LR
-        S1["API · DB"] --> S3["브라우저 보안<br/>CORS · PKCE"] --> S2["배포<br/>git push = 배포"] --> S4["Cloudflare<br/>edge · Access"]
-    end
-    TOOL --> QUAL --> SHIP
-    SHIP -.->|"사용자의 요청이 다시"| REQ
+```d2 layout=elk pad=40 title="브라우저에서 CDN·오리진·DB로 가는 요청의 길, 런타임에서 패키지와 빌드로 이어지는 도구 사슬, 타입·린트·테스트에서 CI로 가는 품질 관문, API·DB에서 브라우저 보안과 배포·Cloudflare로 가는 서비스화를 네 묶음으로 정리하고 다시 요청의 길로 돌아오는 덱 전체 요약도"
+direction: down
 
-    classDef key  fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
-    classDef ok   fill:#dcfce7,stroke:#16a34a,color:#14532d
-    classDef warn fill:#fef3c7,stroke:#d97706,color:#78350f
-    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
-    class R1,R2,R3,R4 mute
-    class T1,T2,T3 key
-    class Q1,Q2 ok
-    class S1,S2,S3,S4 warn
+classes: {
+  key: {
+    style: {
+      fill: "#dbeafe"
+      stroke: "#2563eb"
+      font-color: "#1e3a8a"
+    }
+  }
+  ok: {
+    style: {
+      fill: "#dcfce7"
+      stroke: "#16a34a"
+      font-color: "#14532d"
+    }
+  }
+  warn: {
+    style: {
+      fill: "#fef3c7"
+      stroke: "#d97706"
+      font-color: "#78350f"
+    }
+  }
+  mute: {
+    style: {
+      fill: "#f1f5f9"
+      stroke: "#94a3b8"
+      font-color: "#334155"
+    }
+  }
+}
+
+req: "요청의 길 (1~2장)" {
+  grid-columns: 4
+
+  r1: 브라우저 { class: mute }
+  r2: CDN { class: mute }
+  r3: 오리진 { class: mute }
+  r4: DB { class: mute }
+
+  r1 -> r2
+  r2 -> r3
+  r3 -> r4
+}
+
+tool: "도구 사슬 (4~7장)" {
+  grid-columns: 3
+
+  t1: "런타임\nNode 24" { class: key }
+  t2: "패키지\npnpm" { class: key }
+  t3: "빌드\nVite 8" { class: key }
+
+  t1 -> t2
+  t2 -> t3
+}
+
+qual: "지키는 것 (8~9장)" {
+  grid-columns: 2
+
+  q1: 타입·린트·테스트 { class: ok }
+  q2: CI { class: ok }
+
+  q1 -> q2
+}
+
+ship: "서비스로 (10~13장)" {
+  grid-columns: 4
+
+  s1: API · DB { class: warn }
+  s3: "브라우저 보안\nCORS · PKCE" { class: warn }
+  s2: "배포\ngit push = 배포" { class: warn }
+  s4: "Cloudflare\nedge · Access" { class: warn }
+
+  s1 -> s3
+  s3 -> s2
+  s2 -> s4
+}
+
+tool -> qual
+qual -> ship
+ship -> req: 사용자의 요청이 다시 { style.stroke-dash: 3 }
 ```
 
 ## 장별 한 문장

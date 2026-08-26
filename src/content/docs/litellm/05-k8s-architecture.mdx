@@ -21,39 +21,82 @@ import TermIntro from '../../../components/docs/TermIntro.astro';
 
 ## 권장 시작 구조
 
-```mermaid
-flowchart TB
-    CLIENT["사내 애플리케이션"] --> GW["Gateway API<br/>TLS · 내부 DNS"]
-    GW --> SVC["Service<br/>litellm:4000"]
+```d2 layout=elk pad=40 title="사내 애플리케이션이 Gateway API와 Service를 거쳐 온프렘 쿠버네티스의 LiteLLM Pod 두 개로 들어오고, Pod가 ConfigMap·Secret을 공유하며 Pod 밖의 Postgres HA·Redis HA·외부 provider·사내 model endpoint·관측 스택에 연결되는 배치"
+direction: down
 
-    subgraph K8S["온프렘 Kubernetes"]
-      direction TB
-      SVC --> P1["LiteLLM Pod A<br/>1 worker"]
-      SVC --> P2["LiteLLM Pod B<br/>1 worker"]
-      P1 --- CM["ConfigMap<br/>config.yaml"]
-      P2 --- CM
-      P1 --- SEC["Secret mount/env"]
-      P2 --- SEC
-      MIG["migration Job"] --> PG
-    end
+classes: {
+  key: {
+    style: {
+      fill: "#dbeafe"
+      stroke: "#2563eb"
+      font-color: "#1e3a8a"
+    }
+  }
+  zone: {
+    style: {
+      fill: "#ede9fe"
+      stroke: "#7c3aed"
+      font-color: "#4c1d95"
+    }
+  }
+  warn: {
+    style: {
+      fill: "#fef3c7"
+      stroke: "#d97706"
+      font-color: "#78350f"
+    }
+  }
+  ok: {
+    style: {
+      fill: "#dcfce7"
+      stroke: "#16a34a"
+      font-color: "#14532d"
+    }
+  }
+}
 
-    P1 --> PG[("Postgres HA")]
-    P2 --> PG
-    P1 --> REDIS[("Redis HA")]
-    P2 --> REDIS
-    P1 --> EXT["외부 provider"]
-    P2 --> LOCAL["사내 model endpoint"]
-    P1 -.-> OBS["Prometheus · 로그 · Langfuse"]
-    P2 -.-> OBS
+client: 사내 애플리케이션 { class: key }
+gw: "Gateway API\nTLS · 내부 DNS" { class: key }
+svc: "Service\nlitellm:4000" { class: key }
 
-    classDef key  fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
-    classDef zone fill:#ede9fe,stroke:#7c3aed,color:#4c1d95
-    classDef warn fill:#fef3c7,stroke:#d97706,color:#78350f
-    classDef ok   fill:#dcfce7,stroke:#16a34a,color:#14532d
-    class CLIENT,GW,SVC key
-    class P1,P2,CM,SEC,MIG zone
-    class PG,REDIS warn
-    class EXT,LOCAL,OBS ok
+k8s: 온프렘 Kubernetes {
+  p1: "LiteLLM Pod A\n1 worker" { class: zone }
+  p2: "LiteLLM Pod B\n1 worker" { class: zone }
+  cm: "ConfigMap\nconfig.yaml" { class: zone }
+  sec: Secret mount/env { class: zone }
+  mig: migration Job { class: zone }
+
+  p1 -- cm
+  p2 -- cm
+  p1 -- sec
+  p2 -- sec
+}
+
+pg: Postgres HA {
+  shape: cylinder
+  class: warn
+}
+redis: Redis HA {
+  shape: cylinder
+  class: warn
+}
+ext: 외부 provider { class: ok }
+local: 사내 model endpoint { class: ok }
+obs: Prometheus · 로그 · Langfuse { class: ok }
+
+client -> gw
+gw -> svc
+svc -> k8s.p1
+svc -> k8s.p2
+k8s.mig -> pg
+k8s.p1 -> pg
+k8s.p2 -> pg
+k8s.p1 -> redis
+k8s.p2 -> redis
+k8s.p1 -> ext
+k8s.p2 -> local
+k8s.p1 -> obs: { style.stroke-dash: 3 }
+k8s.p2 -> obs: { style.stroke-dash: 3 }
 ```
 
 첫 production은 **monolithic chart, 2개 이상 replica, worker 1개/Pod**로 시작하는 편이 운영 경계가 작다.

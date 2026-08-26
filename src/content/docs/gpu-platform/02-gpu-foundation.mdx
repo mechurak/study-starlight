@@ -23,32 +23,64 @@ import SourceFigure from '../../../components/docs/SourceFigure.astro';
 
 ## 전체에서 GPU Operator의 자리
 
-```mermaid
-flowchart TB
-    ISVC["KServe InferenceService"] --> POD["model Pod<br/>limits: nvidia.com/gpu: 1"]
-    K8S["Kubernetes scheduler · kubelet"] --> POD
-    subgraph node["GPU node · GPU Operator가 준비하는 영역"]
-        DP["device plugin<br/>GPU resource 광고"]
-        CTK["Container Toolkit · CDI<br/>장치를 container에 연결"]
-        DRV["NVIDIA driver<br/>OS가 GPU와 통신"]
-        GPU["물리 GPU · MIG instance"]
-        DRV --> GPU
-        CTK --> DRV
-        DP --> CTK
-    end
-    DP -. "Allocatable" .-> K8S
-    POD --> CTK
-    GFD["GFD<br/>GPU label"] -.-> K8S
-    DCGM["DCGM Exporter<br/>health · metric"] -.-> OBS["Prometheus"]
+```d2 layout=elk pad=40 title="InferenceService와 쿠버네티스 스케줄러가 model Pod를 만들고, GPU node 안에서 device plugin·Container Toolkit·NVIDIA driver를 거쳐 물리 GPU에 닿는 경로와 GFD·DCGM Exporter가 각각 스케줄러와 Prometheus로 신호를 보내는 그림"
+direction: down
 
-    classDef key fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
-    classDef zone fill:#ede9fe,stroke:#7c3aed,color:#4c1d95
-    classDef ok fill:#dcfce7,stroke:#16a34a,color:#14532d
-    classDef warn fill:#fef3c7,stroke:#d97706,color:#78350f
-    class ISVC,K8S key
-    class DP,CTK,GFD,DCGM zone
-    class POD,OBS ok
-    class DRV,GPU warn
+classes: {
+  key: {
+    style: {
+      fill: "#dbeafe"
+      stroke: "#2563eb"
+      font-color: "#1e3a8a"
+    }
+  }
+  zone: {
+    style: {
+      fill: "#ede9fe"
+      stroke: "#7c3aed"
+      font-color: "#4c1d95"
+    }
+  }
+  ok: {
+    style: {
+      fill: "#dcfce7"
+      stroke: "#16a34a"
+      font-color: "#14532d"
+    }
+  }
+  warn: {
+    style: {
+      fill: "#fef3c7"
+      stroke: "#d97706"
+      font-color: "#78350f"
+    }
+  }
+}
+
+isvc: KServe InferenceService { class: key }
+k8s: Kubernetes scheduler · kubelet { class: key }
+pod: "model Pod\nlimits: nvidia.com/gpu: 1" { class: ok }
+gfd: "GFD\nGPU label" { class: zone }
+dcgm: "DCGM Exporter\nhealth · metric" { class: zone }
+obs: Prometheus { class: ok }
+
+node: GPU node · GPU Operator가 준비하는 영역 {
+  dp: "device plugin\nGPU resource 광고" { class: zone }
+  ctk: "Container Toolkit · CDI\n장치를 container에 연결" { class: zone }
+  drv: "NVIDIA driver\nOS가 GPU와 통신" { class: warn }
+  gpu: 물리 GPU · MIG instance { class: warn }
+
+  dp -> ctk
+  ctk -> drv
+  drv -> gpu
+}
+
+isvc -> pod
+k8s -> pod
+pod -> node.ctk
+node.dp -> k8s: Allocatable { style.stroke-dash: 3 }
+gfd -> k8s: { style.stroke-dash: 3 }
+dcgm -> obs: { style.stroke-dash: 3 }
 ```
 
 위에서 `InferenceService`가 GPU 한 장을 요구해도 아래 사슬이 준비되지 않으면 Pod는 실행되지 않는다.
@@ -87,22 +119,23 @@ GFD의 label은 **이 node가 어떤 GPU인지** 알려 주고, device plugin의
 
 ## Pod가 GPU를 받는 순간
 
-```mermaid
-sequenceDiagram
-    participant DP as Device Plugin
-    participant KL as kubelet
-    participant SC as Scheduler
-    participant CRI as containerd · CDI
-    participant P as Model Pod
+```d2 pad=40 title="Device Plugin이 kubelet에 GPU 개수를 알리고 스케줄러가 node를 고른 뒤, kubelet의 Allocate 요청과 CDI device 반환을 거쳐 containerd가 GPU를 붙인 컨테이너를 만들고 모델 Pod의 CUDA가 그 GPU를 보게 되는 순서도"
+shape: sequence_diagram
 
-    DP->>KL: 이 node에 nvidia.com/gpu가 N개 있음
-    KL->>SC: Capacity · Allocatable 갱신
-    P->>SC: nvidia.com/gpu: 1 + nodeSelector 요청
-    SC->>KL: label과 빈 GPU가 맞는 node에 bind
-    KL->>DP: 선택한 GPU를 Allocate 요청
-    DP-->>KL: CDI device와 환경 정보 반환
-    KL->>CRI: GPU device를 포함해 container 생성
-    CRI-->>P: CUDA가 선택된 GPU를 볼 수 있음
+dp: Device Plugin
+kl: kubelet
+sc: Scheduler
+cri: containerd · CDI
+p: Model Pod
+
+dp -> kl: 이 node에 nvidia.com/gpu가 N개 있음
+kl -> sc: Capacity · Allocatable 갱신
+p -> sc: "nvidia.com/gpu: 1 + nodeSelector 요청"
+sc -> kl: label과 빈 GPU가 맞는 node에 bind
+kl -> dp: 선택한 GPU를 Allocate 요청
+dp -> kl: CDI device와 환경 정보 반환 { style.stroke-dash: 3 }
+kl -> cri: GPU device를 포함해 container 생성
+cri -> p: CUDA가 선택된 GPU를 볼 수 있음 { style.stroke-dash: 3 }
 ```
 
 여기서 GPU Operator는 scheduler를 대신하지 않는다. scheduler는 device plugin이 광고한 **개수**와 node

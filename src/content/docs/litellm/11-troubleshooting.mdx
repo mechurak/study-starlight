@@ -21,21 +21,47 @@ import TermIntro from '../../../components/docs/TermIntro.astro';
 
 ## 진단 사다리
 
-```mermaid
-flowchart TB
-    A["① DNS · TLS · Gateway"] --> B["② LiteLLM liveness · readiness"]
-    B --> C["③ key · model access · budget"]
-    C --> D["④ Redis limit · cooldown"]
-    D --> E["⑤ router가 고른 deployment"]
-    E --> F["⑥ provider DNS · TLS · quota · model"]
-    F --> G["⑦ 응답 뒤 spend · callback"]
+```d2 layout=elk pad=40 title="장애를 볼 때 DNS·TLS·Gateway부터 liveness, key와 model access, Redis limit, router의 deployment 선택, provider quota, 응답 뒤 spend·callback까지 일곱 단계를 순서대로 훑는 점검 순서"
+direction: down
 
-    classDef key  fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
-    classDef zone fill:#ede9fe,stroke:#7c3aed,color:#4c1d95
-    classDef warn fill:#fef3c7,stroke:#d97706,color:#78350f
-    class A,B key
-    class C,D,E zone
-    class F,G warn
+classes: {
+  key: {
+    style: {
+      fill: "#dbeafe"
+      stroke: "#2563eb"
+      font-color: "#1e3a8a"
+    }
+  }
+  zone: {
+    style: {
+      fill: "#ede9fe"
+      stroke: "#7c3aed"
+      font-color: "#4c1d95"
+    }
+  }
+  warn: {
+    style: {
+      fill: "#fef3c7"
+      stroke: "#d97706"
+      font-color: "#78350f"
+    }
+  }
+}
+
+a: ① DNS · TLS · Gateway { class: key }
+b: ② LiteLLM liveness · readiness { class: key }
+c: ③ key · model access · budget { class: zone }
+d: ④ Redis limit · cooldown { class: zone }
+e: ⑤ router가 고른 deployment { class: zone }
+f: ⑥ provider DNS · TLS · quota · model { class: warn }
+g: ⑦ 응답 뒤 spend · callback { class: warn }
+
+a -> b
+b -> c
+c -> d
+d -> e
+e -> f
+f -> g
 ```
 
 각 층의 성공 증거를 하나씩 모은다. provider dashboard가 정상이라는 이유로 client TLS를 건너뛰거나,
@@ -93,18 +119,41 @@ curl -fsS http://127.0.0.1:4000/health/readiness
 
 ## timeout과 긴 tail latency
 
-```mermaid
-flowchart LR
-    SLOW["느린 요청"] --> Q{"어디서 기다렸나"}
-    Q -->|"handler 전"| POD["Pod 포화 · event loop<br/>in-flight와 Gateway latency"]
-    Q -->|"정책 조회"| STATE["Postgres · Redis latency"]
-    Q -->|"provider"| UP["queue · TTFT · network"]
-    Q -->|"여러 번 시도"| RETRY["retry · fallback 누적"]
+```d2 layout=elk pad=40 title="느린 요청이 handler 전 Pod 포화, 정책 조회의 Postgres·Redis latency, provider의 queue와 TTFT, 여러 번 시도한 retry·fallback 누적 중 어디서 기다렸는지로 갈리는 판단 그림"
+direction: down
 
-    classDef bad  fill:#fee2e2,stroke:#dc2626,color:#7f1d1d
-    classDef warn fill:#fef3c7,stroke:#d97706,color:#78350f
-    class SLOW bad
-    class Q,POD,STATE,UP,RETRY warn
+classes: {
+  bad: {
+    style: {
+      fill: "#fee2e2"
+      stroke: "#dc2626"
+      font-color: "#7f1d1d"
+    }
+  }
+  warn: {
+    style: {
+      fill: "#fef3c7"
+      stroke: "#d97706"
+      font-color: "#78350f"
+    }
+  }
+}
+
+slow: 느린 요청 { class: bad }
+q: 어디서 기다렸나 {
+  shape: diamond
+  class: warn
+}
+pod: "Pod 포화 · event loop\nin-flight와 Gateway latency" { class: warn }
+state: Postgres · Redis latency { class: warn }
+up: queue · TTFT · network { class: warn }
+retry: retry · fallback 누적 { class: warn }
+
+slow -> q
+q -> pod: handler 전
+q -> state: 정책 조회
+q -> up: provider
+q -> retry: 여러 번 시도
 ```
 
 평균 latency가 아니라 attempt별 시간과 p99를 본다. fallback 성공은 최종 status를 200으로 만들 수 있어도
