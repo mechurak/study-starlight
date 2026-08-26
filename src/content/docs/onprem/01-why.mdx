@@ -36,23 +36,47 @@ import TermIntro from '../../../components/docs/TermIntro.astro';
 쪽이 없어진 것**이다. 클라우드에서 `type: LoadBalancer`를 성립시킨 건 쿠버네티스가 아니라
 사업자의 클라우드 컨트롤러였다.
 
-```mermaid
-flowchart LR
-    subgraph cloud["클라우드"]
-        direction TB
-        M1["Service<br/>type: LoadBalancer"] --> CCM["클라우드 컨트롤러"] --> ELB["ELB 생성 · IP 할당"]
-    end
-    subgraph on["온프렘"]
-        direction TB
-        M2["Service<br/>type: LoadBalancer"] --> GAP["???"] --> PEND["EXTERNAL-IP: pending"]
-    end
+```d2 layout=elk pad=40 title="클라우드에서는 LoadBalancer 타입 Service를 클라우드 컨트롤러가 받아 ELB를 만들어 주지만, 온프렘에서는 그 자리가 비어 EXTERNAL-IP가 pending에 머무는 대비"
+grid-columns: 2
 
-    classDef ok   fill:#dcfce7,stroke:#16a34a,color:#14532d
-    classDef bad  fill:#fee2e2,stroke:#dc2626,color:#7f1d1d
-    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
-    class ELB ok
-    class GAP,PEND bad
-    class M1,M2,CCM mute
+classes: {
+  ok: {
+    style: {
+      fill: "#dcfce7"
+      stroke: "#16a34a"
+      font-color: "#14532d"
+    }
+  }
+  bad: {
+    style: {
+      fill: "#fee2e2"
+      stroke: "#dc2626"
+      font-color: "#7f1d1d"
+    }
+  }
+  mute: {
+    style: {
+      fill: "#f1f5f9"
+      stroke: "#94a3b8"
+      font-color: "#334155"
+    }
+  }
+}
+
+cloud: 클라우드 {
+  grid-rows: 3
+  m1: "Service\ntype: LoadBalancer" { class: mute }
+  ccm: 클라우드 컨트롤러 { class: mute }
+  elb: ELB 생성 · IP 할당 { class: ok }
+  m1 -> ccm -> elb
+}
+on: 온프렘 {
+  grid-rows: 3
+  m2: "Service\ntype: LoadBalancer" { class: mute }
+  gap: "???" { class: bad }
+  pend: "EXTERNAL-IP: pending" { class: bad }
+  m2 -> gap -> pend
+}
 ```
 
 ## 해법 — 빈칸을 세고 하나씩 채운다
@@ -107,45 +131,64 @@ DB가 없으면 Keycloak을 못 올리고, Keycloak이 없으면 Grafana에 SSO�
 빈칸을 다 채우면 이런 모양이 된다. **아래층이 죽으면 위층이 같이 죽는다** —
 이 그림이 [12장](/onprem/12-ops/) 진단 사다리의 원본이다.
 
-```mermaid
-flowchart LR
-    subgraph L5["⑤ 서비스"]
-        direction TB
-        APP["사내 앱 · 사용자"]
-    end
-    subgraph L4["④ 운영 도구"]
-        direction TB
-        GIT["Argo CD"]
-        OBS["Prometheus · Loki · Tempo · Grafana"]
-        BK["Velero"]
-    end
-    subgraph L3["③ 상태"]
-        direction TB
-        S3O[("오브젝트 스토리지")]
-        DB[("CloudNativePG")]
-    end
-    subgraph L2["② 입구"]
-        direction TB
-        NET["MetalLB · Gateway · cert-manager · external-dns"]
-        AUTH["Keycloak · oauth2-proxy"]
-    end
-    subgraph L1["① 바닥"]
-        direction TB
-        K8S["노드 · etcd · CNI · CSI"]
-    end
+```d2 layout=elk pad=40 title="① 바닥(노드·etcd·CNI·CSI) 위에 ② 입구(MetalLB·Gateway·인증)와 ③ 상태(오브젝트 스토리지·CloudNativePG), 그 위에 ④ 운영 도구와 ⑤ 서비스가 얹히는 온프렘 다섯 층 구조"
+grid-rows: 5
 
-    APP --> L4
-    APP --> L2
-    L4 --> L3
-    L3 --> L1
-    L2 --> L1
+classes: {
+  zone: {
+    style: {
+      fill: "#ede9fe"
+      stroke: "#7c3aed"
+      font-color: "#4c1d95"
+    }
+  }
+  key: {
+    style: {
+      fill: "#dbeafe"
+      stroke: "#2563eb"
+      font-color: "#1e3a8a"
+    }
+  }
+  mute: {
+    style: {
+      fill: "#f1f5f9"
+      stroke: "#94a3b8"
+      font-color: "#334155"
+    }
+  }
+}
 
-    classDef zone fill:#ede9fe,stroke:#7c3aed,color:#4c1d95
-    classDef key  fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
-    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
-    class K8S,NET,AUTH zone
-    class S3O,DB key
-    class APP,GIT,OBS,BK mute
+l5: ⑤ 서비스 {
+  app: 사내 앱 · 사용자 { class: mute }
+}
+l4: ④ 운영 도구 {
+  git: Argo CD { class: mute }
+  obs: "Prometheus · Loki\n· Tempo · Grafana" { class: mute }
+  bk: Velero { class: mute }
+}
+l3: ③ 상태 {
+  s3o: 오브젝트 스토리지 {
+    shape: cylinder
+    class: key
+  }
+  db: CloudNativePG {
+    shape: cylinder
+    class: key
+  }
+}
+l2: ② 입구 {
+  net: "MetalLB · Gateway\n· cert-manager · external-dns" { class: zone }
+  auth: "Keycloak\n· oauth2-proxy" { class: zone }
+}
+l1: ① 바닥 {
+  k8s: "노드 · etcd\n· CNI · CSI" { class: zone }
+}
+
+l5.app -> l4
+l5.app -> l2
+l4 -> l3
+l3 -> l1
+l2 -> l1
 ```
 
 | 층 | 내용 | 죽으면 |

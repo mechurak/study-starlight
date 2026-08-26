@@ -208,24 +208,55 @@ def step(self, action):
 방향 예측은 지도학습에 맡기고, **RL은 그 위에서 크기와 실행을 맡는 하이브리드**가
 현실적인 구조다.
 
-```mermaid
-flowchart LR
-    D["시장 데이터"] --> F["특징 생성"]
-    F --> SL["지도학습 예측기<br/>방향·변동성 전망"]
-    F --> ST["상태 구성"]
-    SL --> ST
-    ST --> RL["RL 정책<br/>목표 비중 · 실행"]
-    RL --> EX["주문 실행 로직"]
-    EX --> RISK["리스크 한도 · 마스킹"]
+```d2 layout=elk pad=40 title="시장 데이터에서 특징을 만들어 지도학습 예측기와 상태 구성으로 보내고, RL 정책이 목표 비중을 정한 뒤 주문 실행과 리스크 한도를 거치는 파이프라인"
+direction: down
 
-    classDef key  fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
-    classDef ok   fill:#dcfce7,stroke:#16a34a,color:#14532d
-    classDef warn fill:#fef3c7,stroke:#d97706,color:#78350f
-    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
-    class SL key
-    class RL ok
-    class RISK warn
-    class D,F,ST,EX mute
+classes: {
+  key: {
+    style: {
+      fill: "#dbeafe"
+      stroke: "#2563eb"
+      font-color: "#1e3a8a"
+    }
+  }
+  ok: {
+    style: {
+      fill: "#dcfce7"
+      stroke: "#16a34a"
+      font-color: "#14532d"
+    }
+  }
+  warn: {
+    style: {
+      fill: "#fef3c7"
+      stroke: "#d97706"
+      font-color: "#78350f"
+    }
+  }
+  mute: {
+    style: {
+      fill: "#f1f5f9"
+      stroke: "#94a3b8"
+      font-color: "#334155"
+    }
+  }
+}
+
+d: 시장 데이터 { class: mute }
+f: 특징 생성 { class: mute }
+sl: "지도학습 예측기\n방향·변동성 전망" { class: key }
+st: 상태 구성 { class: mute }
+rl: "RL 정책\n목표 비중 · 실행" { class: ok }
+ex: 주문 실행 로직 { class: mute }
+risk: 리스크 한도 · 마스킹 { class: warn }
+
+d -> f
+f -> sl
+f -> st
+sl -> st
+st -> rl
+rl -> ex
+ex -> risk
 ```
 
 ## 설계 점검표

@@ -116,20 +116,46 @@ Q*(s,a) = E[ r + γ · max_a' Q*(s', a') ]
 
 전이 확률 `P`를 다 안다면 벨만 방정식을 **그냥 반복해서 풀면** 된다.
 
-```mermaid
-flowchart LR
-    A["정책 π를 아무렇게나 시작"] --> B["정책 평가<br/>V^π 를 수렴할 때까지 갱신"]
-    B --> C["정책 개선<br/>π(s) ← argmax_a Q(s,a)"]
-    C --> D{"정책이 바뀌었나"}
-    D -->|"그렇다"| B
-    D -->|"아니다"| E["최적 정책 π*"]
+```d2 layout=elk pad=40 title="정책 평가와 정책 개선을 번갈아 돌리다가 정책이 더 안 바뀌면 최적 정책에 도달하는 정책 반복 순환도"
+direction: down
 
-    classDef key  fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
-    classDef ok   fill:#dcfce7,stroke:#16a34a,color:#14532d
-    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
-    class A mute
-    class B,C key
-    class E ok
+classes: {
+  key: {
+    style: {
+      fill: "#dbeafe"
+      stroke: "#2563eb"
+      font-color: "#1e3a8a"
+    }
+  }
+  ok: {
+    style: {
+      fill: "#dcfce7"
+      stroke: "#16a34a"
+      font-color: "#14532d"
+    }
+  }
+  mute: {
+    style: {
+      fill: "#f1f5f9"
+      stroke: "#94a3b8"
+      font-color: "#334155"
+    }
+  }
+}
+
+a: 정책 π를 아무렇게나 시작 { class: mute }
+b: "정책 평가\nV^π 를 수렴할 때까지 갱신" { class: key }
+c: "정책 개선\nπ(s) ← argmax_a Q(s,a)" { class: key }
+d: 정책이 바뀌었나 {
+  shape: diamond
+}
+e: 최적 정책 π* { class: ok }
+
+a -> b
+b -> c
+c -> d
+d -> b: 그렇다
+d -> e: 아니다
 ```
 
 **평가 → 개선을 번갈아 하면 최적 정책에 도달한다**는 것이 동적 계획법의 결론이고,
@@ -225,27 +251,60 @@ GAE(λ) : 위 전부를 λ로 가중 평균한 것          ← λ 하나로 저
 
 지금까지의 재료로 뒤 장들의 지도를 그릴 수 있다.
 
-```mermaid
-flowchart TB
-    B["벨만 방정식"] --> V["가치를 배운다<br/>Q(s,a)를 맞히고 argmax"]
-    B --> P["정책을 직접 배운다<br/>π(a|s)를 경사로 민다"]
-    V --> DQN["DQN 계열 — 4장<br/>이산 행동에 강하다"]
-    P --> PG["정책 경사 — 5장<br/>연속 행동 가능, 분산이 크다"]
-    PG --> AC["액터-크리틱<br/>가치로 분산을 줄인다"]
-    AC --> PPO["PPO — 6장<br/>널리 쓰이는 on-policy 기준선"]
-    V --> SAC["SAC · TD3 — 6장<br/>off-policy 연속 제어"]
-    AC --> SAC
-    DQN --> OFF["오프라인 RL — 7장<br/>새 데이터 없이"]
-    SAC --> OFF
+```d2 layout=elk pad=40 title="벨만 방정식에서 가치를 배우는 갈래(DQN·SAC)와 정책을 직접 배우는 갈래(정책 경사·액터-크리틱·PPO)가 갈라졌다가 오프라인 RL로 모이는 알고리즘 계보도"
+direction: down
 
-    classDef key  fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
-    classDef ok   fill:#dcfce7,stroke:#16a34a,color:#14532d
-    classDef warn fill:#fef3c7,stroke:#d97706,color:#78350f
-    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
-    class B key
-    class DQN,PPO,SAC ok
-    class OFF warn
-    class V,P,PG,AC mute
+classes: {
+  key: {
+    style: {
+      fill: "#dbeafe"
+      stroke: "#2563eb"
+      font-color: "#1e3a8a"
+    }
+  }
+  ok: {
+    style: {
+      fill: "#dcfce7"
+      stroke: "#16a34a"
+      font-color: "#14532d"
+    }
+  }
+  warn: {
+    style: {
+      fill: "#fef3c7"
+      stroke: "#d97706"
+      font-color: "#78350f"
+    }
+  }
+  mute: {
+    style: {
+      fill: "#f1f5f9"
+      stroke: "#94a3b8"
+      font-color: "#334155"
+    }
+  }
+}
+
+b: 벨만 방정식 { class: key }
+v: "가치를 배운다\nQ(s,a)를 맞히고 argmax" { class: mute }
+p: "정책을 직접 배운다\nπ(a|s)를 경사로 민다" { class: mute }
+dqn: "DQN 계열 — 4장\n이산 행동에 강하다" { class: ok }
+pg: "정책 경사 — 5장\n연속 행동 가능, 분산이 크다" { class: mute }
+ac: "액터-크리틱\n가치로 분산을 줄인다" { class: mute }
+ppo: "PPO — 6장\n널리 쓰이는 on-policy 기준선" { class: ok }
+sac: "SAC · TD3 — 6장\noff-policy 연속 제어" { class: ok }
+off: "오프라인 RL — 7장\n새 데이터 없이" { class: warn }
+
+b -> v
+b -> p
+v -> dqn
+p -> pg
+pg -> ac
+ac -> ppo
+v -> sac
+ac -> sac
+dqn -> off
+sac -> off
 ```
 
 | 갈래 | 핵심 아이디어 | 강점 | 약점 |

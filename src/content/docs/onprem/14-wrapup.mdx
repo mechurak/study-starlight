@@ -19,46 +19,68 @@ import TermIntro from '../../../components/docs/TermIntro.astro';
 
 ## 전체 지도
 
-```mermaid
-flowchart LR
-    subgraph L5["⑤ 서비스"]
-        direction TB
-        APP["사내 앱"]
-    end
-    subgraph L4["④ 운영 도구"]
-        direction TB
-        ARGO["Argo CD · 시크릿 — 9~10장"]
-        OBS["관측 스택 — 8장 · 관측 덱"]
-        VEL["Velero · etcd 스냅샷 — 11장"]
-    end
-    subgraph L3["③ 상태"]
-        direction TB
-        S3[("오브젝트 스토리지 — 6장")]
-        PG[("CloudNativePG — 7장")]
-    end
-    subgraph L2["② 입구"]
-        direction TB
-        NET["MetalLB · Gateway API — 3장"]
-        TLS["cert-manager · external-dns — 4장"]
-        AUTH["Keycloak · oauth2-proxy — 5장"]
-    end
-    subgraph L1["① 바닥"]
-        direction TB
-        BASE["노드 · etcd · CNI · CSI — 2장"]
-    end
+```d2 layout=elk pad=40 title="⑤ 서비스부터 ① 바닥까지 다섯 층에 각 장에서 채운 도구를 얹어 정리한 온프렘 플랫폼 전체 지도"
+grid-rows: 5
 
-    APP --> L2
-    APP --> L3
-    L4 --> L3
-    L2 --> L1
-    L3 --> L1
+classes: {
+  zone: {
+    style: {
+      fill: "#ede9fe"
+      stroke: "#7c3aed"
+      font-color: "#4c1d95"
+    }
+  }
+  key: {
+    style: {
+      fill: "#dbeafe"
+      stroke: "#2563eb"
+      font-color: "#1e3a8a"
+    }
+  }
+  mute: {
+    style: {
+      fill: "#f1f5f9"
+      stroke: "#94a3b8"
+      font-color: "#334155"
+    }
+  }
+}
 
-    classDef zone fill:#ede9fe,stroke:#7c3aed,color:#4c1d95
-    classDef key  fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
-    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
-    class BASE,NET,TLS,AUTH zone
-    class S3,PG key
-    class APP,ARGO,OBS,VEL mute
+l5: ⑤ 서비스 {
+  app: 사내 앱 { class: mute }
+}
+l4: ④ 운영 도구 {
+  grid-rows: 3
+  argo: Argo CD · 시크릿 — 9~10장 { class: mute }
+  obs: 관측 스택 — 8장 · 관측 덱 { class: mute }
+  vel: Velero · etcd 스냅샷 — 11장 { class: mute }
+}
+l3: ③ 상태 {
+  grid-rows: 2
+  s3: 오브젝트 스토리지 — 6장 {
+    shape: cylinder
+    class: key
+  }
+  pg: CloudNativePG — 7장 {
+    shape: cylinder
+    class: key
+  }
+}
+l2: ② 입구 {
+  grid-rows: 3
+  net: MetalLB · Gateway API — 3장 { class: zone }
+  tls: cert-manager · external-dns — 4장 { class: zone }
+  auth: Keycloak · oauth2-proxy — 5장 { class: zone }
+}
+l1: ① 바닥 {
+  base: 노드 · etcd · CNI · CSI — 2장 { class: zone }
+}
+
+l5.app -> l2
+l5.app -> l3
+l4 -> l3
+l2 -> l1
+l3 -> l1
 ```
 
 ## 장별 한 문장

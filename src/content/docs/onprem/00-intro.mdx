@@ -85,32 +85,52 @@ Kafka 운영 (→ [Kafka 덱](/kafka/)).
 
 얹은 도구가 열 개가 넘어도 **상태가 저장되는 곳은 몇 군데뿐**이다.
 
-```mermaid
-flowchart LR
-    subgraph up["상태를 갖는 위층"]
-        direction TB
-        LOKI["Loki (로그)"]
-        TEMPO["Tempo (트레이스)"]
-        VEL["Velero (백업)"]
-        KC["Keycloak"]
-        GRAF["Grafana"]
-    end
-    subgraph base["바닥"]
-        direction TB
-        S3[("오브젝트 스토리지<br/>MinIO 또는 대안")]
-        PG[("PostgreSQL<br/>CloudNativePG")]
-    end
-    LOKI --> S3
-    TEMPO --> S3
-    VEL --> S3
-    PG -->|"베이스백업 · WAL"| S3
-    KC --> PG
-    GRAF --> PG
+```d2 layout=elk pad=40 title="Loki·Tempo·Velero의 상태는 오브젝트 스토리지로, Keycloak·Grafana의 상태는 PostgreSQL로 떨어지고 PostgreSQL도 베이스백업·WAL을 오브젝트 스토리지에 두는 바닥 두 개 구조"
+direction: down
 
-    classDef ok   fill:#dcfce7,stroke:#16a34a,color:#14532d
-    classDef key  fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
-    class S3,PG key
-    class LOKI,TEMPO,VEL,KC,GRAF ok
+classes: {
+  ok: {
+    style: {
+      fill: "#dcfce7"
+      stroke: "#16a34a"
+      font-color: "#14532d"
+    }
+  }
+  key: {
+    style: {
+      fill: "#dbeafe"
+      stroke: "#2563eb"
+      font-color: "#1e3a8a"
+    }
+  }
+}
+
+up: 상태를 갖는 위층 {
+  grid-rows: 5
+  loki: Loki (로그) { class: ok }
+  tempo: Tempo (트레이스) { class: ok }
+  vel: Velero (백업) { class: ok }
+  kc: Keycloak { class: ok }
+  graf: Grafana { class: ok }
+}
+base: 바닥 {
+  grid-rows: 2
+  s3: "오브젝트 스토리지\nMinIO 또는 대안" {
+    shape: cylinder
+    class: key
+  }
+  pg: "PostgreSQL\nCloudNativePG" {
+    shape: cylinder
+    class: key
+  }
+}
+
+up.loki -> base.s3
+up.tempo -> base.s3
+up.vel -> base.s3
+base.pg -> base.s3: 베이스백업 · WAL
+up.kc -> base.pg
+up.graf -> base.pg
 ```
 
 그래서 **바닥을 어디에 두느냐**가 이 덱에서 제일 큰 결정이다. 관측 백엔드의 저장소를

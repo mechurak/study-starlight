@@ -86,28 +86,79 @@ import TermIntro from '../../../components/docs/TermIntro.astro';
 | **② 행동 간 결합** | 지금 행동이 다음 상태·선택지를 바꿔 뒤 결정과 **얽힌다** | 독립 채점 가능하면 → 밴딧·예측 + 최적화 |
 | **③ 보상을 정의할 수 있다** | 행동 순서 전체의 좋고 나쁨을 수치로 매길 수 있다 | 못 매기면 → 시연·보상 모델·문제 재정의 |
 
-```mermaid
-flowchart TB
-    Q1{"결정을 여러 번<br/>연달아 하는가"} -->|"아니다"| B1["지도학습 · 밴딧<br/>(추천, 광고 소재 선택)"]
-    Q1 -->|"그렇다"| Q2{"지금 행동이 미래 상태·선택지를<br/>바꾸는가"}
-    Q2 -->|"아니다"| B2["밴딧 · 매 스텝 예측<br/>(독립적으로 채점 가능)"]
-    Q2 -->|"그렇다"| Q3{"행동 순서 전체를<br/>채점할 수 있는가"}
-    Q3 -->|"아니다"| B3["시연 · 보상 모델 · 문제 재정의"]
-    Q3 -->|"그렇다"| Q4{"환경의 수식 모델을<br/>알고 있는가"}
-    Q4 -->|"안다"| B4["MPC · 최적 제어<br/>학습 없이 푼다"]
-    Q4 -->|"모른다"| Q5{"시행착오를 어디서<br/>몇 백만 번 하나"}
-    Q5 -->|"시뮬레이터가 있다"| RL1["강화학습 (온라인)<br/>→ 6장 PPO · SAC"]
-    Q5 -->|"과거 로그만 있다"| RL2["오프라인 강화학습<br/>→ 7장"]
-    Q5 -->|"둘 다 없다"| B5["여기서 멈춘다<br/>먼저 시뮬레이터나 로그부터"]
+```d2 layout=elk pad=40 title="순차적 결정인가·행동이 미래를 바꾸는가·전체를 채점할 수 있는가·수식 모델을 아는가·시행착오를 어디서 하는가 다섯 질문으로 강화학습을 쓸지 판정하는 분기도"
+direction: down
 
-    classDef ok   fill:#dcfce7,stroke:#16a34a,color:#14532d
-    classDef bad  fill:#fee2e2,stroke:#dc2626,color:#7f1d1d
-    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
-    classDef key  fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
-    class RL1,RL2 ok
-    class B5 bad
-    class B1,B2,B3,B4 mute
-    class Q1,Q2,Q3,Q4,Q5 key
+classes: {
+  ok: {
+    style: {
+      fill: "#dcfce7"
+      stroke: "#16a34a"
+      font-color: "#14532d"
+    }
+  }
+  bad: {
+    style: {
+      fill: "#fee2e2"
+      stroke: "#dc2626"
+      font-color: "#7f1d1d"
+    }
+  }
+  mute: {
+    style: {
+      fill: "#f1f5f9"
+      stroke: "#94a3b8"
+      font-color: "#334155"
+    }
+  }
+  key: {
+    style: {
+      fill: "#dbeafe"
+      stroke: "#2563eb"
+      font-color: "#1e3a8a"
+    }
+  }
+}
+
+q1: "결정을 여러 번\n연달아 하는가" {
+  shape: diamond
+  class: key
+}
+q2: "지금 행동이\n미래 상태·선택지를\n바꾸는가" {
+  shape: diamond
+  class: key
+}
+q3: "행동 순서 전체를\n채점할 수 있는가" {
+  shape: diamond
+  class: key
+}
+q4: "환경의 수식 모델을\n알고 있는가" {
+  shape: diamond
+  class: key
+}
+q5: "시행착오를 어디서\n몇 백만 번 하나" {
+  shape: diamond
+  class: key
+}
+b1: "지도학습 · 밴딧\n(추천, 광고\n소재 선택)" { class: mute }
+b2: "밴딧 · 매 스텝 예측\n(독립적으로 채점 가능)" { class: mute }
+b3: 시연 · 보상 모델 · 문제 재정의 { class: mute }
+b4: "MPC · 최적 제어\n학습 없이 푼다" { class: mute }
+b5: "여기서 멈춘다\n먼저 시뮬레이터나\n로그부터" { class: bad }
+rl1: "강화학습 (온라인)\n→ 6장 PPO · SAC" { class: ok }
+rl2: "오프라인 강화학습\n→ 7장" { class: ok }
+
+q1 -> b1: 아니다
+q1 -> q2: 그렇다
+q2 -> b2: 아니다
+q2 -> q3: 그렇다
+q3 -> b3: 아니다
+q3 -> q4: 그렇다
+q4 -> b4: 안다
+q4 -> q5: 모른다
+q5 -> rl1: 시뮬레이터가 있다
+q5 -> rl2: 과거 로그만 있다
+q5 -> b5: 둘 다 없다
 ```
 
 이 그림의 마지막 갈래가 이 덱의 두 응용을 정확히 가른다 —
@@ -186,29 +237,47 @@ RL을 얹으면 예측 오차 위에 학습 불안정성이 하나 더 쌓일 �
 로봇과 트레이딩은 도메인은 멀지만, **강화학습이 부딪히는 벽이 정확히 서로 반대**다.
 한쪽만 보면 "RL은 이런 것"이라는 상이 한쪽으로 기운다.
 
-```mermaid
-flowchart LR
-    subgraph R["로봇 — 14~16장"]
-        direction TB
-        R1["시뮬레이터를 만든다<br/>물리 법칙은 안 변한다"]
-        R2["샘플이 실물보다 싸다<br/>GPU에서 수천 개 병렬"]
-        R3["벽: sim-to-real<br/>시뮬과 실물이 다르다"]
-        R1 --> R2 --> R3
-    end
-    subgraph T["트레이딩 — 11~13장"]
-        direction TB
-        T1["시뮬레이터를 못 만든다<br/>내 주문이 시장을 바꾼다"]
-        T2["샘플은 과거 로그뿐<br/>더 못 뽑는다"]
-        T3["벽: 비정상성·과최적화<br/>어제와 내일이 다르다"]
-        T1 --> T2 --> T3
-    end
+```d2 layout=elk pad=40 title="로봇은 시뮬레이터를 만들 수 있어 샘플이 싸고 sim-to-real이 벽인 반면, 트레이딩은 시뮬레이터를 못 만들어 과거 로그뿐이고 비정상성·과최적화가 벽이라는 대비"
+grid-columns: 2
 
-    classDef ok   fill:#dcfce7,stroke:#16a34a,color:#14532d
-    classDef bad  fill:#fee2e2,stroke:#dc2626,color:#7f1d1d
-    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
-    class R1,R2 ok
-    class T1,T2 mute
-    class R3,T3 bad
+classes: {
+  ok: {
+    style: {
+      fill: "#dcfce7"
+      stroke: "#16a34a"
+      font-color: "#14532d"
+    }
+  }
+  bad: {
+    style: {
+      fill: "#fee2e2"
+      stroke: "#dc2626"
+      font-color: "#7f1d1d"
+    }
+  }
+  mute: {
+    style: {
+      fill: "#f1f5f9"
+      stroke: "#94a3b8"
+      font-color: "#334155"
+    }
+  }
+}
+
+r: 로봇 — 14~16장 {
+  grid-rows: 3
+  r1: "시뮬레이터를 만든다\n물리 법칙은 안 변한다" { class: ok }
+  r2: "샘플이 실물보다 싸다\nGPU에서 수천 개 병렬" { class: ok }
+  r3: "벽: sim-to-real\n시뮬과 실물이 다르다" { class: bad }
+  r1 -> r2 -> r3
+}
+t: 트레이딩 — 11~13장 {
+  grid-rows: 3
+  t1: "시뮬레이터를 못 만든다\n내 주문이 시장을 바꾼다" { class: mute }
+  t2: "샘플은 과거 로그뿐\n더 못 뽑는다" { class: mute }
+  t3: "벽: 비정상성·과최적화\n어제와 내일이 다르다" { class: bad }
+  t1 -> t2 -> t3
+}
 ```
 
 **같은 PPO가 로봇에서는 1순위, 트레이딩에서는 거의 안 쓰이는 이유**가 이 그림에 다 있다.

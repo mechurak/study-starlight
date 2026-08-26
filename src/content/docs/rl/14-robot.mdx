@@ -81,37 +81,57 @@ sim-to-real 성공률**의 문제다.
 | **제어 주기 흔들림** | 실물의 주기가 일정하지 않다 | 주기 지터 무작위화 |
 | **관측 누락** | 실물에는 지형 정보가 없다 | **교사-학생** (아래) |
 
-```mermaid
-flowchart LR
-    subgraph SIM["시뮬레이션"]
-        direction TB
-        S1["이상적인 모터"]
-        S2["정확한 물성치"]
-        S3["지연 없음"]
-        S4["완벽한 센서"]
-    end
-    subgraph REAL["실물"]
-        direction TB
-        R1["포화·마찰·백래시"]
-        R2["개체마다 다른 질량"]
-        R3["10~30ms 지연"]
-        R4["잡음 · 드리프트"]
-    end
-    subgraph FIX["메우는 장치"]
-        direction TB
-        F1["액추에이터 모델"]
-        F2["도메인 랜덤화"]
-        F3["지연 시뮬"]
-        F4["관측 잡음 주입"]
-    end
-    SIM --> FIX --> REAL
+```d2 layout=elk pad=40 title="시뮬레이션의 이상적 가정 네 가지와 실물의 현실 네 가지를 액추에이터 모델·도메인 랜덤화·지연 시뮬·관측 잡음 주입이 메우는 대응 관계"
+grid-columns: 3
 
-    classDef ok   fill:#dcfce7,stroke:#16a34a,color:#14532d
-    classDef bad  fill:#fee2e2,stroke:#dc2626,color:#7f1d1d
-    classDef key  fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
-    class S1,S2,S3,S4 ok
-    class R1,R2,R3,R4 bad
-    class F1,F2,F3,F4 key
+classes: {
+  ok: {
+    style: {
+      fill: "#dcfce7"
+      stroke: "#16a34a"
+      font-color: "#14532d"
+    }
+  }
+  bad: {
+    style: {
+      fill: "#fee2e2"
+      stroke: "#dc2626"
+      font-color: "#7f1d1d"
+    }
+  }
+  key: {
+    style: {
+      fill: "#dbeafe"
+      stroke: "#2563eb"
+      font-color: "#1e3a8a"
+    }
+  }
+}
+
+sim: 시뮬레이션 {
+  grid-rows: 4
+  s1: 이상적인 모터 { class: ok }
+  s2: 정확한 물성치 { class: ok }
+  s3: 지연 없음 { class: ok }
+  s4: 완벽한 센서 { class: ok }
+}
+fix: 메우는 장치 {
+  grid-rows: 4
+  f1: 액추에이터 모델 { class: key }
+  f2: 도메인 랜덤화 { class: key }
+  f3: 지연 시뮬 { class: key }
+  f4: 관측 잡음 주입 { class: key }
+}
+real: 실물 {
+  grid-rows: 4
+  r1: 포화·마찰·백래시 { class: bad }
+  r2: 개체마다 다른 질량 { class: bad }
+  r3: 10~30ms 지연 { class: bad }
+  r4: 잡음 · 드리프트 { class: bad }
+}
+
+sim -> fix
+fix -> real
 ```
 
 ### 도메인 랜덤화 — 실물을 "또 하나의 시뮬"로 만든다

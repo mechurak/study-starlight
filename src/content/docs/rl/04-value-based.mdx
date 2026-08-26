@@ -125,18 +125,43 @@ Q러닝 + 신경망은 **셋 다 해당한다.** DQN의 두 장치는 이 삼요
 연속된 경험은 서로 지나치게 닮아 있다. 방금 본 프레임 100장으로 학습하면
 신경망이 **최근 구간에만 맞춰졌다가 다음 구간에서 그걸 잊는다.**
 
-```mermaid
-flowchart LR
-    ENV["환경"] -->|"(s,a,r,s') 하나씩"| BUF[("재생 버퍼<br/>보통 10만~100만 개")]
-    BUF -->|"무작위로 32~256개"| NET["Q 신경망 학습"]
-    NET -->|"ε-greedy 로 행동"| ENV
+```d2 layout=elk pad=40 title="환경이 만든 전이를 재생 버퍼에 쌓고 무작위 미니배치로 Q 신경망을 학습해 ε-greedy로 다시 행동하는 DQN 학습 순환도"
+direction: down
 
-    classDef key  fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
-    classDef ok   fill:#dcfce7,stroke:#16a34a,color:#14532d
-    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
-    class BUF ok
-    class NET key
-    class ENV mute
+classes: {
+  key: {
+    style: {
+      fill: "#dbeafe"
+      stroke: "#2563eb"
+      font-color: "#1e3a8a"
+    }
+  }
+  ok: {
+    style: {
+      fill: "#dcfce7"
+      stroke: "#16a34a"
+      font-color: "#14532d"
+    }
+  }
+  mute: {
+    style: {
+      fill: "#f1f5f9"
+      stroke: "#94a3b8"
+      font-color: "#334155"
+    }
+  }
+}
+
+env: 환경 { class: mute }
+buf: "재생 버퍼\n보통 10만~100만 개" {
+  shape: cylinder
+  class: ok
+}
+net: Q 신경망 학습 { class: key }
+
+env -> buf: "(s,a,r,s') 하나씩"
+buf -> net: 무작위로 32~256개
+net -> env: ε-greedy 로 행동
 ```
 
 얻는 것이 둘이다 — **시간적 상관이 깨지고**, 경험 하나를 **여러 번 재사용**한다.

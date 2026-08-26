@@ -53,38 +53,72 @@ import TermIntro from '../../../components/docs/TermIntro.astro';
 이 스택으로 통일하는 이유는 하나다. **저장소가 한 종류로 모인다** —
 Loki도 Tempo도 오브젝트 스토리지에 쓴다.
 
-```mermaid
-flowchart LR
-    subgraph col["수집"]
-        direction TB
-        ALLOY["Grafana Alloy"]
-    end
-    subgraph store["저장"]
-        direction TB
-        PROM["Prometheus (메트릭)"]
-        LOKI["Loki (로그)"]
-        TEMPO["Tempo (트레이스)"]
-    end
-    K8S["노드 · 파드 · 앱"] --> ALLOY
-    ALLOY --> LOKI
-    ALLOY --> TEMPO
-    PROM -->|"긁어 간다 (pull)"| K8S
-    LOKI --> S3[("오브젝트 스토리지 — 6장")]
-    TEMPO --> S3
-    PROM --> AM["Alertmanager"]
-    GRAF["Grafana"] --> PROM
-    GRAF --> LOKI
-    GRAF --> TEMPO
-    GRAF --> PG[("PostgreSQL — 7장")]
+```d2 layout=elk pad=40 title="Alloy가 로그와 트레이스를 Loki·Tempo로 보내고 Prometheus는 직접 긁어 가며, Loki·Tempo의 상태는 오브젝트 스토리지에 Grafana의 상태는 PostgreSQL에 떨어지는 관측 스택 구조"
+direction: right
 
-    classDef key  fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
-    classDef ok   fill:#dcfce7,stroke:#16a34a,color:#14532d
-    classDef warn fill:#fef3c7,stroke:#d97706,color:#78350f
-    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
-    class S3,PG ok
-    class GRAF key
-    class AM warn
-    class K8S,ALLOY,PROM,LOKI,TEMPO mute
+classes: {
+  key: {
+    style: {
+      fill: "#dbeafe"
+      stroke: "#2563eb"
+      font-color: "#1e3a8a"
+    }
+  }
+  ok: {
+    style: {
+      fill: "#dcfce7"
+      stroke: "#16a34a"
+      font-color: "#14532d"
+    }
+  }
+  warn: {
+    style: {
+      fill: "#fef3c7"
+      stroke: "#d97706"
+      font-color: "#78350f"
+    }
+  }
+  mute: {
+    style: {
+      fill: "#f1f5f9"
+      stroke: "#94a3b8"
+      font-color: "#334155"
+    }
+  }
+}
+
+k8s: 노드 · 파드 · 앱 { class: mute }
+col: 수집 {
+  alloy: Grafana Alloy { class: mute }
+}
+store: 저장 {
+  grid-rows: 3
+  prom: Prometheus (메트릭) { class: mute }
+  loki: Loki (로그) { class: mute }
+  tempo: Tempo (트레이스) { class: mute }
+}
+s3: 오브젝트 스토리지 — 6장 {
+  shape: cylinder
+  class: ok
+}
+pg: PostgreSQL — 7장 {
+  shape: cylinder
+  class: ok
+}
+am: Alertmanager { class: warn }
+graf: Grafana { class: key }
+
+k8s -> col.alloy
+col.alloy -> store.loki
+col.alloy -> store.tempo
+store.prom -> k8s: 긁어 간다 (pull)
+store.loki -> s3
+store.tempo -> s3
+store.prom -> am
+graf -> store.prom
+graf -> store.loki
+graf -> store.tempo
+graf -> pg
 ```
 
 **이 덱의 두 번째 축이 여기서 그대로 보인다** — 초록 두 개가

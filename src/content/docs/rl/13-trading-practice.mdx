@@ -97,26 +97,58 @@ RL이 더하는 것은 **호가창 신호에 대한 반응**과 **체결 확률�
 
 ## 되는 자리들의 공통 조건
 
-```mermaid
-flowchart TB
-    C["금융에서 RL이 되는 자리"] --> C1["보상이 계산값이다<br/>예측이 아니다"]
-    C --> C2["호라이즌이 짧다<br/>레짐 변화 노출이 작다"]
-    C --> C3["데이터가 풍부하다<br/>틱·호가 단위"]
-    C --> C4["기준선이 명확하다<br/>TWAP · 델타헤지"]
-    C --> C5["내 행동이 이후 체결 기회를 바꾼다<br/>순차 결합이 강하다"]
+```d2 layout=elk pad=40 title="금융에서 RL이 되는 자리 다섯 조건과, 일봉 방향 예측 매매에서 그 다섯이 모두 반대로 뒤집히는 대비"
+direction: right
 
-    X["안 되는 자리 — 일봉 방향 예측 매매"] --> X1["보상이 거의 잡음"]
-    X --> X2["호라이즌이 길다"]
-    X --> X3["데이터가 5천 스텝"]
-    X --> X4["기준선이 매수 후 보유뿐"]
-    X --> X5["소액은 시장을 안 바꾼다"]
+classes: {
+  ok: {
+    style: {
+      fill: "#dcfce7"
+      stroke: "#16a34a"
+      font-color: "#14532d"
+    }
+  }
+  bad: {
+    style: {
+      fill: "#fee2e2"
+      stroke: "#dc2626"
+      font-color: "#7f1d1d"
+    }
+  }
+  key: {
+    style: {
+      fill: "#dbeafe"
+      stroke: "#2563eb"
+      font-color: "#1e3a8a"
+    }
+  }
+}
 
-    classDef ok   fill:#dcfce7,stroke:#16a34a,color:#14532d
-    classDef bad  fill:#fee2e2,stroke:#dc2626,color:#7f1d1d
-    classDef key  fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
-    class C key
-    class C1,C2,C3,C4,C5 ok
-    class X,X1,X2,X3,X4,X5 bad
+c: 금융에서 RL이 되는 자리 { class: key }
+c1: "보상이 계산값이다\n예측이 아니다" { class: ok }
+c2: "호라이즌이 짧다\n레짐 변화 노출이 작다" { class: ok }
+c3: "데이터가 풍부하다\n틱·호가 단위" { class: ok }
+c4: "기준선이 명확하다\nTWAP · 델타헤지" { class: ok }
+c5: "내 행동이 이후 체결 기회를 바꾼다\n순차 결합이 강하다" { class: ok }
+
+x: 안 되는 자리 — 일봉 방향 예측 매매 { class: bad }
+x1: 보상이 거의 잡음 { class: bad }
+x2: 호라이즌이 길다 { class: bad }
+x3: 데이터가 5천 스텝 { class: bad }
+x4: 기준선이 매수 후 보유뿐 { class: bad }
+x5: 소액은 시장을 안 바꾼다 { class: bad }
+
+c -> c1
+c -> c2
+c -> c3
+c -> c4
+c -> c5
+
+x -> x1
+x -> x2
+x -> x3
+x -> x4
+x -> x5
 ```
 
 **다섯 조건을 체크리스트로 쓸 수 있다.** 새 금융 RL 아이디어를 들었을 때

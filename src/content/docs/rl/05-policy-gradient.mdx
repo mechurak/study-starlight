@@ -145,24 +145,53 @@ A(s,a) ≈ r + γ·V(s') − V(s)        ← 3장의 TD 오차와 같은 식이�
 
 여기서 **액터-크리틱** 구조가 완성된다.
 
-```mermaid
-flowchart LR
-    S["상태 s"] --> ACT["액터 π(a|s;θ)<br/>행동을 고른다"]
-    S --> CRI["크리틱 V(s;w)<br/>이 자리의 값을 매긴다"]
-    ACT -->|"행동 a"| ENV["환경"]
-    ENV -->|"r, s'"| TD["어드밴티지 계산<br/>A = r + γV(s') − V(s)"]
-    CRI --> TD
-    TD -->|"A > 0 이면 확률↑"| ACT
-    TD -->|"예측 오차를 줄인다"| CRI
+```d2 layout=elk pad=40 title="상태를 받은 액터가 행동을 고르고 환경의 보상으로 어드밴티지를 계산해 액터의 확률과 크리틱의 예측을 함께 고치는 액터-크리틱 구조"
+direction: down
 
-    classDef key  fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
-    classDef ok   fill:#dcfce7,stroke:#16a34a,color:#14532d
-    classDef warn fill:#fef3c7,stroke:#d97706,color:#78350f
-    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
-    class ACT ok
-    class CRI key
-    class TD warn
-    class S,ENV mute
+classes: {
+  key: {
+    style: {
+      fill: "#dbeafe"
+      stroke: "#2563eb"
+      font-color: "#1e3a8a"
+    }
+  }
+  ok: {
+    style: {
+      fill: "#dcfce7"
+      stroke: "#16a34a"
+      font-color: "#14532d"
+    }
+  }
+  warn: {
+    style: {
+      fill: "#fef3c7"
+      stroke: "#d97706"
+      font-color: "#78350f"
+    }
+  }
+  mute: {
+    style: {
+      fill: "#f1f5f9"
+      stroke: "#94a3b8"
+      font-color: "#334155"
+    }
+  }
+}
+
+s: 상태 s { class: mute }
+act: "액터 π(a|s;θ)\n행동을 고른다" { class: ok }
+cri: "크리틱 V(s;w)\n이 자리의 값을 매긴다" { class: key }
+env: 환경 { class: mute }
+td: "어드밴티지 계산\nA = r + γV(s') − V(s)" { class: warn }
+
+s -> act
+s -> cri
+act -> env: 행동 a
+env -> td: "r, s'"
+cri -> td
+td -> act: A > 0 이면 확률↑
+td -> cri: 예측 오차를 줄인다
 ```
 
 | 역할 | 배우는 것 | 신호 |
@@ -207,21 +236,49 @@ flowchart LR
 
 액터-크리틱에는 아직 큰 구멍이 하나 있다. **정책을 얼마나 밀어야 하는가**이다.
 
-```mermaid
-flowchart TB
-    A["정책을 조금 민다"] --> B["새 정책으로 데이터를 모은다"]
-    B --> C{"너무 많이 밀었나"}
-    C -->|"그렇다"| D["나쁜 정책으로 데이터를 모은다<br/>→ 더 나쁜 갱신 → 붕괴"]
-    C -->|"아니다"| E["조금 나아진 정책"]
-    E --> A
-    D --> F["회복 불가<br/>지도학습과 결정적으로 다른 점"]
+```d2 layout=elk pad=40 title="정책을 조금 밀어 데이터를 모으는 순환에서, 너무 많이 밀면 나쁜 정책이 나쁜 데이터를 모아 회복 불가로 붕괴하는 경로"
+direction: down
 
-    classDef ok   fill:#dcfce7,stroke:#16a34a,color:#14532d
-    classDef bad  fill:#fee2e2,stroke:#dc2626,color:#7f1d1d
-    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
-    class E ok
-    class D,F bad
-    class A,B,C mute
+classes: {
+  ok: {
+    style: {
+      fill: "#dcfce7"
+      stroke: "#16a34a"
+      font-color: "#14532d"
+    }
+  }
+  bad: {
+    style: {
+      fill: "#fee2e2"
+      stroke: "#dc2626"
+      font-color: "#7f1d1d"
+    }
+  }
+  mute: {
+    style: {
+      fill: "#f1f5f9"
+      stroke: "#94a3b8"
+      font-color: "#334155"
+    }
+  }
+}
+
+a: 정책을 조금 민다 { class: mute }
+b: 새 정책으로 데이터를 모은다 { class: mute }
+c: 너무 많이 밀었나 {
+  shape: diamond
+  class: mute
+}
+d: "나쁜 정책으로 데이터를 모은다\n→ 더 나쁜 갱신 → 붕괴" { class: bad }
+e: 조금 나아진 정책 { class: ok }
+f: "회복 불가\n지도학습과 결정적으로 다른 점" { class: bad }
+
+a -> b
+b -> c
+c -> d: 그렇다
+c -> e: 아니다
+e -> a
+d -> f
 ```
 
 지도학습이라면 학습률을 크게 잡아 손실이 튀어도 다음 배치에서 회복한다.

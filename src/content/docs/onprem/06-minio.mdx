@@ -77,27 +77,56 @@ mc admin policy attach store readwrite --user loki-user
 
 ## 어디에 두나 — 이 장에서 제일 중요한 결정
 
-```mermaid
-flowchart LR
-    subgraph bad["① 클러스터 안에 둔다"]
-        direction TB
-        K1["쿠버네티스 클러스터"]
-        K1 --> L1["Loki"]
-        K1 --> S1[("오브젝트 스토리지")]
-        L1 --> S1
-    end
-    subgraph good["② 클러스터 밖에 둔다"]
-        direction TB
-        K2["쿠버네티스 클러스터"] --> L2["Loki"]
-        L2 -->|"S3 API"| S2[("전용 스토리지 노드")]
-    end
+```d2 layout=elk pad=40 title="오브젝트 스토리지를 클러스터 안에 두면 클러스터가 죽을 때 로그 저장소도 같이 죽고, 클러스터 밖 전용 스토리지 노드에 두면 S3 API로만 의존하는 대비"
+grid-columns: 2
 
-    classDef bad2 fill:#fee2e2,stroke:#dc2626,color:#7f1d1d
-    classDef ok   fill:#dcfce7,stroke:#16a34a,color:#14532d
-    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
-    class S1 bad2
-    class S2 ok
-    class K1,K2,L1,L2 mute
+classes: {
+  bad: {
+    style: {
+      fill: "#fee2e2"
+      stroke: "#dc2626"
+      font-color: "#7f1d1d"
+    }
+  }
+  ok: {
+    style: {
+      fill: "#dcfce7"
+      stroke: "#16a34a"
+      font-color: "#14532d"
+    }
+  }
+  mute: {
+    style: {
+      fill: "#f1f5f9"
+      stroke: "#94a3b8"
+      font-color: "#334155"
+    }
+  }
+}
+
+bad: ① 클러스터 안에 둔다 {
+  grid-rows: 3
+  k1: 쿠버네티스 클러스터 { class: mute }
+  l1: Loki { class: mute }
+  s1: 오브젝트 스토리지 {
+    shape: cylinder
+    class: bad
+  }
+  k1 -> l1
+  k1 -> s1
+  l1 -> s1
+}
+good: ② 클러스터 밖에 둔다 {
+  grid-rows: 3
+  k2: 쿠버네티스 클러스터 { class: mute }
+  l2: Loki { class: mute }
+  s2: 전용 스토리지 노드 {
+    shape: cylinder
+    class: ok
+  }
+  k2 -> l2
+  l2 -> s2: S3 API
+}
 ```
 
 | | 클러스터 안 | **클러스터 밖 (권장)** |

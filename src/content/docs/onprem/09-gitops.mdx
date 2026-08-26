@@ -40,20 +40,47 @@ CloudNativePG · kube-prometheus-stack · Loki · Tempo · Grafana · Alloy · V
 
 ## Argo CD — 원하는 상태를 계속 맞춘다
 
-```mermaid
-flowchart LR
-    DEV["사람"] -->|"PR · 머지"| GIT[("Git 저장소<br/>매니페스트 · values")]
-    ARGO["Argo CD"] -->|"주기적으로 읽는다"| GIT
-    ARGO -->|"차이가 있으면 적용"| K8S["클러스터"]
-    K8S -.->|"실제 상태 보고"| ARGO
-    ARGO -.->|"드리프트 알림"| OBS["Prometheus — 관측 덱 2장"]
+```d2 layout=elk pad=40 title="사람이 PR과 머지로 Git 저장소를 고치면 Argo CD가 주기적으로 읽어 차이를 클러스터에 적용하고, 실제 상태 보고와 드리프트 알림이 되돌아오는 GitOps 순환"
+direction: right
 
-    classDef key  fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
-    classDef ok   fill:#dcfce7,stroke:#16a34a,color:#14532d
-    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
-    class GIT ok
-    class ARGO key
-    class DEV,K8S,OBS mute
+classes: {
+  key: {
+    style: {
+      fill: "#dbeafe"
+      stroke: "#2563eb"
+      font-color: "#1e3a8a"
+    }
+  }
+  ok: {
+    style: {
+      fill: "#dcfce7"
+      stroke: "#16a34a"
+      font-color: "#14532d"
+    }
+  }
+  mute: {
+    style: {
+      fill: "#f1f5f9"
+      stroke: "#94a3b8"
+      font-color: "#334155"
+    }
+  }
+}
+
+dev: 사람 { class: mute }
+git: "Git 저장소\n매니페스트 · values" {
+  shape: cylinder
+  class: ok
+}
+argo: Argo CD { class: key }
+k8s: 클러스터 { class: mute }
+obs: Prometheus — 관측 덱 2장 { class: mute }
+
+dev -> git: PR · 머지
+argo -> git: 주기적으로 읽는다
+argo -> k8s: 차이가 있으면 적용
+k8s -> argo: 실제 상태 보고 { style.stroke-dash: 3 }
+argo -> obs: 드리프트 알림 { style.stroke-dash: 3 }
 ```
 
 | | Argo CD | Flux |

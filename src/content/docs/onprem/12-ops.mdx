@@ -189,20 +189,57 @@ kubectl get certificate -A -o json | jq -r '
 [1장](/onprem/01-why/)의 층 구조가 그대로 진단 순서가 된다.
 **위에서 아래로 내려가며 "여기까지는 되나"를 확인한다.**
 
-```mermaid
-flowchart LR
-    S["사용자: 안 됩니다"] --> L5{"⑤ 앱이<br/>응답하나?"}
-    L5 -->|"안 됨"| L2{"② 입구까지<br/>오나?"}
-    L2 -->|"안 옴"| L1{"① 노드·CNI<br/>정상인가?"}
-    L2 -->|"옴"| L3{"③ DB·스토리지<br/>정상인가?"}
-    L5 -->|"됨"| CLIENT["클라이언트 · DNS · 사용자 환경"]
+```d2 layout=elk pad=40 title="앱이 응답하는지에서 시작해 입구까지 오는지, 노드·CNI가 정상인지, DB·스토리지가 정상인지 순으로 층을 내려가며 원인을 좁히는 진단 사다리"
+direction: down
 
-    classDef bad  fill:#fee2e2,stroke:#dc2626,color:#7f1d1d
-    classDef key  fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
-    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
-    class S bad
-    class L5,L2,L3,L1 key
-    class CLIENT mute
+classes: {
+  bad: {
+    style: {
+      fill: "#fee2e2"
+      stroke: "#dc2626"
+      font-color: "#7f1d1d"
+    }
+  }
+  key: {
+    style: {
+      fill: "#dbeafe"
+      stroke: "#2563eb"
+      font-color: "#1e3a8a"
+    }
+  }
+  mute: {
+    style: {
+      fill: "#f1f5f9"
+      stroke: "#94a3b8"
+      font-color: "#334155"
+    }
+  }
+}
+
+s: "사용자: 안 됩니다" { class: bad }
+l5: "⑤ 앱이\n응답하나?" {
+  shape: diamond
+  class: key
+}
+l2: "② 입구까지\n오나?" {
+  shape: diamond
+  class: key
+}
+l1: "① 노드·CNI\n정상인가?" {
+  shape: diamond
+  class: key
+}
+l3: "③ DB·스토리지\n정상인가?" {
+  shape: diamond
+  class: key
+}
+client: 클라이언트 · DNS · 사용자 환경 { class: mute }
+
+s -> l5
+l5 -> l2: 안 됨
+l2 -> l1: 안 옴
+l2 -> l3: 옴
+l5 -> client: 됨
 ```
 
 | 단계 | 질문 | 명령 |

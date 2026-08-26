@@ -38,29 +38,58 @@ import TermIntro from '../../../components/docs/TermIntro.astro';
 
 ## 깨지는 전제 여섯
 
-```mermaid
-flowchart TB
-    M["MDP의 전제"] --> A1["전이·보상이 고정"]
-    M --> A2["상태를 관측할 수 있다"]
-    M --> A3["샘플을 더 뽑을 수 있다"]
-    M --> A4["보상에 신호가 있다"]
+```d2 layout=elk pad=40 title="MDP의 네 전제(전이·보상 고정, 관측 가능, 샘플 추가 확보, 보상 신호)가 시장에서 각각 비정상성·부분 관측·유한한 역사·극저 SNR로 깨져 과적합이 기본값이 되는 구조"
+direction: down
 
-    A1 -.->|"깨진다"| B1["비정상성<br/>레짐이 바뀐다"]
-    A2 -.->|"깨진다"| B2["부분 관측<br/>남의 의도는 안 보인다"]
-    A3 -.->|"깨진다"| B3["유한한 역사<br/>일봉 20년 = 5천 스텝"]
-    A4 -.->|"거의 없다"| B4["극저 SNR<br/>수익률은 거의 잡음"]
+classes: {
+  key: {
+    style: {
+      fill: "#dbeafe"
+      stroke: "#2563eb"
+      font-color: "#1e3a8a"
+    }
+  }
+  bad: {
+    style: {
+      fill: "#fee2e2"
+      stroke: "#dc2626"
+      font-color: "#7f1d1d"
+    }
+  }
+  mute: {
+    style: {
+      fill: "#f1f5f9"
+      stroke: "#94a3b8"
+      font-color: "#334155"
+    }
+  }
+}
 
-    B1 --> C["결과: 과적합이 기본값이 된다"]
-    B2 --> C
-    B3 --> C
-    B4 --> C
+m: MDP의 전제 { class: key }
+a1: 전이·보상이 고정 { class: mute }
+a2: 상태를 관측할 수 있다 { class: mute }
+a3: 샘플을 더 뽑을 수 있다 { class: mute }
+a4: 보상에 신호가 있다 { class: mute }
+b1: "비정상성\n레짐이 바뀐다" { class: bad }
+b2: "부분 관측\n남의 의도는 안 보인다" { class: bad }
+b3: "유한한 역사\n일봉 20년 = 5천 스텝" { class: bad }
+b4: "극저 SNR\n수익률은 거의 잡음" { class: bad }
+c: "결과: 과적합이 기본값이 된다" { class: bad }
 
-    classDef key  fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
-    classDef bad  fill:#fee2e2,stroke:#dc2626,color:#7f1d1d
-    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
-    class M key
-    class B1,B2,B3,B4,C bad
-    class A1,A2,A3,A4 mute
+m -> a1
+m -> a2
+m -> a3
+m -> a4
+
+a1 -> b1: 깨진다 { style.stroke-dash: 3 }
+a2 -> b2: 깨진다 { style.stroke-dash: 3 }
+a3 -> b3: 깨진다 { style.stroke-dash: 3 }
+a4 -> b4: 거의 없다 { style.stroke-dash: 3 }
+
+b1 -> c
+b2 -> c
+b3 -> c
+b4 -> c
 ```
 
 ### ① 비정상성 — 규칙이 바뀐다

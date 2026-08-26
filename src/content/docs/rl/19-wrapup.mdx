@@ -22,51 +22,76 @@ import TermIntro from '../../../components/docs/TermIntro.astro';
 
 ## 전체 지도
 
-```mermaid
-flowchart TB
-    subgraph J["판정 — 0~1장"]
-        direction TB
-        J1["이 문제에 RL을 쓸 것인가<br/>순차 · 미래 결합 · 전체 행동을 채점할 수 있나"]
-    end
-    subgraph F["문제 세우기 — 2~3장"]
-        direction TB
-        F1["MDP 다섯 칸"]
-        F2["가치와 벨만"]
-    end
-    subgraph A["알고리즘 — 4~7장"]
-        direction TB
-        A1["가치 기반 — DQN"]
-        A2["정책 기반 — PPO"]
-        A3["off-policy — SAC"]
-        A4["오프라인 · 모델 기반"]
-    end
-    subgraph P["실전 — 8~10장"]
-        direction TB
-        P1["보상 설계"]
-        P2["학습과 디버깅"]
-        P3["평가"]
-    end
-    subgraph D["두 응용"]
-        direction TB
-        D1["트레이딩 — 11~13장<br/>시뮬레이터가 없다"]
-        D2["로봇 — 14~16장<br/>시뮬레이터를 만든다"]
-    end
-    C["진로 — 17장"]
+```d2 layout=elk pad=40 title="판정(0~1장) → 문제 세우기(2~3장) → 알고리즘(4~7장) → 실전(8~10장) → 두 응용(트레이딩·로봇) → 진로(17장) 순으로 이어지는 덱 전체 지도"
+direction: down
 
-    J --> F --> A --> P --> D --> C
+classes: {
+  key: {
+    style: {
+      fill: "#dbeafe"
+      stroke: "#2563eb"
+      font-color: "#1e3a8a"
+    }
+  }
+  ok: {
+    style: {
+      fill: "#dcfce7"
+      stroke: "#16a34a"
+      font-color: "#14532d"
+    }
+  }
+  warn: {
+    style: {
+      fill: "#fef3c7"
+      stroke: "#d97706"
+      font-color: "#78350f"
+    }
+  }
+  bad: {
+    style: {
+      fill: "#fee2e2"
+      stroke: "#dc2626"
+      font-color: "#7f1d1d"
+    }
+  }
+  mute: {
+    style: {
+      fill: "#f1f5f9"
+      stroke: "#94a3b8"
+      font-color: "#334155"
+    }
+  }
+}
 
-    classDef key  fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
-    classDef ok   fill:#dcfce7,stroke:#16a34a,color:#14532d
-    classDef warn fill:#fef3c7,stroke:#d97706,color:#78350f
-    classDef bad  fill:#fee2e2,stroke:#dc2626,color:#7f1d1d
-    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
-    class J1 key
-    class F1,F2 mute
-    class A1,A2,A3,A4 mute
-    class P1,P2,P3 warn
-    class D1 bad
-    class D2 ok
-    class C key
+j: 판정 — 0~1장 {
+  j1: "이 문제에 RL을 쓸 것인가\n순차 · 미래 결합 · 전체 행동을 채점할 수 있나" { class: key }
+}
+f: 문제 세우기 — 2~3장 {
+  f1: MDP 다섯 칸 { class: mute }
+  f2: 가치와 벨만 { class: mute }
+}
+a: 알고리즘 — 4~7장 {
+  a1: 가치 기반 — DQN { class: mute }
+  a2: 정책 기반 — PPO { class: mute }
+  a3: off-policy — SAC { class: mute }
+  a4: 오프라인 · 모델 기반 { class: mute }
+}
+p: 실전 — 8~10장 {
+  p1: 보상 설계 { class: warn }
+  p2: 학습과 디버깅 { class: warn }
+  p3: 평가 { class: warn }
+}
+d: 두 응용 {
+  d1: "트레이딩 — 11~13장\n시뮬레이터가 없다" { class: bad }
+  d2: "로봇 — 14~16장\n시뮬레이터를 만든다" { class: ok }
+}
+c: 진로 — 17장 { class: key }
+
+j -> f
+f -> a
+a -> p
+p -> d
+d -> c
 ```
 
 ## 장별 한 문장

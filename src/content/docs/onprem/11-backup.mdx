@@ -43,36 +43,67 @@ Git에 매니페스트가 다 있어도 **상태는 없다.** Argo CD로 클러�
 
 ## 층별 백업 — 무엇을 무엇으로
 
-```mermaid
-flowchart LR
-    subgraph src["백업 대상"]
-        direction TB
-        GIT2["매니페스트"]
-        ETCD["etcd"]
-        PV["PV 데이터"]
-        DB["PostgreSQL"]
-        KEY["sealing key 세트 · CA 키"]
-    end
-    subgraph dst["보관처"]
-        direction TB
-        GITR[("Git 저장소<br/>클러스터 밖")]
-        S3[("오브젝트 스토리지")]
-        OFF[("오프사이트<br/>다른 실패 도메인")]
-        VAULT[("금고 · 오프라인")]
-    end
-    GIT2 --> GITR
-    ETCD -->|"스냅샷"| S3
-    PV -->|"Velero"| S3
-    DB -->|"베이스백업 + WAL"| S3
-    S3 -->|"복제"| OFF
-    KEY --> VAULT
+```d2 layout=elk pad=40 title="매니페스트·etcd·PV·PostgreSQL·sealing key 다섯 백업 대상이 각각 Git 저장소·오브젝트 스토리지·금고로 가고, 오브젝트 스토리지는 다시 오프사이트로 복제되는 보관 구조"
+direction: down
 
-    classDef ok   fill:#dcfce7,stroke:#16a34a,color:#14532d
-    classDef bad  fill:#fee2e2,stroke:#dc2626,color:#7f1d1d
-    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
-    class OFF,VAULT ok
-    class KEY bad
-    class GIT2,ETCD,PV,DB,GITR,S3 mute
+classes: {
+  ok: {
+    style: {
+      fill: "#dcfce7"
+      stroke: "#16a34a"
+      font-color: "#14532d"
+    }
+  }
+  bad: {
+    style: {
+      fill: "#fee2e2"
+      stroke: "#dc2626"
+      font-color: "#7f1d1d"
+    }
+  }
+  mute: {
+    style: {
+      fill: "#f1f5f9"
+      stroke: "#94a3b8"
+      font-color: "#334155"
+    }
+  }
+}
+
+src: 백업 대상 {
+  grid-rows: 5
+  git2: 매니페스트 { class: mute }
+  etcd: etcd { class: mute }
+  pv: PV 데이터 { class: mute }
+  db: PostgreSQL { class: mute }
+  key: sealing key 세트 · CA 키 { class: bad }
+}
+dst: 보관처 {
+  grid-rows: 4
+  gitr: "Git 저장소\n클러스터 밖" {
+    shape: cylinder
+    class: mute
+  }
+  s3: 오브젝트 스토리지 {
+    shape: cylinder
+    class: mute
+  }
+  off: "오프사이트\n다른 실패 도메인" {
+    shape: cylinder
+    class: ok
+  }
+  vault: 금고 · 오프라인 {
+    shape: cylinder
+    class: ok
+  }
+}
+
+src.git2 -> dst.gitr
+src.etcd -> dst.s3: 스냅샷
+src.pv -> dst.s3: Velero
+src.db -> dst.s3: 베이스백업 + WAL
+dst.s3 -> dst.off: 복제
+src.key -> dst.vault
 ```
 
 ### etcd 스냅샷

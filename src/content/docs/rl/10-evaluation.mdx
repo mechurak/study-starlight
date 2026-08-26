@@ -118,21 +118,50 @@ import TermIntro from '../../../components/docs/TermIntro.astro';
 | **특정 기간·종목** | 다른 기간에서 손실 | **워크포워드** ([12장](/rl/12-trading-design/)) |
 | 난수 시퀀스 | 시드를 바꾸면 다르다 | 평가 시드를 학습과 분리 |
 
-```mermaid
-flowchart LR
-    TR["학습 조건<br/>(지형 A~F · 2010~2020년)"] --> P["정책"]
-    P --> E1["같은 조건에서 평가<br/>= 훈련 성적"]
-    P --> E2["안 본 조건에서 평가<br/>= 일반화"]
-    P --> E3["실제 세계 / 실거래<br/>= 진짜 성적"]
+```d2 layout=elk pad=40 title="같은 학습 조건에서 잰 훈련 성적, 안 본 조건에서 잰 일반화, 실제 세계에서 잰 진짜 성적 세 가지로 정책을 평가하는 구분도"
+direction: right
 
-    classDef ok   fill:#dcfce7,stroke:#16a34a,color:#14532d
-    classDef warn fill:#fef3c7,stroke:#d97706,color:#78350f
-    classDef bad  fill:#fee2e2,stroke:#dc2626,color:#7f1d1d
-    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
-    class E1 bad
-    class E2 warn
-    class E3 ok
-    class TR,P mute
+classes: {
+  ok: {
+    style: {
+      fill: "#dcfce7"
+      stroke: "#16a34a"
+      font-color: "#14532d"
+    }
+  }
+  warn: {
+    style: {
+      fill: "#fef3c7"
+      stroke: "#d97706"
+      font-color: "#78350f"
+    }
+  }
+  bad: {
+    style: {
+      fill: "#fee2e2"
+      stroke: "#dc2626"
+      font-color: "#7f1d1d"
+    }
+  }
+  mute: {
+    style: {
+      fill: "#f1f5f9"
+      stroke: "#94a3b8"
+      font-color: "#334155"
+    }
+  }
+}
+
+tr: "학습 조건\n(지형 A~F · 2010~2020년)" { class: mute }
+p: 정책 { class: mute }
+e1: "같은 조건에서 평가\n= 훈련 성적" { class: bad }
+e2: "안 본 조건에서 평가\n= 일반화" { class: warn }
+e3: "실제 세계 / 실거래\n= 진짜 성적" { class: ok }
+
+tr -> p
+p -> e1
+p -> e2
+p -> e3
 ```
 
 흔히 뒤 단계로 갈수록 성능이 떨어지지만 **항상 단조롭게 내려가는 법칙은 아니다.** 핵심은

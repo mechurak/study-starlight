@@ -40,22 +40,48 @@ import TermIntro from '../../../components/docs/TermIntro.astro';
 Q러닝의 타깃에는 `max_a' Q(s',a')`가 들어 있다. 그 `max`는 **데이터에 없는 행동까지 포함해서**
 최대를 고른다. 그리고 신경망은 안 본 입력에 대해 아무 값이나 내놓는다.
 
-```mermaid
-flowchart TB
-    A["로그에 없는 행동 a'<br/>Q(s',a')를 신경망이 추정"] --> B["근거 없이 크게 나온다<br/>(외삽 오차)"]
-    B --> C["max가 그걸 고른다"]
-    C --> D["타깃이 부풀어 오른다"]
-    D --> E["부푼 타깃으로 Q 학습"]
-    E --> B
-    E --> F["정책은 '해 본 적 없는데<br/>최고로 보이는' 행동을 고른다"]
-    F --> G["실전에서 붕괴"]
+```d2 layout=elk pad=40 title="로그에 없는 행동의 Q값이 근거 없이 커지고 max가 그걸 골라 타깃이 부푸는 되먹임과, 그 결과 정책이 해 본 적 없는 행동을 골라 실전에서 붕괴하는 경로"
+direction: down
 
-    classDef bad  fill:#fee2e2,stroke:#dc2626,color:#7f1d1d
-    classDef warn fill:#fef3c7,stroke:#d97706,color:#78350f
-    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
-    class B,D,G bad
-    class C,E,F warn
-    class A mute
+classes: {
+  bad: {
+    style: {
+      fill: "#fee2e2"
+      stroke: "#dc2626"
+      font-color: "#7f1d1d"
+    }
+  }
+  warn: {
+    style: {
+      fill: "#fef3c7"
+      stroke: "#d97706"
+      font-color: "#78350f"
+    }
+  }
+  mute: {
+    style: {
+      fill: "#f1f5f9"
+      stroke: "#94a3b8"
+      font-color: "#334155"
+    }
+  }
+}
+
+a: "로그에 없는 행동 a'\nQ(s',a')를 신경망이 추정" { class: mute }
+b: "근거 없이 크게 나온다\n(외삽 오차)" { class: bad }
+c: max가 그걸 고른다 { class: warn }
+d: 타깃이 부풀어 오른다 { class: bad }
+e: 부푼 타깃으로 Q 학습 { class: warn }
+f: "정책은 '해 본 적 없는데\n최고로 보이는' 행동을 고른다" { class: warn }
+g: 실전에서 붕괴 { class: bad }
+
+a -> b
+b -> c
+c -> d
+d -> e
+e -> b
+e -> f
+f -> g
 ```
 
 **되먹임 고리가 닫혀 있다는 점이 무섭다.** 온라인이라면 그 행동을 해 보고
@@ -137,19 +163,45 @@ Q(s,a) ← r + γ · V(s')
 
 다른 방향의 절약이 있다. **환경 자체를 신경망으로 배워서, 그 안에서 마음껏 연습**하는 것이다.
 
-```mermaid
-flowchart LR
-    D[("실제 데이터<br/>비싸다")] --> M["세계 모델 학습<br/>s,a → s', r"]
-    M --> I["모델 안에서 상상 롤아웃<br/>실환경보다 저렴"]
-    I --> P["정책 학습"]
-    P -->|"조금만 실제로 굴려 본다"| D
+```d2 layout=elk pad=40 title="비싼 실제 데이터로 세계 모델을 학습하고 모델 안 상상 롤아웃으로 정책을 학습한 뒤 조금만 실제로 굴려 데이터를 보강하는 모델 기반 RL 순환도"
+direction: down
 
-    classDef ok   fill:#dcfce7,stroke:#16a34a,color:#14532d
-    classDef key  fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
-    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
-    class D mute
-    class M key
-    class I,P ok
+classes: {
+  ok: {
+    style: {
+      fill: "#dcfce7"
+      stroke: "#16a34a"
+      font-color: "#14532d"
+    }
+  }
+  key: {
+    style: {
+      fill: "#dbeafe"
+      stroke: "#2563eb"
+      font-color: "#1e3a8a"
+    }
+  }
+  mute: {
+    style: {
+      fill: "#f1f5f9"
+      stroke: "#94a3b8"
+      font-color: "#334155"
+    }
+  }
+}
+
+d: "실제 데이터\n비싸다" {
+  shape: cylinder
+  class: mute
+}
+m: "세계 모델 학습\ns,a → s', r" { class: key }
+i: "모델 안에서 상상 롤아웃\n실환경보다 저렴" { class: ok }
+p: 정책 학습 { class: ok }
+
+d -> m
+m -> i
+i -> p
+p -> d: 조금만 실제로 굴려 본다
 ```
 
 | 접근 | 무엇 | 특징 |

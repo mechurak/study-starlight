@@ -44,20 +44,49 @@ Keycloak 자체 — realm · client · mapper · 토큰 수명 · AD 연동 — 
 
 ## 세 패턴 — 앱의 처지에 따라 갈린다
 
-```mermaid
-flowchart LR
-    Q1{"앱이 OIDC를<br/>지원하나?"}
-    Q1 -->|"그렇다"| P1["패턴 ①<br/>앱이 직접 Keycloak과 대화<br/>(Grafana · Argo CD · MinIO)"]
-    Q1 -->|"아니다"| Q2{"쿠버네티스<br/>API 서버인가?"}
-    Q2 -->|"그렇다"| P3["패턴 ③<br/>API 서버 OIDC + kubelogin"]
-    Q2 -->|"아니다"| P2["패턴 ②<br/>앞에 oauth2-proxy를 세운다<br/>(Prometheus · Alertmanager · 사내 대시보드)"]
+```d2 layout=elk pad=40 title="앱이 OIDC를 지원하면 패턴 ①로 직접 Keycloak과 대화하고, 아니면 쿠버네티스 API 서버인지에 따라 패턴 ③ kubelogin과 패턴 ② oauth2-proxy로 갈리는 분기도"
+direction: down
 
-    classDef key  fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
-    classDef ok   fill:#dcfce7,stroke:#16a34a,color:#14532d
-    classDef warn fill:#fef3c7,stroke:#d97706,color:#78350f
-    class Q1,Q2 key
-    class P1 ok
-    class P2,P3 warn
+classes: {
+  key: {
+    style: {
+      fill: "#dbeafe"
+      stroke: "#2563eb"
+      font-color: "#1e3a8a"
+    }
+  }
+  ok: {
+    style: {
+      fill: "#dcfce7"
+      stroke: "#16a34a"
+      font-color: "#14532d"
+    }
+  }
+  warn: {
+    style: {
+      fill: "#fef3c7"
+      stroke: "#d97706"
+      font-color: "#78350f"
+    }
+  }
+}
+
+q1: "앱이 OIDC를\n지원하나?" {
+  shape: diamond
+  class: key
+}
+q2: "쿠버네티스\nAPI 서버인가?" {
+  shape: diamond
+  class: key
+}
+p1: "패턴 ①\n앱이 직접 Keycloak과 대화\n(Grafana · Argo CD · MinIO)" { class: ok }
+p3: "패턴 ③\nAPI 서버 OIDC + kubelogin" { class: warn }
+p2: "패턴 ②\n앞에 oauth2-proxy를 세운다\n(Prometheus · Alertmanager · 사내 대시보드)" { class: warn }
+
+q1 -> p1: 그렇다
+q1 -> q2: 아니다
+q2 -> p3: 그렇다
+q2 -> p2: 아니다
 ```
 
 | 패턴 | 방식 | 장점 | 대가 |
@@ -88,19 +117,38 @@ oauth2-proxy는 두 가지 방식으로 배치한다. **Gateway API 시대에는
 게이트웨이가 요청을 백엔드로 넘기기 전에 oauth2-proxy에 **"이 요청 통과시켜도 되나"** 를 묻는다.
 인증되지 않았으면 oauth2-proxy가 Keycloak 로그인으로 리다이렉트한다.
 
-```mermaid
-flowchart LR
-    U["사용자"] --> GW["Gateway"]
-    GW -->|"① 이 요청 OK?"| OP["oauth2-proxy"]
-    OP -->|"② 미인증 → 로그인"| KC["Keycloak"]
-    KC --> OP
-    OP -->|"③ OK + 사용자 헤더"| GW
-    GW -->|"④ 전달"| APP["Prometheus"]
+```d2 layout=elk pad=40 title="Gateway가 요청을 oauth2-proxy에 물어 미인증이면 Keycloak 로그인으로 보내고, 인증되면 사용자 헤더와 함께 Prometheus로 전달하는 흐름"
+direction: down
 
-    classDef warn fill:#fef3c7,stroke:#d97706,color:#78350f
-    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
-    class OP,KC warn
-    class U,GW,APP mute
+classes: {
+  warn: {
+    style: {
+      fill: "#fef3c7"
+      stroke: "#d97706"
+      font-color: "#78350f"
+    }
+  }
+  mute: {
+    style: {
+      fill: "#f1f5f9"
+      stroke: "#94a3b8"
+      font-color: "#334155"
+    }
+  }
+}
+
+u: 사용자 { class: mute }
+gw: Gateway { class: mute }
+op: oauth2-proxy { class: warn }
+kc: Keycloak { class: warn }
+app: Prometheus { class: mute }
+
+u -> gw
+gw -> op: ① 이 요청 OK?
+op -> kc: ② 미인증 → 로그인
+kc -> op
+op -> gw: ③ OK + 사용자 헤더
+gw -> app: ④ 전달
 ```
 
 구현체마다 리소스 이름이 다르다 — Envoy Gateway는 `SecurityPolicy`, Traefik은 미들웨어.
@@ -164,16 +212,34 @@ Prometheus는 여전히 "모두가 관리자"다 — 프록시는 **문을 잠�
 도구를 붙이는 것보다 **"누가 무엇을 할 수 있나"를 정하는 게** 훨씬 오래 걸린다.
 사슬은 셋이고, 어느 한 곳만 끊겨도 사용자는 "로그인은 되는데 아무것도 안 보인다"를 겪는다.
 
-```mermaid
-flowchart LR
-    AD["AD 그룹<br/>CN=platform-admins"] -->|"① LDAP 매퍼<br/>(Keycloak 덱 4장)"| KG["Keycloak 그룹"]
-    KG -->|"② groups claim<br/>(mapper · scope)"| TOK["ID 토큰"]
-    TOK -->|"③ 도구별 매핑"| ROLE["Grafana Admin<br/>Argo CD role:admin"]
+```d2 layout=elk pad=40 title="AD 그룹이 LDAP 매퍼로 Keycloak 그룹이 되고 groups claim으로 ID 토큰에 실린 뒤 도구별 매핑으로 Grafana Admin·Argo CD role:admin이 되는 권한 사슬"
+direction: down
 
-    classDef key  fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
-    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
-    class TOK key
-    class AD,KG,ROLE mute
+classes: {
+  key: {
+    style: {
+      fill: "#dbeafe"
+      stroke: "#2563eb"
+      font-color: "#1e3a8a"
+    }
+  }
+  mute: {
+    style: {
+      fill: "#f1f5f9"
+      stroke: "#94a3b8"
+      font-color: "#334155"
+    }
+  }
+}
+
+ad: "AD 그룹\nCN=platform-admins" { class: mute }
+kg: Keycloak 그룹 { class: mute }
+tok: ID 토큰 { class: key }
+role: "Grafana Admin\nArgo CD role:admin" { class: mute }
+
+ad -> kg: "① LDAP 매퍼\n(Keycloak 덱 4장)"
+kg -> tok: "② groups claim\n(mapper · scope)"
+tok -> role: ③ 도구별 매핑
 ```
 
 <Steps>

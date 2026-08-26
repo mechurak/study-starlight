@@ -26,27 +26,52 @@ import TermIntro from '../../../components/docs/TermIntro.astro';
 전통적인 구조는 이랬다. **CPU에서 물리 시뮬 → 관측을 GPU로 복사 → 신경망 추론 →
 행동을 CPU로 복사.** 환경 수를 늘려도 이 왕복이 병목이라 처리량이 안 올랐다.
 
-```mermaid
-flowchart LR
-    subgraph OLD["전통적 구조"]
-        direction TB
-        C1["CPU 환경 16~64개"] -->|"복사"| G1["GPU 신경망"]
-        G1 -->|"복사"| C1
-    end
-    subgraph NEW["GPU 네이티브"]
-        direction TB
-        G2["GPU 안의 환경 4096개<br/>물리 + 관측 + 보상"] --> G3["GPU 신경망"]
-        G3 --> G2
-    end
-    OLD -->|"수천~수만 SPS"| R1["보행 학습에 수 시간~수일"]
-    NEW -->|"수십만~수백만 SPS"| R2["보행 학습에 수 분~수십 분"]
+```d2 layout=elk pad=40 title="CPU 환경과 GPU 신경망 사이를 복사하는 전통적 구조는 수천~수만 SPS로 보행 학습에 수 시간~수일이 걸리고, 환경까지 GPU에 올린 구조는 수십만~수백만 SPS로 수 분~수십 분에 끝나는 대비"
+direction: down
 
-    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
-    classDef ok   fill:#dcfce7,stroke:#16a34a,color:#14532d
-    classDef key  fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
-    class C1,G1,R1 mute
-    class G2,G3 key
-    class R2 ok
+classes: {
+  mute: {
+    style: {
+      fill: "#f1f5f9"
+      stroke: "#94a3b8"
+      font-color: "#334155"
+    }
+  }
+  ok: {
+    style: {
+      fill: "#dcfce7"
+      stroke: "#16a34a"
+      font-color: "#14532d"
+    }
+  }
+  key: {
+    style: {
+      fill: "#dbeafe"
+      stroke: "#2563eb"
+      font-color: "#1e3a8a"
+    }
+  }
+}
+
+old: 전통적 구조 {
+  grid-rows: 2
+  c1: CPU 환경 16~64개 { class: mute }
+  g1: GPU 신경망 { class: mute }
+  c1 -> g1: 복사
+  g1 -> c1: 복사
+}
+new: GPU 네이티브 {
+  grid-rows: 2
+  g2: "GPU 안의 환경 4096개\n물리 + 관측 + 보상" { class: key }
+  g3: GPU 신경망 { class: key }
+  g2 -> g3
+  g3 -> g2
+}
+r1: 보행 학습에 수 시간~수일 { class: mute }
+r2: 보행 학습에 수 분~수십 분 { class: ok }
+
+old -> r1: 수천~수만 SPS
+new -> r2: 수십만~수백만 SPS
 ```
 
 **환경·관측·보상 계산까지 전부 GPU 텐서로 두면** 복사가 사라진다.

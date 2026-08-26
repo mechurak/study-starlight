@@ -42,23 +42,51 @@ Postgres를 StatefulSet + PVC로 띄우는 건 어렵지 않다. 30줄이면 뜬
 
 CloudNativePG는 `Cluster` 리소스 하나로 그 절차를 전부 선언한다.
 
-```mermaid
-flowchart LR
-    SPEC["Cluster CRD<br/>instances: 3<br/>backup · monitoring"] --> OP["CNPG 오퍼레이터"]
-    OP --> P["primary<br/>(쓰기)"]
-    OP --> R1["replica 1"]
-    OP --> R2["replica 2"]
-    P -->|"스트리밍 복제 (WAL)"| R1
-    P -->|"스트리밍 복제 (WAL)"| R2
-    P -->|"베이스 백업 · WAL 아카이브"| S3[("오브젝트 스토리지<br/>6장")]
-    OP -.->|"프라이머리 이상 감지 시 승격"| R1
+```d2 layout=elk pad=40 title="Cluster CRD를 받은 CNPG 오퍼레이터가 primary와 replica 둘을 만들고, primary가 WAL 스트리밍 복제와 오브젝트 스토리지 백업을 하며 이상 시 replica가 승격되는 구조"
+direction: down
 
-    classDef key  fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
-    classDef ok   fill:#dcfce7,stroke:#16a34a,color:#14532d
-    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
-    class OP key
-    class S3 ok
-    class SPEC,P,R1,R2 mute
+classes: {
+  key: {
+    style: {
+      fill: "#dbeafe"
+      stroke: "#2563eb"
+      font-color: "#1e3a8a"
+    }
+  }
+  ok: {
+    style: {
+      fill: "#dcfce7"
+      stroke: "#16a34a"
+      font-color: "#14532d"
+    }
+  }
+  mute: {
+    style: {
+      fill: "#f1f5f9"
+      stroke: "#94a3b8"
+      font-color: "#334155"
+    }
+  }
+}
+
+spec: "Cluster CRD\ninstances: 3\nbackup · monitoring" { class: mute }
+op: CNPG 오퍼레이터 { class: key }
+p: "primary\n(쓰기)" { class: mute }
+r1: replica 1 { class: mute }
+r2: replica 2 { class: mute }
+s3: "오브젝트 스토리지\n6장" {
+  shape: cylinder
+  class: ok
+}
+
+spec -> op
+op -> p
+op -> r1
+op -> r2
+p -> r1: 스트리밍 복제 (WAL)
+p -> r2: 스트리밍 복제 (WAL)
+p -> s3: "베이스 백업\n· WAL 아카이브"
+op -> r1: "프라이머리 이상\n감지 시 승격" { style.stroke-dash: 3 }
 ```
 
 오퍼레이터가 만들어 주는 **서비스 셋**이 특히 중요하다 — 앱은 파드 이름을 몰라도 된다.
@@ -155,20 +183,50 @@ spec:
 
 ## 백업과 복구 — 여기가 오퍼레이터를 쓰는 진짜 이유
 
-```mermaid
-flowchart LR
-    PG["Postgres"] -->|"주기적 베이스 백업"| B1[("s3://pg-backups/…/base")]
-    PG -->|"WAL 아카이브 (연속)"| B2[("s3://pg-backups/…/wals")]
-    B1 --> REC["새 Cluster<br/>bootstrap.recovery"]
-    B2 --> REC
-    REC -->|"targetTime 지정"| PIT["원하는 시점의 DB"]
+```d2 layout=elk pad=40 title="주기적 베이스 백업과 연속 WAL 아카이브를 오브젝트 스토리지에 두고, 새 Cluster의 bootstrap.recovery가 둘을 읽어 targetTime 시점의 DB로 복구하는 흐름"
+direction: down
 
-    classDef ok   fill:#dcfce7,stroke:#16a34a,color:#14532d
-    classDef key  fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
-    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
-    class B1,B2 ok
-    class PIT key
-    class PG,REC mute
+classes: {
+  ok: {
+    style: {
+      fill: "#dcfce7"
+      stroke: "#16a34a"
+      font-color: "#14532d"
+    }
+  }
+  key: {
+    style: {
+      fill: "#dbeafe"
+      stroke: "#2563eb"
+      font-color: "#1e3a8a"
+    }
+  }
+  mute: {
+    style: {
+      fill: "#f1f5f9"
+      stroke: "#94a3b8"
+      font-color: "#334155"
+    }
+  }
+}
+
+pg: Postgres { class: mute }
+b1: "s3://pg-backups/…/base" {
+  shape: cylinder
+  class: ok
+}
+b2: "s3://pg-backups/…/wals" {
+  shape: cylinder
+  class: ok
+}
+rec: "새 Cluster\nbootstrap.recovery" { class: mute }
+pit: 원하는 시점의 DB { class: key }
+
+pg -> b1: 주기적 베이스 백업
+pg -> b2: WAL 아카이브 (연속)
+b1 -> rec
+b2 -> rec
+rec -> pit: targetTime 지정
 ```
 
 <Tabs>

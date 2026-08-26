@@ -98,20 +98,45 @@ import TermIntro from '../../../components/docs/TermIntro.astro';
 **VLA의 발상은 "여러 로봇·여러 과제의 데이터를 한 모델에 몰아넣고,
 무엇을 할지는 언어로 지시받는" 것**이다.
 
-```mermaid
-flowchart LR
-    IMG["카메라 이미지<br/>(여러 대)"] --> VLM["비전-언어 모델<br/>사전학습된 백본"]
-    TXT["언어 지시<br/>'접시를 건조대에 놓아'"] --> VLM
-    ST["로봇 상태<br/>관절 · 그리퍼"] --> VLM
-    VLM --> ACT["행동 청크 생성<br/>확산 또는 토큰"]
-    ACT --> ROB["로봇 제어 루프"]
+```d2 layout=elk pad=40 title="카메라 이미지·언어 지시·로봇 상태를 비전-언어 모델이 함께 받아 행동 청크를 생성하고 로봇 제어 루프로 넘기는 VLA 구조"
+direction: down
 
-    classDef key  fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
-    classDef ok   fill:#dcfce7,stroke:#16a34a,color:#14532d
-    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
-    class VLM key
-    class ACT ok
-    class IMG,TXT,ST,ROB mute
+classes: {
+  key: {
+    style: {
+      fill: "#dbeafe"
+      stroke: "#2563eb"
+      font-color: "#1e3a8a"
+    }
+  }
+  ok: {
+    style: {
+      fill: "#dcfce7"
+      stroke: "#16a34a"
+      font-color: "#14532d"
+    }
+  }
+  mute: {
+    style: {
+      fill: "#f1f5f9"
+      stroke: "#94a3b8"
+      font-color: "#334155"
+    }
+  }
+}
+
+img: "카메라 이미지\n(여러 대)" { class: mute }
+txt: "언어 지시\n'접시를 건조대에 놓아'" { class: mute }
+st: "로봇 상태\n관절 · 그리퍼" { class: mute }
+vlm: "비전-언어 모델\n사전학습된 백본" { class: key }
+act: "행동 청크 생성\n확산 또는 토큰" { class: ok }
+rob: 로봇 제어 루프 { class: mute }
+
+img -> vlm
+txt -> vlm
+st -> vlm
+vlm -> act
+act -> rob
 ```
 
 | 왜 언어인가 | 효과 |

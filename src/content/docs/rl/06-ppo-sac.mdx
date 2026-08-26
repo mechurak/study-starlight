@@ -40,24 +40,57 @@ on-policy인데도 데이터를 조금은 아껴 쓸 수 있는 이유다.
 
 ### PPO의 한 사이클
 
-```mermaid
-flowchart LR
-    A["N개 환경 × T 스텝<br/>데이터 수집 (rollout)"] --> B["GAE로 어드밴티지 계산<br/>λ = 0.95"]
-    B --> C["어드밴티지 정규화<br/>배치 평균 0, 표준편차 1"]
-    C --> D["미니배치로 K 에폭 학습<br/>클리핑된 목표"]
-    D --> E{"KL이 너무 커졌나"}
-    E -->|"그렇다"| F["조기 종료"]
-    E -->|"아니다"| A
-    F --> A
+```d2 layout=elk pad=40 title="롤아웃 수집 → GAE 어드밴티지 계산 → 정규화 → 클리핑 목표로 K 에폭 학습 → KL이 크면 조기 종료 후 다시 수집으로 도는 PPO 한 사이클"
+direction: down
 
-    classDef key  fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
-    classDef ok   fill:#dcfce7,stroke:#16a34a,color:#14532d
-    classDef warn fill:#fef3c7,stroke:#d97706,color:#78350f
-    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
-    class A,B mute
-    class C ok
-    class D key
-    class E,F warn
+classes: {
+  key: {
+    style: {
+      fill: "#dbeafe"
+      stroke: "#2563eb"
+      font-color: "#1e3a8a"
+    }
+  }
+  ok: {
+    style: {
+      fill: "#dcfce7"
+      stroke: "#16a34a"
+      font-color: "#14532d"
+    }
+  }
+  warn: {
+    style: {
+      fill: "#fef3c7"
+      stroke: "#d97706"
+      font-color: "#78350f"
+    }
+  }
+  mute: {
+    style: {
+      fill: "#f1f5f9"
+      stroke: "#94a3b8"
+      font-color: "#334155"
+    }
+  }
+}
+
+a: "N개 환경 × T 스텝\n데이터 수집 (rollout)" { class: mute }
+b: "GAE로 어드밴티지 계산\nλ = 0.95" { class: mute }
+c: "어드밴티지 정규화\n배치 평균 0, 표준편차 1" { class: ok }
+d: "미니배치로 K 에폭 학습\n클리핑된 목표" { class: key }
+e: KL이 너무 커졌나 {
+  shape: diamond
+  class: warn
+}
+f: 조기 종료 { class: warn }
+
+a -> b
+b -> c
+c -> d
+d -> e
+e -> f: 그렇다
+e -> a: 아니다
+f -> a
 ```
 
 **데이터를 모으고 → 여러 번 재사용해 학습하고 → 버리고 다시 모은다.**
@@ -151,23 +184,58 @@ SAC의 두 번째 아이디어는 목표 자체를 바꾼 것이다.
 
 ## 무엇을 고르나
 
-```mermaid
-flowchart TB
-    Q1{"행동이 연속인가"} -->|"아니다 (이산)"| Q2{"샘플이 비싼가"}
-    Q2 -->|"싸다"| P1["PPO<br/>안정적이고 손이 덜 간다"]
-    Q2 -->|"비싸다"| D1["DQN 계열 — 4장<br/>또는 오프라인 RL — 7장"]
-    Q1 -->|"그렇다 (연속)"| Q3{"시뮬레이터로 샘플을<br/>대량 뽑을 수 있나"}
-    Q3 -->|"뽑을 수 있다"| P2["PPO<br/>병렬 시뮬 + 대규모 배치"]
-    Q3 -->|"제한적이다"| S1["SAC<br/>샘플 효율 우선"]
-    Q3 -->|"아예 못 뽑는다"| O1["오프라인 RL — 7장"]
+```d2 layout=elk pad=40 title="행동이 이산인지 연속인지, 샘플이 비싼지, 시뮬레이터로 대량 샘플을 뽑을 수 있는지로 PPO·DQN·SAC·오프라인 RL을 고르는 분기도"
+direction: down
 
-    classDef ok   fill:#dcfce7,stroke:#16a34a,color:#14532d
-    classDef warn fill:#fef3c7,stroke:#d97706,color:#78350f
-    classDef key  fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
-    class P1,P2 ok
-    class S1 key
-    class D1,O1 warn
-    class Q1,Q2,Q3 warn
+classes: {
+  ok: {
+    style: {
+      fill: "#dcfce7"
+      stroke: "#16a34a"
+      font-color: "#14532d"
+    }
+  }
+  warn: {
+    style: {
+      fill: "#fef3c7"
+      stroke: "#d97706"
+      font-color: "#78350f"
+    }
+  }
+  key: {
+    style: {
+      fill: "#dbeafe"
+      stroke: "#2563eb"
+      font-color: "#1e3a8a"
+    }
+  }
+}
+
+q1: 행동이 연속인가 {
+  shape: diamond
+  class: warn
+}
+q2: 샘플이 비싼가 {
+  shape: diamond
+  class: warn
+}
+q3: "시뮬레이터로 샘플을\n대량 뽑을 수\n있나" {
+  shape: diamond
+  class: warn
+}
+p1: "PPO\n안정적이고\n손이 덜 간다" { class: ok }
+d1: "DQN 계열 — 4장\n또는\n오프라인 RL — 7장" { class: warn }
+p2: "PPO\n병렬 시뮬\n+ 대규모 배치" { class: ok }
+s1: "SAC\n샘플 효율 우선" { class: key }
+o1: 오프라인 RL — 7장 { class: warn }
+
+q1 -> q2: 아니다 (이산)
+q2 -> p1: 싸다
+q2 -> d1: 비싸다
+q1 -> q3: 그렇다 (연속)
+q3 -> p2: 뽑을 수 있다
+q3 -> s1: 제한적이다
+q3 -> o1: 아예 못 뽑는다
 ```
 
 | | PPO | SAC |
