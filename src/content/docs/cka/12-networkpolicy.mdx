@@ -11,21 +11,24 @@ import { Steps, Card, CardGrid, Tabs, TabItem } from '@astrojs/starlight/compone
 
 Kubernetes 네트워크 모델의 전제 —
 
-```mermaid
-flowchart LR
-    subgraph NS1["네임스페이스 prod"]
-      A["Pod A"]
-      B["Pod B"]
-    end
-    subgraph NS2["네임스페이스 dev"]
-      C["Pod C"]
-    end
-    A <-->|"NAT 없이 직접 ✅"| B
-    A <-->|"네임스페이스가 달라도 ✅"| C
-    B <-->|"노드가 달라도 ✅"| C
+```d2 layout=elk pad=40 title="Pod 은 네임스페이스가 달라도 노드가 달라도 NAT 없이 서로 직접 통신할 수 있다는 기본 전제"
+direction: down
 
-    classDef pod fill:#dcfce7,stroke:#16a34a,color:#14532d
-    class A,B,C pod
+classes: {
+  ok: { style: { fill: "#dcfce7"; stroke: "#16a34a"; font-color: "#14532d" } }
+}
+
+ns1: 네임스페이스 prod {
+  a: Pod A { class: ok }
+  b: Pod B { class: ok }
+}
+ns2: 네임스페이스 dev {
+  c: Pod C { class: ok }
+}
+
+ns1.a <-> ns1.b: NAT 없이 직접 ✅
+ns1.a <-> ns2.c: 네임스페이스가 달라도 ✅
+ns1.b <-> ns2.c: 노드가 달라도 ✅
 ```
 
 - **모든 Pod은 모든 Pod과 NAT(Network Address Translation — 주소 변환) 없이 통신할 수 있다**
@@ -47,16 +50,18 @@ NetworkPolicy는 이 기본값을 **선택적으로 좁히는** 도구다.
 구현이 없으면 Pod은 IP조차 받지 못한다. 그 구현을 맡아 "평평한 네트워크"를 실제로 만드는 주체가
 CNI(Container Network Interface — kubelet이 Pod 네트워크를 만들 때 호출하는 표준 인터페이스)다.
 
-```mermaid
-sequenceDiagram
-    participant KL as kubelet
-    participant CNI as CNI 플러그인
-    participant POD as Pod 네트워크 네임스페이스
-    KL->>CNI: Pod 생성 — ADD 호출
-    Note over CNI: 설정 /etc/cni/net.d/<br/>바이너리 /opt/cni/bin/
-    CNI->>POD: IP 할당 · veth 인터페이스 연결 · 라우팅
-    CNI-->>KL: 결과 반환
-    Note over KL: 실패하면 Pod 은 ContainerCreating 에서 멈춘다
+```d2 pad=40 title="kubelet 이 Pod 생성 때 CNI 플러그인의 ADD 를 호출해 IP 할당 · veth 연결 · 라우팅을 맡기고 실패하면 ContainerCreating 에서 멈추는 순서"
+shape: sequence_diagram
+
+kl: kubelet
+cni: CNI 플러그인
+pod: Pod 네트워크 네임스페이스
+
+kl -> cni: Pod 생성 — ADD 호출
+cni.n1: "설정 /etc/cni/net.d/\n바이너리 /opt/cni/bin/"
+cni -> pod: IP 할당 · veth 인터페이스 연결 · 라우팅
+cni -> kl: 결과 반환 { style.stroke-dash: 3 }
+kl.n1: 실패하면 Pod 은 ContainerCreating 에서 멈춘다
 ```
 
 - kubelet은 Pod을 만들 때 **CNI 플러그인을 호출**해 IP를 할당하고
@@ -127,18 +132,24 @@ NetworkPolicy는 `kubectl create`로 못 만든다 — 시험 중에는 공식
 
 **네 부분이 각각 다른 질문에 답한다.**
 
-```mermaid
-flowchart LR
-    P["NetworkPolicy"]
-    P --> Q1["podSelector<br/>누구에게 적용하나"]
-    P --> Q2["policyTypes<br/>어느 방향을 통제하나"]
-    P --> Q3["ingress.from<br/>들어오는 것 중 무엇을 허용하나"]
-    P --> Q4["egress.to<br/>나가는 것 중 무엇을 허용하나"]
+```d2 layout=elk pad=40 title="NetworkPolicy 를 읽을 때 podSelector · policyTypes · ingress.from · egress.to 네 가지를 각각 무엇을 정하는 칸으로 볼지"
+direction: right
 
-    classDef key fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
-    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
-    class Q1,Q2 key
-    class Q3,Q4 mute
+classes: {
+  key: { style: { fill: "#dbeafe"; stroke: "#2563eb"; font-color: "#1e3a8a" } }
+  mute: { style: { fill: "#f1f5f9"; stroke: "#94a3b8"; font-color: "#334155" } }
+}
+
+p: NetworkPolicy
+q1: "podSelector\n누구에게 적용하나" { class: key }
+q2: "policyTypes\n어느 방향을 통제하나" { class: key }
+q3: "ingress.from\n들어오는 것 중 무엇을 허용하나" { class: mute }
+q4: "egress.to\n나가는 것 중 무엇을 허용하나" { class: mute }
+
+p -> q1
+p -> q2
+p -> q3
+p -> q4
 ```
 
 ### 세 가지 규칙을 먼저 외우자
@@ -160,19 +171,26 @@ flowchart LR
 
 첫 번째 규칙이 가장 중요하다 — **정책 하나가 스위치를 뒤집는다.**
 
-```mermaid
-flowchart LR
-    S1["정책이 하나도 없다"] --> A1["전부 허용 ✅"]
-    S2["정책이 하나라도 걸렸다"] --> A2["기본 거부로 전환"]
-    A2 --> A3["명시적으로 허용한 것만 통과"]
-    A2 --> A4["나머지는 전부 차단 ❌"]
+```d2 layout=elk pad=40 title="정책이 하나도 없으면 전부 허용이고 하나라도 걸리면 기본 거부로 바뀌어 명시적으로 허용한 것만 통과한다는 대비"
+direction: down
 
-    classDef ok fill:#dcfce7,stroke:#16a34a,color:#14532d
-    classDef bad fill:#fee2e2,stroke:#dc2626,color:#7f1d1d
-    classDef warn fill:#fef3c7,stroke:#d97706,color:#78350f
-    class A1,A3 ok
-    class A4 bad
-    class A2 warn
+classes: {
+  ok: { style: { fill: "#dcfce7"; stroke: "#16a34a"; font-color: "#14532d" } }
+  bad: { style: { fill: "#fee2e2"; stroke: "#dc2626"; font-color: "#7f1d1d" } }
+  warn: { style: { fill: "#fef3c7"; stroke: "#d97706"; font-color: "#78350f" } }
+}
+
+s1: 정책이 하나도 없다
+a1: 전부 허용 ✅ { class: ok }
+s2: 정책이 하나라도 걸렸다
+a2: 기본 거부로 전환 { class: warn }
+a3: 명시적으로 허용한 것만 통과 { class: ok }
+a4: 나머지는 전부 차단 ❌ { class: bad }
+
+s1 -> a1
+s2 -> a2
+a2 -> a3
+a2 -> a4
 ```
 
 이 셋을 알면 대부분의 혼란이 정리된다.
@@ -238,17 +256,22 @@ ingress:
             - 10.0.5.0/24
 ```
 
-```mermaid
-flowchart LR
-    T["대상 Pod<br/>podSelector 로 지정"]
-    S1["① podSelector<br/>같은 네임스페이스 안에서만 찾는다"] --> T
-    S2["② namespaceSelector<br/>다른 네임스페이스 전체"] --> T
-    S3["③ ipBlock<br/>패킷의 소스 IP · 클러스터 밖 포함"] --> T
+```d2 layout=elk pad=40 title="from 에 쓸 수 있는 podSelector · namespaceSelector · ipBlock 세 가지가 각각 어느 범위를 가리키는지"
+direction: right
 
-    classDef key fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
-    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
-    class T key
-    class S1,S2,S3 mute
+classes: {
+  key: { style: { fill: "#dbeafe"; stroke: "#2563eb"; font-color: "#1e3a8a" } }
+  mute: { style: { fill: "#f1f5f9"; stroke: "#94a3b8"; font-color: "#334155" } }
+}
+
+s1: "① podSelector\n같은 네임스페이스 안에서만 찾는다" { class: mute }
+s2: "② namespaceSelector\n다른 네임스페이스 전체" { class: mute }
+s3: "③ ipBlock\n패킷의 소스 IP · 클러스터 밖 포함" { class: mute }
+t: "대상 Pod\npodSelector 로 지정" { class: key }
+
+s1 -> t
+s2 -> t
+s3 -> t
 ```
 
 - `podSelector` 만 쓰면 **정책이 있는 네임스페이스 안**에서만 찾는다
@@ -274,13 +297,19 @@ from:
 **또는**
 "같은 네임스페이스의 `app=web` Pod"
 
-```mermaid
-flowchart LR
-    A["frontend 네임스페이스의<br/>모든 Pod"] --> T["허용"]
-    B["같은 네임스페이스의<br/>app=web Pod"] --> T
+```d2 layout=elk pad=40 title="from 아래에 하이픈을 두 번 쓰면 두 조건이 OR 로 묶여 각각 따로 허용된다는 모습"
+direction: right
 
-    classDef ok fill:#dcfce7,stroke:#16a34a,color:#14532d
-    class A,B,T ok
+classes: {
+  ok: { style: { fill: "#dcfce7"; stroke: "#16a34a"; font-color: "#14532d" } }
+}
+
+a: "frontend 네임스페이스의\n모든 Pod" { class: ok }
+b: "같은 네임스페이스의\napp=web Pod" { class: ok }
+t: 허용 { class: ok }
+
+a -> t
+b -> t
 ```
 
 </TabItem>
@@ -298,16 +327,22 @@ from:
 
 "frontend 네임스페이스**이면서** `app=web`인 Pod"
 
-```mermaid
-flowchart LR
-    A["frontend 네임스페이스"] --> X{"둘 다 만족"}
-    B["app=web 라벨"] --> X
-    X --> T["허용"]
+```d2 layout=elk pad=40 title="하이픈 하나 아래에 두 셀렉터를 나란히 쓰면 AND 로 묶여 둘 다 만족해야 허용된다는 모습"
+direction: right
 
-    classDef ok fill:#dcfce7,stroke:#16a34a,color:#14532d
-    classDef key fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
-    class T ok
-    class X key
+classes: {
+  ok: { style: { fill: "#dcfce7"; stroke: "#16a34a"; font-color: "#14532d" } }
+  key: { style: { fill: "#dbeafe"; stroke: "#2563eb"; font-color: "#1e3a8a" } }
+}
+
+a: frontend 네임스페이스
+b: app=web 라벨
+x: 둘 다 만족 { shape: diamond; class: key }
+t: 허용 { class: ok }
+
+a -> x
+b -> x
+x -> t
 ```
 
 </TabItem>
@@ -350,19 +385,25 @@ kube-system 네임스페이스에서 도는데, 라벨이 `k8s-app: kube-dns` �
 
 **DNS를 안 열면 증상이 엉뚱한 곳에서 나타난다.**
 
-```mermaid
-flowchart LR
-    P["egress 정책을 켰다"] --> D["CoreDNS 로 가는<br/>UDP 53 도 막힌다"]
-    D --> N["이름 해석 실패"]
-    N --> S["증상: 연결 거부가 아니라<br/>Name or service not known"]
-    S --> W["엉뚱하게 Service · 앱을 의심하게 된다 ❌"]
+```d2 layout=elk pad=40 title="egress 정책을 켜면 CoreDNS 로 가는 UDP 53 까지 막혀 연결 거부가 아니라 이름 해석 실패로 나타나 엉뚱한 곳을 의심하게 되는 연쇄"
+direction: down
 
-    classDef bad fill:#fee2e2,stroke:#dc2626,color:#7f1d1d
-    classDef warn fill:#fef3c7,stroke:#d97706,color:#78350f
-    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
-    class W bad
-    class D,N,S warn
-    class P mute
+classes: {
+  bad: { style: { fill: "#fee2e2"; stroke: "#dc2626"; font-color: "#7f1d1d" } }
+  warn: { style: { fill: "#fef3c7"; stroke: "#d97706"; font-color: "#78350f" } }
+  mute: { style: { fill: "#f1f5f9"; stroke: "#94a3b8"; font-color: "#334155" } }
+}
+
+p: egress 정책을 켰다 { class: mute }
+d: "CoreDNS 로 가는\nUDP 53 도 막힌다" { class: warn }
+n: 이름 해석 실패 { class: warn }
+s: "증상: 연결 거부가 아니라\nName or service not known" { class: warn }
+w: 엉뚱하게 Service · 앱을 의심하게 된다 ❌ { class: bad }
+
+p -> d
+d -> n
+n -> s
+s -> w
 ```
 
 :::caution[함정]
@@ -391,19 +432,24 @@ ports:
 
 **NetworkPolicy는 Service를 모른다.**
 
-```mermaid
-flowchart LR
-    C["클라이언트"] --> SVC["Service<br/>port 80 → targetPort 8080"]
-    SVC --> POD["Pod<br/>8080 에서 수신"]
-    NP["NetworkPolicy"] -.->|"여기를 본다<br/>→ 8080 을 써야 한다"| POD
-    NP -.->|"이건 안 본다 ❌"| SVC
+```d2 layout=elk pad=40 title="NetworkPolicy 의 포트는 Pod 이 실제로 듣는 targetPort 를 보고 Service 의 port 는 보지 않는다는 대비"
+direction: down
 
-    classDef key fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
-    classDef bad fill:#fee2e2,stroke:#dc2626,color:#7f1d1d
-    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
-    class POD key
-    class SVC bad
-    class C,NP mute
+classes: {
+  key: { style: { fill: "#dbeafe"; stroke: "#2563eb"; font-color: "#1e3a8a" } }
+  bad: { style: { fill: "#fee2e2"; stroke: "#dc2626"; font-color: "#7f1d1d" } }
+  mute: { style: { fill: "#f1f5f9"; stroke: "#94a3b8"; font-color: "#334155" } }
+}
+
+c: 클라이언트 { class: mute }
+svc: "Service\nport 80 → targetPort 8080" { class: bad }
+pod: "Pod\n8080 에서 수신" { class: key }
+np: NetworkPolicy { class: mute }
+
+c -> svc
+svc -> pod
+np -> pod: "여기를 본다\n→ 8080 을 써야 한다" { style.stroke-dash: 3 }
+np -> svc: 이건 안 본다 ❌ { style.stroke-dash: 3 }
 ```
 
 :::caution[함정]
@@ -441,20 +487,26 @@ spec:
 
 **정책 하나가 어디까지 바꾸는지** 보면 감이 온다.
 
-```mermaid
-flowchart LR
-    WEB["web<br/>정책 없음"] -->|"아무 데나 갈 수 있다 ✅"| API["api<br/>정책 없음"]
-    API -->|"5432 허용 ✅"| DB["db<br/>tier=db · 정책 걸림"]
-    WEB -.->|"차단 ❌"| DB
-    EXT["다른 네임스페이스"] -.->|"차단 ❌"| DB
-    API -->|"egress 는 여전히 자유 ⚠️"| OUT["외부 · 아무 데나"]
+```d2 layout=elk pad=40 title="db 에만 정책을 걸면 api 에서 5432 만 통과하고 web 과 다른 네임스페이스는 차단되지만 api 의 egress 는 여전히 자유롭다는 결과"
+direction: down
 
-    classDef locked fill:#fee2e2,stroke:#dc2626,color:#7f1d1d
-    classDef free fill:#dcfce7,stroke:#16a34a,color:#14532d
-    classDef warn fill:#fef3c7,stroke:#d97706,color:#78350f
-    class DB locked
-    class WEB,API free
-    class OUT warn
+classes: {
+  ok: { style: { fill: "#dcfce7"; stroke: "#16a34a"; font-color: "#14532d" } }
+  bad: { style: { fill: "#fee2e2"; stroke: "#dc2626"; font-color: "#7f1d1d" } }
+  warn: { style: { fill: "#fef3c7"; stroke: "#d97706"; font-color: "#78350f" } }
+}
+
+web: "web\n정책 없음" { class: ok }
+api: "api\n정책 없음" { class: ok }
+db: "db\ntier=db · 정책 걸림" { class: bad }
+ext: 다른 네임스페이스
+dest: 외부 · 아무 데나 { class: warn }
+
+web -> api: 아무 데나 갈 수 있다 ✅
+api -> db: 5432 허용 ✅
+web -> db: 차단 ❌ { style.stroke-dash: 3 }
+ext -> db: 차단 ❌ { style.stroke-dash: 3 }
+api -> dest: egress 는 여전히 자유 ⚠️
 ```
 
 - 이 정책 하나로 **db Pod의 다른 모든 인바운드가 막힌다**
@@ -477,23 +529,31 @@ kubectl get pods -n prod --show-labels
 kubectl get ns --show-labels
 ```
 
-```mermaid
-flowchart TD
-    S{"증상"}
-    S -->|"정책을 만들었는데 안 막힌다"| A["CNI 가 NetworkPolicy 를 지원하지 않는다<br/>Flannel 기본 설정을 의심"]
-    S -->|"의도보다 많이 막힌다"| B{"무엇을 확인하나"}
-    B --> B1["AND/OR 하이픈 위치"]
-    B --> B2["egress 라면 DNS 허용 여부"]
-    B --> B3["포트를 Service 포트로 쓰지 않았나"]
-    S -->|"특정 네임스페이스만 안 된다"| C["namespaceSelector 라벨 불일치<br/>kubectl get ns --show-labels"]
-    S -->|"이름 해석부터 실패"| D["egress 에서 UDP 53 미허용"]
+```d2 layout=elk pad=40 title="안 막힌다 · 많이 막힌다 · 특정 네임스페이스만 · 이름 해석 실패 네 증상에서 CNI 지원 · 하이픈 위치 · 라벨 · UDP 53 중 어디를 볼지 가르는 진단표"
+direction: down
 
-    classDef bad fill:#fee2e2,stroke:#dc2626,color:#7f1d1d
-    classDef warn fill:#fef3c7,stroke:#d97706,color:#78350f
-    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
-    class A,D bad
-    class B1,B2,B3,C warn
-    class S,B mute
+classes: {
+  bad: { style: { fill: "#fee2e2"; stroke: "#dc2626"; font-color: "#7f1d1d" } }
+  warn: { style: { fill: "#fef3c7"; stroke: "#d97706"; font-color: "#78350f" } }
+  mute: { style: { fill: "#f1f5f9"; stroke: "#94a3b8"; font-color: "#334155" } }
+}
+
+s: 증상 { shape: diamond; class: mute }
+a: "CNI 가 NetworkPolicy 를\n지원하지 않는다\nFlannel 기본 설정을 의심" { class: bad }
+b: 무엇을 확인하나 { shape: diamond; class: mute }
+b1: AND/OR 하이픈 위치 { class: warn }
+b2: "egress 라면\nDNS 허용 여부" { class: warn }
+b3: "포트를 Service 포트로\n쓰지 않았나" { class: warn }
+c: "namespaceSelector\n라벨 불일치\nkubectl get ns --show-labels" { class: warn }
+d: "egress 에서\nUDP 53 미허용" { class: bad }
+
+s -> a: 정책을 만들었는데 안 막힌다
+s -> b: 의도보다 많이 막힌다
+b -> b1
+b -> b2
+b -> b3
+s -> c: 특정 네임스페이스만 안 된다
+s -> d: 이름 해석부터 실패
 ```
 
 | 증상 | 원인 후보 |

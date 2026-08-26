@@ -23,22 +23,29 @@ kubectl get svc kube-dns -n kube-system
 
 **특별한 시스템이 아니라 그냥 Deployment + Service다.** 그래서 똑같이 고장 나고 똑같이 고친다.
 
-```mermaid
-flowchart LR
-    POD["앱 Pod<br/>/etc/resolv.conf 의<br/>nameserver 10.96.0.10"]
-    POD --> SVC["Service kube-dns<br/>ClusterIP 10.96.0.10"]
-    SVC --> EP["EndpointSlice"]
-    EP --> C1["CoreDNS Pod 1"]
-    EP --> C2["CoreDNS Pod 2"]
-    C1 --> K["kubernetes 플러그인<br/>Service · Pod 이름 해석"]
-    C1 --> F["forward 플러그인<br/>그 밖의 도메인 → 노드 리졸버"]
+```d2 layout=elk pad=40 title="Pod 의 resolv.conf 가 가리키는 kube-dns ClusterIP 가 EndpointSlice 를 거쳐 CoreDNS Pod 에 닿고 kubernetes · forward 플러그인으로 갈리는 경로"
+direction: down
 
-    classDef key fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
-    classDef dns fill:#fef3c7,stroke:#d97706,color:#78350f
-    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
-    class SVC key
-    class C1,C2 dns
-    class POD,EP,K,F mute
+classes: {
+  warn: { style: { fill: "#fef3c7"; stroke: "#d97706"; font-color: "#78350f" } }
+  key: { style: { fill: "#dbeafe"; stroke: "#2563eb"; font-color: "#1e3a8a" } }
+  mute: { style: { fill: "#f1f5f9"; stroke: "#94a3b8"; font-color: "#334155" } }
+}
+
+pod: "앱 Pod\n/etc/resolv.conf 의\nnameserver 10.96.0.10" { class: mute }
+svc: "Service kube-dns\nClusterIP 10.96.0.10" { class: key }
+ep: EndpointSlice { class: mute }
+c1: CoreDNS Pod 1 { class: warn }
+c2: CoreDNS Pod 2 { class: warn }
+k: "kubernetes 플러그인\nService · Pod 이름 해석" { class: mute }
+f: "forward 플러그인\n그 밖의 도메인 → 노드 리졸버" { class: mute }
+
+pod -> svc
+svc -> ep
+ep -> c1
+ep -> c2
+c1 -> k
+c1 -> f
 ```
 
 - CoreDNS는 **평범한 Deployment**다. 보통 2개의 레플리카로 돈다
@@ -59,18 +66,30 @@ flowchart LR
 계층으로 붙는다. 이것이 FQDN(Fully Qualified Domain Name — 상위 도메인까지 다 붙인
 완전한 이름)이고, 이렇게 생겼다.
 
-```mermaid
-flowchart LR
-    A["web-svc"] --> B["prod"] --> C["svc"] --> D["cluster.local"]
-    A1["서비스 이름"] -.-> A
-    B1["네임스페이스"] -.-> B
-    C1["리소스 종류<br/>svc 또는 pod"] -.-> C
-    D1["클러스터 도메인<br/>기본값"] -.-> D
+```d2 layout=elk pad=40 title="FQDN web-svc.prod.svc.cluster.local 의 네 조각이 각각 서비스 이름 · 네임스페이스 · 리소스 종류 · 클러스터 도메인이라는 대응"
+direction: down
 
-    classDef part fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
-    classDef label fill:#f1f5f9,stroke:#94a3b8,color:#334155
-    class A,B,C,D part
-    class A1,B1,C1,D1 label
+classes: {
+  key: { style: { fill: "#dbeafe"; stroke: "#2563eb"; font-color: "#1e3a8a" } }
+  mute: { style: { fill: "#f1f5f9"; stroke: "#94a3b8"; font-color: "#334155" } }
+}
+
+p1: web-svc { class: key }
+p2: prod { class: key }
+p3: svc { class: key }
+p4: cluster.local { class: key }
+l1: 서비스 이름 { class: mute }
+l2: 네임스페이스 { class: mute }
+l3: "리소스 종류\nsvc 또는 pod" { class: mute }
+l4: "클러스터 도메인\n기본값" { class: mute }
+
+p1 -> p2
+p2 -> p3
+p3 -> p4
+l1 -> p1: { style.stroke-dash: 3 }
+l2 -> p2: { style.stroke-dash: 3 }
+l3 -> p3: { style.stroke-dash: 3 }
+l4 -> p4: { style.stroke-dash: 3 }
 ```
 
 | 어디서 부르나 | 쓸 수 있는 이름 |
@@ -116,25 +135,34 @@ options ndots:5
 
 ### 짧은 이름이 해석되는 순서
 
-```mermaid
-flowchart TD
-    Q["web-svc 를 조회"] --> N{"점이 5개 이상인가<br/>ndots:5"}
-    N -->|"아니다 · 점 0개"| S1["① web-svc.default.svc.cluster.local"]
-    S1 -->|"성공"| OK["해석 완료 ✅"]
-    S1 -->|실패| S2["② web-svc.svc.cluster.local"]
-    S2 -->|실패| S3["③ web-svc.cluster.local"]
-    S3 -->|실패| S4["④ web-svc 그대로 조회"]
-    S4 -->|실패| NX["NXDOMAIN ❌"]
-    N -->|"그렇다"| DIRECT["search 를 건너뛰고 바로 조회"]
+```d2 layout=elk pad=40 title="ndots 5 미만이면 search 도메인을 ① 부터 ④ 까지 차례로 붙여 조회하고 전부 실패하면 NXDOMAIN 이 되는 순서"
+direction: down
 
-    classDef ok fill:#dcfce7,stroke:#16a34a,color:#14532d
-    classDef bad fill:#fee2e2,stroke:#dc2626,color:#7f1d1d
-    classDef step fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
-    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
-    class OK,DIRECT ok
-    class NX bad
-    class S1,S2,S3,S4 step
-    class Q,N mute
+classes: {
+  ok: { style: { fill: "#dcfce7"; stroke: "#16a34a"; font-color: "#14532d" } }
+  bad: { style: { fill: "#fee2e2"; stroke: "#dc2626"; font-color: "#7f1d1d" } }
+  key: { style: { fill: "#dbeafe"; stroke: "#2563eb"; font-color: "#1e3a8a" } }
+  mute: { style: { fill: "#f1f5f9"; stroke: "#94a3b8"; font-color: "#334155" } }
+}
+
+q: web-svc 를 조회 { class: mute }
+n: "점이 5개 이상인가\nndots:5" { shape: diamond; class: mute }
+s1: ① web-svc.default.svc.cluster.local { class: key }
+s2: ② web-svc.svc.cluster.local { class: key }
+s3: ③ web-svc.cluster.local { class: key }
+s4: ④ web-svc 그대로 조회 { class: key }
+done: 해석 완료 ✅ { class: ok }
+nx: NXDOMAIN ❌ { class: bad }
+direct: search 를 건너뛰고 바로 조회 { class: ok }
+
+q -> n
+n -> s1: 아니다 · 점 0개
+s1 -> done: 성공
+s1 -> s2: 실패
+s2 -> s3: 실패
+s3 -> s4: 실패
+s4 -> nx: 실패
+n -> direct: 그렇다
 ```
 
 :::caution[함정]
@@ -186,18 +214,23 @@ spec:
 `Default`와 `None`은 깊게 팔 필요 없이 이름과 역할만 구분해 두면 된다 —
 특히 `Default`가 기본값이 **아니라는** 점만 조심한다.
 
-```mermaid
-flowchart LR
-    H["hostNetwork: true Pod"] --> D{"dnsPolicy"}
-    D -->|"ClusterFirst · 기본"| B["노드 DNS 를 쓰게 된다<br/>클러스터 서비스 이름 해석 실패 ❌"]
-    D -->|ClusterFirstWithHostNet| G["클러스터 DNS 사용<br/>정상 ✅"]
+```d2 layout=elk pad=40 title="hostNetwork Pod 은 기본 ClusterFirst 로 두면 노드 DNS 를 쓰게 되고 ClusterFirstWithHostNet 으로 바꿔야 클러스터 DNS 를 쓴다는 갈래"
+direction: down
 
-    classDef ok fill:#dcfce7,stroke:#16a34a,color:#14532d
-    classDef bad fill:#fee2e2,stroke:#dc2626,color:#7f1d1d
-    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
-    class G ok
-    class B bad
-    class H,D mute
+classes: {
+  ok: { style: { fill: "#dcfce7"; stroke: "#16a34a"; font-color: "#14532d" } }
+  bad: { style: { fill: "#fee2e2"; stroke: "#dc2626"; font-color: "#7f1d1d" } }
+  mute: { style: { fill: "#f1f5f9"; stroke: "#94a3b8"; font-color: "#334155" } }
+}
+
+h: "hostNetwork: true Pod" { class: mute }
+d: dnsPolicy { shape: diamond; class: mute }
+b: "노드 DNS 를 쓰게 된다\n클러스터 서비스 이름 해석 실패 ❌" { class: bad }
+g: "클러스터 DNS 사용\n정상 ✅" { class: ok }
+
+h -> d
+d -> b: ClusterFirst · 기본
+d -> g: ClusterFirstWithHostNet
 ```
 
 :::caution[함정]
@@ -239,20 +272,27 @@ kubectl edit cm coredns -n kube-system
 
 **질의 하나가 이 플러그인 체인을 순서대로 통과한다.**
 
-```mermaid
-flowchart LR
-    Q["질의"] --> CA["cache<br/>있으면 바로 응답"]
-    CA -->|"miss"| K{"kubernetes 플러그인<br/>cluster.local 인가"}
-    K -->|"그렇다"| KR["Service · Pod 이름 해석 → 응답"]
-    K -->|"아니다 · fallthrough"| FW["forward<br/>노드 /etc/resolv.conf 로"]
-    FW --> EXT["외부 DNS 응답"]
+```d2 layout=elk pad=40 title="CoreDNS 가 cache 로 먼저 답하고 miss 면 kubernetes 플러그인이 cluster.local 을 풀며 그 밖은 forward 로 외부 DNS 에 넘기는 순서"
+direction: down
 
-    classDef key fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
-    classDef ok fill:#dcfce7,stroke:#16a34a,color:#14532d
-    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
-    class K,FW key
-    class KR,EXT ok
-    class Q,CA mute
+classes: {
+  ok: { style: { fill: "#dcfce7"; stroke: "#16a34a"; font-color: "#14532d" } }
+  key: { style: { fill: "#dbeafe"; stroke: "#2563eb"; font-color: "#1e3a8a" } }
+  mute: { style: { fill: "#f1f5f9"; stroke: "#94a3b8"; font-color: "#334155" } }
+}
+
+q: 질의 { class: mute }
+ca: "cache\n있으면 바로 응답" { class: mute }
+k: "kubernetes 플러그인\ncluster.local 인가" { shape: diamond; class: key }
+kr: Service · Pod 이름 해석 → 응답 { class: ok }
+fw: "forward\n노드 /etc/resolv.conf 로" { class: key }
+ext: 외부 DNS 응답 { class: ok }
+
+q -> ca
+ca -> k: miss
+k -> kr: 그렇다
+k -> fw: 아니다 · fallthrough
+fw -> ext
 ```
 
 - **`kubernetes` 플러그인**이 Service/Pod 이름을 담당한다
@@ -336,22 +376,29 @@ hosts {
 
 ### DNS 증상별 원인
 
-```mermaid
-flowchart TD
-    S{"무엇이 안 되나"}
-    S -->|"모든 이름"| A["CoreDNS Pod 다운<br/>kube-dns 엔드포인트가 비어 있다"]
-    S -->|"클러스터 이름만"| B["Corefile 의 kubernetes 플러그인 이상<br/>또는 dnsPolicy 잘못"]
-    S -->|"외부 도메인만"| C["forward 대상 문제<br/>노드 /etc/resolv.conf 확인"]
-    S -->|"특정 네임스페이스만"| D["짧은 이름을 썼다<br/>→ FQDN 이 필요"]
-    S -->|"이름은 되는데 연결이 안 됨"| E["Service · 엔드포인트 문제 · 9장<br/>또는 NetworkPolicy · 12장"]
-    S -->|"간헐적으로 느리다"| F["ndots:5 로 인한 불필요한 조회<br/>CoreDNS 레플리카 부족"]
+```d2 layout=elk pad=40 title="무엇이 안 되는지에 따라 CoreDNS 다운 · Corefile · forward 대상 · 짧은 이름 · Service · ndots 중 어디를 볼지 가르는 진단표"
+direction: right
 
-    classDef bad fill:#fee2e2,stroke:#dc2626,color:#7f1d1d
-    classDef warn fill:#fef3c7,stroke:#d97706,color:#78350f
-    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
-    class A bad
-    class B,C,D,E,F warn
-    class S mute
+classes: {
+  bad: { style: { fill: "#fee2e2"; stroke: "#dc2626"; font-color: "#7f1d1d" } }
+  warn: { style: { fill: "#fef3c7"; stroke: "#d97706"; font-color: "#78350f" } }
+  mute: { style: { fill: "#f1f5f9"; stroke: "#94a3b8"; font-color: "#334155" } }
+}
+
+s: 무엇이 안 되나 { shape: diamond; class: mute }
+a: "CoreDNS Pod 다운\nkube-dns 엔드포인트가 비어 있다" { class: bad }
+b: "Corefile 의 kubernetes 플러그인 이상\n또는 dnsPolicy 잘못" { class: warn }
+c: "forward 대상 문제\n노드 /etc/resolv.conf 확인" { class: warn }
+d: "짧은 이름을 썼다\n→ FQDN 이 필요" { class: warn }
+e: "Service · 엔드포인트 문제 · 9장\n또는 NetworkPolicy · 12장" { class: warn }
+f: "ndots:5 로 인한 불필요한 조회\nCoreDNS 레플리카 부족" { class: warn }
+
+s -> a: 모든 이름
+s -> b: 클러스터 이름만
+s -> c: 외부 도메인만
+s -> d: 특정 네임스페이스만
+s -> e: 이름은 되는데 연결이 안 됨
+s -> f: 간헐적으로 느리다
 ```
 
 | 증상 | 원인 후보 |
