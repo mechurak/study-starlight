@@ -12,21 +12,29 @@ import { Steps, Card, CardGrid, Tabs, TabItem } from '@astrojs/starlight/compone
 2장의 그림에서 모든 화살표는 API 서버를 향했다 — kubectl은 그중 **사람이 쏘는 화살표**다.
 시험의 모든 조작이 이 클라이언트를 거치니, 이 장은 곧 손 속도를 버는 장이다.
 
-```mermaid
-flowchart LR
-    U["당신"] --> KC["kubectl"]
-    CFG["kubeconfig<br/>~/.kube/config"] -->|"어디로 · 누구로"| KC
-    KC -->|"HTTPS REST 요청"| API["kube-apiserver"]
-    API --> ETCD[("etcd")]
-    ERR1["연결이 안 된다"] -.->|"= server 주소 문제"| CFG
-    ERR2["권한이 없다 403"] -.->|"= user 신원 문제"| CFG
+```d2 layout=elk pad=40 title="kubeconfig 가 kubectl 에게 어디로 · 누구로 접속할지 알려주고, 연결 실패는 server 주소, 403 은 user 신원 문제로 이어진다"
+direction: down
 
-    classDef key fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
-    classDef bad fill:#fee2e2,stroke:#dc2626,color:#7f1d1d
-    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
-    class CFG key
-    class ERR1,ERR2 bad
-    class U,KC,API,ETCD mute
+classes: {
+  key: { style: { fill: "#dbeafe"; stroke: "#2563eb"; font-color: "#1e3a8a" } }
+  bad: { style: { fill: "#fee2e2"; stroke: "#dc2626"; font-color: "#7f1d1d" } }
+  mute: { style: { fill: "#f1f5f9"; stroke: "#94a3b8"; font-color: "#334155" } }
+}
+
+u: 당신 { class: mute }
+kc: kubectl { class: mute }
+cfg: "kubeconfig\n~/.kube/config" { class: key }
+api: kube-apiserver { class: mute }
+etcd: etcd { shape: cylinder; class: mute }
+err1: 연결이 안 된다 { class: bad }
+err2: 권한이 없다 403 { class: bad }
+
+u -> kc
+cfg -> kc: 어디로 · 누구로
+kc -> api: HTTPS REST 요청
+api -> etcd
+err1 -> cfg: = server 주소 문제 { style.stroke-dash: 3 }
+err2 -> cfg: = user 신원 문제 { style.stroke-dash: 3 }
 ```
 
 - API 서버에 **HTTP 요청을 보내는 클라이언트**. 그 이상도 이하도 아니다
@@ -71,17 +79,24 @@ contexts:                    # 조합: cluster + user + namespace
 current-context: prod-admin  # 지금 쓰는 조합
 ```
 
-```mermaid
-flowchart LR
-    CL["clusters<br/>어디로 · server + CA"] --> CTX["contexts<br/>조합"]
-    US["users<br/>누구로 · 인증서 · 토큰"] --> CTX
-    NS["namespace<br/>기본 네임스페이스"] --> CTX
-    CTX --> CUR["current-context<br/>지금 쓰는 조합"]
+```d2 layout=elk pad=40 title="kubeconfig 의 clusters · users · namespace 가 contexts 로 조합되고 그중 하나가 current-context 가 되는 구조"
+direction: down
 
-    classDef key fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
-    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
-    class CTX,CUR key
-    class CL,US,NS mute
+classes: {
+  key: { style: { fill: "#dbeafe"; stroke: "#2563eb"; font-color: "#1e3a8a" } }
+  mute: { style: { fill: "#f1f5f9"; stroke: "#94a3b8"; font-color: "#334155" } }
+}
+
+cl: "clusters\n어디로 · server + CA" { class: mute }
+us: "users\n누구로 · 인증서 · 토큰" { class: mute }
+ns: "namespace\n기본 네임스페이스" { class: mute }
+ctx: "contexts\n조합" { class: key }
+cur: "current-context\n지금 쓰는 조합" { class: key }
+
+cl -> ctx
+us -> ctx
+ns -> ctx
+ctx -> cur
 ```
 
 **context = cluster + user + namespace.** 셋을 묶은 것이 컨텍스트다.
@@ -218,20 +233,29 @@ Events 한 줄에 답이 있는 경우가 대부분이다. (18장)
 
 ### 명령형 vs 선언형 — 시험에서는 섞어 쓴다
 
-```mermaid
-flowchart LR
-    I["명령형<br/>kubectl create · scale · expose"] -->|"빠르다 · 표현이 제한적"| R1["바로 만들어진다"]
-    D["선언형<br/>kubectl apply -f"] -->|"모든 필드 표현 가능 · 파일이 필요"| R2["파일 기준으로 맞춘다"]
-    BEST["★ 시험 전략"] --> S1["① 명령형 + dry-run 으로 뼈대 생성"]
-    S1 --> S2["② 필요한 필드만 편집"]
-    S2 --> S3["③ kubectl apply -f"]
+```d2 layout=elk pad=40 title="명령형과 선언형의 차이, 그리고 dry-run 으로 뼈대를 만들고 필요한 필드만 고친 뒤 apply 하는 시험 전략"
+direction: down
 
-    classDef key fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
-    classDef ok fill:#dcfce7,stroke:#16a34a,color:#14532d
-    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
-    class BEST key
-    class S1,S2,S3 ok
-    class I,D,R1,R2 mute
+classes: {
+  ok: { style: { fill: "#dcfce7"; stroke: "#16a34a"; font-color: "#14532d" } }
+  key: { style: { fill: "#dbeafe"; stroke: "#2563eb"; font-color: "#1e3a8a" } }
+  mute: { style: { fill: "#f1f5f9"; stroke: "#94a3b8"; font-color: "#334155" } }
+}
+
+i: "명령형\nkubectl create · scale · expose" { class: mute }
+r1: 바로 만들어진다 { class: mute }
+d: "선언형\nkubectl apply -f" { class: mute }
+r2: 파일 기준으로 맞춘다 { class: mute }
+best: ★ 시험 전략 { class: key }
+s1: ① 명령형 + dry-run 으로 뼈대 생성 { class: ok }
+s2: ② 필요한 필드만 편집 { class: ok }
+s3: ③ kubectl apply -f { class: ok }
+
+i -> r1: 빠르다 · 표현이 제한적
+d -> r2: "모든 필드 표현 가능 ·\n파일이 필요"
+best -> s1
+s1 -> s2
+s2 -> s3
 ```
 
 :::tip[시험 전략]
@@ -283,19 +307,25 @@ kubectl run nginx --image=nginx --dry-run=client -o yaml > pod.yaml
 kubectl expose deploy web --port=80 --dry-run=client -o yaml > svc.yaml
 ```
 
-```mermaid
-flowchart LR
-    C["kubectl create …"] --> Q{"--dry-run"}
-    Q -->|client| CL["클라이언트에서만 만든다<br/>서버에 안 보낸다 → YAML 생성용"]
-    Q -->|server| SV["서버에 보내되 저장은 안 한다<br/>admission·검증까지 통과하는지 확인"]
-    Q -->|"생략"| REAL["실제로 생성된다"]
+```d2 layout=elk pad=40 title="--dry-run 이 client 면 클라이언트에서만, server 면 서버 검증까지, 생략하면 실제로 생성된다는 세 갈래"
+direction: down
 
-    classDef key fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
-    classDef warn fill:#fef3c7,stroke:#d97706,color:#78350f
-    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
-    class CL key
-    class SV warn
-    class C,Q,REAL mute
+classes: {
+  key: { style: { fill: "#dbeafe"; stroke: "#2563eb"; font-color: "#1e3a8a" } }
+  warn: { style: { fill: "#fef3c7"; stroke: "#d97706"; font-color: "#78350f" } }
+  mute: { style: { fill: "#f1f5f9"; stroke: "#94a3b8"; font-color: "#334155" } }
+}
+
+c: kubectl create … { class: mute }
+q: --dry-run { shape: diamond; class: mute }
+cl: "클라이언트에서만 만든다\n서버에 안 보낸다\n→ YAML 생성용" { class: key }
+sv: "서버에 보내되 저장은 안 한다\nadmission·검증까지\n통과하는지 확인" { class: warn }
+real: 실제로 생성된다 { class: mute }
+
+c -> q
+q -> cl: client
+q -> sv: server
+q -> real: 생략
 ```
 
 :::tip[시험]
@@ -368,22 +398,29 @@ Pod의 **대부분 필드는 수정할 수 없다.**
 파일에 안 적힌 것(다른 도구가 넣은 필드)이 통째로 날아간다.
 `apply`가 단순 덮어쓰기가 아닌 이유가 이것이다.
 
-```mermaid
-flowchart LR
-    F["① 내 파일 web.yaml"] --> M{"3-way merge"}
-    C["② 클러스터의 현재 상태"] --> M
-    L["③ 마지막으로 적용한 것<br/>last-applied-configuration 애노테이션"] --> M
-    M --> R["파일에 없는 필드를<br/>함부로 지우지 않는다 ✅"]
-    REP["kubectl replace"] -.->|"3-way merge 를 안 한다"| R2["통째로 교체<br/>파일에 없는 필드가 사라진다 ❌"]
+```d2 layout=elk pad=40 title="apply 의 3-way merge 는 내 파일·현재 상태·last-applied 애노테이션을 합쳐 파일에 없는 필드를 지키지만, replace 는 통째로 교체한다"
+direction: down
 
-    classDef ok fill:#dcfce7,stroke:#16a34a,color:#14532d
-    classDef bad fill:#fee2e2,stroke:#dc2626,color:#7f1d1d
-    classDef key fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
-    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
-    class R ok
-    class R2 bad
-    class M key
-    class F,C,L,REP mute
+classes: {
+  ok: { style: { fill: "#dcfce7"; stroke: "#16a34a"; font-color: "#14532d" } }
+  bad: { style: { fill: "#fee2e2"; stroke: "#dc2626"; font-color: "#7f1d1d" } }
+  key: { style: { fill: "#dbeafe"; stroke: "#2563eb"; font-color: "#1e3a8a" } }
+  mute: { style: { fill: "#f1f5f9"; stroke: "#94a3b8"; font-color: "#334155" } }
+}
+
+f: ① 내 파일 web.yaml { class: mute }
+c: ② 클러스터의 현재 상태 { class: mute }
+l: "③ 마지막으로 적용한 것\nlast-applied-configuration\n애노테이션" { class: mute }
+m: 3-way merge { shape: diamond; class: key }
+r: "파일에 없는 필드를\n함부로 지우지 않는다 ✅" { class: ok }
+rep: kubectl replace { class: mute }
+r2: "통째로 교체\n파일에 없는 필드가\n사라진다 ❌" { class: bad }
+
+f -> m
+c -> m
+l -> m
+m -> r
+rep -> r2: 3-way merge 를 안 한다 { style.stroke-dash: 3 }
 ```
 
 - `apply`는 **파일 / 클러스터의 현재 / 마지막으로 적용한 것** 셋을 비교한다
@@ -414,21 +451,27 @@ kubectl delete pod web --force --grace-period=0   # 즉시 (graceful 생략)
 kubectl delete deploy web --cascade=orphan        # 자식(Pod)을 남긴다
 ```
 
-```mermaid
-flowchart TD
-    D["kubectl delete pod web"] --> Q{"상위 컨트롤러가 있는가"}
-    Q -->|"있다 · Deployment 등"| BACK["즉시 다시 생긴다 ⚠️<br/>→ 컨트롤러를 지워야 한다"]
-    Q -->|"없다 · 단독 Pod"| GONE["사라진다 ✅"]
-    NS["네임스페이스가 Terminating 에서 안 끝난다"] --> FIN["finalizer 를 의심한다 · 18장"]
+```d2 layout=elk pad=40 title="Pod 를 지웠을 때 상위 컨트롤러가 있으면 다시 생기고 없으면 사라진다는 갈림길, 그리고 Terminating 이 안 끝나면 finalizer 를 의심한다"
+direction: down
 
-    classDef ok fill:#dcfce7,stroke:#16a34a,color:#14532d
-    classDef warn fill:#fef3c7,stroke:#d97706,color:#78350f
-    classDef bad fill:#fee2e2,stroke:#dc2626,color:#7f1d1d
-    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
-    class GONE ok
-    class BACK warn
-    class FIN bad
-    class D,Q,NS mute
+classes: {
+  ok: { style: { fill: "#dcfce7"; stroke: "#16a34a"; font-color: "#14532d" } }
+  warn: { style: { fill: "#fef3c7"; stroke: "#d97706"; font-color: "#78350f" } }
+  bad: { style: { fill: "#fee2e2"; stroke: "#dc2626"; font-color: "#7f1d1d" } }
+  mute: { style: { fill: "#f1f5f9"; stroke: "#94a3b8"; font-color: "#334155" } }
+}
+
+d: kubectl delete pod web { class: mute }
+q: 상위 컨트롤러가 있는가 { shape: diamond; class: mute }
+back: "즉시 다시 생긴다 ⚠️\n→ 컨트롤러를 지워야 한다" { class: warn }
+gone: 사라진다 ✅ { class: ok }
+ns: 네임스페이스가 Terminating 에서 안 끝난다 { class: mute }
+fin: finalizer 를 의심한다 · 18장 { class: bad }
+
+d -> q
+q -> back: 있다 · Deployment 등
+q -> gone: 없다 · 단독 Pod
+ns -> fin
 ```
 
 - 기본 삭제는 **graceful**이다 — `terminationGracePeriodSeconds`(기본 30초)를 기다린다
@@ -496,18 +539,23 @@ kubectl run tmp --image=busybox:1.36 --rm -it --restart=Never -- sh
 #         nslookup web-svc
 ```
 
-```mermaid
-flowchart LR
-    Q{"컨테이너 안을 봐야 한다"} -->|"셸이 있다"| E["kubectl exec -it … -- sh ✅"]
-    Q -->|"distroless · 셸이 없다"| D["kubectl debug -it web<br/>--image=busybox --target=web"]
-    D --> EPH["임시 컨테이너 ephemeral container 를 붙인다"]
+```d2 layout=elk pad=40 title="셸이 있으면 kubectl exec, distroless 라 셸이 없으면 kubectl debug 로 임시 컨테이너를 붙인다"
+direction: down
 
-    classDef ok fill:#dcfce7,stroke:#16a34a,color:#14532d
-    classDef key fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
-    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
-    class E ok
-    class D,EPH key
-    class Q mute
+classes: {
+  ok: { style: { fill: "#dcfce7"; stroke: "#16a34a"; font-color: "#14532d" } }
+  key: { style: { fill: "#dbeafe"; stroke: "#2563eb"; font-color: "#1e3a8a" } }
+  mute: { style: { fill: "#f1f5f9"; stroke: "#94a3b8"; font-color: "#334155" } }
+}
+
+q: 컨테이너 안을 봐야 한다 { shape: diamond; class: mute }
+e: kubectl exec -it … -- sh ✅ { class: ok }
+d: "kubectl debug -it web\n--image=busybox --target=web" { class: key }
+eph: 임시 컨테이너 ephemeral container 를 붙인다 { class: key }
+
+q -> e: 셸이 있다
+q -> d: distroless · 셸이 없다
+d -> eph
 ```
 
 :::caution[함정]

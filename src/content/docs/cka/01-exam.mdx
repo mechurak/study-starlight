@@ -33,28 +33,29 @@ import { Steps, Card, CardGrid, Tabs, TabItem, LinkCard, Badge } from '@astrojs/
 
 ### 도메인과 배점
 
-```mermaid
-flowchart LR
-    T["Troubleshooting<br/>30%<br/>18장"]
-    C["Cluster Architecture<br/>25%<br/>14~17장"]
-    N["Servicing and Networking<br/>20%<br/>9~12장"]
-    W["Workloads and Scheduling<br/>15%<br/>4~8장"]
-    S["Storage<br/>10%<br/>13장"]
-    T --- C
-    C --- N
-    N --- W
-    W --- S
-    SUM["T + C = 55%<br/>여기가 승부처다"] -.- T
-    SUM -.- C
+```d2 layout=elk pad=40 title="CKA 다섯 도메인의 배점 — Troubleshooting 30%, Cluster Architecture 25%, Servicing and Networking 20%, Workloads and Scheduling 15%, Storage 10%"
+direction: down
 
-    classDef big fill:#fee2e2,stroke:#dc2626,color:#7f1d1d
-    classDef mid fill:#fef3c7,stroke:#d97706,color:#78350f
-    classDef small fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
-    classDef note fill:#dcfce7,stroke:#16a34a,color:#14532d
-    class T,C big
-    class N,W mid
-    class S small
-    class SUM note
+classes: {
+  big: { style: { fill: "#fee2e2"; stroke: "#dc2626"; font-color: "#7f1d1d" } }
+  mid: { style: { fill: "#fef3c7"; stroke: "#d97706"; font-color: "#78350f" } }
+  small: { style: { fill: "#dbeafe"; stroke: "#2563eb"; font-color: "#1e3a8a" } }
+  note: { style: { fill: "#dcfce7"; stroke: "#16a34a"; font-color: "#14532d" } }
+}
+
+t: "Troubleshooting\n30%\n18장" { class: big }
+c: "Cluster Architecture\n25%\n14~17장" { class: big }
+n: "Servicing and Networking\n20%\n9~12장" { class: mid }
+w: "Workloads and Scheduling\n15%\n4~8장" { class: mid }
+s: "Storage\n10%\n13장" { class: small }
+sum: "T + C = 55%\n여기가 승부처다" { class: note }
+
+t -- c
+c -- n
+n -- w
+w -- s
+sum -- t: { style.stroke-dash: 3 }
+sum -- c: { style.stroke-dash: 3 }
 ```
 
 | 비중 | 도메인 | 이 덱의 장 |
@@ -125,22 +126,29 @@ flowchart LR
 
 굵게 표시한 항목들이 **최근 개정에서 들어오거나 강조된 것**들이다.
 
-```mermaid
-flowchart LR
-    NEW["최근 개정에서 강조된 것"]
-    NEW --> G["Gateway API<br/>Ingress 만 알면 안 된다 · 11장"]
-    NEW --> H["Helm / Kustomize<br/>설치·값 오버라이드 · 16장"]
-    NEW --> C["CRD와 오퍼레이터<br/>설치하고 상태 확인 · 17장"]
-    NEW --> A["워크로드 오토스케일링<br/>HPA + metrics-server · 8장"]
-    NEW --> L["컨테이너 출력 스트림<br/>로그 전반 · 18장"]
-    OLD["오래된 자료의 함정"] -.->|"Docker · PodSecurityPolicy 를 다루고<br/>Gateway API 가 없다 ❌"| NEW
+```d2 layout=elk pad=40 title="최근 개정에서 강조된 Gateway API · Helm/Kustomize · CRD와 오퍼레이터 · 오토스케일링 · 로그, 그리고 이것들이 빠진 오래된 자료의 함정"
+direction: right
 
-    classDef key fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
-    classDef bad fill:#fee2e2,stroke:#dc2626,color:#7f1d1d
-    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
-    class NEW key
-    class OLD bad
-    class G,H,C,A,L mute
+classes: {
+  key: { style: { fill: "#dbeafe"; stroke: "#2563eb"; font-color: "#1e3a8a" } }
+  bad: { style: { fill: "#fee2e2"; stroke: "#dc2626"; font-color: "#7f1d1d" } }
+  mute: { style: { fill: "#f1f5f9"; stroke: "#94a3b8"; font-color: "#334155" } }
+}
+
+new: 최근 개정에서 강조된 것 { class: key }
+g: "Gateway API\nIngress 만 알면 안 된다 ·\n11장" { class: mute }
+h: "Helm / Kustomize\n설치·값 오버라이드 ·\n16장" { class: mute }
+c: "CRD와 오퍼레이터\n설치하고 상태 확인 ·\n17장" { class: mute }
+a: "워크로드 오토스케일링\nHPA + metrics-server ·\n8장" { class: mute }
+l: "컨테이너 출력 스트림\n로그 전반 ·\n18장" { class: mute }
+old: 오래된 자료의 함정 { class: bad }
+
+new -> g
+new -> h
+new -> c
+new -> a
+new -> l
+old -> new: "Docker ·\nPodSecurityPolicy 를 다루고\nGateway API 가 없다 ❌" { style.stroke-dash: 3 }
 ```
 
 - **Gateway API** — Ingress만 알면 안 된다. CRD(CustomResourceDefinition — 새 리소스 종류를 추가하는 확장) 기반이라 설치부터 다르다 (11장)
@@ -180,19 +188,27 @@ flowchart LR
 - 문제 지문에서 명령을 복사할 때 **줄바꿈이 깨지는 일**이 있다. 붙여넣고 눈으로 확인
 - 노드 작업 후에는 **반드시 `exit`** 해서 원래 셸로 돌아올 것
 
-```mermaid
-flowchart LR
-    Q1["문제 N"] --> SSH["ssh node01"] --> WORK["노드에서 작업"]
-    WORK -->|"exit 했다 ✅"| BACK["원래 셸<br/>다음 문제 정상"]
-    WORK -->|"exit 을 잊었다 ❌"| STUCK["노드 셸에 남는다<br/>kubectl 이 다른 kubeconfig 를 보거나 아예 없다"]
-    STUCK --> WHY["'갑자기 명령이 안 먹는다' 의 90%"]
+```d2 layout=elk pad=40 title="노드에 ssh 로 들어가 작업한 뒤 exit 을 했는지에 따라 다음 문제에서 kubectl 이 정상 동작하거나 막히는 갈림길"
+direction: down
 
-    classDef ok fill:#dcfce7,stroke:#16a34a,color:#14532d
-    classDef bad fill:#fee2e2,stroke:#dc2626,color:#7f1d1d
-    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
-    class BACK ok
-    class STUCK,WHY bad
-    class Q1,SSH,WORK mute
+classes: {
+  ok: { style: { fill: "#dcfce7"; stroke: "#16a34a"; font-color: "#14532d" } }
+  bad: { style: { fill: "#fee2e2"; stroke: "#dc2626"; font-color: "#7f1d1d" } }
+  mute: { style: { fill: "#f1f5f9"; stroke: "#94a3b8"; font-color: "#334155" } }
+}
+
+q1: 문제 N { class: mute }
+ssh: ssh node01 { class: mute }
+work: 노드에서 작업 { class: mute }
+back: "원래 셸\n다음 문제 정상" { class: ok }
+stuck: "노드 셸에 남는다\nkubectl 이 다른 kubeconfig 를 보거나 아예 없다" { class: bad }
+why: "'갑자기 명령이 안 먹는다' 의 90%" { class: bad }
+
+q1 -> ssh
+ssh -> work
+work -> back: exit 했다 ✅
+work -> stuck: exit 을 잊었다 ❌
+stuck -> why
 ```
 
 :::caution[함정]
@@ -237,24 +253,36 @@ set number
 
 시험 중 브라우저에서 **아래만** 열 수 있다.
 
-```mermaid
-flowchart LR
-    OK["열 수 있다 ✅"] --> O1["kubernetes.io/docs/<br/>검색 기능 포함"]
-    OK --> O2["kubernetes.io/blog/"]
-    OK --> O3["helm.sh/docs/"]
-    OK --> O4["gateway-api.sigs.k8s.io/"]
-    OK --> O5["문제의 Quick Reference 링크"]
-    NG["열면 안 된다 ❌"] --> N1["GitHub"]
-    NG --> N2["StackOverflow"]
-    NG --> N3["블로그 전부"]
-    NOTE["검색은 되지만<br/>외부 사이트 클릭에 주의"] -.- NG
+```d2 layout=elk pad=40 title="시험 중 열 수 있는 문서 사이트와 열면 안 되는 GitHub · StackOverflow · 블로그의 구분"
+direction: right
 
-    classDef ok fill:#dcfce7,stroke:#16a34a,color:#14532d
-    classDef bad fill:#fee2e2,stroke:#dc2626,color:#7f1d1d
-    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
-    class OK,O1,O2,O3,O4,O5 ok
-    class NG,N1,N2,N3 bad
-    class NOTE mute
+classes: {
+  ok: { style: { fill: "#dcfce7"; stroke: "#16a34a"; font-color: "#14532d" } }
+  bad: { style: { fill: "#fee2e2"; stroke: "#dc2626"; font-color: "#7f1d1d" } }
+  mute: { style: { fill: "#f1f5f9"; stroke: "#94a3b8"; font-color: "#334155" } }
+}
+
+allow: 열 수 있다 ✅ { class: ok }
+o1: "kubernetes.io/docs/\n검색 기능 포함" { class: ok }
+o2: kubernetes.io/blog/ { class: ok }
+o3: helm.sh/docs/ { class: ok }
+o4: gateway-api.sigs.k8s.io/ { class: ok }
+o5: "문제의\nQuick Reference 링크" { class: ok }
+deny: 열면 안 된다 ❌ { class: bad }
+n1: GitHub { class: bad }
+n2: StackOverflow { class: bad }
+n3: 블로그 전부 { class: bad }
+note: "검색은 되지만\n외부 사이트 클릭에 주의" { class: mute }
+
+allow -> o1
+allow -> o2
+allow -> o3
+allow -> o4
+allow -> o5
+deny -> n1
+deny -> n2
+deny -> n3
+note -- deny: { style.stroke-dash: 3 }
 ```
 
 :::caution[함정]
@@ -289,20 +317,27 @@ kubectl 옵션이 가물가물할 때는 검색보다 [kubectl Quick Reference](
 
 ## 채점은 결과만 본다
 
-```mermaid
-flowchart LR
-    M1["kubectl create 로 만들었다"] --> R["클러스터의 최종 상태"]
-    M2["YAML 파일로 만들었다"] --> R
-    M3["kubectl edit 으로 고쳤다"] --> R
-    R --> SCORE["자동 검증 스크립트가 채점<br/>어떻게 만들었는지는 상관없다"]
-    SCORE --> PART["부분 점수가 있다<br/>맞춘 요구만큼 받는다"]
+```d2 layout=elk pad=40 title="create·YAML·edit 중 무엇으로 만들었든 클러스터의 최종 상태만 자동 채점되고 부분 점수가 있다는 구조"
+direction: down
 
-    classDef key fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
-    classDef ok fill:#dcfce7,stroke:#16a34a,color:#14532d
-    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
-    class R key
-    class PART ok
-    class M1,M2,M3,SCORE mute
+classes: {
+  ok: { style: { fill: "#dcfce7"; stroke: "#16a34a"; font-color: "#14532d" } }
+  key: { style: { fill: "#dbeafe"; stroke: "#2563eb"; font-color: "#1e3a8a" } }
+  mute: { style: { fill: "#f1f5f9"; stroke: "#94a3b8"; font-color: "#334155" } }
+}
+
+m1: kubectl create 로 만들었다 { class: mute }
+m2: YAML 파일로 만들었다 { class: mute }
+m3: kubectl edit 으로 고쳤다 { class: mute }
+r: 클러스터의 최종 상태 { class: key }
+score: "자동 검증 스크립트가 채점\n어떻게 만들었는지는 상관없다" { class: mute }
+part: "부분 점수가 있다\n맞춘 요구만큼 받는다" { class: ok }
+
+m1 -> r
+m2 -> r
+m3 -> r
+r -> score
+score -> part
 ```
 
 - 채점은 **자동화된 검증 스크립트**가 클러스터의 최종 상태를 본다

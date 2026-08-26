@@ -28,36 +28,39 @@ import { Steps, Card, CardGrid, Tabs, TabItem, FileTree } from '@astrojs/starlig
 
 ### 전체 그림
 
-```mermaid
-flowchart LR
-    U["kubectl / 클라이언트"] --> API
+```d2 layout=elk pad=40 title="컨트롤 플레인의 apiserver·etcd·scheduler·controller-manager와 워커 노드의 kubelet·kube-proxy·containerd가 apiserver 하나를 관문으로 삼는 구조"
+direction: down
 
-    subgraph CP["컨트롤 플레인"]
-      API["kube-apiserver<br/>유일한 관문"]
-      ETCD[("etcd<br/>유일한 저장소")]
-      SCH["kube-scheduler"]
-      CM["kube-controller-manager"]
-      API <--> ETCD
-      SCH --> API
-      CM --> API
-    end
+classes: {
+  key: { style: { fill: "#dbeafe"; stroke: "#2563eb"; font-color: "#1e3a8a" } }
+  store: { style: { fill: "#fef3c7"; stroke: "#d97706"; font-color: "#78350f" } }
+  mute: { style: { fill: "#f1f5f9"; stroke: "#94a3b8"; font-color: "#334155" } }
+}
 
-    subgraph N1["워커 노드"]
-      KL["kubelet"]
-      KP["kube-proxy"]
-      CR["containerd"]
-      KL --> CR
-    end
+u: kubectl / 클라이언트 { class: mute }
 
-    KL --> API
-    KP --> API
+cp: 컨트롤 플레인 {
+  api: "kube-apiserver\n유일한 관문" { class: key }
+  etcd: "etcd\n유일한 저장소" { shape: cylinder; class: store }
+  sch: kube-scheduler { class: mute }
+  cm: kube-controller-manager { class: mute }
 
-    classDef key fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
-    classDef store fill:#fef3c7,stroke:#d97706,color:#78350f
-    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
-    class API key
-    class ETCD store
-    class SCH,CM,KL,KP,CR,U mute
+  api <-> etcd
+  sch -> api
+  cm -> api
+}
+
+n1: 워커 노드 {
+  kl: kubelet { class: mute }
+  kp: kube-proxy { class: mute }
+  cr: containerd { class: mute }
+
+  kl -> cr
+}
+
+u -> cp.api
+n1.kl -> cp.api
+n1.kp -> cp.api
 ```
 
 **화살표 방향이 핵심이다.** 모든 컴포넌트가 **API 서버를 향한다.**
@@ -117,20 +120,27 @@ etcd 백업/복구는 **거의 확실히 나온다.**
 spec이 etcd에 저장되는 것만으로는 아무 일도 일어나지 않는다.
 Pod을 **어느 노드에서** 돌릴지 누군가 정해야 하는데, 그 결정만 전담하는 것이 스케줄러다.
 
-```mermaid
-flowchart LR
-    W["spec.nodeName 이 비어 있는 Pod"] --> F["Filtering<br/>못 놓는 노드를 거른다"]
-    F --> S["Scoring<br/>남은 노드에 점수"]
-    S --> B["spec.nodeName 을 채운다<br/>★ 여기까지가 전부"]
-    B -.->|"실행은 kubelet 의 몫"| KL["kubelet"]
-    F -.->|"리소스 부족 · taint<br/>nodeSelector 불일치 …"| X["전부 걸러지면 Pending"]
+```d2 layout=elk pad=40 title="스케줄러가 Filtering과 Scoring을 거쳐 spec.nodeName만 채우고, 실행은 kubelet이 맡으며, 전부 걸러지면 Pending에 머무는 흐름"
+direction: down
 
-    classDef key fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
-    classDef bad fill:#fee2e2,stroke:#dc2626,color:#7f1d1d
-    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
-    class F,S key
-    class X bad
-    class W,B,KL mute
+classes: {
+  key: { style: { fill: "#dbeafe"; stroke: "#2563eb"; font-color: "#1e3a8a" } }
+  bad: { style: { fill: "#fee2e2"; stroke: "#dc2626"; font-color: "#7f1d1d" } }
+  mute: { style: { fill: "#f1f5f9"; stroke: "#94a3b8"; font-color: "#334155" } }
+}
+
+w: spec.nodeName 이 비어 있는 Pod { class: mute }
+f: "Filtering\n못 놓는 노드를 거른다" { class: key }
+s: "Scoring\n남은 노드에 점수" { class: key }
+b: "spec.nodeName 을 채운다\n★ 여기까지가 전부" { class: mute }
+kl: kubelet { class: mute }
+x: 전부 걸러지면 Pending { class: bad }
+
+w -> f
+f -> s
+s -> b
+b -> kl: 실행은 kubelet 의 몫 { style.stroke-dash: 3 }
+f -> x: "리소스 부족 · taint\nnodeSelector 불일치 …" { style.stroke-dash: 3 }
 ```
 
 - `spec.nodeName`이 **비어 있는 Pod**을 찾는다
@@ -153,22 +163,32 @@ flowchart LR
 0장의 축 — "**선언된 상태와 실제 상태의 차이를 줄이는 루프**" — 가 실제로 도는 곳이 여기다.
 리소스 종류마다 전담 루프(컨트롤러)가 있고, 그 루프들을 한 프로세스에 담은 것이 컨트롤러 매니저다.
 
-```mermaid
-flowchart LR
-    CM["kube-controller-manager<br/>프로세스 하나"]
-    CM --> L1["Deployment 컨트롤러"]
-    CM --> L2["ReplicaSet 컨트롤러"]
-    CM --> L3["Node 컨트롤러"]
-    CM --> L4["Job / CronJob 컨트롤러"]
-    CM --> L5["EndpointSlice 컨트롤러"]
-    CM --> L6["ServiceAccount 컨트롤러"]
-    CM --> L7["PV / PVC 컨트롤러"]
-    L1 --> LOOP["각 루프: 원하는 상태 관찰<br/>→ 실제 상태 관찰<br/>→ 차이만큼 API 호출"]
+```d2 layout=elk pad=40 title="kube-controller-manager 프로세스 하나가 Deployment·ReplicaSet·Node·Job·EndpointSlice·ServiceAccount·PV/PVC 컨트롤러 루프를 함께 돌린다"
+direction: right
 
-    classDef key fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
-    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
-    class CM,LOOP key
-    class L1,L2,L3,L4,L5,L6,L7 mute
+classes: {
+  key: { style: { fill: "#dbeafe"; stroke: "#2563eb"; font-color: "#1e3a8a" } }
+  mute: { style: { fill: "#f1f5f9"; stroke: "#94a3b8"; font-color: "#334155" } }
+}
+
+cm: "kube-controller-manager\n프로세스 하나" { class: key }
+l1: Deployment 컨트롤러 { class: mute }
+l2: ReplicaSet 컨트롤러 { class: mute }
+l3: Node 컨트롤러 { class: mute }
+l4: Job / CronJob 컨트롤러 { class: mute }
+l5: EndpointSlice 컨트롤러 { class: mute }
+l6: ServiceAccount 컨트롤러 { class: mute }
+l7: PV / PVC 컨트롤러 { class: mute }
+loop: "각 루프: 원하는 상태 관찰\n→ 실제 상태 관찰\n→ 차이만큼 API 호출" { class: key }
+
+cm -> l1
+cm -> l2
+cm -> l3
+cm -> l4
+cm -> l5
+cm -> l6
+cm -> l7
+l1 -> loop
 ```
 
 | 컨트롤러 | 하는 일 |
@@ -213,20 +233,26 @@ kubelet은 클러스터 안의 Pod이 **아니다.**
 Service의 ClusterIP는 **어느 인터페이스에도 붙어 있지 않은 가상 IP다** (Service 자체는 9장).
 이 주소로 온 패킷을 실제 Pod IP로 바꿔 줄 무언가가 노드마다 필요하다 — 그 번역 규칙을 심는 것이 kube-proxy다.
 
-```mermaid
-flowchart LR
-    API["kube-apiserver"] -->|"Service · EndpointSlice watch"| KP["kube-proxy<br/>DaemonSet"]
-    KP -->|"규칙만 심고 빠진다"| K["노드 커널<br/>iptables · ipvs · nftables"]
-    C["클라이언트 Pod"] -->|"패킷"| K
-    K -->|"DNAT"| P["대상 Pod"]
-    KP -.->|"트래픽은 여기를 통과하지 않는다"| K
+```d2 layout=elk pad=40 title="kube-proxy가 Service와 EndpointSlice를 watch 해 노드 커널에 규칙만 심고, 실제 패킷은 커널이 DNAT 해 대상 Pod로 보낸다"
+direction: down
 
-    classDef key fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
-    classDef kern fill:#fef3c7,stroke:#d97706,color:#78350f
-    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
-    class KP key
-    class K kern
-    class API,C,P mute
+classes: {
+  key: { style: { fill: "#dbeafe"; stroke: "#2563eb"; font-color: "#1e3a8a" } }
+  kern: { style: { fill: "#fef3c7"; stroke: "#d97706"; font-color: "#78350f" } }
+  mute: { style: { fill: "#f1f5f9"; stroke: "#94a3b8"; font-color: "#334155" } }
+}
+
+api: kube-apiserver { class: mute }
+kp: "kube-proxy\nDaemonSet" { class: key }
+k: "노드 커널\niptables · ipvs · nftables" { class: kern }
+c: 클라이언트 Pod { class: mute }
+p: 대상 Pod { class: mute }
+
+api -> kp: Service · EndpointSlice watch
+kp -> k: 규칙만 심고 빠진다
+c -> k: 패킷
+k -> p: DNAT
+kp -> k: 트래픽은 여기를 통과하지 않는다 { style.stroke-dash: 3 }
 ```
 
 - 노드마다 하나씩. 보통 **DaemonSet**(모든 노드에 Pod을 하나씩 두는 워크로드 — 5장)으로 돈다
@@ -290,19 +316,27 @@ API 서버가 안 뜨는 문제에서 `crictl ps -a | grep apiserver` 로
 
 kubeadm으로 만든 클러스터에서, 컨트롤 플레인 컴포넌트는 **Pod이다.** 그런데 특별한 Pod이다.
 
-```mermaid
-flowchart LR
-    F["/etc/kubernetes/manifests/*.yaml"] -->|"kubelet 이 직접 읽는다"| KL["kubelet"]
-    KL --> CR["containerd"] --> POD["컨트롤 플레인 Pod"]
-    KL -.->|"읽기 전용 미러 Pod 등록"| API["kube-apiserver"]
-    NOTE["API 서버도 스케줄러도 거치지 않는다<br/>→ 순환 의존을 피한다"] -.- F
+```d2 layout=elk pad=40 title="정적 Pod는 kubelet이 매니페스트 디렉터리를 직접 읽어 띄우고 API 서버에는 읽기 전용 미러 Pod만 등록한다"
+direction: down
 
-    classDef key fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
-    classDef warn fill:#fef3c7,stroke:#d97706,color:#78350f
-    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
-    class F key
-    class NOTE warn
-    class KL,CR,POD,API mute
+classes: {
+  key: { style: { fill: "#dbeafe"; stroke: "#2563eb"; font-color: "#1e3a8a" } }
+  warn: { style: { fill: "#fef3c7"; stroke: "#d97706"; font-color: "#78350f" } }
+  mute: { style: { fill: "#f1f5f9"; stroke: "#94a3b8"; font-color: "#334155" } }
+}
+
+f: /etc/kubernetes/manifests/*.yaml { class: key }
+kl: kubelet { class: mute }
+cr: containerd { class: mute }
+pod: 컨트롤 플레인 Pod { class: mute }
+api: kube-apiserver { class: mute }
+note: "API 서버도 스케줄러도 거치지 않는다\n→ 순환 의존을 피한다" { class: warn }
+
+f -> kl: kubelet 이 직접 읽는다
+kl -> cr
+cr -> pod
+kl -> api: 읽기 전용 미러 Pod 등록 { style.stroke-dash: 3 }
+note -- f: { style.stroke-dash: 3 }
 ```
 
 - **kubelet이 디렉터리를 직접 읽어서** 띄운다. API 서버도 스케줄러도 거치지 않는다
@@ -342,25 +376,34 @@ sudo grep staticPodPath /var/lib/kubelet/config.yaml
 그래서 인증·인가·정책 검사가 전부 이 안에서 정해진 순서로 일어난다.
 `kubectl apply -f pod.yaml` 을 쳤을 때 API 서버 안에서 벌어지는 일.
 
-```mermaid
-flowchart LR
-    R["요청"] --> A["Authentication<br/>너는 누구인가"]
-    A -->|"실패 401"| X1["거부"]
-    A --> Z["Authorization<br/>해도 되는가 · RBAC"]
-    Z -->|"실패 403"| X2["거부"]
-    Z --> M["Mutating Admission<br/>요청을 고친다"]
-    M --> V["Validating Admission<br/>규칙 위반인가"]
-    V -->|"위반"| X3["거부"]
-    V --> S["스키마 검증 → etcd 저장"]
+```d2 layout=elk pad=40 title="API 서버 요청이 인증 → 인가 → Mutating Admission → Validating Admission → 스키마 검증을 거쳐 etcd에 저장되고, 각 단계에서 401·403·위반으로 거부되는 경로"
+direction: down
 
-    classDef ok fill:#dcfce7,stroke:#16a34a,color:#14532d
-    classDef bad fill:#fee2e2,stroke:#dc2626,color:#7f1d1d
-    classDef key fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
-    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
-    class S ok
-    class X1,X2,X3 bad
-    class A,Z key
-    class R,M,V mute
+classes: {
+  ok: { style: { fill: "#dcfce7"; stroke: "#16a34a"; font-color: "#14532d" } }
+  bad: { style: { fill: "#fee2e2"; stroke: "#dc2626"; font-color: "#7f1d1d" } }
+  key: { style: { fill: "#dbeafe"; stroke: "#2563eb"; font-color: "#1e3a8a" } }
+  mute: { style: { fill: "#f1f5f9"; stroke: "#94a3b8"; font-color: "#334155" } }
+}
+
+r: 요청 { class: mute }
+a: "Authentication\n너는 누구인가" { class: key }
+x1: 거부 { class: bad }
+z: "Authorization\n해도 되는가 · RBAC" { class: key }
+x2: 거부 { class: bad }
+m: "Mutating Admission\n요청을 고친다" { class: mute }
+v: "Validating Admission\n규칙 위반인가" { class: mute }
+x3: 거부 { class: bad }
+s: 스키마 검증 → etcd 저장 { class: ok }
+
+r -> a
+a -> x1: 실패 401
+a -> z
+z -> x2: 실패 403
+z -> m
+m -> v
+v -> x3: 위반
+v -> s
 ```
 
 인증·인가는 "**누가** 요청했나"까지만 본다. 요청의 **내용**이 규칙에 맞는지 —
@@ -372,24 +415,26 @@ admission이다. 요청을 고쳐 주는 **Mutating**과 검사만 하는 **Vali
 
 ### 저장된 다음 — 컨트롤러들의 릴레이
 
-```mermaid
-sequenceDiagram
-    participant K as kubectl
-    participant A as apiserver
-    participant D as Deployment 컨트롤러
-    participant R as ReplicaSet 컨트롤러
-    participant S as scheduler
-    participant L as kubelet
-    K->>A: Deployment 생성
-    A->>D: watch 이벤트
-    D->>A: ReplicaSet 생성
-    A->>R: watch 이벤트
-    R->>A: Pod 생성 (nodeName 비어 있음)
-    A->>S: watch 이벤트
-    S->>A: nodeName 채움 (binding)
-    A->>L: 내 노드의 Pod
-    L->>L: 이미지 pull → 컨테이너 실행
-    L->>A: 상태 보고 (Running)
+```d2 pad=40 title="Deployment 생성 한 번이 apiserver의 watch 를 통해 Deployment · ReplicaSet 컨트롤러와 스케줄러, kubelet 으로 이어지는 순서"
+shape: sequence_diagram
+
+k: kubectl
+a: apiserver
+d: Deployment 컨트롤러
+r: ReplicaSet 컨트롤러
+s: scheduler
+l: kubelet
+
+k -> a: Deployment 생성
+a -> d: watch 이벤트
+d -> a: ReplicaSet 생성
+a -> r: watch 이벤트
+r -> a: Pod 생성 (nodeName 비어 있음)
+a -> s: watch 이벤트
+s -> a: nodeName 채움 (binding)
+a -> l: 내 노드의 Pod
+l -> l: 이미지 pull → 컨테이너 실행
+l -> a: 상태 보고 (Running)
 ```
 
 **아무도 서로를 직접 호출하지 않는다.** 전부 API 서버를 통한 **watch**다.
@@ -417,21 +462,27 @@ status:                    # 실제 상태        ← 컨트롤러가 쓴다
   readyReplicas: 3
 ```
 
-```mermaid
-flowchart LR
-    H["사람"] -->|"쓴다"| SPEC["spec<br/>원하는 상태"]
-    SPEC --> CTRL["컨트롤러"]
-    CTRL -->|"현실을 맞춘다"| REAL["실제 클러스터"]
-    REAL --> STATUS["status<br/>실제 상태"]
-    CTRL -->|"쓴다"| STATUS
-    H -.->|"직접 편집하지 않는다 ❌"| STATUS
+```d2 layout=elk pad=40 title="사람은 spec 을 쓰고 컨트롤러가 status 를 쓰며, 사람이 status 를 직접 편집하지는 않는다는 역할 구분"
+direction: down
 
-    classDef key fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
-    classDef bad fill:#fee2e2,stroke:#dc2626,color:#7f1d1d
-    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
-    class SPEC key
-    class STATUS bad
-    class H,CTRL,REAL mute
+classes: {
+  key: { style: { fill: "#dbeafe"; stroke: "#2563eb"; font-color: "#1e3a8a" } }
+  bad: { style: { fill: "#fee2e2"; stroke: "#dc2626"; font-color: "#7f1d1d" } }
+  mute: { style: { fill: "#f1f5f9"; stroke: "#94a3b8"; font-color: "#334155" } }
+}
+
+h: 사람 { class: mute }
+spec: "spec\n원하는 상태" { class: key }
+ctrl: 컨트롤러 { class: mute }
+real: 실제 클러스터 { class: mute }
+status: "status\n실제 상태" { class: bad }
+
+h -> spec: 쓴다
+spec -> ctrl
+ctrl -> real: 현실을 맞춘다
+real -> status
+ctrl -> status: 쓴다
+h -> status: 직접 편집하지 않는다 ❌ { style.stroke-dash: 3 }
 ```
 
 - **`spec`은 사람이, `status`는 시스템이 쓴다.** `status`를 직접 편집하지 않는다
@@ -470,28 +521,34 @@ kubectl explain deployment.spec.strategy --recursive # 하위 전부 펼치기
 
 ### 네임스페이스
 
-```mermaid
-flowchart LR
-    subgraph NS["네임스페이스 안 — 이름의 유효 범위"]
-      P["Pod"]
-      S["Service"]
-      C["ConfigMap · Secret"]
-      RB["Role · RoleBinding"]
-    end
-    subgraph CL["클러스터 스코프 — 네임스페이스가 없다"]
-      N["Node"]
-      PV["PersistentVolume"]
-      SC["StorageClass"]
-      CR["ClusterRole"]
-    end
-    NET["네트워크 격리가 아니다 ⚠️<br/>다른 네임스페이스와 통신은 그대로 된다<br/>막으려면 NetworkPolicy · 12장"] -.- NS
+```d2 layout=elk pad=40 title="네임스페이스 안에 있는 Pod·Service·ConfigMap·Role 과 클러스터 스코프인 Node·PV·StorageClass·ClusterRole 의 구분, 그리고 네임스페이스가 네트워크 격리가 아니라는 경고"
+grid-rows: 3
 
-    classDef ns fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
-    classDef cl fill:#fef3c7,stroke:#d97706,color:#78350f
-    classDef warn fill:#fee2e2,stroke:#dc2626,color:#7f1d1d
-    class P,S,C,RB ns
-    class N,PV,SC,CR cl
-    class NET warn
+classes: {
+  ns: { style: { fill: "#dbeafe"; stroke: "#2563eb"; font-color: "#1e3a8a" } }
+  cl: { style: { fill: "#fef3c7"; stroke: "#d97706"; font-color: "#78350f" } }
+  warn: { style: { fill: "#fee2e2"; stroke: "#dc2626"; font-color: "#7f1d1d" } }
+}
+
+net: "네트워크 격리가 아니다 ⚠️\n다른 네임스페이스와 통신은 그대로 된다\n막으려면 NetworkPolicy · 12장" { class: warn }
+
+nsg: 네임스페이스 안 — 이름의 유효 범위 {
+  grid-columns: 2
+  p: Pod { class: ns }
+  s: Service { class: ns }
+  c: ConfigMap · Secret { class: ns }
+  rb: Role · RoleBinding { class: ns }
+}
+
+clg: 클러스터 스코프 — 네임스페이스가 없다 {
+  grid-columns: 2
+  n: Node { class: cl }
+  pv: PersistentVolume { class: cl }
+  sc: StorageClass { class: cl }
+  cr: ClusterRole { class: cl }
+}
+
+net -- nsg: { style.stroke-dash: 3 }
 ```
 
 ```bash
@@ -509,18 +566,27 @@ kubectl config set-context --current --namespace=dev   # 기본 네임스페이�
 
 ### 라벨과 셀렉터 — 연결의 접착제
 
-```mermaid
-flowchart LR
-    L["Pod 라벨<br/>app=web"] --> SVC["Service selector"]
-    L --> RS["ReplicaSet selector"]
-    L --> NP["NetworkPolicy podSelector"]
-    L --> PDB["PodDisruptionBudget selector"]
-    A["애노테이션<br/>선택 대상이 아니다"] -.->|"도구가 읽는 메타데이터"| TOOL["kubectl · 컨트롤러 · 외부 도구"]
+```d2 layout=elk pad=40 title="Pod 라벨은 Service·ReplicaSet·NetworkPolicy·PodDisruptionBudget 의 선택 대상이고, 애노테이션은 선택 대상이 아니라 도구가 읽는 메타데이터다"
+direction: right
 
-    classDef key fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
-    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
-    class L key
-    class SVC,RS,NP,PDB,A,TOOL mute
+classes: {
+  key: { style: { fill: "#dbeafe"; stroke: "#2563eb"; font-color: "#1e3a8a" } }
+  mute: { style: { fill: "#f1f5f9"; stroke: "#94a3b8"; font-color: "#334155" } }
+}
+
+l: "Pod 라벨\napp=web" { class: key }
+svc: Service selector { class: mute }
+rs: ReplicaSet selector { class: mute }
+np: NetworkPolicy podSelector { class: mute }
+pdb: PodDisruptionBudget selector { class: mute }
+a: "애노테이션\n선택 대상이 아니다" { class: mute }
+tool: kubectl · 컨트롤러 · 외부 도구 { class: mute }
+
+l -> svc
+l -> rs
+l -> np
+l -> pdb
+a -> tool: 도구가 읽는 메타데이터 { style.stroke-dash: 3 }
 ```
 
 - **라벨(label)**: 선택하기 위한 key-value. Service·ReplicaSet·NetworkPolicy가 전부 이걸로 대상을 찾는다
@@ -556,19 +622,25 @@ kubectl get events --field-selector type=Warning
 **ownerReferences** — 오브젝트가 누구에게서 만들어졌는지 기록한다.
 지운 Pod이 자꾸 되살아날 때 "누가 만들었나"를 추적하는 근거가 이 필드다.
 
-```mermaid
-flowchart LR
-    D["Deployment web"] -->|ownerReference| RS["ReplicaSet web-5d4f"]
-    RS -->|ownerReference| P["Pod web-5d4f-x7k2p"]
-    DEL["부모를 지우면"] -->|"가비지 컬렉터가 자식을 지운다 · cascade"| P
-    ORPH["--cascade=orphan"] -.->|"Pod 을 남긴다"| P
+```d2 layout=elk pad=40 title="Deployment → ReplicaSet → Pod 로 이어지는 ownerReference 사슬과, 부모를 지우면 가비지 컬렉터가 자식을 지우는 cascade 동작"
+direction: down
 
-    classDef key fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
-    classDef warn fill:#fef3c7,stroke:#d97706,color:#78350f
-    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
-    class D key
-    class ORPH warn
-    class RS,P,DEL mute
+classes: {
+  key: { style: { fill: "#dbeafe"; stroke: "#2563eb"; font-color: "#1e3a8a" } }
+  warn: { style: { fill: "#fef3c7"; stroke: "#d97706"; font-color: "#78350f" } }
+  mute: { style: { fill: "#f1f5f9"; stroke: "#94a3b8"; font-color: "#334155" } }
+}
+
+d: Deployment web { class: key }
+rs: ReplicaSet web-5d4f { class: mute }
+p: Pod web-5d4f-x7k2p { class: mute }
+del: 부모를 지우면 { class: mute }
+orph: --cascade=orphan { class: warn }
+
+d -> rs: ownerReference
+rs -> p: ownerReference
+del -> p: 가비지 컬렉터가 자식을 지운다 · cascade
+orph -> p: Pod 을 남긴다 { style.stroke-dash: 3 }
 ```
 
 ```bash

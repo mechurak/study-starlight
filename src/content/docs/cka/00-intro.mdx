@@ -16,17 +16,24 @@ import { Steps, Card, CardGrid, Tabs, TabItem, LinkCard } from '@astrojs/starlig
 - 그래서 암기는 오래 못 간다 — **동작 모델**이 있어야 처음 보는 문제도 푼다
 - 반대로 동작 모델만 있고 손이 느리면 **시간에 진다**. 둘 다 필요하다
 
-```mermaid
-flowchart LR
-    C["개념<br/>무엇인가"] --> A["실제 동작<br/>안에서 무슨 일이"] --> CMD["명령<br/>어떻게 하나"] --> P["함정<br/>어디서 틀리나"]
-    P -.->|"다음 주제에서 반복"| C
+```d2 layout=elk pad=40 title="개념 → 실제 동작 → 명령 → 함정 순서로 서술하고 다음 주제에서 다시 개념으로 돌아오는 이 덱의 설명 흐름"
+direction: down
 
-    classDef key fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
-    classDef bad fill:#fee2e2,stroke:#dc2626,color:#7f1d1d
-    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
-    class A key
-    class P bad
-    class C,CMD mute
+classes: {
+  key: { style: { fill: "#dbeafe"; stroke: "#2563eb"; font-color: "#1e3a8a" } }
+  bad: { style: { fill: "#fee2e2"; stroke: "#dc2626"; font-color: "#7f1d1d" } }
+  mute: { style: { fill: "#f1f5f9"; stroke: "#94a3b8"; font-color: "#334155" } }
+}
+
+c: "개념\n무엇인가" { class: mute }
+a: "실제 동작\n안에서 무슨 일이" { class: key }
+cmd: "명령\n어떻게 하나" { class: mute }
+p: "함정\n어디서 틀리나" { class: bad }
+
+c -> a
+a -> cmd
+cmd -> p
+p -> c: 다음 주제에서 반복 { style.stroke-dash: 3 }
 ```
 
 ## 대상 독자
@@ -71,15 +78,27 @@ etcd 백업·복구, kubeadm(클러스터 설치·업그레이드 도구) 업그
 
 **배점 순서와 학습 순서는 다르다.**
 
-```mermaid
-flowchart LR
-    B["기초<br/>2~3장"] --> W["워크로드<br/>4~8장"] --> N["네트워크<br/>9~12장"] --> S["스토리지<br/>13장"] --> C["클러스터<br/>14~17장"] --> T["트러블슈팅<br/>18장 · 30%"]
-    T -.->|"앞의 전부가 재료다<br/>그래서 마지막"| B
+```d2 layout=elk pad=40 title="기초 → 워크로드 → 네트워크 → 스토리지 → 클러스터 → 트러블슈팅 순서의 학습 경로와, 트러블슈팅이 마지막인 이유"
+direction: down
 
-    classDef key fill:#fee2e2,stroke:#dc2626,color:#7f1d1d
-    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
-    class T key
-    class B,W,N,S,C mute
+classes: {
+  key: { style: { fill: "#fee2e2"; stroke: "#dc2626"; font-color: "#7f1d1d" } }
+  mute: { style: { fill: "#f1f5f9"; stroke: "#94a3b8"; font-color: "#334155" } }
+}
+
+b: "기초\n2~3장" { class: mute }
+w: "워크로드\n4~8장" { class: mute }
+n: "네트워크\n9~12장" { class: mute }
+s: "스토리지\n13장" { class: mute }
+c: "클러스터\n14~17장" { class: mute }
+t: "트러블슈팅\n18장 · 30%" { class: key }
+
+b -> w
+w -> n
+n -> s
+s -> c
+c -> t
+t -> b: "앞의 전부가 재료다\n그래서 마지막" { style.stroke-dash: 3 }
 ```
 
 트러블슈팅이 30%지만 마지막에 있는 이유는, 앞의 전부를 알아야 진단이 되기 때문이다.
@@ -89,22 +108,27 @@ flowchart LR
 Kubernetes의 모든 것은
 **"선언된 상태"와 "실제 상태"의 차이를 줄이는 루프**다.
 
-```mermaid
-flowchart LR
-    SPEC["spec<br/>당신이 쓴 원하는 상태"] --> CTRL["컨트롤러<br/>차이를 관찰한다"]
-    CTRL -->|"차이만큼 행동"| REAL["실제 클러스터"]
-    REAL --> STATUS["status<br/>실제 상태"]
-    STATUS --> CTRL
-    STUCK["문제가 생겼다<br/>= 루프가 어딘가에서 막혔다"] -.-> CTRL
+```d2 layout=elk pad=40 title="spec과 status의 차이를 컨트롤러가 줄이는 조정 루프와, 문제란 그 루프가 막힌 것이라는 관점"
+direction: down
 
-    classDef key fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
-    classDef ok fill:#dcfce7,stroke:#16a34a,color:#14532d
-    classDef bad fill:#fee2e2,stroke:#dc2626,color:#7f1d1d
-    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
-    class SPEC key
-    class STATUS ok
-    class STUCK bad
-    class CTRL,REAL mute
+classes: {
+  ok: { style: { fill: "#dcfce7"; stroke: "#16a34a"; font-color: "#14532d" } }
+  bad: { style: { fill: "#fee2e2"; stroke: "#dc2626"; font-color: "#7f1d1d" } }
+  key: { style: { fill: "#dbeafe"; stroke: "#2563eb"; font-color: "#1e3a8a" } }
+  mute: { style: { fill: "#f1f5f9"; stroke: "#94a3b8"; font-color: "#334155" } }
+}
+
+spec: "spec\n당신이 쓴 원하는 상태" { class: key }
+ctrl: "컨트롤러\n차이를 관찰한다" { class: mute }
+real: 실제 클러스터 { class: mute }
+status: "status\n실제 상태" { class: ok }
+stuck: "문제가 생겼다\n= 루프가 어딘가에서 막혔다" { class: bad }
+
+spec -> ctrl
+ctrl -> real: 차이만큼 행동
+real -> status
+status -> ctrl
+stuck -> ctrl: { style.stroke-dash: 3 }
 ```
 
 트러블슈팅 30%가 결국 이 한 문장이다. "**어느 루프가 어디서 멈췄나**"를 찾는 것.
@@ -142,20 +166,23 @@ macOS와 Ubuntu에서 Docker·kind·kubectl을 설치하고 클러스터를 만�
 [kind 실습 환경](/lab-environment/01-kind/)의 운영체제별 탭을 따른다. 이 장은 도구 설치법 대신
 **어떤 연습에 어떤 환경을 고를지**만 구분한다.
 
-```mermaid
-flowchart LR
-    Q{"무엇을 연습하나"}
-    Q -->|"워크로드 · 네트워크 · RBAC"| KIND["kind<br/>빠르게 뜬다 ✅"]
-    Q -->|"업그레이드 · etcd · 컨트롤 플레인"| KC["killercoda<br/>진짜 kubeadm 노드 ✅"]
-    Q -->|"0에서 클러스터 만들기"| VM["VM 2대<br/>kubeadm init 직접"]
-    KIND -.->|"노드가 컨테이너라<br/>apt install kubeadm 흐름이 다르다 ❌"| KC
+```d2 layout=elk pad=40 title="연습할 주제에 따라 kind · killercoda · VM 2대 중 무엇을 고를지, 그리고 kind가 업그레이드 연습에 부적합한 이유"
+direction: down
 
-    classDef ok fill:#dcfce7,stroke:#16a34a,color:#14532d
-    classDef bad fill:#fee2e2,stroke:#dc2626,color:#7f1d1d
-    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
-    class KIND,KC ok
-    class VM mute
-    class Q mute
+classes: {
+  ok: { style: { fill: "#dcfce7"; stroke: "#16a34a"; font-color: "#14532d" } }
+  mute: { style: { fill: "#f1f5f9"; stroke: "#94a3b8"; font-color: "#334155" } }
+}
+
+q: 무엇을 연습하나 { shape: diamond; class: mute }
+kind: "kind\n빠르게 뜬다 ✅" { class: ok }
+kc: "killercoda\n진짜 kubeadm 노드 ✅" { class: ok }
+vm: "VM 2대\nkubeadm init 직접" { class: mute }
+
+q -> kind: 워크로드 · 네트워크 · RBAC
+q -> kc: 업그레이드 · etcd · 컨트롤 플레인
+q -> vm: 0에서 클러스터 만들기
+kind -> kc: "노드가 컨테이너라\napt install kubeadm 흐름이 다르다 ❌" { style.stroke-dash: 3 }
 ```
 
 :::caution[함정]
