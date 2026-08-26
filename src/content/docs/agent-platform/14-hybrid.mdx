@@ -19,24 +19,56 @@ import Thesis from '../../../components/docs/Thesis.astro';
 
 ## Hybrid target 지도
 
-```mermaid
-flowchart LR
-    SPEC["AgentVersion<br/>data · protocol · capability"] --> PLACE{"Placement Policy"}
-    PLACE -->|"restricted · code형 기준선"| K0["맨 Kubernetes"]
-    PLACE -->|"restricted · 구성형/sandbox"| KAG["온프렘 kagent 후보"]
-    PLACE -->|"AWS allowed · session isolation"| ACR["AgentCore"]
-    K0 --> ROUTE["Stable Agent Endpoint"]
-    KAG --> ROUTE["Stable Agent Endpoint"]
-    ACR --> ROUTE
-    IDP["IdP · ACL"] --> ROUTE
-    ROUTE --> USER["Consumer"]
+```d2 layout=elk pad=40 title="AgentVersion의 요구를 Placement Policy가 판정해 맨 Kubernetes·온프렘 kagent 후보·AgentCore 셋 중 하나에 배치하고, 셋 모두 IdP·ACL이 붙은 하나의 Stable Agent Endpoint로 다시 모여 Consumer에게 가는 흐름"
+direction: down
 
-    classDef key fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
-    classDef zone fill:#ede9fe,stroke:#7c3aed,color:#4c1d95
-    classDef ok fill:#dcfce7,stroke:#16a34a,color:#14532d
-    class SPEC,IDP,USER key
-    class PLACE zone
-    class K0,KAG,ACR,ROUTE ok
+classes: {
+  key: {
+    style: {
+      fill: "#dbeafe"
+      stroke: "#2563eb"
+      font-color: "#1e3a8a"
+    }
+  }
+  zone: {
+    style: {
+      fill: "#ede9fe"
+      stroke: "#7c3aed"
+      font-color: "#4c1d95"
+    }
+  }
+  ok: {
+    style: {
+      fill: "#dcfce7"
+      stroke: "#16a34a"
+      font-color: "#14532d"
+    }
+  }
+}
+
+spec: "AgentVersion\ndata · protocol · capability" { class: key }
+place: Placement Policy {
+  class: zone
+  shape: diamond
+}
+
+k0: 맨 Kubernetes { class: ok }
+kag: 온프렘 kagent 후보 { class: ok }
+acr: AgentCore { class: ok }
+
+route: Stable Agent Endpoint { class: ok }
+idp: IdP · ACL { class: key }
+user: Consumer { class: key }
+
+spec -> place
+place -> k0: restricted · code형 기준선
+place -> kag: "restricted · 구성형/sandbox"
+place -> acr: AWS allowed · session isolation
+k0 -> route
+kag -> route
+acr -> route
+idp -> route
+route -> user
 ```
 
 creator는 `AWS allowed`나 `restricted only` 같은 업무 제약을 제출할 수 있지만 subnet이나 cluster를 직접 고르지

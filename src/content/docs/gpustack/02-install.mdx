@@ -19,38 +19,60 @@ import TermIntro from '../../../components/docs/TermIntro.astro';
 
 ## 권장 배치
 
-```mermaid
-flowchart LR
-    subgraph mgmt["관리 노드 · CPU VM"]
-        direction TB
-        LITE["LiteLLM"]
-        GS["GPUStack Server + Gateway"]
-        DB[("PostgreSQL")]
-        MON["Prometheus · Grafana"]
-        GS --> DB
-    end
-    subgraph workers["DGX Spark worker pool"]
-        direction TB
-        S1["spark-01"]
-        S2["spark-02"]
-        DOTS["…"]
-        S10["spark-10"]
-    end
-    LITE --> GS
-    GS --> S1
-    GS --> S2
-    GS --> DOTS
-    GS --> S10
-    MON -.-> GS
-    MON -.-> S1
-    MON -.-> S10
+```d2 layout=elk pad=40 title="CPU VM 관리 노드에 LiteLLM·GPUStack Server·PostgreSQL·모니터링을 두고, 여기서 DGX Spark worker pool 열 대를 관리하는 배치"
+direction: down
 
-    classDef key  fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
-    classDef zone fill:#ede9fe,stroke:#7c3aed,color:#4c1d95
-    classDef ok   fill:#dcfce7,stroke:#16a34a,color:#14532d
-    class LITE key
-    class GS,DB,MON zone
-    class S1,S2,DOTS,S10 ok
+classes: {
+  key: {
+    style: {
+      fill: "#dbeafe"
+      stroke: "#2563eb"
+      font-color: "#1e3a8a"
+    }
+  }
+  zone: {
+    style: {
+      fill: "#ede9fe"
+      stroke: "#7c3aed"
+      font-color: "#4c1d95"
+    }
+  }
+  ok: {
+    style: {
+      fill: "#dcfce7"
+      stroke: "#16a34a"
+      font-color: "#14532d"
+    }
+  }
+}
+
+mgmt: 관리 노드 · CPU VM {
+  lite: LiteLLM { class: key }
+  gs: GPUStack Server + Gateway { class: zone }
+  db: PostgreSQL {
+    class: zone
+    shape: cylinder
+  }
+  mon: Prometheus · Grafana { class: zone }
+
+  gs -> db
+}
+
+workers: DGX Spark worker pool {
+  s1: spark-01 { class: ok }
+  s2: spark-02 { class: ok }
+  dots: "…" { class: ok }
+  s10: spark-10 { class: ok }
+}
+
+mgmt.lite -> mgmt.gs
+mgmt.gs -> workers.s1
+mgmt.gs -> workers.s2
+mgmt.gs -> workers.dots
+mgmt.gs -> workers.s10
+mgmt.mon -> mgmt.gs: { style.stroke-dash: 3 }
+mgmt.mon -> workers.s1: { style.stroke-dash: 3 }
+mgmt.mon -> workers.s10: { style.stroke-dash: 3 }
 ```
 
 Quickstart는 Server를 GPU worker와 같은 장비에 둘 수도 있다고 설명한다. PoC에는 편하지만 Spark의

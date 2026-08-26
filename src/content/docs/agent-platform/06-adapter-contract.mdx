@@ -19,30 +19,64 @@ import Thesis from '../../../components/docs/Thesis.astro';
 
 ## Adapter의 자리
 
-```mermaid
-flowchart LR
-    CORE["Platform Core<br/>Agent · Knowledge · Version · Grant"] --> PORT["RuntimeAdapter port"]
-    CORE --> DPORT["Durability port<br/>ExecutionProfile"]
-    PORT --> K0["KubernetesAdapter<br/>기준선"]
-    PORT --> KA["KagentAdapter"]
-    PORT --> AA["AgentCoreAdapter"]
-    K0 --> K8S0["Deployment · Service · Job"]
-    KA --> K8S["Agent CR · Service · Secret"]
-    AA --> AWS["OCI/CodeZip · Runtime · Endpoint"]
-    DPORT --> NONE["none<br/>현재"]
-    DPORT -.-> DEFER["Temporal · Dapr Agents<br/>재개 시 후보"]
-    K8S0 --> NORMAL["Normalized DeploymentStatus"]
-    K8S --> NORMAL["Normalized DeploymentStatus"]
-    AWS --> NORMAL
-    NORMAL --> CORE
+```d2 layout=elk pad=40 title="Platform Core가 RuntimeAdapter port로 세 어댑터를 부르고 각 어댑터의 제품 resource가 하나의 Normalized DeploymentStatus로 돌아오며, durability port는 현재 none이고 재개 시 후보만 점선으로 붙어 있는 구조"
+direction: down
 
-    classDef key fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
-    classDef zone fill:#ede9fe,stroke:#7c3aed,color:#4c1d95
-    classDef ok fill:#dcfce7,stroke:#16a34a,color:#14532d
-    class CORE key
-    class PORT,DPORT,NORMAL zone
-    class K0,KA,AA,K8S0,K8S,AWS ok
-    class NONE,DEFER zone
+classes: {
+  key: {
+    style: {
+      fill: "#dbeafe"
+      stroke: "#2563eb"
+      font-color: "#1e3a8a"
+    }
+  }
+  zone: {
+    style: {
+      fill: "#ede9fe"
+      stroke: "#7c3aed"
+      font-color: "#4c1d95"
+    }
+  }
+  ok: {
+    style: {
+      fill: "#dcfce7"
+      stroke: "#16a34a"
+      font-color: "#14532d"
+    }
+  }
+}
+
+core: "Platform Core\nAgent · Knowledge · Version · Grant" { class: key }
+port: RuntimeAdapter port { class: zone }
+dport: "Durability port\nExecutionProfile" { class: zone }
+
+k0: "KubernetesAdapter\n기준선" { class: ok }
+ka: KagentAdapter { class: ok }
+aa: AgentCoreAdapter { class: ok }
+
+k8s0: Deployment · Service · Job { class: ok }
+k8s: Agent CR · Service · Secret { class: ok }
+aws: "OCI/CodeZip · Runtime · Endpoint" { class: ok }
+
+dnone: "none\n현재" { class: zone }
+ddefer: "Temporal · Dapr Agents\n재개 시 후보" { class: zone }
+
+normal: Normalized DeploymentStatus { class: zone }
+
+core -> port
+core -> dport
+port -> k0
+port -> ka
+port -> aa
+k0 -> k8s0
+ka -> k8s
+aa -> aws
+dport -> dnone
+dport -> ddefer: { style.stroke-dash: 3 }
+k8s0 -> normal
+k8s -> normal
+aws -> normal
+normal -> core
 ```
 
 platform core는 Kubernetes client나 AWS SDK를 import하지 않는다. adapter가 provider credential, retry,

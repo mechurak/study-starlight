@@ -19,29 +19,58 @@ import TermIntro from '../../../components/docs/TermIntro.astro';
 
 ## 두 흐름을 분리한다
 
-```mermaid
-flowchart TB
-    subgraph request["요청 경로"]
-        direction LR
-        APP["사용자 · 앱"] --> LITE["LiteLLM"]
-        LITE --> GW["GPUStack AI Gateway"]
-        GW --> API["vLLM 또는 FastAPI"]
-    end
-    subgraph control["제어 경로"]
-        direction LR
-        ADMIN["운영자"] --> SERVER["GPUStack Server"]
-        SERVER --> SCHED["Scheduler · Controller"]
-        SCHED --> WORKER["GPUStack Worker"]
-        WORKER --> DOCKER["Docker + NVIDIA Runtime"]
-    end
-    DOCKER -.-> API
+```d2 layout=elk pad=40 title="사용자에서 LiteLLM·Gateway를 거쳐 모델 API에 닿는 요청 경로와, 운영자에서 Server·Scheduler·Worker를 거쳐 Docker 런타임에 닿는 제어 경로를 위아래로 나눈 그림"
+direction: down
 
-    classDef key  fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
-    classDef zone fill:#ede9fe,stroke:#7c3aed,color:#4c1d95
-    classDef ok   fill:#dcfce7,stroke:#16a34a,color:#14532d
-    class APP,LITE key
-    class GW,ADMIN,SERVER,SCHED,WORKER zone
-    class API,DOCKER ok
+classes: {
+  key: {
+    style: {
+      fill: "#dbeafe"
+      stroke: "#2563eb"
+      font-color: "#1e3a8a"
+    }
+  }
+  zone: {
+    style: {
+      fill: "#ede9fe"
+      stroke: "#7c3aed"
+      font-color: "#4c1d95"
+    }
+  }
+  ok: {
+    style: {
+      fill: "#dcfce7"
+      stroke: "#16a34a"
+      font-color: "#14532d"
+    }
+  }
+}
+
+request: 요청 경로 {
+  app: 사용자 · 앱 { class: key }
+  lite: LiteLLM { class: key }
+  gw: GPUStack AI Gateway { class: zone }
+  api: vLLM 또는 FastAPI { class: ok }
+
+  app -> lite
+  lite -> gw
+  gw -> api
+}
+
+control: 제어 경로 {
+  admin: 운영자 { class: zone }
+  server: GPUStack Server { class: zone }
+  sched: Scheduler · Controller { class: zone }
+  worker: GPUStack Worker { class: zone }
+  docker: Docker + NVIDIA Runtime { class: ok }
+
+  admin -> server
+  server -> sched
+  sched -> worker
+  worker -> docker
+}
+
+control.docker -> request.api: { style.stroke-dash: 3 }
 ```
 
 요청 경로에서는 LiteLLM이 모델 alias를 GPUStack endpoint로 바꾸고, GPUStack gateway가 route의

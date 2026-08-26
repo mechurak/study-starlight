@@ -51,19 +51,41 @@ image 포함도 단순하다. local path failover를 원하면 후보 worker 모
 
 ## 관측은 세 층으로 나눈다
 
-```mermaid
-flowchart TB
-    SVC["서비스 지표<br/>요청 · 오류 · 지연 · queue"] --> DECIDE["사용자 영향 판단"]
-    MODEL["모델 지표<br/>TTFT · tokens/s · batch · cache"] --> DECIDE
-    NODE["노드 지표<br/>memory · temperature · disk · network"] --> DECIDE
+```d2 layout=elk pad=40 title="서비스 지표·모델 지표·노드 지표 세 갈래가 하나의 사용자 영향 판단으로 모이는 관측 구조"
+direction: down
 
-    classDef key  fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
-    classDef ok   fill:#dcfce7,stroke:#16a34a,color:#14532d
-    classDef warn fill:#fef3c7,stroke:#d97706,color:#78350f
-    class SVC key
-    class MODEL ok
-    class NODE warn
-    class DECIDE key
+classes: {
+  key: {
+    style: {
+      fill: "#dbeafe"
+      stroke: "#2563eb"
+      font-color: "#1e3a8a"
+    }
+  }
+  ok: {
+    style: {
+      fill: "#dcfce7"
+      stroke: "#16a34a"
+      font-color: "#14532d"
+    }
+  }
+  warn: {
+    style: {
+      fill: "#fef3c7"
+      stroke: "#d97706"
+      font-color: "#78350f"
+    }
+  }
+}
+
+svc: "서비스 지표\n요청 · 오류 · 지연 · queue" { class: key }
+model: "모델 지표\nTTFT · tokens/s · batch · cache" { class: ok }
+node: "노드 지표\nmemory · temperature · disk · network" { class: warn }
+decide: 사용자 영향 판단 { class: key }
+
+svc -> decide
+model -> decide
+node -> decide
 ```
 
 GPU 사용률만 보면 queue가 길어지는 이유를 알 수 없다. 이용자 관점 RED 지표, backend 내부 지표,

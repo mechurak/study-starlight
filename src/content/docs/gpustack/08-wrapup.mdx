@@ -22,48 +22,72 @@ import TermIntro from '../../../components/docs/TermIntro.astro';
 
 ## 전체 지도
 
-```mermaid
-flowchart LR
-    subgraph north["이용자 정책"]
-        direction TB
-        USER["사용자 · 앱"]
-        LITE["LiteLLM<br/>key · quota · alias · fallback"]
-        USER --> LITE
-    end
-    subgraph plane["GPUStack 관리 · 라우팅"]
-        direction TB
-        ROUTE["Model Route"]
-        CTRL["Server · Scheduler · Controller"]
-        ROUTE -.-> CTRL
-    end
-    subgraph run["모델 실행"]
-        direction TB
-        V1["vLLM<br/>LLM · embedding"]
-        F1["FastAPI<br/>classification · embedding"]
-    end
-    subgraph fleet["DGX Spark fleet"]
-        direction TB
-        SINGLE["single cells<br/>spark-05 … 10"]
-        PAIR["pair cells<br/>spark-01+02 · 03+04"]
-    end
+```d2 layout=elk pad=40 title="이용자 정책·GPUStack 관리와 라우팅·모델 실행·DGX Spark fleet 네 층이 위에서 아래로 이어지고, pair cell은 vLLM만 쓰는 덱 전체 지도"
+direction: down
 
-    LITE --> ROUTE
-    ROUTE --> V1
-    ROUTE --> F1
-    CTRL --> V1
-    CTRL --> F1
-    V1 --> SINGLE
-    V1 --> PAIR
-    F1 --> SINGLE
+classes: {
+  key: {
+    style: {
+      fill: "#dbeafe"
+      stroke: "#2563eb"
+      font-color: "#1e3a8a"
+    }
+  }
+  zone: {
+    style: {
+      fill: "#ede9fe"
+      stroke: "#7c3aed"
+      font-color: "#4c1d95"
+    }
+  }
+  ok: {
+    style: {
+      fill: "#dcfce7"
+      stroke: "#16a34a"
+      font-color: "#14532d"
+    }
+  }
+  warn: {
+    style: {
+      fill: "#fef3c7"
+      stroke: "#d97706"
+      font-color: "#78350f"
+    }
+  }
+}
 
-    classDef key  fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
-    classDef zone fill:#ede9fe,stroke:#7c3aed,color:#4c1d95
-    classDef ok   fill:#dcfce7,stroke:#16a34a,color:#14532d
-    classDef warn fill:#fef3c7,stroke:#d97706,color:#78350f
-    class USER,LITE key
-    class ROUTE,CTRL zone
-    class V1,F1,SINGLE ok
-    class PAIR warn
+north: 이용자 정책 {
+  user: 사용자 · 앱 { class: key }
+  lite: "LiteLLM\nkey · quota · alias · fallback" { class: key }
+
+  user -> lite
+}
+
+plane: GPUStack 관리 · 라우팅 {
+  route: Model Route { class: zone }
+  ctrl: Server · Scheduler · Controller { class: zone }
+
+  route -> ctrl: { style.stroke-dash: 3 }
+}
+
+run: 모델 실행 {
+  v1: "vLLM\nLLM · embedding" { class: ok }
+  f1: "FastAPI\nclassification · embedding" { class: ok }
+}
+
+fleet: DGX Spark fleet {
+  single: "single cells\nspark-05 … 10" { class: ok }
+  pair: "pair cells\nspark-01+02 · 03+04" { class: warn }
+}
+
+north.lite -> plane.route
+plane.route -> run.v1
+plane.route -> run.f1
+plane.ctrl -> run.v1
+plane.ctrl -> run.f1
+run.v1 -> fleet.single
+run.v1 -> fleet.pair
+run.f1 -> fleet.single
 ```
 
 LiteLLM은 사용자를 알고, GPUStack은 route와 실행 상태를 알며, backend는 inference를 안다.

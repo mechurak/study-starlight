@@ -10,32 +10,71 @@ import Thesis from '../../../components/docs/Thesis.astro';
 
 ## 전체 지도
 
-```mermaid
-flowchart LR
-    USER["임직원"] --> PORTAL["Portal · Catalog"]
-    IDP["IdP<br/>user · group"] --> PORTAL
-    PORTAL --> CORE["Agent · Knowledge · Tool · Version<br/>Grant · Publication"]
-    CORE --> POLICY["Approval · Placement"]
-    POLICY --> ADAPTER["RuntimeAdapter"]
-    ADAPTER --> K0["맨 Kubernetes<br/>온프렘 기준선"]
-    ADAPTER --> KAG["kagent<br/>온프렘 Kubernetes"]
-    ADAPTER --> ACR["AgentCore<br/>AWS managed runtime"]
-    USER --> EDGE["Stable Invoke API<br/>ACL · session binding"]
-    EDGE --> KAG
-    EDGE --> ACR
-    KAG --> TOOL["Tool Policy · MCP"]
-    ACR --> TOOL
-    KAG -.-> OBS["Audit · OTel · Langfuse"]
-    ACR -.-> OBS
+```d2 layout=elk pad=40 title="임직원과 IdP가 Portal·Catalog로 들어가 제품 중립 resource와 승인·배치를 거쳐 RuntimeAdapter가 세 runtime에 배포하고, 호출은 Stable Invoke API로 따로 들어가 Tool Policy와 감사로 이어지는 덱 전체 지도"
+direction: down
 
-    classDef key fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
-    classDef zone fill:#ede9fe,stroke:#7c3aed,color:#4c1d95
-    classDef ok fill:#dcfce7,stroke:#16a34a,color:#14532d
-    classDef warn fill:#fef3c7,stroke:#d97706,color:#78350f
-    class USER,IDP,EDGE key
-    class PORTAL,CORE,POLICY,ADAPTER zone
-    class K0,KAG,ACR ok
-    class TOOL,OBS warn
+classes: {
+  key: {
+    style: {
+      fill: "#dbeafe"
+      stroke: "#2563eb"
+      font-color: "#1e3a8a"
+    }
+  }
+  zone: {
+    style: {
+      fill: "#ede9fe"
+      stroke: "#7c3aed"
+      font-color: "#4c1d95"
+    }
+  }
+  ok: {
+    style: {
+      fill: "#dcfce7"
+      stroke: "#16a34a"
+      font-color: "#14532d"
+    }
+  }
+  warn: {
+    style: {
+      fill: "#fef3c7"
+      stroke: "#d97706"
+      font-color: "#78350f"
+    }
+  }
+}
+
+user: 임직원 { class: key }
+idp: "IdP\nuser · group" { class: key }
+edge: "Stable Invoke API\nACL · session binding" { class: key }
+
+portal: Portal · Catalog { class: zone }
+core: "Agent · Knowledge · Tool · Version\nGrant · Publication" { class: zone }
+policy: Approval · Placement { class: zone }
+adapter: RuntimeAdapter { class: zone }
+
+k0: "맨 Kubernetes\n온프렘 기준선" { class: ok }
+kag: "kagent\n온프렘 Kubernetes" { class: ok }
+acr: "AgentCore\nAWS managed runtime" { class: ok }
+
+tool: Tool Policy · MCP { class: warn }
+obs: Audit · OTel · Langfuse { class: warn }
+
+user -> portal
+idp -> portal
+portal -> core
+core -> policy
+policy -> adapter
+adapter -> k0
+adapter -> kag
+adapter -> acr
+user -> edge
+edge -> kag
+edge -> acr
+kag -> tool
+acr -> tool
+kag -> obs: { style.stroke-dash: 3 }
+acr -> obs: { style.stroke-dash: 3 }
 ```
 
 ## 설계 결정 열일곱 가지

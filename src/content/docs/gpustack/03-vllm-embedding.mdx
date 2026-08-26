@@ -19,19 +19,43 @@ import TermIntro from '../../../components/docs/TermIntro.astro';
 
 ## LLM의 기본 배포 패턴
 
-```mermaid
-flowchart LR
-    LITE["LiteLLM<br/>corp-chat"] --> ROUTE["GPUStack route<br/>qwen-prod"]
-    ROUTE --> A["replica 1<br/>spark-01 · vLLM"]
-    ROUTE --> B["replica 2<br/>spark-02 · vLLM"]
-    ROUTE -.-> F["fallback<br/>작은 모델 또는 외부 provider"]
+```d2 layout=elk pad=40 title="LiteLLM의 corp-chat 별칭이 GPUStack route로 가고, route가 두 replica에 나눠 보내며 fallback은 점선으로 붙은 구성"
+direction: right
 
-    classDef key  fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
-    classDef ok   fill:#dcfce7,stroke:#16a34a,color:#14532d
-    classDef warn fill:#fef3c7,stroke:#d97706,color:#78350f
-    class LITE,ROUTE key
-    class A,B ok
-    class F warn
+classes: {
+  key: {
+    style: {
+      fill: "#dbeafe"
+      stroke: "#2563eb"
+      font-color: "#1e3a8a"
+    }
+  }
+  ok: {
+    style: {
+      fill: "#dcfce7"
+      stroke: "#16a34a"
+      font-color: "#14532d"
+    }
+  }
+  warn: {
+    style: {
+      fill: "#fef3c7"
+      stroke: "#d97706"
+      font-color: "#78350f"
+    }
+  }
+}
+
+lite: "LiteLLM\ncorp-chat" { class: key }
+route: "GPUStack route\nqwen-prod" { class: key }
+a: "replica 1\nspark-01 · vLLM" { class: ok }
+b: "replica 2\nspark-02 · vLLM" { class: ok }
+f: "fallback\n작은 모델 또는 외부 provider" { class: warn }
+
+lite -> route
+route -> a
+route -> b
+route -> f: { style.stroke-dash: 3 }
 ```
 
 replica 둘은 같은 weight를 각자 메모리에 올리고 요청을 독립적으로 처리한다. 메모리를 합치는 방식은

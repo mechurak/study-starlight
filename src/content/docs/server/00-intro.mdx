@@ -74,19 +74,43 @@ SELinux (Ubuntu는 AppArmor를 쓴다 — 이름만).
 
 리눅스에서 "설정을 본다"는 결국 파일을 읽는 일이다. 디렉터리의 역할만 알면 절반은 찾아진다.
 
-```mermaid
-flowchart LR
-    ETC["/etc<br/>사람이 쓴 설정<br/>(백업 대상)"] --> SYS["실행 중인 시스템"]
-    PROC["/proc · /sys<br/>커널이 실시간으로 만드는 가짜 파일<br/>(디스크에 없다)"] --> SYS
-    SYS --> VAR["/var<br/>변하는 것 — 로그 · 캐시 · DB"]
-    SYS --> RUN["/run<br/>재부팅하면 사라지는 실행 상태<br/>(PID · 소켓)"]
+```d2 layout=elk pad=40 title="/etc와 /proc·/sys가 실행 중인 시스템으로 들어가고, 시스템에서 /var와 /run이 나오는 디렉터리 역할 지도"
+direction: down
 
-    classDef key  fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
-    classDef ok   fill:#dcfce7,stroke:#16a34a,color:#14532d
-    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
-    class ETC key
-    class SYS ok
-    class PROC,VAR,RUN mute
+classes: {
+  key: {
+    style: {
+      fill: "#dbeafe"
+      stroke: "#2563eb"
+      font-color: "#1e3a8a"
+    }
+  }
+  ok: {
+    style: {
+      fill: "#dcfce7"
+      stroke: "#16a34a"
+      font-color: "#14532d"
+    }
+  }
+  mute: {
+    style: {
+      fill: "#f1f5f9"
+      stroke: "#94a3b8"
+      font-color: "#334155"
+    }
+  }
+}
+
+etc: "/etc\n사람이 쓴 설정\n(백업 대상)" { class: key }
+proc: "/proc · /sys\n커널이 실시간으로 만드는 가짜 파일\n(디스크에 없다)" { class: mute }
+sys: 실행 중인 시스템 { class: ok }
+var: "/var\n변하는 것 — 로그 · 캐시 · DB" { class: mute }
+run: "/run\n재부팅하면 사라지는 실행 상태\n(PID · 소켓)" { class: mute }
+
+etc -> sys
+proc -> sys
+sys -> var
+sys -> run
 ```
 
 `free`도 `top`도 `lscpu`도 결국 `/proc` 아래를 읽어 예쁘게 보여주는 프로그램이다 —

@@ -50,22 +50,48 @@ DGX Spark가 열 대 있으면 가장 먼저 필요한 것은 거대한 분산 �
 
 ## 전체를 관통하는 두 경계
 
-```mermaid
-flowchart LR
-    USER["이용자 · 사내 서비스"] --> LITE["LiteLLM<br/>키 · quota · alias · fallback"]
-    LITE --> ROUTE["GPUStack AI Gateway<br/>model route · load balancing"]
-    ROUTE --> DEPLOY["GPUStack deployment<br/>배치 · replica · 재시작"]
-    DEPLOY --> VLLM["vLLM<br/>LLM · embedding"]
-    DEPLOY --> FAST["FastAPI custom backend<br/>classification · embedding"]
-    VLLM --> SPARK["DGX Spark worker"]
-    FAST --> SPARK
+```d2 layout=elk pad=40 title="이용자 요청이 LiteLLM과 GPUStack AI Gateway를 거쳐 deployment로 가고, vLLM과 FastAPI custom backend 두 갈래가 다시 DGX Spark worker에서 실행되는 경로"
+direction: down
 
-    classDef key  fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
-    classDef ok   fill:#dcfce7,stroke:#16a34a,color:#14532d
-    classDef zone fill:#ede9fe,stroke:#7c3aed,color:#4c1d95
-    class USER,LITE key
-    class ROUTE,DEPLOY zone
-    class VLLM,FAST,SPARK ok
+classes: {
+  key: {
+    style: {
+      fill: "#dbeafe"
+      stroke: "#2563eb"
+      font-color: "#1e3a8a"
+    }
+  }
+  zone: {
+    style: {
+      fill: "#ede9fe"
+      stroke: "#7c3aed"
+      font-color: "#4c1d95"
+    }
+  }
+  ok: {
+    style: {
+      fill: "#dcfce7"
+      stroke: "#16a34a"
+      font-color: "#14532d"
+    }
+  }
+}
+
+user: 이용자 · 사내 서비스 { class: key }
+lite: "LiteLLM\n키 · quota · alias · fallback" { class: key }
+route: "GPUStack AI Gateway\nmodel route · load balancing" { class: zone }
+deploy: "GPUStack deployment\n배치 · replica · 재시작" { class: zone }
+vllm: "vLLM\nLLM · embedding" { class: ok }
+fast: "FastAPI custom backend\nclassification · embedding" { class: ok }
+spark: DGX Spark worker { class: ok }
+
+user -> lite
+lite -> route
+route -> deploy
+deploy -> vllm
+deploy -> fast
+vllm -> spark
+fast -> spark
 ```
 
 **북쪽 경계**에서는 LiteLLM이 이용자를 안다. 가상 키, 사용자별 제한, 모델 별칭과 외부 모델

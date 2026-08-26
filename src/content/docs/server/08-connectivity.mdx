@@ -23,29 +23,60 @@ import TermIntro from '../../../components/docs/TermIntro.astro';
 각 층은 **아래층이 성공해야만 의미가 있다.** 그래서 위에서부터 찍어보는 것이 아니라
 아래에서 위로 올라가며 **처음 실패하는 지점**을 찾는다. 거기가 원인이다.
 
-```mermaid
-flowchart TB
-    L1["1. 링크<br/>케이블 · NIC이 살아 있나"] --> L2["2. IP 주소<br/>주소를 받았나"]
-    L2 --> L3["3. 라우팅<br/>나갈 길이 있나"]
-    L3 --> L4["4. 외부 도달<br/>게이트웨이 너머로 가나"]
-    L4 --> L5["5. DNS<br/>이름이 IP로 풀리나"]
-    L5 --> L6["6. TCP<br/>그 포트에 붙나"]
-    L6 --> L7["7. TLS<br/>인증서가 검증되나"]
-    L7 --> L8["8. HTTP<br/>응답이 오나"]
+```d2 layout=elk pad=40 title="링크부터 HTTP까지 여덟 층을 아래에서 위로 올라가며 확인하고, 각 층이 실패했을 때 의심할 원인을 옆에 붙인 사다리"
+direction: down
 
-    L1 -.실패.-> E1["케이블 · 스위치 포트"]
-    L2 -.실패.-> E2["DHCP · netplan"]
-    L3 -.실패.-> E3["기본 게이트웨이 누락"]
-    L4 -.실패.-> E4["방화벽 · 라우팅"]
-    L5 -.실패.-> E5["DNS 서버 · 검색 도메인"]
-    L6 -.실패.-> E6["방화벽 · 프록시 · 서비스 미기동"]
-    L7 -.실패.-> E7["사내 CA 미설치 · 시각 오차"]
-    L8 -.실패.-> E8["프록시 인증 · 애플리케이션"]
+classes: {
+  ok: {
+    style: {
+      fill: "#dcfce7"
+      stroke: "#16a34a"
+      font-color: "#14532d"
+    }
+  }
+  bad: {
+    style: {
+      fill: "#fee2e2"
+      stroke: "#dc2626"
+      font-color: "#7f1d1d"
+    }
+  }
+}
 
-    classDef ok   fill:#dcfce7,stroke:#16a34a,color:#14532d
-    classDef bad  fill:#fee2e2,stroke:#dc2626,color:#7f1d1d
-    class L1,L2,L3,L4,L5,L6,L7,L8 ok
-    class E1,E2,E3,E4,E5,E6,E7,E8 bad
+l1: "1. 링크\n케이블 · NIC이 살아 있나" { class: ok }
+l2: "2. IP 주소\n주소를 받았나" { class: ok }
+l3: "3. 라우팅\n나갈 길이 있나" { class: ok }
+l4: "4. 외부 도달\n게이트웨이 너머로 가나" { class: ok }
+l5: "5. DNS\n이름이 IP로 풀리나" { class: ok }
+l6: "6. TCP\n그 포트에 붙나" { class: ok }
+l7: "7. TLS\n인증서가 검증되나" { class: ok }
+l8: "8. HTTP\n응답이 오나" { class: ok }
+
+e1: 케이블 · 스위치 포트 { class: bad }
+e2: DHCP · netplan { class: bad }
+e3: 기본 게이트웨이 누락 { class: bad }
+e4: 방화벽 · 라우팅 { class: bad }
+e5: DNS 서버 · 검색 도메인 { class: bad }
+e6: 방화벽 · 프록시 · 서비스 미기동 { class: bad }
+e7: 사내 CA 미설치 · 시각 오차 { class: bad }
+e8: 프록시 인증 · 애플리케이션 { class: bad }
+
+l1 -> l2
+l2 -> l3
+l3 -> l4
+l4 -> l5
+l5 -> l6
+l6 -> l7
+l7 -> l8
+
+l1 -> e1: 실패 { style.stroke-dash: 3 }
+l2 -> e2: 실패 { style.stroke-dash: 3 }
+l3 -> e3: 실패 { style.stroke-dash: 3 }
+l4 -> e4: 실패 { style.stroke-dash: 3 }
+l5 -> e5: 실패 { style.stroke-dash: 3 }
+l6 -> e6: 실패 { style.stroke-dash: 3 }
+l7 -> e7: 실패 { style.stroke-dash: 3 }
+l8 -> e8: 실패 { style.stroke-dash: 3 }
 ```
 
 ## 순서대로 확인하기

@@ -21,21 +21,58 @@ import Thesis from '../../../components/docs/Thesis.astro';
 
 ## 세 개의 문
 
-```mermaid
-flowchart LR
-    USER["사용자 · creator"] --> C1{"1 · 관리 권한<br/>edit · deploy · share"}
-    C1 --> PORTAL["Portal control plane"]
-    USER --> C2{"2 · 호출 권한<br/>agent:invoke"}
-    C2 --> RUNTIME["Agent runtime"]
-    RUNTIME --> C3{"3 · action 권한<br/>tool · input · user"}
-    C3 --> TOOL["업무 API · data"]
+```d2 layout=elk pad=40 title="사용자가 관리 권한 관문을 지나 포털로, 호출 권한 관문을 지나 runtime으로 가고, runtime이 다시 action 권한 관문을 지나 업무 API에 닿는 세 권한의 분리"
+direction: down
 
-    classDef key fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
-    classDef zone fill:#ede9fe,stroke:#7c3aed,color:#4c1d95
-    classDef warn fill:#fef3c7,stroke:#d97706,color:#78350f
-    class USER key
-    class C1,C2,C3 zone
-    class PORTAL,RUNTIME,TOOL warn
+classes: {
+  key: {
+    style: {
+      fill: "#dbeafe"
+      stroke: "#2563eb"
+      font-color: "#1e3a8a"
+    }
+  }
+  zone: {
+    style: {
+      fill: "#ede9fe"
+      stroke: "#7c3aed"
+      font-color: "#4c1d95"
+    }
+  }
+  warn: {
+    style: {
+      fill: "#fef3c7"
+      stroke: "#d97706"
+      font-color: "#78350f"
+    }
+  }
+}
+
+user: 사용자 · creator { class: key }
+
+c1: "1 · 관리 권한\nedit · deploy · share" {
+  class: zone
+  shape: diamond
+}
+c2: "2 · 호출 권한\nagent:invoke" {
+  class: zone
+  shape: diamond
+}
+c3: "3 · action 권한\ntool · input · user" {
+  class: zone
+  shape: diamond
+}
+
+portal: Portal control plane { class: warn }
+runtime: Agent runtime { class: warn }
+tool: 업무 API · data { class: warn }
+
+user -> c1
+c1 -> portal
+user -> c2
+c2 -> runtime
+runtime -> c3
+c3 -> tool
 ```
 
 첫 문은 Agent 정의와 grant를 바꾸는 권한, 둘째는 대화를 시작하는 권한, 셋째는 Agent가 실제 업무를 수행하는

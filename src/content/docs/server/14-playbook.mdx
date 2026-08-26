@@ -215,19 +215,41 @@ last reboot | head
 
 ## 대응의 순서 — 복구가 먼저다
 
-```mermaid
-flowchart LR
-    A["1. 증거 남기기<br/>로그 · 상태 스냅숏"] --> B["2. 서비스 복구<br/>재시작 · 롤백 · 우회"]
-    B --> C["3. 원인 규명<br/>남긴 증거로"]
-    C --> D["4. 재발 방지<br/>알람 · 상한 · 문서"]
+```d2 layout=elk pad=40 title="증거 남기기에서 서비스 복구, 원인 규명, 재발 방지로 이어지는 장애 대응 네 단계"
+direction: right
 
-    classDef warn fill:#fef3c7,stroke:#d97706,color:#78350f
-    classDef ok   fill:#dcfce7,stroke:#16a34a,color:#14532d
-    classDef key  fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
-    class A warn
-    class B ok
-    class C key
-    class D ok
+classes: {
+  warn: {
+    style: {
+      fill: "#fef3c7"
+      stroke: "#d97706"
+      font-color: "#78350f"
+    }
+  }
+  ok: {
+    style: {
+      fill: "#dcfce7"
+      stroke: "#16a34a"
+      font-color: "#14532d"
+    }
+  }
+  key: {
+    style: {
+      fill: "#dbeafe"
+      stroke: "#2563eb"
+      font-color: "#1e3a8a"
+    }
+  }
+}
+
+a: "1. 증거 남기기\n로그 · 상태 스냅숏" { class: warn }
+b: "2. 서비스 복구\n재시작 · 롤백 · 우회" { class: ok }
+c: "3. 원인 규명\n남긴 증거로" { class: key }
+d: "4. 재발 방지\n알람 · 상한 · 문서" { class: ok }
+
+a -> b
+b -> c
+c -> d
 ```
 
 재시작하면 증거가 사라진다. **재시작 전에 30초만 써서 상태를 남긴다.**

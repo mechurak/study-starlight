@@ -25,24 +25,56 @@ import Thesis from '../../../components/docs/Thesis.astro';
 사용자가 만든 MCP endpoint를 form에 붙이는 것만으로 self-service 플랫폼이 되지 않는다. 그 URL이나 image가 누구
 소유인지, 어떤 code와 schema를 실행하는지, 어느 data로 나가는지, 문제가 생기면 무엇을 중지할지 알 수 없기 때문이다.
 
-```mermaid
-flowchart LR
-    CREATOR["MCP creator"] --> SUBMIT["source · image digest<br/>또는 remote endpoint 제출"]
-    SUBMIT --> CHECK["build · scan · policy<br/>소유권 · network 검증"]
-    CHECK --> VERSION["ToolVersion<br/>artifact · schema · auth"]
-    VERSION --> DEPLOY["ToolDeployment<br/>실행 또는 연결"]
-    DEPLOY --> DISCOVER["discovery · smoke test<br/>audit 확인"]
-    DISCOVER --> PUBLISH["ToolPublication<br/>catalog 공개"]
-    PUBLISH --> BIND["AgentVersion<br/>ToolBinding · allowlist"]
+```d2 layout=elk pad=40 title="MCP creator의 제출에서 검증·ToolVersion·ToolDeployment·discovery를 거쳐 ToolPublication 공개와 AgentVersion의 ToolBinding까지 이어지는 일곱 단계 lifecycle"
+direction: down
 
-    classDef key fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
-    classDef zone fill:#ede9fe,stroke:#7c3aed,color:#4c1d95
-    classDef ok fill:#dcfce7,stroke:#16a34a,color:#14532d
-    classDef warn fill:#fef3c7,stroke:#d97706,color:#78350f
-    class CREATOR,SUBMIT key
-    class CHECK,VERSION zone
-    class DEPLOY,DISCOVER ok
-    class PUBLISH,BIND warn
+classes: {
+  key: {
+    style: {
+      fill: "#dbeafe"
+      stroke: "#2563eb"
+      font-color: "#1e3a8a"
+    }
+  }
+  zone: {
+    style: {
+      fill: "#ede9fe"
+      stroke: "#7c3aed"
+      font-color: "#4c1d95"
+    }
+  }
+  ok: {
+    style: {
+      fill: "#dcfce7"
+      stroke: "#16a34a"
+      font-color: "#14532d"
+    }
+  }
+  warn: {
+    style: {
+      fill: "#fef3c7"
+      stroke: "#d97706"
+      font-color: "#78350f"
+    }
+  }
+}
+
+creator: MCP creator { class: key }
+submit: "source · image digest\n또는 remote endpoint 제출" { class: key }
+check: "build · scan · policy\n소유권 · network 검증" { class: zone }
+version: "ToolVersion\nartifact · schema · auth" { class: zone }
+deploy: "ToolDeployment\n실행 또는 연결" { class: ok }
+discover: "discovery · smoke test\naudit 확인" { class: ok }
+publish: "ToolPublication\ncatalog 공개" { class: warn }
+bind: "AgentVersion\nToolBinding · allowlist" { class: warn }
+
+creator -> submit
+submit -> check
+check -> version
+version -> deploy
+deploy -> discover
+discover -> publish
+publish -> bind
 ```
 
 `ToolPublication`은 Agent catalog 공개와도 다르다. tool이 공개됐다는 것은 승인된 Agent creator가 binding 후보로

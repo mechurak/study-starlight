@@ -21,21 +21,53 @@ import TermIntro from '../../../components/docs/TermIntro.astro';
 
 ## 왜 한 곳에 설정할 수 없는가
 
-```mermaid
-flowchart LR
-    ENV["환경변수<br/>http_proxy · no_proxy"] --> C1["curl · wget · pip · npm<br/>대부분의 CLI"]
-    APT["/etc/apt/apt.conf.d/95proxy"] --> C2["apt"]
-    SNAP["snap set system proxy.*"] --> C3["snap"]
-    UNIT["systemd drop-in<br/>Environment="] --> C4["서비스 데몬<br/>(docker · 앱)"]
-    GIT["git config http.proxy"] --> C5["git (https)"]
-    CA["/usr/local/share/ca-certificates<br/>+ update-ca-certificates"] --> C6["TLS 검증 — 전부"]
+```d2 layout=elk pad=40 title="환경변수·apt·snap·systemd·git·CA 저장소가 각각 어떤 프로그램의 프록시와 TLS 검증을 담당하는지 짝지은 표"
+direction: right
 
-    classDef key  fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
-    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
-    classDef warn fill:#fef3c7,stroke:#d97706,color:#78350f
-    class ENV,CA key
-    class APT,SNAP,UNIT,GIT warn
-    class C1,C2,C3,C4,C5,C6 mute
+classes: {
+  key: {
+    style: {
+      fill: "#dbeafe"
+      stroke: "#2563eb"
+      font-color: "#1e3a8a"
+    }
+  }
+  warn: {
+    style: {
+      fill: "#fef3c7"
+      stroke: "#d97706"
+      font-color: "#78350f"
+    }
+  }
+  mute: {
+    style: {
+      fill: "#f1f5f9"
+      stroke: "#94a3b8"
+      font-color: "#334155"
+    }
+  }
+}
+
+env: "환경변수\nhttp_proxy · no_proxy" { class: key }
+apt: "/etc/apt/apt.conf.d/95proxy" { class: warn }
+snap: "snap set system proxy.*" { class: warn }
+unit: "systemd drop-in\nEnvironment=" { class: warn }
+git: "git config http.proxy" { class: warn }
+ca: "/usr/local/share/ca-certificates\n+ update-ca-certificates" { class: key }
+
+c1: "curl · wget · pip · npm\n대부분의 CLI" { class: mute }
+c2: apt { class: mute }
+c3: snap { class: mute }
+c4: "서비스 데몬\n(docker · 앱)" { class: mute }
+c5: "git (https)" { class: mute }
+c6: TLS 검증 — 전부 { class: mute }
+
+env -> c1
+apt -> c2
+snap -> c3
+unit -> c4
+git -> c5
+ca -> c6
 ```
 
 환경변수를 읽는 프로그램이 가장 많지만 **전부는 아니다.**

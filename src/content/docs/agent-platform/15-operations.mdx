@@ -45,20 +45,47 @@ retention과 열람 role을 정한다. [Langfuse 덱](/langfuse/)의 trace 설�
 
 ## Health를 층별로 나눈다
 
-```mermaid
-flowchart LR
-    EDGE["Portal · ACL"] --> RT["Runtime"] --> MODEL["Model"] --> TOOL["Tool"]
-    EDGE -.-> AUDIT["Audit · Trace"]
-    RT -.-> AUDIT
-    MODEL -.-> AUDIT
-    TOOL -.-> AUDIT
+```d2 layout=elk pad=40 title="Portal·ACL에서 Runtime, Model, Tool로 이어지는 요청 경로와 네 구간이 모두 Audit·Trace로 점선으로 흘려보내는 기록"
+direction: right
 
-    classDef key fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
-    classDef ok fill:#dcfce7,stroke:#16a34a,color:#14532d
-    classDef warn fill:#fef3c7,stroke:#d97706,color:#78350f
-    class EDGE key
-    class RT,MODEL,TOOL ok
-    class AUDIT warn
+classes: {
+  key: {
+    style: {
+      fill: "#dbeafe"
+      stroke: "#2563eb"
+      font-color: "#1e3a8a"
+    }
+  }
+  ok: {
+    style: {
+      fill: "#dcfce7"
+      stroke: "#16a34a"
+      font-color: "#14532d"
+    }
+  }
+  warn: {
+    style: {
+      fill: "#fef3c7"
+      stroke: "#d97706"
+      font-color: "#78350f"
+    }
+  }
+}
+
+edge: Portal · ACL { class: key }
+rt: Runtime { class: ok }
+model: Model { class: ok }
+tool: Tool { class: ok }
+audit: Audit · Trace { class: warn }
+
+edge -> rt
+rt -> model
+model -> tool
+
+edge -> audit: { style.stroke-dash: 3 }
+rt -> audit: { style.stroke-dash: 3 }
+model -> audit: { style.stroke-dash: 3 }
+tool -> audit: { style.stroke-dash: 3 }
 ```
 
 synthetic test는 허용 사용자·금지 사용자·read tool·거부될 write tool을 각각 호출한다. runtime health endpoint만

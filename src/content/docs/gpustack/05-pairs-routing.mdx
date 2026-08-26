@@ -66,19 +66,43 @@ DGX Spark 두 대에서 vLLM을 함께 실행하면 기술적으로 분산 추�
 
 ## 여러 pair를 하나의 모델 이름으로 묶는다
 
-```mermaid
-flowchart LR
-    LITE["LiteLLM<br/>corp-large"] --> ROUTE["GPUStack route<br/>large-prod"]
-    ROUTE -->|"weight 50"| PA["deployment A<br/>pair-a · spark-01+02"]
-    ROUTE -->|"weight 50"| PB["deployment B<br/>pair-b · spark-03+04"]
-    ROUTE -.->|"fallback"| SMALL["single-node<br/>작은 모델"]
+```d2 layout=elk pad=40 title="LiteLLM의 corp-large가 GPUStack route로 가고, route가 두 pair deployment에 가중치 50씩 나눠 보내며 fallback은 단일 노드 작은 모델로 점선으로 빠지는 구성"
+direction: right
 
-    classDef key  fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
-    classDef ok   fill:#dcfce7,stroke:#16a34a,color:#14532d
-    classDef warn fill:#fef3c7,stroke:#d97706,color:#78350f
-    class LITE,ROUTE key
-    class PA,PB ok
-    class SMALL warn
+classes: {
+  key: {
+    style: {
+      fill: "#dbeafe"
+      stroke: "#2563eb"
+      font-color: "#1e3a8a"
+    }
+  }
+  ok: {
+    style: {
+      fill: "#dcfce7"
+      stroke: "#16a34a"
+      font-color: "#14532d"
+    }
+  }
+  warn: {
+    style: {
+      fill: "#fef3c7"
+      stroke: "#d97706"
+      font-color: "#78350f"
+    }
+  }
+}
+
+lite: "LiteLLM\ncorp-large" { class: key }
+route: "GPUStack route\nlarge-prod" { class: key }
+pa: "deployment A\npair-a · spark-01+02" { class: ok }
+pb: "deployment B\npair-b · spark-03+04" { class: ok }
+small: "single-node\n작은 모델" { class: warn }
+
+lite -> route
+route -> pa: weight 50
+route -> pb: weight 50
+route -> small: fallback { style.stroke-dash: 3 }
 ```
 
 고정 pair마다 deployment를 하나 만들면 장애와 변경 범위가 명확하다. GPUStack model route에 두 target을
