@@ -22,22 +22,52 @@ import TermIntro from '../../../components/docs/TermIntro.astro';
 
 ## 진단 사다리
 
-```mermaid
-flowchart LR
-    MAKE["1. SDK가 observation을<br/>완결했는가"] --> SEND["2. batch·flush가<br/>전송했는가"]
-    SEND --> ACCEPT["3. Web이 인증하고<br/>S3+queue에 받았는가"]
-    ACCEPT --> WORK["4. Worker가<br/>처리했는가"]
-    WORK --> STORE["5. ClickHouse에<br/>적재됐는가"]
-    STORE --> READ["6. API/UI filter가<br/>읽는가"]
+```d2 layout=elk pad=40 title="trace가 안 보일 때 SDK 완결·전송·Web 수신·Worker 처리·ClickHouse 적재·조회 순으로 좁혀 가는 여섯 관문"
+direction: down
 
-    classDef key  fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
-    classDef zone fill:#ede9fe,stroke:#7c3aed,color:#4c1d95
-    classDef warn fill:#fef3c7,stroke:#d97706,color:#78350f
-    classDef bad  fill:#fee2e2,stroke:#dc2626,color:#7f1d1d
-    class MAKE,SEND key
-    class ACCEPT,WORK zone
-    class STORE warn
-    class READ bad
+classes: {
+  key: {
+    style: {
+      fill: "#dbeafe"
+      stroke: "#2563eb"
+      font-color: "#1e3a8a"
+    }
+  }
+  zone: {
+    style: {
+      fill: "#ede9fe"
+      stroke: "#7c3aed"
+      font-color: "#4c1d95"
+    }
+  }
+  warn: {
+    style: {
+      fill: "#fef3c7"
+      stroke: "#d97706"
+      font-color: "#78350f"
+    }
+  }
+  bad: {
+    style: {
+      fill: "#fee2e2"
+      stroke: "#dc2626"
+      font-color: "#7f1d1d"
+    }
+  }
+}
+
+make: "1. SDK가 observation을\n완결했는가" { class: key }
+send: "2. batch·flush가\n전송했는가" { class: key }
+accept: "3. Web이 인증하고\nS3+queue에 받았는가" { class: zone }
+work: "4. Worker가\n처리했는가" { class: zone }
+store: "5. ClickHouse에\n적재됐는가" { class: warn }
+read: "6. API/UI filter가\n읽는가" { class: bad }
+
+make -> send
+send -> accept
+accept -> work
+work -> store
+store -> read
 ```
 
 UI refresh를 반복하기 전에 synthetic trace id 하나로 이 순서를 따른다. 여러 요청을 섞으면 각 경계의 log를 연결하기

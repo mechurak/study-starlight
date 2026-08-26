@@ -54,17 +54,34 @@ Prometheus UI, Loki 조회, Tempo — 각각 따로 열면 조사할 때마다 �
   ]}
 />
 
-```mermaid
-flowchart LR
-    P["Prometheus<br/>메트릭"] -->|"exemplar<br/>(그래프 점 → 트레이스)"| T["Tempo<br/>트레이스"]
-    L["Loki<br/>로그"] -->|"derived field<br/>(trace_id → 트레이스)"| T
-    T -->|"trace to logs<br/>(서비스·시각 → 로그)"| L
-    T -->|"span metrics"| P
+```d2 layout=elk pad=40 title="Grafana에서 Prometheus·Loki·Tempo를 exemplar·derived field·trace to logs·span metrics로 서로 잇는 네 갈래 연결"
+direction: down
 
-    classDef key  fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
-    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
-    class T key
-    class P,L mute
+classes: {
+  key: {
+    style: {
+      fill: "#dbeafe"
+      stroke: "#2563eb"
+      font-color: "#1e3a8a"
+    }
+  }
+  mute: {
+    style: {
+      fill: "#f1f5f9"
+      stroke: "#94a3b8"
+      font-color: "#334155"
+    }
+  }
+}
+
+p: "Prometheus\n메트릭" { class: mute }
+t: "Tempo\n트레이스" { class: key }
+l: "Loki\n로그" { class: mute }
+
+p -> t: "exemplar\n(그래프 점 → 트레이스)"
+l -> t: "derived field\n(trace_id → 트레이스)"
+t -> l: "trace to logs\n(서비스·시각 → 로그)"
+t -> p: span metrics
 ```
 
 프로비저닝 파일 하나로 셋을 다 넣는다. **UI에서 손으로 만들지 않는다** — 아래 절 참고.

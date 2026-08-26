@@ -87,21 +87,50 @@ Web health는 기본적으로 DB 연결까지 보장하지 않는다. liveness�
 
 ## v3에서 v4로 옮기는 세 단계
 
-```mermaid
-flowchart LR
-    INFRA["1. Infrastructure<br/>CH 25.12+ · PG 15+ · Redis 7+"] --> SERVER["2. Server v4<br/>legacy 또는 dual"]
-    SERVER --> CLIENT["3a. SDK·API·evaluator 전환"]
-    CLIENT --> HISTORY["3b. backfill 또는<br/>retention rollover"]
-    HISTORY --> CUT["3c. events_only<br/>commit"]
+```d2 layout=elk pad=40 title="인프라 버전을 올리고 서버 v4를 띄운 뒤 클라이언트 전환·이력 처리·events_only 커밋 순으로 가는 업그레이드 단계"
+direction: down
 
-    classDef key  fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
-    classDef zone fill:#ede9fe,stroke:#7c3aed,color:#4c1d95
-    classDef warn fill:#fef3c7,stroke:#d97706,color:#78350f
-    classDef ok   fill:#dcfce7,stroke:#16a34a,color:#14532d
-    class INFRA key
-    class SERVER,CLIENT zone
-    class HISTORY warn
-    class CUT ok
+classes: {
+  key: {
+    style: {
+      fill: "#dbeafe"
+      stroke: "#2563eb"
+      font-color: "#1e3a8a"
+    }
+  }
+  zone: {
+    style: {
+      fill: "#ede9fe"
+      stroke: "#7c3aed"
+      font-color: "#4c1d95"
+    }
+  }
+  ok: {
+    style: {
+      fill: "#dcfce7"
+      stroke: "#16a34a"
+      font-color: "#14532d"
+    }
+  }
+  warn: {
+    style: {
+      fill: "#fef3c7"
+      stroke: "#d97706"
+      font-color: "#78350f"
+    }
+  }
+}
+
+infra: "1. Infrastructure\nCH 25.12+ · PG 15+ · Redis 7+" { class: key }
+server: "2. Server v4\nlegacy 또는 dual" { class: zone }
+client: 3a. SDK·API·evaluator 전환 { class: zone }
+history: "3b. backfill 또는\nretention rollover" { class: warn }
+cut: "3c. events_only\ncommit" { class: ok }
+
+infra -> server
+server -> client
+client -> history
+history -> cut
 ```
 
 공식 v4 migration guide의 최소 infrastructure는 ClickHouse 25.12, Postgres 15, Redis 7.0이며 권장 version은 더 높다.

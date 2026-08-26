@@ -22,25 +22,58 @@ import TermIntro from '../../../components/docs/TermIntro.astro';
 
 ## 먼저 데이터 흐름을 분류한다
 
-```mermaid
-flowchart LR
-    INPUT["사용자 input<br/>PII · secret 가능"] --> MASK["앱 경계 masking"]
-    MASK --> SDK["Langfuse SDK"]
-    SDK --> WEB["Web ingest"]
-    WEB --> S3["raw event bucket"]
-    WEB --> REDIS["queue"]
-    REDIS --> WORKER["Worker<br/>선택적 server masking"]
-    WORKER --> CH["ClickHouse"]
-    CH --> UI["UI · API · export"]
+```d2 layout=elk pad=40 title="PII가 섞일 수 있는 사용자 입력이 앱 경계 masking을 지나 SDK·Web·Worker를 거쳐 ClickHouse와 UI까지 가는 동안 어디서 가려지는지 보여주는 경로"
+direction: down
 
-    classDef key  fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
-    classDef zone fill:#ede9fe,stroke:#7c3aed,color:#4c1d95
-    classDef warn fill:#fef3c7,stroke:#d97706,color:#78350f
-    classDef bad  fill:#fee2e2,stroke:#dc2626,color:#7f1d1d
-    class INPUT bad
-    class MASK key
-    class SDK,WEB,REDIS,WORKER zone
-    class S3,CH,UI warn
+classes: {
+  key: {
+    style: {
+      fill: "#dbeafe"
+      stroke: "#2563eb"
+      font-color: "#1e3a8a"
+    }
+  }
+  zone: {
+    style: {
+      fill: "#ede9fe"
+      stroke: "#7c3aed"
+      font-color: "#4c1d95"
+    }
+  }
+  warn: {
+    style: {
+      fill: "#fef3c7"
+      stroke: "#d97706"
+      font-color: "#78350f"
+    }
+  }
+  bad: {
+    style: {
+      fill: "#fee2e2"
+      stroke: "#dc2626"
+      font-color: "#7f1d1d"
+    }
+  }
+}
+
+input: "사용자 input\nPII · secret 가능" { class: bad }
+mask: 앱 경계 masking { class: key }
+sdk: Langfuse SDK { class: zone }
+web: Web ingest { class: zone }
+s3: raw event bucket { class: warn }
+redis: queue { class: zone }
+worker: "Worker\n선택적 server masking" { class: zone }
+ch: ClickHouse { class: warn }
+ui: UI · API · export { class: warn }
+
+input -> mask
+mask -> sdk
+sdk -> web
+web -> s3
+web -> redis
+redis -> worker
+worker -> ch
+ch -> ui
 ```
 
 Server-side masking이 ClickHouse 전에 실행돼도 공식 self-host 경로에서는 raw event가 S3에 먼저 놓일 수 있다.

@@ -54,42 +54,69 @@ import Thesis from '../../../components/docs/Thesis.astro';
 
 ## 이 덱의 기준 그림
 
-```mermaid
-flowchart LR
-    subgraph corp["사내 영역"]
-        USER["분석가 · 앱"]
-        SRC["업무 DB · 파일 · 로그"]
-    end
-    subgraph link["전용 연결"]
-        CX["CX · AWS Direct Connect"]
-    end
-    subgraph aws["회사 AWS 계정"]
-        VPC["customer-managed VPC<br/>classic compute"]
-        S3["S3 + Delta tables<br/>실제 분석 데이터"]
-        IAM["IAM · KMS · CloudTrail"]
-    end
-    subgraph dbx["Databricks 관리 영역"]
-        CTRL["control plane<br/>workspace · jobs · notebooks"]
-        UC["Unity Catalog<br/>권한 · 감사 · lineage"]
-    end
+```d2 layout=elk pad=40 title="사내 분석가·업무 데이터가 CX·Direct Connect를 거쳐 회사 AWS 계정의 VPC·S3로 이어지고, Databricks 관리 영역의 control plane·Unity Catalog가 PrivateLink와 IAM role로 붙는 전체 지도"
+direction: down
 
-    USER --> CX --> VPC
-    SRC --> CX --> VPC
-    VPC --> S3
-    VPC -. "PrivateLink · secure connectivity" .-> CTRL
-    CTRL --> UC
-    UC -. "IAM role로 허가" .-> S3
-    IAM -. "AWS 통제" .-> VPC
-    IAM -.-> S3
+classes: {
+  key: {
+    style: {
+      fill: "#dbeafe"
+      stroke: "#2563eb"
+      font-color: "#1e3a8a"
+    }
+  }
+  ok: {
+    style: {
+      fill: "#dcfce7"
+      stroke: "#16a34a"
+      font-color: "#14532d"
+    }
+  }
+  warn: {
+    style: {
+      fill: "#fef3c7"
+      stroke: "#d97706"
+      font-color: "#78350f"
+    }
+  }
+  zone: {
+    style: {
+      fill: "#ede9fe"
+      stroke: "#7c3aed"
+      font-color: "#4c1d95"
+    }
+  }
+}
 
-    classDef key  fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
-    classDef ok   fill:#dcfce7,stroke:#16a34a,color:#14532d
-    classDef warn fill:#fef3c7,stroke:#d97706,color:#78350f
-    classDef zone fill:#ede9fe,stroke:#7c3aed,color:#4c1d95
-    class USER,SRC key
-    class CX warn
-    class VPC,S3,IAM ok
-    class CTRL,UC zone
+corp: 사내 영역 {
+  user: 분석가 · 앱 { class: key }
+  src: 업무 DB · 파일 · 로그 { class: key }
+}
+
+conn: 전용 연결 {
+  cx: CX · AWS Direct Connect { class: warn }
+}
+
+aws: 회사 AWS 계정 {
+  vpc: "customer-managed VPC\nclassic compute" { class: ok }
+  s3: "S3 + Delta tables\n실제 분석 데이터" { class: ok }
+  iam: IAM · KMS · CloudTrail { class: ok }
+}
+
+dbx: Databricks 관리 영역 {
+  ctrl: "control plane\nworkspace · jobs · notebooks" { class: zone }
+  uc: "Unity Catalog\n권한 · 감사 · lineage" { class: zone }
+}
+
+corp.user -> conn.cx
+corp.src -> conn.cx
+conn.cx -> aws.vpc
+aws.vpc -> aws.s3
+aws.vpc -> dbx.ctrl: PrivateLink · secure connectivity { style.stroke-dash: 3 }
+dbx.ctrl -> dbx.uc
+dbx.uc -> aws.s3: IAM role로 허가 { style.stroke-dash: 3 }
+aws.iam -> aws.vpc: AWS 통제 { style.stroke-dash: 3 }
+aws.iam -> aws.s3 { style.stroke-dash: 3 }
 ```
 
 그림에서 가장 중요한 선은 `VPC → S3`다. VPC가 데이터를 담는 것이 아니라 VPC 안의 compute가

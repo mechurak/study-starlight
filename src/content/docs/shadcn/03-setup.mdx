@@ -61,19 +61,43 @@ import TermIntro from '../../../components/docs/TermIntro.astro';
 
 ## `init`이 만드는 것 네 개
 
-```mermaid
-flowchart TB
-    I["shadcn init"] --> A["components.json<br/>CLI 설정"]
-    I --> B["globals.css 수정<br/>토큰 = 테마"]
-    I --> C["lib/utils.ts<br/>cn() 함수"]
-    I --> D["package.json<br/>의존성 추가"]
+```d2 layout=elk pad=40 title="shadcn init이 components.json·globals.css·lib/utils.ts·package.json 네 곳을 건드리는 것을 보여주는 그림"
+direction: right
 
-    classDef key  fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
-    classDef ok   fill:#dcfce7,stroke:#16a34a,color:#14532d
-    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
-    class B ok
-    class A key
-    class I,C,D mute
+classes: {
+  key: {
+    style: {
+      fill: "#dbeafe"
+      stroke: "#2563eb"
+      font-color: "#1e3a8a"
+    }
+  }
+  ok: {
+    style: {
+      fill: "#dcfce7"
+      stroke: "#16a34a"
+      font-color: "#14532d"
+    }
+  }
+  mute: {
+    style: {
+      fill: "#f1f5f9"
+      stroke: "#94a3b8"
+      font-color: "#334155"
+    }
+  }
+}
+
+i: shadcn init { class: mute }
+a: "components.json\nCLI 설정" { class: key }
+b: "globals.css 수정\n토큰 = 테마" { class: ok }
+c: "lib/utils.ts\ncn() 함수" { class: mute }
+d: "package.json\n의존성 추가" { class: mute }
+
+i -> a
+i -> b
+i -> c
+i -> d
 ```
 
 | 파일 | 하는 일 | 이 덱에서 |

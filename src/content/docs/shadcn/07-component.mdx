@@ -222,20 +222,51 @@ export function cn(...inputs: ClassValue[]) {
 받은 파일은 내 코드지만, **아무렇게나 고치면 [11장](/shadcn/11-registry/)의 업스트림 추적이 어려워진다.**
 세 단계로 나눠 생각한다.
 
-```mermaid
-flowchart TB
-    Q{"무엇을 바꾸고 싶은가"} -->|"색 · 둥글기 · 간격"| T["토큰을 고친다<br/>globals.css"]
-    Q -->|"variant 추가<br/>기본 크기 변경"| E["ui/ 파일을 고친다<br/>수정 이유를 주석으로"]
-    Q -->|"우리 도메인 로직<br/>특정 화면 전용"| W["감싸는 컴포넌트를 만든다<br/>ui/ 밖에"]
+```d2 layout=elk pad=40 title="바꾸려는 것이 무엇이냐에 따라 토큰 수정·ui 파일 수정·감싸는 컴포넌트 작성 중 하나를 고르는 분기도"
+direction: down
 
-    classDef ok   fill:#dcfce7,stroke:#16a34a,color:#14532d
-    classDef warn fill:#fef3c7,stroke:#d97706,color:#78350f
-    classDef key  fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
-    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
-    class T ok
-    class E warn
-    class W key
-    class Q mute
+classes: {
+  ok: {
+    style: {
+      fill: "#dcfce7"
+      stroke: "#16a34a"
+      font-color: "#14532d"
+    }
+  }
+  warn: {
+    style: {
+      fill: "#fef3c7"
+      stroke: "#d97706"
+      font-color: "#78350f"
+    }
+  }
+  key: {
+    style: {
+      fill: "#dbeafe"
+      stroke: "#2563eb"
+      font-color: "#1e3a8a"
+    }
+  }
+  mute: {
+    style: {
+      fill: "#f1f5f9"
+      stroke: "#94a3b8"
+      font-color: "#334155"
+    }
+  }
+}
+
+q: 무엇을 바꾸고 싶은가 {
+  shape: diamond
+  class: mute
+}
+t: "토큰을 고친다\nglobals.css" { class: ok }
+e: "ui/ 파일을 고친다\n수정 이유를 주석으로" { class: warn }
+w: "감싸는 컴포넌트를 만든다\nui/ 밖에" { class: key }
+
+q -> t: 색 · 둥글기 · 간격
+q -> e: "variant 추가\n기본 크기 변경"
+q -> w: "우리 도메인 로직\n특정 화면 전용"
 ```
 
 | 하고 싶은 것 | 어디를 | 왜 |

@@ -21,21 +21,47 @@ import ColorScale from '../../../components/demos/ColorScale.astro';
 
 ## 순서
 
-```mermaid
-flowchart LR
-    A["① 브랜드 색<br/>하나 정한다"] --> B["② 중립색<br/>baseColor"]
-    B --> C["③ 나머지 의미 토큰<br/>파생시킨다"]
-    C --> D["④ 형태<br/>--radius"]
-    D --> E["⑤ 글자<br/>--font-sans"]
-    E --> F["⑥ 다크 한 벌"]
-    F --> G["⑦ 검사"]
+```d2 layout=elk pad=40 title="브랜드 색과 중립색에서 시작해 의미 토큰·형태·글자를 정하고 다크 한 벌과 검사로 끝나는 테마 제작 일곱 단계"
+direction: down
 
-    classDef key  fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
-    classDef ok   fill:#dcfce7,stroke:#16a34a,color:#14532d
-    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
-    class A,B key
-    class F,G ok
-    class C,D,E mute
+classes: {
+  key: {
+    style: {
+      fill: "#dbeafe"
+      stroke: "#2563eb"
+      font-color: "#1e3a8a"
+    }
+  }
+  ok: {
+    style: {
+      fill: "#dcfce7"
+      stroke: "#16a34a"
+      font-color: "#14532d"
+    }
+  }
+  mute: {
+    style: {
+      fill: "#f1f5f9"
+      stroke: "#94a3b8"
+      font-color: "#334155"
+    }
+  }
+}
+
+a: "① 브랜드 색\n하나 정한다" { class: key }
+b: "② 중립색\nbaseColor" { class: key }
+c: "③ 나머지 의미 토큰\n파생시킨다" { class: mute }
+d: "④ 형태\n--radius" { class: mute }
+e: "⑤ 글자\n--font-sans" { class: mute }
+f: ⑥ 다크 한 벌 { class: ok }
+g: ⑦ 검사 { class: ok }
+
+a -> b
+b -> c
+c -> d
+d -> e
+e -> f
+f -> g
 ```
 
 **출발점은 두 개다** — 브랜드 색과 중립색.

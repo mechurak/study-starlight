@@ -84,23 +84,52 @@ Material Design과 사내 SI 스타일이 이렇게 다른데도 마크업이 �
 
 "테마 = 색"이라고 생각하면 절반만 관리하게 된다. 실제로는 다섯 종류다.
 
-```mermaid
-flowchart LR
-    T["테마"]
-    T --> R1["색<br/>배경 · 글자 · 강조 · 경고"]
-    T --> R2["형태<br/>둥글기 · 간격 · 테두리 · 그림자"]
-    T --> R3["글자<br/>폰트 · 크기 · 굵기 · 줄간격"]
-    T --> R4["컴포넌트<br/>버튼 · 카드 · 입력창의 조합 규칙"]
-    T --> R5["아이콘 · 폰트 파일<br/>세트 · 굵기 · 로딩 방식"]
+```d2 layout=elk pad=40 title="테마를 색·형태·글자·컴포넌트·아이콘 폰트 파일 다섯 종류의 리소스 목록으로 펼친 그림"
+direction: right
 
-    classDef key  fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
-    classDef ok   fill:#dcfce7,stroke:#16a34a,color:#14532d
-    classDef warn fill:#fef3c7,stroke:#d97706,color:#78350f
-    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
-    class T key
-    class R1,R2 ok
-    class R3,R4 warn
-    class R5 mute
+classes: {
+  key: {
+    style: {
+      fill: "#dbeafe"
+      stroke: "#2563eb"
+      font-color: "#1e3a8a"
+    }
+  }
+  ok: {
+    style: {
+      fill: "#dcfce7"
+      stroke: "#16a34a"
+      font-color: "#14532d"
+    }
+  }
+  warn: {
+    style: {
+      fill: "#fef3c7"
+      stroke: "#d97706"
+      font-color: "#78350f"
+    }
+  }
+  mute: {
+    style: {
+      fill: "#f1f5f9"
+      stroke: "#94a3b8"
+      font-color: "#334155"
+    }
+  }
+}
+
+t: 테마 { class: key }
+r1: "색\n배경 · 글자 · 강조 · 경고" { class: ok }
+r2: "형태\n둥글기 · 간격 · 테두리 · 그림자" { class: ok }
+r3: "글자\n폰트 · 크기 · 굵기 · 줄간격" { class: warn }
+r4: "컴포넌트\n버튼 · 카드 · 입력창의 조합 규칙" { class: warn }
+r5: "아이콘 · 폰트 파일\n세트 · 굵기 · 로딩 방식" { class: mute }
+
+t -> r1
+t -> r2
+t -> r3
+t -> r4
+t -> r5
 ```
 
 <CardGrid>
@@ -134,21 +163,48 @@ flowchart LR
 
 토큰에는 두 층이 있다. **이 구분을 놓치면 이름을 붙여도 소용이 없다.**
 
-```mermaid
-flowchart LR
-    A["원시 토큰<br/>--zinc-900: #18181b<br/>'무슨 색인가'"] --> B["의미 토큰<br/>--primary: var(--zinc-900)<br/>'무슨 역할인가'"]
-    B --> C["컴포넌트<br/>class='bg-primary'"]
-    X["컴포넌트가 원시 토큰을<br/>직접 쓰면 ❌"]
-    A -.-> X
+```d2 layout=elk pad=40 title="원시 토큰이 의미 토큰을 거쳐 컴포넌트로 가야 하고, 컴포넌트가 원시 토큰을 직접 쓰면 안 된다는 것을 보여주는 그림"
+direction: down
 
-    classDef key  fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
-    classDef ok   fill:#dcfce7,stroke:#16a34a,color:#14532d
-    classDef bad  fill:#fee2e2,stroke:#dc2626,color:#7f1d1d
-    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
-    class A mute
-    class B key
-    class C ok
-    class X bad
+classes: {
+  key: {
+    style: {
+      fill: "#dbeafe"
+      stroke: "#2563eb"
+      font-color: "#1e3a8a"
+    }
+  }
+  ok: {
+    style: {
+      fill: "#dcfce7"
+      stroke: "#16a34a"
+      font-color: "#14532d"
+    }
+  }
+  bad: {
+    style: {
+      fill: "#fee2e2"
+      stroke: "#dc2626"
+      font-color: "#7f1d1d"
+    }
+  }
+  mute: {
+    style: {
+      fill: "#f1f5f9"
+      stroke: "#94a3b8"
+      font-color: "#334155"
+    }
+  }
+}
+
+a: "원시 토큰\n--zinc-900: #18181b\n'무슨 색인가'" { class: mute }
+b: "의미 토큰\n--primary: var(--zinc-900)\n'무슨 역할인가'" { class: key }
+c: "컴포넌트\nclass='bg-primary'" { class: ok }
+x: "컴포넌트가 원시 토큰을\n직접 쓰면 ❌" { class: bad }
+
+a -> b
+b -> c
+a -> x { style.stroke-dash: 3 }
 ```
 
 | | 원시 토큰 | 의미 토큰 |

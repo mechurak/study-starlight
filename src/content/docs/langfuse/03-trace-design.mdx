@@ -33,24 +33,54 @@ import TermIntro from '../../../components/docs/TermIntro.astro';
 
 ## Agent trace의 권장 tree
 
-```mermaid
-flowchart TB
-    ROOT["agent-run<br/>root span"] --> PLAN["agent: plan"]
-    PLAN --> G1["generation: decide-next-action"]
-    PLAN --> T1["tool: search-internal-docs"]
-    PLAN --> T2["tool: fetch-ticket"]
-    PLAN --> G2["generation: compose-final-answer"]
-    G2 -.-> S["score: task-success"]
+```d2 layout=elk pad=40 title="agent-run 루트 아래 plan이 오고, plan 아래 판단 generation과 도구 호출 둘, 최종 답변 generation이 붙어 score로 이어지는 trace 설계"
+direction: right
 
-    classDef key  fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
-    classDef zone fill:#ede9fe,stroke:#7c3aed,color:#4c1d95
-    classDef ok   fill:#dcfce7,stroke:#16a34a,color:#14532d
-    classDef warn fill:#fef3c7,stroke:#d97706,color:#78350f
-    class ROOT key
-    class PLAN zone
-    class G1,G2 ok
-    class T1,T2 warn
-    class S zone
+classes: {
+  key: {
+    style: {
+      fill: "#dbeafe"
+      stroke: "#2563eb"
+      font-color: "#1e3a8a"
+    }
+  }
+  zone: {
+    style: {
+      fill: "#ede9fe"
+      stroke: "#7c3aed"
+      font-color: "#4c1d95"
+    }
+  }
+  ok: {
+    style: {
+      fill: "#dcfce7"
+      stroke: "#16a34a"
+      font-color: "#14532d"
+    }
+  }
+  warn: {
+    style: {
+      fill: "#fef3c7"
+      stroke: "#d97706"
+      font-color: "#78350f"
+    }
+  }
+}
+
+root: "agent-run\nroot span" { class: key }
+plan: "agent: plan" { class: zone }
+g1: "generation: decide-next-action" { class: ok }
+t1: "tool: search-internal-docs" { class: warn }
+t2: "tool: fetch-ticket" { class: warn }
+g2: "generation: compose-final-answer" { class: ok }
+s: "score: task-success" { class: zone }
+
+root -> plan
+plan -> g1
+plan -> t1
+plan -> t2
+plan -> g2
+g2 -> s { style.stroke-dash: 3 }
 ```
 
 agent observation은 흐름을 결정하는 범위, generation은 실제 model 호출, tool은 외부 행동이다. agent의 반복 loop가

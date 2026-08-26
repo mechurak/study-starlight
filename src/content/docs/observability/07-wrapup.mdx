@@ -20,47 +20,73 @@ import TermIntro from '../../../components/docs/TermIntro.astro';
 
 ## 전체 지도
 
-```mermaid
-flowchart LR
-    subgraph get["수집 — 1장"]
-        direction TB
-        ALLOY["Grafana Alloy"]
-        SCRAPE["Prometheus scrape"]
-    end
-    subgraph keep["저장"]
-        direction TB
-        PROM["Prometheus — 2장"]
-        LOKI["Loki — 3장"]
-        TEMPO["Tempo — 4장"]
-    end
-    subgraph out["출구"]
-        direction TB
-        GRAF["Grafana — 5장"]
-        AM["Alertmanager — 2장"]
-    end
-    S3[("오브젝트 스토리지<br/>온프렘 덱 6장")]
+```d2 layout=dagre pad=40 title="수집(Alloy·Prometheus scrape) · 저장(Prometheus·Loki·Tempo) · 출구(Grafana·Alertmanager)로 묶은 덱 전체 지도와 세 신호를 잇는 점선"
+direction: down
 
-    ALLOY --> LOKI
-    ALLOY --> TEMPO
-    SCRAPE --> PROM
-    LOKI --> S3
-    TEMPO --> S3
-    PROM --> AM
-    GRAF --> PROM
-    GRAF --> LOKI
-    GRAF --> TEMPO
-    LOKI -.->|"trace_id"| TEMPO
-    PROM -.->|"exemplar"| TEMPO
-    TEMPO -.->|"trace to logs"| LOKI
+classes: {
+  ok: {
+    style: {
+      fill: "#dcfce7"
+      stroke: "#16a34a"
+      font-color: "#14532d"
+    }
+  }
+  key: {
+    style: {
+      fill: "#dbeafe"
+      stroke: "#2563eb"
+      font-color: "#1e3a8a"
+    }
+  }
+  warn: {
+    style: {
+      fill: "#fef3c7"
+      stroke: "#d97706"
+      font-color: "#78350f"
+    }
+  }
+  mute: {
+    style: {
+      fill: "#f1f5f9"
+      stroke: "#94a3b8"
+      font-color: "#334155"
+    }
+  }
+}
 
-    classDef ok   fill:#dcfce7,stroke:#16a34a,color:#14532d
-    classDef key  fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
-    classDef warn fill:#fef3c7,stroke:#d97706,color:#78350f
-    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
-    class S3 ok
-    class GRAF key
-    class AM warn
-    class ALLOY,SCRAPE,PROM,LOKI,TEMPO mute
+get: 수집 — 1장 {
+  alloy: Grafana Alloy { class: mute }
+  scrape: Prometheus scrape { class: mute }
+}
+
+keep: 저장 {
+  prom: Prometheus — 2장 { class: mute }
+  loki: Loki — 3장 { class: mute }
+  tempo: Tempo — 4장 { class: mute }
+}
+
+out: 출구 {
+  graf: Grafana — 5장 { class: key }
+  am: Alertmanager — 2장 { class: warn }
+}
+
+s3: "오브젝트 스토리지\n온프렘 덱 6장" {
+  shape: cylinder
+  class: ok
+}
+
+get.alloy -> keep.loki
+get.alloy -> keep.tempo
+get.scrape -> keep.prom
+keep.loki -> s3
+keep.tempo -> s3
+keep.prom -> out.am
+out.graf -> keep.prom
+out.graf -> keep.loki
+out.graf -> keep.tempo
+keep.loki -> keep.tempo: trace_id { style.stroke-dash: 3 }
+keep.prom -> keep.tempo: exemplar { style.stroke-dash: 3 }
+keep.tempo -> keep.loki: trace to logs { style.stroke-dash: 3 }
 ```
 
 점선 셋이 이 덱의 결론이다 — **저장소 셋을 세우는 것보다 그 셋을 잇는 것이 어렵고 값지다.**

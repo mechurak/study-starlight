@@ -106,20 +106,48 @@ CLI의 현재 migration/preset 흐름으로 diff를 확인한다.
 
 ### 무슨 문제가 생기나
 
-```mermaid
-flowchart LR
-    A["HTML 도착"] --> B["CSS 파싱<br/>웹폰트 발견"]
-    B --> C["폰트 파일 요청<br/>수십~수백 KB"]
-    C --> D{"그동안 글자를<br/>어떻게 보여줄까"}
-    D -->|"숨긴다"| E["FOIT<br/>빈 화면처럼 보임"]
-    D -->|"기본 폰트로"| F["FOUT<br/>폰트가 바뀌며 덜컹"]
+```d2 layout=elk pad=40 title="HTML 도착부터 웹폰트 요청까지 간 뒤 글자를 숨기면 FOIT, 기본 폰트로 보이면 FOUT이 되는 갈림길"
+direction: down
 
-    classDef bad  fill:#fee2e2,stroke:#dc2626,color:#7f1d1d
-    classDef warn fill:#fef3c7,stroke:#d97706,color:#78350f
-    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
-    class E bad
-    class F warn
-    class A,B,C,D mute
+classes: {
+  bad: {
+    style: {
+      fill: "#fee2e2"
+      stroke: "#dc2626"
+      font-color: "#7f1d1d"
+    }
+  }
+  warn: {
+    style: {
+      fill: "#fef3c7"
+      stroke: "#d97706"
+      font-color: "#78350f"
+    }
+  }
+  mute: {
+    style: {
+      fill: "#f1f5f9"
+      stroke: "#94a3b8"
+      font-color: "#334155"
+    }
+  }
+}
+
+a: HTML 도착 { class: mute }
+b: "CSS 파싱\n웹폰트 발견" { class: mute }
+c: "폰트 파일 요청\n수십~수백 KB" { class: mute }
+d: "그동안 글자를\n어떻게 보여줄까" {
+  shape: diamond
+  class: mute
+}
+e: "FOIT\n빈 화면처럼 보임" { class: bad }
+f: "FOUT\n폰트가 바뀌며 덜컹" { class: warn }
+
+a -> b
+b -> c
+c -> d
+d -> e: 숨긴다
+d -> f: 기본 폰트로
 ```
 
 첫 방문처럼 폰트가 캐시에 없을 때 브라우저는 대기 중 글자를 숨기거나 폴백으로 보여 준다.

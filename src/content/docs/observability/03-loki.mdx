@@ -80,22 +80,51 @@ Loki에 들어가는 로그 한 줄은 이 모양이다.
   sourceLabel="Grafana Loki 공식 문서 — Architecture"
 />
 
-```mermaid
-flowchart LR
-    POD["파드 stdout"] --> ALLOY["Grafana Alloy<br/>(DaemonSet)"]
-    ALLOY -->|"라벨 + 본문"| DIST["Loki distributor"]
-    DIST --> ING["ingester<br/>(메모리 + WAL)"]
-    ING -->|"chunk 압축"| S3[("오브젝트 스토리지<br/>chunk + 인덱스")]
-    Q["Grafana / LogQL"] --> QF["querier"]
-    QF --> S3
-    QF --> ING
+```d2 layout=elk pad=40 title="파드 stdout이 Alloy를 거쳐 Loki distributor·ingester로 들어가 오브젝트 스토리지에 쌓이고, querier가 ingester와 스토리지를 함께 읽는 구조"
+direction: down
 
-    classDef ok   fill:#dcfce7,stroke:#16a34a,color:#14532d
-    classDef key  fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
-    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
-    class S3 ok
-    class ALLOY key
-    class POD,DIST,ING,Q,QF mute
+classes: {
+  ok: {
+    style: {
+      fill: "#dcfce7"
+      stroke: "#16a34a"
+      font-color: "#14532d"
+    }
+  }
+  key: {
+    style: {
+      fill: "#dbeafe"
+      stroke: "#2563eb"
+      font-color: "#1e3a8a"
+    }
+  }
+  mute: {
+    style: {
+      fill: "#f1f5f9"
+      stroke: "#94a3b8"
+      font-color: "#334155"
+    }
+  }
+}
+
+pod: 파드 stdout { class: mute }
+alloy: "Grafana Alloy\n(DaemonSet)" { class: key }
+dist: Loki distributor { class: mute }
+ing: "ingester\n(메모리 + WAL)" { class: mute }
+s3: "오브젝트 스토리지\nchunk + 인덱스" {
+  shape: cylinder
+  class: ok
+}
+q: Grafana / LogQL { class: mute }
+qf: querier { class: mute }
+
+pod -> alloy
+alloy -> dist: 라벨 + 본문
+dist -> ing
+ing -> s3: chunk 압축
+q -> qf
+qf -> s3
+qf -> ing
 ```
 
 :::tip[핵심 — 라벨이 곧 검색 범위다]

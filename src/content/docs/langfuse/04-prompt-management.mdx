@@ -37,25 +37,52 @@ input이다.
 
 ## Version과 label
 
-```mermaid
-flowchart LR
-    V1["version 1<br/>이전 production"]
-    V2["version 2<br/>새 예시 추가"]
-    V3["version 3<br/>실험 중"]
-    PROD["label: production"] --> V2
-    STAGE["label: staging"] --> V3
-    LATEST["label: latest"] --> V3
-    ROLLBACK["rollback"] -.->|"pointer 이동"| V1
+```d2 layout=elk pad=40 title="production·staging·latest 라벨이 각각 어느 prompt version을 가리키고, rollback은 포인터를 옛 version으로 되돌리는 관계"
+direction: right
 
-    classDef key  fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
-    classDef zone fill:#ede9fe,stroke:#7c3aed,color:#4c1d95
-    classDef ok   fill:#dcfce7,stroke:#16a34a,color:#14532d
-    classDef warn fill:#fef3c7,stroke:#d97706,color:#78350f
-    class V1,V2,V3 key
-    class PROD ok
-    class STAGE zone
-    class LATEST warn
-    class ROLLBACK zone
+classes: {
+  key: {
+    style: {
+      fill: "#dbeafe"
+      stroke: "#2563eb"
+      font-color: "#1e3a8a"
+    }
+  }
+  zone: {
+    style: {
+      fill: "#ede9fe"
+      stroke: "#7c3aed"
+      font-color: "#4c1d95"
+    }
+  }
+  ok: {
+    style: {
+      fill: "#dcfce7"
+      stroke: "#16a34a"
+      font-color: "#14532d"
+    }
+  }
+  warn: {
+    style: {
+      fill: "#fef3c7"
+      stroke: "#d97706"
+      font-color: "#78350f"
+    }
+  }
+}
+
+v1: "version 1\n이전 production" { class: key }
+v2: "version 2\n새 예시 추가" { class: key }
+v3: "version 3\n실험 중" { class: key }
+prod: "label: production" { class: ok }
+stage: "label: staging" { class: zone }
+latest: "label: latest" { class: warn }
+rollback: rollback { class: zone }
+
+prod -> v2
+stage -> v3
+latest -> v3
+rollback -> v1: pointer 이동 { style.stroke-dash: 3 }
 ```
 
 새 prompt를 저장하면 새 version과 `latest`가 생긴다. 검증이 끝나면 `production` label을 그 version으로 옮긴다.

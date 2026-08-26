@@ -114,26 +114,47 @@ realm·client·사용자(import분)·세션까지 **전부 DB에 있다.** Keycl
 
 `instances: 2` 이상이면 세 가지가 맞물린다 —
 
-```mermaid
-flowchart LR
-    subgraph K8S["k8s 클러스터"]
-        I["ingress<br/>(sticky session)"]
-        K1["keycloak-0"]
-        K2["keycloak-1"]
-        I --> K1
-        I --> K2
-        K1 <-->|"Infinispan<br/>(JGroups · mTLS)"| K2
-    end
-    DB["PostgreSQL<br/>세션 · 설정의 원본"]
-    K1 --> DB
-    K2 --> DB
+```d2 layout=elk pad=40 title="ingress가 sticky session으로 keycloak 두 파드에 붙고, 두 파드는 Infinispan으로 서로 묶이며 PostgreSQL을 원본으로 쓰는 HA 구성"
+direction: down
 
-    classDef key  fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
-    classDef ok   fill:#dcfce7,stroke:#16a34a,color:#14532d
-    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
-    class K1,K2 key
-    class DB ok
-    class I mute
+classes: {
+  key: {
+    style: {
+      fill: "#dbeafe"
+      stroke: "#2563eb"
+      font-color: "#1e3a8a"
+    }
+  }
+  ok: {
+    style: {
+      fill: "#dcfce7"
+      stroke: "#16a34a"
+      font-color: "#14532d"
+    }
+  }
+  mute: {
+    style: {
+      fill: "#f1f5f9"
+      stroke: "#94a3b8"
+      font-color: "#334155"
+    }
+  }
+}
+
+k8s: k8s 클러스터 {
+  i: "ingress\n(sticky session)" { class: mute }
+  k1: keycloak-0 { class: key }
+  k2: keycloak-1 { class: key }
+
+  i -> k1
+  i -> k2
+  k1 <-> k2: "Infinispan\n(JGroups · mTLS)"
+}
+
+db: "PostgreSQL\n세션 · 설정의 원본" { class: ok }
+
+k8s.k1 -> db
+k8s.k2 -> db
 ```
 
 | 부품 | 역할 | 설정 포인트 |

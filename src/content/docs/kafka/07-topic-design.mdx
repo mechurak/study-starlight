@@ -35,16 +35,34 @@ import TermIntro from '../../../components/docs/TermIntro.astro';
 [2장](/kafka/02-log/)·[5장](/kafka/05-consumer/)의 결론이 여기로 모인다 —
 **파티션 수 = 소비 병렬성의 상한**이고, 늘리면 키 배정이 바뀌며, 줄일 수는 없다.
 
-```mermaid
-flowchart LR
-    A["목표 처리량<br/>(피크 초당 건수)"] --> C["필요 파티션 수 ≈<br/>목표 처리량 ÷ 컨슈머 1개 처리량"]
-    B["컨슈머 1개의 처리량<br/>(실측 — 초당 처리 건수)"] --> C
-    C --> D["+ 성장 여유<br/>(보통 2배 안팎)"]
+```d2 layout=elk pad=40 title="목표 처리량과 컨슈머 하나의 실측 처리량으로 필요한 파티션 수를 구하고 성장 여유를 더하는 계산"
+direction: down
 
-    classDef key  fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
-    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
-    class C key
-    class A,B,D mute
+classes: {
+  key: {
+    style: {
+      fill: "#dbeafe"
+      stroke: "#2563eb"
+      font-color: "#1e3a8a"
+    }
+  }
+  mute: {
+    style: {
+      fill: "#f1f5f9"
+      stroke: "#94a3b8"
+      font-color: "#334155"
+    }
+  }
+}
+
+a: "목표 처리량\n(피크 초당 건수)" { class: mute }
+b: "컨슈머 1개의 처리량\n(실측 — 초당 처리 건수)" { class: mute }
+c: "필요 파티션 수 ≈\n목표 처리량 ÷ 컨슈머 1개 처리량" { class: key }
+d: "+ 성장 여유\n(보통 2배 안팎)" { class: mute }
+
+a -> c
+b -> c
+c -> d
 ```
 
 - 병목은 대부분 브로커가 아니라 **컨슈머의 처리 속도**다(DB 쓰기, API 호출…) —

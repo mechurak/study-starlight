@@ -22,25 +22,56 @@ import TermIntro from '../../../components/docs/TermIntro.astro';
 
 ## Production에서 release gate까지
 
-```mermaid
-flowchart LR
-    TRACE["낮은 score의<br/>production trace"] --> ITEM["dataset item<br/>input · expected · metadata"]
-    ITEM --> BASE["run A<br/>현재 production"]
-    ITEM --> CAND["run B<br/>새 prompt/model/code"]
-    BASE --> EVAL["같은 evaluators"]
-    CAND --> EVAL
-    EVAL --> COMP["quality · cost · latency 비교"]
-    COMP -->|"통과"| DEPLOY["production 배포"]
-    DEPLOY --> TRACE
+```d2 layout=elk pad=40 title="낮은 score의 trace를 dataset item으로 만들어 현재 production과 후보를 같은 evaluator로 돌리고, 비교를 통과하면 배포해 다시 관측으로 돌아오는 순환"
+direction: down
 
-    classDef key  fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
-    classDef zone fill:#ede9fe,stroke:#7c3aed,color:#4c1d95
-    classDef ok   fill:#dcfce7,stroke:#16a34a,color:#14532d
-    classDef warn fill:#fef3c7,stroke:#d97706,color:#78350f
-    class TRACE,ITEM key
-    class BASE,CAND zone
-    class EVAL,COMP warn
-    class DEPLOY ok
+classes: {
+  key: {
+    style: {
+      fill: "#dbeafe"
+      stroke: "#2563eb"
+      font-color: "#1e3a8a"
+    }
+  }
+  zone: {
+    style: {
+      fill: "#ede9fe"
+      stroke: "#7c3aed"
+      font-color: "#4c1d95"
+    }
+  }
+  ok: {
+    style: {
+      fill: "#dcfce7"
+      stroke: "#16a34a"
+      font-color: "#14532d"
+    }
+  }
+  warn: {
+    style: {
+      fill: "#fef3c7"
+      stroke: "#d97706"
+      font-color: "#78350f"
+    }
+  }
+}
+
+trace: "낮은 score의\nproduction trace" { class: key }
+item: "dataset item\ninput · expected · metadata" { class: key }
+base: "run A\n현재 production" { class: zone }
+cand: "run B\n새 prompt/model/code" { class: zone }
+eval: 같은 evaluators { class: warn }
+comp: quality · cost · latency 비교 { class: warn }
+deploy: production 배포 { class: ok }
+
+trace -> item
+item -> base
+item -> cand
+base -> eval
+cand -> eval
+eval -> comp
+comp -> deploy: 통과
+deploy -> trace
 ```
 
 원본 trace link를 유지하면 왜 이 item이 들어왔는지 확인할 수 있다. 하지만 retention으로 trace가 삭제되면 link가

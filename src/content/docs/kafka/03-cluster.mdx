@@ -31,19 +31,43 @@ import TermIntro from '../../../components/docs/TermIntro.astro';
 파티션마다 복제본을 RF부 둔다. 그중 **리더 한 부**만 프로듀서·컨슈머를 상대하고,
 팔로워들은 리더에서 데이터를 당겨 와 복사한다.
 
-```mermaid
-flowchart LR
-    P["프로듀서"] -->|"쓰기"| L["브로커 1<br/>파티션 0 리더"]
-    L -->|"복제"| F1["브로커 2<br/>파티션 0 팔로워"]
-    L -->|"복제"| F2["브로커 3<br/>파티션 0 팔로워"]
-    C["컨슈머"] -->|"읽기"| L
+```d2 layout=elk pad=40 title="프로듀서와 컨슈머가 파티션 리더 브로커만 상대하고, 리더가 팔로워 둘에게 복제하는 구조"
+direction: down
 
-    classDef key  fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
-    classDef ok   fill:#dcfce7,stroke:#16a34a,color:#14532d
-    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
-    class L key
-    class F1,F2 ok
-    class P,C mute
+classes: {
+  key: {
+    style: {
+      fill: "#dbeafe"
+      stroke: "#2563eb"
+      font-color: "#1e3a8a"
+    }
+  }
+  ok: {
+    style: {
+      fill: "#dcfce7"
+      stroke: "#16a34a"
+      font-color: "#14532d"
+    }
+  }
+  mute: {
+    style: {
+      fill: "#f1f5f9"
+      stroke: "#94a3b8"
+      font-color: "#334155"
+    }
+  }
+}
+
+p: 프로듀서 { class: mute }
+l: "브로커 1\n파티션 0 리더" { class: key }
+f1: "브로커 2\n파티션 0 팔로워" { class: ok }
+f2: "브로커 3\n파티션 0 팔로워" { class: ok }
+c: 컨슈머 { class: mute }
+
+p -> l: 쓰기
+l -> f1: 복제
+l -> f2: 복제
+c -> l: 읽기
 ```
 
 - 리더가 죽으면 팔로워 중 하나가 새 리더로 **선출**된다 — 클라이언트는 잠깐의 재시도 후

@@ -34,23 +34,49 @@ import Thesis from '../../../components/docs/Thesis.astro';
 | 스팬 | server 스팬 하나 | server 스팬 + **자식 스팬 `inventory.reserve`** |
 | 답하는 질문 | 오류 요청 하나 따라가기 | **언제부터? 그리고 어디서?** |
 
-```mermaid
-flowchart LR
-    TRAFFIC["traffic.py<br/>정상 → 장애 → 회복"] --> APP["checkout 앱 (Flask)<br/>host :8080"]
-    APP -->|"OTLP<br/>port-forward :4318"| COL["OpenTelemetry Collector<br/>kind의 LGTM Pod"]
-    COL --> PROM["Prometheus"]
-    COL --> LOKI["Loki"]
-    COL --> TEMPO["Tempo"]
-    PROM --> GRAF["Grafana"]
-    LOKI --> GRAF
-    TEMPO --> GRAF
+```d2 layout=elk pad=40 title="traffic.py가 정상·장애·회복 시나리오로 checkout 앱을 호출하고 OTLP로 Collector에 보내 Prometheus·Loki·Tempo를 거쳐 Grafana로 모이는 실습 구성"
+direction: down
 
-    classDef bad  fill:#fee2e2,stroke:#dc2626,color:#7f1d1d
-    classDef key  fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
-    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
-    class APP bad
-    class GRAF key
-    class TRAFFIC,COL,PROM,LOKI,TEMPO mute
+classes: {
+  bad: {
+    style: {
+      fill: "#fee2e2"
+      stroke: "#dc2626"
+      font-color: "#7f1d1d"
+    }
+  }
+  key: {
+    style: {
+      fill: "#dbeafe"
+      stroke: "#2563eb"
+      font-color: "#1e3a8a"
+    }
+  }
+  mute: {
+    style: {
+      fill: "#f1f5f9"
+      stroke: "#94a3b8"
+      font-color: "#334155"
+    }
+  }
+}
+
+traffic: "traffic.py\n정상 → 장애 → 회복" { class: mute }
+app: "checkout 앱 (Flask)\nhost :8080" { class: bad }
+col: "OpenTelemetry Collector\nkind의 LGTM Pod" { class: mute }
+prom: Prometheus { class: mute }
+loki: Loki { class: mute }
+tempo: Tempo { class: mute }
+graf: Grafana { class: key }
+
+traffic -> app
+app -> col: "OTLP\nport-forward :4318"
+col -> prom
+col -> loki
+col -> tempo
+prom -> graf
+loki -> graf
+tempo -> graf
 ```
 
 ## 계측 코드부터 읽는다

@@ -22,24 +22,55 @@ import TermIntro from '../../../components/docs/TermIntro.astro';
 
 ## 전체 중 이 장의 자리
 
-```mermaid
-flowchart TB
-    USER["사용자 · job"] --> UC["Unity Catalog<br/>catalog.schema.table 권한"]
-    UC --> CRED["Storage credential<br/>AWS IAM role"]
-    UC --> LOC["External location<br/>s3://bucket/prefix"]
-    CRED --> IAM["IAM trust + policy"]
-    LOC --> S3["회사 S3"]
-    IAM --> S3
-    S3 --> DELTA["Parquet data files<br/>+ Delta transaction log"]
+```d2 layout=elk pad=40 title="사용자가 Unity Catalog 권한을 거쳐 storage credential과 external location으로, 다시 IAM과 회사 S3의 Parquet·Delta 로그로 이어지는 권한 경로"
+direction: down
 
-    classDef key  fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
-    classDef ok   fill:#dcfce7,stroke:#16a34a,color:#14532d
-    classDef warn fill:#fef3c7,stroke:#d97706,color:#78350f
-    classDef zone fill:#ede9fe,stroke:#7c3aed,color:#4c1d95
-    class USER key
-    class UC zone
-    class CRED,LOC,IAM warn
-    class S3,DELTA ok
+classes: {
+  key: {
+    style: {
+      fill: "#dbeafe"
+      stroke: "#2563eb"
+      font-color: "#1e3a8a"
+    }
+  }
+  ok: {
+    style: {
+      fill: "#dcfce7"
+      stroke: "#16a34a"
+      font-color: "#14532d"
+    }
+  }
+  warn: {
+    style: {
+      fill: "#fef3c7"
+      stroke: "#d97706"
+      font-color: "#78350f"
+    }
+  }
+  zone: {
+    style: {
+      fill: "#ede9fe"
+      stroke: "#7c3aed"
+      font-color: "#4c1d95"
+    }
+  }
+}
+
+user: 사용자 · job { class: key }
+uc: "Unity Catalog\ncatalog.schema.table 권한" { class: zone }
+cred: "Storage credential\nAWS IAM role" { class: warn }
+loc: "External location\ns3://bucket/prefix" { class: warn }
+iam: IAM trust + policy { class: warn }
+s3: 회사 S3 { class: ok }
+delta: "Parquet data files\n+ Delta transaction log" { class: ok }
+
+user -> uc
+uc -> cred
+uc -> loc
+cred -> iam
+loc -> s3
+iam -> s3
+s3 -> delta
 ```
 
 이 장을 읽고 나면 "우리 S3에 두면서 Databricks로 governance할 수 있는가"와 "IAM만 설정하면

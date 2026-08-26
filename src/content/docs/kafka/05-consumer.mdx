@@ -30,35 +30,57 @@ import TermIntro from '../../../components/docs/TermIntro.astro';
 
 그룹 안에서 규칙은 하나다 — **파티션 하나는 그룹 내 컨슈머 하나에만** 배정된다.
 
-```mermaid
-flowchart LR
-    subgraph T["토픽 (파티션 4개)"]
-        P0["파티션 0"]
-        P1["파티션 1"]
-        P2["파티션 2"]
-        P3["파티션 3"]
-    end
-    subgraph G1["그룹 A — 알림 서비스 (컨슈머 2)"]
-        A1["컨슈머 A-1"]
-        A2["컨슈머 A-2"]
-    end
-    P0 --> A1
-    P1 --> A1
-    P2 --> A2
-    P3 --> A2
-    subgraph G2["그룹 B — 통계 서비스 (컨슈머 1)"]
-        B1["컨슈머 B-1<br/>(혼자 전부 읽음)"]
-    end
-    P0 --> B1
-    P1 --> B1
-    P2 --> B1
-    P3 --> B1
+```d2 layout=elk pad=40 title="파티션 넷을 그룹 A의 컨슈머 둘이 나눠 갖고, 그룹 B의 컨슈머 하나는 넷을 혼자 다 읽는 그룹별 배분"
+direction: down
 
-    classDef key  fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
-    classDef ok   fill:#dcfce7,stroke:#16a34a,color:#14532d
-    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
-    class P0,P1,P2,P3 key
-    class A1,A2,B1 ok
+classes: {
+  key: {
+    style: {
+      fill: "#dbeafe"
+      stroke: "#2563eb"
+      font-color: "#1e3a8a"
+    }
+  }
+  ok: {
+    style: {
+      fill: "#dcfce7"
+      stroke: "#16a34a"
+      font-color: "#14532d"
+    }
+  }
+  mute: {
+    style: {
+      fill: "#f1f5f9"
+      stroke: "#94a3b8"
+      font-color: "#334155"
+    }
+  }
+}
+
+t: "토픽 (파티션 4개)" {
+  p0: 파티션 0 { class: key }
+  p1: 파티션 1 { class: key }
+  p2: 파티션 2 { class: key }
+  p3: 파티션 3 { class: key }
+}
+
+g1: "그룹 A — 알림 서비스 (컨슈머 2)" {
+  a1: 컨슈머 A-1 { class: ok }
+  a2: 컨슈머 A-2 { class: ok }
+}
+
+g2: "그룹 B — 통계 서비스 (컨슈머 1)" {
+  b1: "컨슈머 B-1\n(혼자 전부 읽음)" { class: ok }
+}
+
+t.p0 -> g1.a1
+t.p1 -> g1.a1
+t.p2 -> g1.a2
+t.p3 -> g1.a2
+t.p0 -> g2.b1
+t.p1 -> g2.b1
+t.p2 -> g2.b1
+t.p3 -> g2.b1
 ```
 
 여기서 따라 나오는 결론들 —

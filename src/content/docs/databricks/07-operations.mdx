@@ -22,22 +22,51 @@ import TermIntro from '../../../components/docs/TermIntro.astro';
 
 ## 운영의 큰 고리
 
-```mermaid
-flowchart LR
-    DEFINE["SLA · owner · budget"] --> RUN["job · warehouse · serving"]
-    RUN --> OBS["freshness · failure · latency · cost"]
-    OBS --> ACT["retry · scale · stop · alert"]
-    ACT --> REVIEW["capacity · policy · architecture review"]
-    REVIEW --> DEFINE
+```d2 layout=elk pad=40 title="SLA·소유자·예산 정의에서 실행·관측·조치·리뷰를 거쳐 다시 정의로 돌아오는 운영 순환"
+direction: down
 
-    classDef key  fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
-    classDef ok   fill:#dcfce7,stroke:#16a34a,color:#14532d
-    classDef warn fill:#fef3c7,stroke:#d97706,color:#78350f
-    classDef zone fill:#ede9fe,stroke:#7c3aed,color:#4c1d95
-    class DEFINE key
-    class RUN ok
-    class OBS,ACT warn
-    class REVIEW zone
+classes: {
+  key: {
+    style: {
+      fill: "#dbeafe"
+      stroke: "#2563eb"
+      font-color: "#1e3a8a"
+    }
+  }
+  ok: {
+    style: {
+      fill: "#dcfce7"
+      stroke: "#16a34a"
+      font-color: "#14532d"
+    }
+  }
+  warn: {
+    style: {
+      fill: "#fef3c7"
+      stroke: "#d97706"
+      font-color: "#78350f"
+    }
+  }
+  zone: {
+    style: {
+      fill: "#ede9fe"
+      stroke: "#7c3aed"
+      font-color: "#4c1d95"
+    }
+  }
+}
+
+define: SLA · owner · budget { class: key }
+run: job · warehouse · serving { class: ok }
+obs: freshness · failure · latency · cost { class: warn }
+act: retry · scale · stop · alert { class: warn }
+review: capacity · policy · architecture review { class: zone }
+
+define -> run
+run -> obs
+obs -> act
+act -> review
+review -> define
 ```
 
 이 장의 질문은 "platform이 열리고 난 뒤 누가 비용과 장애를 책임지는가"다. cluster가 살아 있다는

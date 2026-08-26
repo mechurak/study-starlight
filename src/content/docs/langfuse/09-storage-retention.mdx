@@ -91,22 +91,52 @@ storage 특성을 확인한다.
 
 ## Restore 순서
 
-```mermaid
-flowchart LR
-    SEC["1. Secret/key"] --> STATE["2. Postgres · S3"]
-    STATE --> CH["3. ClickHouse"]
-    CH --> REDIS["4. Redis queue/cache"]
-    REDIS --> APP["5. Web · Worker"]
-    APP --> VERIFY["6. trace/prompt/score 검증"]
+```d2 layout=elk pad=40 title="복구를 secret·key부터 Postgres와 S3, ClickHouse, Redis, 애플리케이션, 검증 순으로 되돌리는 여섯 단계"
+direction: down
 
-    classDef key  fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
-    classDef zone fill:#ede9fe,stroke:#7c3aed,color:#4c1d95
-    classDef warn fill:#fef3c7,stroke:#d97706,color:#78350f
-    classDef ok   fill:#dcfce7,stroke:#16a34a,color:#14532d
-    class SEC,STATE key
-    class CH,REDIS zone
-    class APP warn
-    class VERIFY ok
+classes: {
+  key: {
+    style: {
+      fill: "#dbeafe"
+      stroke: "#2563eb"
+      font-color: "#1e3a8a"
+    }
+  }
+  zone: {
+    style: {
+      fill: "#ede9fe"
+      stroke: "#7c3aed"
+      font-color: "#4c1d95"
+    }
+  }
+  ok: {
+    style: {
+      fill: "#dcfce7"
+      stroke: "#16a34a"
+      font-color: "#14532d"
+    }
+  }
+  warn: {
+    style: {
+      fill: "#fef3c7"
+      stroke: "#d97706"
+      font-color: "#78350f"
+    }
+  }
+}
+
+sec: 1. Secret/key { class: key }
+state: 2. Postgres · S3 { class: key }
+ch: 3. ClickHouse { class: zone }
+redis: 4. Redis queue/cache { class: zone }
+app: 5. Web · Worker { class: warn }
+verify: 6. trace/prompt/score 검증 { class: ok }
+
+sec -> state
+state -> ch
+ch -> redis
+redis -> app
+app -> verify
 ```
 
 정확한 순서는 장애와 backup 방식에 따라 달라질 수 있지만 Web/Worker를 먼저 열어 새 event가 불완전한 저장소에

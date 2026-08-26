@@ -25,20 +25,38 @@ IdP 없이도 사내 인증은 만들 수 있다. 앱마다 LDAP 라이브러리
 AD에 bind해서 비밀번호를 검증하면 된다. 실제로 오래된 사내 시스템이 대부분 이 구조였고,
 앱이 서너 개를 넘는 순간부터 다음이 전부 아프기 시작한다.
 
-```mermaid
-flowchart LR
-    subgraph BEFORE["IdP가 없던 시절 — 앱 N개 × AD 직접 연동"]
-        direction LR
-        A1["그룹웨어"] --> AD1["AD"]
-        A2["사내 포털"] --> AD1
-        A3["위키"] --> AD1
-        A4["새 앱…"] --> AD1
-    end
+```d2 layout=elk pad=40 title="IdP가 없던 시절 그룹웨어·포털·위키·새 앱이 저마다 AD에 직접 연동하던 모습"
+direction: right
 
-    classDef bad  fill:#fee2e2,stroke:#dc2626,color:#7f1d1d
-    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
-    class A1,A2,A3,A4 bad
-    class AD1 mute
+classes: {
+  bad: {
+    style: {
+      fill: "#fee2e2"
+      stroke: "#dc2626"
+      font-color: "#7f1d1d"
+    }
+  }
+  mute: {
+    style: {
+      fill: "#f1f5f9"
+      stroke: "#94a3b8"
+      font-color: "#334155"
+    }
+  }
+}
+
+before: IdP가 없던 시절 — 앱 N개 × AD 직접 연동 {
+  a1: 그룹웨어 { class: bad }
+  a2: 사내 포털 { class: bad }
+  a3: 위키 { class: bad }
+  a4: 새 앱… { class: bad }
+  ad1: AD { class: mute }
+
+  a1 -> ad1
+  a2 -> ad1
+  a3 -> ad1
+  a4 -> ad1
+}
 ```
 
 | 통증 | 왜 아픈가 |
@@ -55,23 +73,47 @@ flowchart LR
 로그인이라는 일을 **앱에서 떼어내 전담 서버(IdP)에 몰아주는** 것이 SSO의 본질이다.
 앱은 로그인 화면을 없애고, 사용자를 IdP로 보낸 뒤, **"누가 로그인했는지"가 적힌 토큰**만 받는다.
 
-```mermaid
-flowchart LR
-    subgraph AFTER["IdP를 세운 뒤 — 비밀번호는 한 길로만"]
-        direction LR
-        B1["그룹웨어"] --> KC["Keycloak (IdP)"]
-        B2["사내 포털"] --> KC
-        B3["위키"] --> KC
-        B4["쿠버네티스"] --> KC
-        KC -->|"LDAP bind (여기만)"| AD2["AD"]
-    end
+```d2 layout=elk pad=40 title="IdP를 세운 뒤 앱 넷이 Keycloak만 바라보고 AD로 가는 LDAP bind는 Keycloak 한 곳뿐인 모습"
+direction: down
 
-    classDef ok   fill:#dcfce7,stroke:#16a34a,color:#14532d
-    classDef key  fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
-    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
-    class B1,B2,B3,B4 ok
-    class KC key
-    class AD2 mute
+classes: {
+  ok: {
+    style: {
+      fill: "#dcfce7"
+      stroke: "#16a34a"
+      font-color: "#14532d"
+    }
+  }
+  key: {
+    style: {
+      fill: "#dbeafe"
+      stroke: "#2563eb"
+      font-color: "#1e3a8a"
+    }
+  }
+  mute: {
+    style: {
+      fill: "#f1f5f9"
+      stroke: "#94a3b8"
+      font-color: "#334155"
+    }
+  }
+}
+
+after: IdP를 세운 뒤 — 비밀번호는 한 길로만 {
+  b1: 그룹웨어 { class: ok }
+  b2: 사내 포털 { class: ok }
+  b3: 위키 { class: ok }
+  b4: 쿠버네티스 { class: ok }
+  kc: "Keycloak (IdP)" { class: key }
+  ad2: AD { class: mute }
+
+  b1 -> kc
+  b2 -> kc
+  b3 -> kc
+  b4 -> kc
+  kc -> ad2: "LDAP bind (여기만)"
+}
 ```
 
 | 통증 | IdP가 이렇게 푼다 |
@@ -113,29 +155,52 @@ Keycloak은 AD를 대체하는 것이 아니라, AD 앞에서 **웹 세계로 �
 이 덱 전체의 지도다. AD와 앱은 서로 직접 모르고, 가운데 Keycloak이 잇는다.
 **경계마다 매핑(mapper) 이 한 번씩** 일어난다.
 
-```mermaid
-flowchart LR
-    subgraph AD["① AD (사용자 원본)"]
-        u["사용자<br/>sAMAccountName · mail<br/>memberOf = 그룹"]
-    end
-    subgraph KC["② Keycloak realm (IdP)"]
-        fed["User Federation<br/>(LDAP 매퍼)"]
-        model["사용자 · 그룹 · 롤 모델"]
-        pm["Protocol Mapper"]
-        fed --> model --> pm
-    end
-    subgraph APP["③ 앱 · 쿠버네티스 (client)"]
-        token["토큰의 claim만 본다<br/>preferred_username · email · groups"]
-    end
-    u -->|"LDAPS bind + 속성 변환"| fed
-    pm -->|"OIDC 토큰 발급"| token
+```d2 layout=elk pad=40 title="AD의 사용자 원본이 Keycloak의 User Federation·모델·Protocol Mapper를 거쳐 앱이 보는 토큰 claim으로 옮겨 가는 경로"
+direction: down
 
-    classDef key  fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
-    classDef ok   fill:#dcfce7,stroke:#16a34a,color:#14532d
-    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
-    class fed,pm key
-    class model ok
-    class u,token mute
+classes: {
+  key: {
+    style: {
+      fill: "#dbeafe"
+      stroke: "#2563eb"
+      font-color: "#1e3a8a"
+    }
+  }
+  ok: {
+    style: {
+      fill: "#dcfce7"
+      stroke: "#16a34a"
+      font-color: "#14532d"
+    }
+  }
+  mute: {
+    style: {
+      fill: "#f1f5f9"
+      stroke: "#94a3b8"
+      font-color: "#334155"
+    }
+  }
+}
+
+ad: "① AD (사용자 원본)" {
+  u: "사용자\nsAMAccountName · mail\nmemberOf = 그룹" { class: mute }
+}
+
+kc: "② Keycloak realm (IdP)" {
+  fed: "User Federation\n(LDAP 매퍼)" { class: key }
+  model: 사용자 · 그룹 · 롤 모델 { class: ok }
+  pm: Protocol Mapper { class: key }
+
+  fed -> model
+  model -> pm
+}
+
+app: "③ 앱 · 쿠버네티스 (client)" {
+  token: "토큰의 claim만 본다\npreferred_username · email · groups" { class: mute }
+}
+
+ad.u -> kc.fed: LDAPS bind + 속성 변환
+kc.pm -> app.token: OIDC 토큰 발급
 ```
 
 | 경계 | 무슨 변환이 일어나나 | 어디서 설정 | 다루는 장 |

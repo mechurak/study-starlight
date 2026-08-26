@@ -22,27 +22,60 @@ import TermIntro from '../../../components/docs/TermIntro.astro';
 
 ## 평가 loop
 
-```mermaid
-flowchart LR
-    PROD["production observation"] --> AUTO["code · LLM judge"]
-    PROD --> USER["사용자 feedback"]
-    PROD --> HUMAN["annotation queue"]
-    AUTO --> SCORE["score"]
-    USER --> SCORE
-    HUMAN --> SCORE
-    SCORE --> MON["segment · trend · alert"]
-    MON --> HARD["낮은 score 사례"]
-    HARD --> DATA["dataset"]
-    DATA --> EXP["offline experiment"]
+```d2 layout=elk pad=40 title="production observation에 자동 평가·사용자 피드백·사람 주석 세 경로로 score가 붙고, 모니터링에서 낮은 score 사례를 골라 dataset과 오프라인 실험으로 넘기는 흐름"
+direction: down
 
-    classDef key  fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
-    classDef zone fill:#ede9fe,stroke:#7c3aed,color:#4c1d95
-    classDef ok   fill:#dcfce7,stroke:#16a34a,color:#14532d
-    classDef warn fill:#fef3c7,stroke:#d97706,color:#78350f
-    class PROD,SCORE key
-    class AUTO,USER,HUMAN zone
-    class MON,HARD warn
-    class DATA,EXP ok
+classes: {
+  key: {
+    style: {
+      fill: "#dbeafe"
+      stroke: "#2563eb"
+      font-color: "#1e3a8a"
+    }
+  }
+  zone: {
+    style: {
+      fill: "#ede9fe"
+      stroke: "#7c3aed"
+      font-color: "#4c1d95"
+    }
+  }
+  ok: {
+    style: {
+      fill: "#dcfce7"
+      stroke: "#16a34a"
+      font-color: "#14532d"
+    }
+  }
+  warn: {
+    style: {
+      fill: "#fef3c7"
+      stroke: "#d97706"
+      font-color: "#78350f"
+    }
+  }
+}
+
+prod: production observation { class: key }
+auto: code · LLM judge { class: zone }
+user: 사용자 feedback { class: zone }
+human: annotation queue { class: zone }
+score: score { class: key }
+mon: segment · trend · alert { class: warn }
+hard: 낮은 score 사례 { class: warn }
+data: dataset { class: ok }
+exp: offline experiment { class: ok }
+
+prod -> auto
+prod -> user
+prod -> human
+auto -> score
+user -> score
+human -> score
+score -> mon
+mon -> hard
+hard -> data
+data -> exp
 ```
 
 online 평가는 production drift를 찾고, offline experiment는 변경을 배포 전에 비교한다. 둘은 경쟁하지 않는다.

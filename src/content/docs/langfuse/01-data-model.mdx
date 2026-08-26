@@ -22,23 +22,54 @@ import TermIntro from '../../../components/docs/TermIntro.astro';
 
 ## 한 chatbot turn을 펼친다
 
-```mermaid
-flowchart TB
-    ROOT["span: chat-turn<br/>trace_id=t1"] --> RET["retriever: search-docs"]
-    ROOT --> AGENT["agent: answer-question"]
-    AGENT --> GEN["generation: draft-answer<br/>model · usage · cost"]
-    AGENT --> TOOL["tool: lookup-policy"]
-    AGENT --> GEN2["generation: final-answer"]
-    GEN2 -.-> SCORE["score: groundedness=0.92"]
+```d2 layout=elk pad=40 title="chat-turn 루트 span 아래 retriever와 agent가 붙고, agent 아래 generation·tool이 이어지며 마지막 generation에 score가 매달리는 trace 구조"
+direction: down
 
-    classDef key  fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
-    classDef zone fill:#ede9fe,stroke:#7c3aed,color:#4c1d95
-    classDef ok   fill:#dcfce7,stroke:#16a34a,color:#14532d
-    classDef warn fill:#fef3c7,stroke:#d97706,color:#78350f
-    class ROOT key
-    class RET,AGENT,TOOL zone
-    class GEN,GEN2 ok
-    class SCORE warn
+classes: {
+  key: {
+    style: {
+      fill: "#dbeafe"
+      stroke: "#2563eb"
+      font-color: "#1e3a8a"
+    }
+  }
+  zone: {
+    style: {
+      fill: "#ede9fe"
+      stroke: "#7c3aed"
+      font-color: "#4c1d95"
+    }
+  }
+  ok: {
+    style: {
+      fill: "#dcfce7"
+      stroke: "#16a34a"
+      font-color: "#14532d"
+    }
+  }
+  warn: {
+    style: {
+      fill: "#fef3c7"
+      stroke: "#d97706"
+      font-color: "#78350f"
+    }
+  }
+}
+
+root: "span: chat-turn\ntrace_id=t1" { class: key }
+ret: "retriever: search-docs" { class: zone }
+agent: "agent: answer-question" { class: zone }
+gen: "generation: draft-answer\nmodel · usage · cost" { class: ok }
+tool: "tool: lookup-policy" { class: zone }
+gen2: "generation: final-answer" { class: ok }
+score: "score: groundedness=0.92" { class: warn }
+
+root -> ret
+root -> agent
+agent -> gen
+agent -> tool
+agent -> gen2
+gen2 -> score { style.stroke-dash: 3 }
 ```
 
 tree는 한 실행을 디버깅하는 보기다. table과 dashboard는 여러 실행의 `generation: final-answer`만 골라 p95 latency,

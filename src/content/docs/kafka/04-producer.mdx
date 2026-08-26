@@ -22,19 +22,43 @@ import TermIntro from '../../../components/docs/TermIntro.astro';
 `send()`는 레코드를 **클라이언트 내부 버퍼에 넣고 바로 리턴**한다. 실제 전송은
 백그라운드 스레드가 배치로 모아서 한다 — 브로커 응답은 콜백/Future로 나중에 온다.
 
-```mermaid
-flowchart LR
-    A["send()"] --> B["직렬화 · 파티션 배정"]
-    B --> C["버퍼에서 배치로 모임<br/>batch.size · linger.ms"]
-    C --> D["브로커 (파티션 리더)"]
-    D -->|"acks 응답"| E["콜백 / Future"]
+```d2 layout=elk pad=40 title="send 호출이 직렬화·파티션 배정을 거쳐 버퍼에서 배치로 모였다가 브로커로 가고 acks 응답이 콜백으로 돌아오는 흐름"
+direction: down
 
-    classDef key  fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
-    classDef warn fill:#fef3c7,stroke:#d97706,color:#78350f
-    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
-    class C warn
-    class D key
-    class A,B,E mute
+classes: {
+  key: {
+    style: {
+      fill: "#dbeafe"
+      stroke: "#2563eb"
+      font-color: "#1e3a8a"
+    }
+  }
+  warn: {
+    style: {
+      fill: "#fef3c7"
+      stroke: "#d97706"
+      font-color: "#78350f"
+    }
+  }
+  mute: {
+    style: {
+      fill: "#f1f5f9"
+      stroke: "#94a3b8"
+      font-color: "#334155"
+    }
+  }
+}
+
+a: send() { class: mute }
+b: 직렬화 · 파티션 배정 { class: mute }
+c: "버퍼에서 배치로 모임\nbatch.size · linger.ms" { class: warn }
+d: "브로커 (파티션 리더)" { class: key }
+e: 콜백 / Future { class: mute }
+
+a -> b
+b -> c
+c -> d
+d -> e: acks 응답
 ```
 
 - `batch.size`(배치 크기)와 `linger.ms`(모으려고 기다리는 시간)가 처리량 ↔ 지연의 손잡이다.

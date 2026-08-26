@@ -22,46 +22,92 @@ import TermIntro from '../../../components/docs/TermIntro.astro';
 
 ## Production 기준 구조
 
-```mermaid
-flowchart TB
-    SDK["애플리케이션 SDK<br/>OTLP batch"] --> GW["Gateway API<br/>TLS · internal DNS"]
-    USER["운영자 browser"] --> GW
-    GW --> WEB["Langfuse Web Service"]
+```d2 layout=elk pad=40 title="SDK와 운영자가 Gateway를 거쳐 Web 파드로 들어오고, Web과 Worker 파드가 Redis·S3·ClickHouse·Postgres를 나눠 쓰는 온프렘 쿠버네티스 배치"
+direction: down
 
-    subgraph K8S["온프렘 Kubernetes"]
-      direction TB
-      WEB --> W1["Web Pod A"]
-      WEB --> W2["Web Pod B"]
-      W1 --> S3
-      W2 --> S3
-      W1 --> REDIS
-      W2 --> REDIS
-      K1["Worker Pod A"] --> REDIS
-      K2["Worker Pod B"] --> REDIS
-      K1 --> S3
-      K2 --> S3
-      K1 --> CH
-      K2 --> CH
-    end
+classes: {
+  key: {
+    style: {
+      fill: "#dbeafe"
+      stroke: "#2563eb"
+      font-color: "#1e3a8a"
+    }
+  }
+  zone: {
+    style: {
+      fill: "#ede9fe"
+      stroke: "#7c3aed"
+      font-color: "#4c1d95"
+    }
+  }
+  ok: {
+    style: {
+      fill: "#dcfce7"
+      stroke: "#16a34a"
+      font-color: "#14532d"
+    }
+  }
+  warn: {
+    style: {
+      fill: "#fef3c7"
+      stroke: "#d97706"
+      font-color: "#78350f"
+    }
+  }
+}
 
-    W1 --> PG[("Postgres HA<br/>user · prompt · dataset")]
-    W2 --> PG
-    K1 --> PG
-    K2 --> PG
-    REDIS[("Redis/Valkey HA<br/>queue · cache")]
-    S3[("S3 compatible<br/>raw event · media")]
-    CH[("ClickHouse<br/>observation · score")]
-    K1 --> LLM["선택적 LLM API<br/>judge · playground"]
-    K2 --> LLM
+sdk: "애플리케이션 SDK\nOTLP batch" { class: key }
+user: 운영자 browser { class: key }
+gw: "Gateway API\nTLS · internal DNS" { class: key }
+web: Langfuse Web Service { class: key }
 
-    classDef key  fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
-    classDef zone fill:#ede9fe,stroke:#7c3aed,color:#4c1d95
-    classDef warn fill:#fef3c7,stroke:#d97706,color:#78350f
-    classDef ok   fill:#dcfce7,stroke:#16a34a,color:#14532d
-    class SDK,USER,GW,WEB key
-    class W1,W2,K1,K2 zone
-    class PG,REDIS,S3,CH warn
-    class LLM ok
+k8s: 온프렘 Kubernetes {
+  w1: Web Pod A { class: zone }
+  w2: Web Pod B { class: zone }
+  k1: Worker Pod A { class: zone }
+  k2: Worker Pod B { class: zone }
+  redis: "Redis/Valkey HA\nqueue · cache" {
+    shape: cylinder
+    class: warn
+  }
+  s3: "S3 compatible\nraw event · media" {
+    shape: cylinder
+    class: warn
+  }
+  ch: "ClickHouse\nobservation · score" {
+    shape: cylinder
+    class: warn
+  }
+
+  w1 -> s3
+  w2 -> s3
+  w1 -> redis
+  w2 -> redis
+  k1 -> redis
+  k2 -> redis
+  k1 -> s3
+  k2 -> s3
+  k1 -> ch
+  k2 -> ch
+}
+
+pg: "Postgres HA\nuser · prompt · dataset" {
+  shape: cylinder
+  class: warn
+}
+llm: "선택적 LLM API\njudge · playground" { class: ok }
+
+sdk -> gw
+user -> gw
+gw -> web
+web -> k8s.w1
+web -> k8s.w2
+k8s.w1 -> pg
+k8s.w2 -> pg
+k8s.k1 -> pg
+k8s.k2 -> pg
+k8s.k1 -> llm
+k8s.k2 -> llm
 ```
 
 Web replica는 ingest와 UI를 받고 Worker replica는 queue를 소비한다. 둘은 독립적으로 scale하지만 같은 Postgres,

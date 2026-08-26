@@ -74,21 +74,45 @@ claim → 앱 내 역할 매핑.** 첫 두 줄은 discovery 문서([2장](/keycl
 
 oauth2-proxy를 끼우는 방식은 둘이고, 이 구분이 이후 모든 혼란의 출발점이다.
 
-```mermaid
-flowchart TB
-    subgraph A["모드 A — ingress에 인증만 위임 (auth_request)"]
-        a1["요청"] --> a2["ingress-nginx"]
-        a2 -.->|"서브요청: 인증됐나?"| a3["oauth2-proxy"]
-        a2 -->|"통과 시 그대로"| a4["앱"]
-    end
-    subgraph B["모드 B — oauth2-proxy가 직접 프록시 (--upstream)"]
-        b1["요청"] --> b2["oauth2-proxy<br/>인증 + 라우팅"] --> b3["앱"]
-    end
+```d2 layout=elk pad=40 title="ingress가 oauth2-proxy에 인증만 서브요청으로 묻는 모드 A와, oauth2-proxy가 직접 앱 앞에서 프록시하는 모드 B 비교"
+direction: right
 
-    classDef key  fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
-    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
-    class a3,b2 key
-    class a1,a2,a4,b1,b3 mute
+classes: {
+  key: {
+    style: {
+      fill: "#dbeafe"
+      stroke: "#2563eb"
+      font-color: "#1e3a8a"
+    }
+  }
+  mute: {
+    style: {
+      fill: "#f1f5f9"
+      stroke: "#94a3b8"
+      font-color: "#334155"
+    }
+  }
+}
+
+a: "모드 A — ingress에 인증만 위임 (auth_request)" {
+  a1: 요청 { class: mute }
+  a2: ingress-nginx { class: mute }
+  a3: oauth2-proxy { class: key }
+  a4: 앱 { class: mute }
+
+  a1 -> a2
+  a2 -> a3: "서브요청: 인증됐나?" { style.stroke-dash: 3 }
+  a2 -> a4: 통과 시 그대로
+}
+
+b: "모드 B — oauth2-proxy가 직접 프록시 (--upstream)" {
+  b1: 요청 { class: mute }
+  b2: "oauth2-proxy\n인증 + 라우팅" { class: key }
+  b3: 앱 { class: mute }
+
+  b1 -> b2
+  b2 -> b3
+}
 ```
 
 | | 모드 A (annotation) | 모드 B (`--upstream`) |

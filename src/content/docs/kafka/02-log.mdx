@@ -36,22 +36,37 @@ import TermIntro from '../../../components/docs/TermIntro.astro';
 토픽은 이름일 뿐, **실제로 존재하는 것은 파티션**이다. 토픽 하나는 파티션 여러 개로
 쪼개지고, 각 파티션이 독립된 append-only 로그다.
 
-```mermaid
-flowchart LR
-    P["프로듀서"] --> P0["파티션 0<br/>0 · 1 · 2 · 3 · 4"]
-    P --> P1["파티션 1<br/>0 · 1 · 2"]
-    P --> P2["파티션 2<br/>0 · 1 · 2 · 3"]
+```d2 layout=elk pad=40 title="토픽 하나가 파티션 셋으로 나뉘고 프로듀서가 세 파티션에 나눠 쓰는 구조"
+direction: right
 
-    subgraph T["토픽 orders.created"]
-        P0
-        P1
-        P2
-    end
+classes: {
+  key: {
+    style: {
+      fill: "#dbeafe"
+      stroke: "#2563eb"
+      font-color: "#1e3a8a"
+    }
+  }
+  mute: {
+    style: {
+      fill: "#f1f5f9"
+      stroke: "#94a3b8"
+      font-color: "#334155"
+    }
+  }
+}
 
-    classDef key  fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
-    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
-    class P0,P1,P2 key
-    class P mute
+p: 프로듀서 { class: mute }
+
+t: 토픽 orders.created {
+  p0: "파티션 0\n0 · 1 · 2 · 3 · 4" { class: key }
+  p1: "파티션 1\n0 · 1 · 2" { class: key }
+  p2: "파티션 2\n0 · 1 · 2 · 3" { class: key }
+}
+
+p -> t.p0
+p -> t.p1
+p -> t.p2
 ```
 
 왜 쪼개는가 —
@@ -73,16 +88,37 @@ flowchart LR
 
 프로듀서는 레코드를 보낼 때 파티션을 이렇게 고른다 —
 
-```mermaid
-flowchart LR
-    R["레코드"] --> Q{"키가 있나?"}
-    Q -->|"있다"| H["키의 해시 % 파티션 수<br/>→ 같은 키는 언제나 같은 파티션"]
-    Q -->|"없다"| S["스티키 분배<br/>배치 단위로 파티션을 돌아가며 채움"]
+```d2 layout=elk pad=40 title="레코드에 키가 있으면 해시로 파티션이 정해지고, 없으면 스티키 분배로 배치 단위로 돌아가며 채우는 분기"
+direction: down
 
-    classDef key  fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
-    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
-    class H key
-    class Q,R,S mute
+classes: {
+  key: {
+    style: {
+      fill: "#dbeafe"
+      stroke: "#2563eb"
+      font-color: "#1e3a8a"
+    }
+  }
+  mute: {
+    style: {
+      fill: "#f1f5f9"
+      stroke: "#94a3b8"
+      font-color: "#334155"
+    }
+  }
+}
+
+r: 레코드 { class: mute }
+q: 키가 있나? {
+  shape: diamond
+  class: mute
+}
+h: "키의 해시 % 파티션 수\n→ 같은 키는 언제나 같은 파티션" { class: key }
+s: "스티키 분배\n배치 단위로 파티션을 돌아가며 채움" { class: mute }
+
+r -> q
+q -> h: 있다
+q -> s: 없다
 ```
 
 - **키가 있으면** — 같은 키는 항상 같은 파티션 → 그 키의 레코드끼리는 **쓴 순서대로 읽힌다.**

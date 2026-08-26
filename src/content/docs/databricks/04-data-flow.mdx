@@ -22,45 +22,75 @@ import TermIntro from '../../../components/docs/TermIntro.astro';
 
 ## 전체 흐름
 
-```mermaid
-flowchart LR
-    subgraph sources["Sources"]
-        DB["온프렘 DB"]
-        FILE["사내 file"]
-        AWS["RDS · app log · event"]
-    end
-    subgraph ingest["Ingestion"]
-        JDBC["JDBC incremental read"]
-        CDC["CDC · DMS · connector"]
-        AUTO["S3 file ingestion"]
-    end
-    subgraph lakehouse["S3 + Delta"]
-        B["Bronze<br/>replay 가능한 원본"]
-        S["Silver<br/>정제 · 표준화"]
-        G["Gold<br/>업무 지표 · serving"]
-    end
-    OPS["job orchestration<br/>checkpoint · retry · alert"]
+```d2 layout=elk pad=40 title="온프렘 DB·사내 파일·AWS 소스가 JDBC·CDC·파일 수집을 거쳐 Bronze에 들어오고 Silver·Gold로 이어지며, job orchestration이 각 단계를 감싸는 흐름"
+direction: down
 
-    DB --> JDBC --> B
-    DB --> CDC --> B
-    FILE --> AUTO --> B
-    AWS --> CDC
-    AWS --> AUTO
-    B --> S --> G
-    OPS -.-> JDBC
-    OPS -.-> CDC
-    OPS -.-> AUTO
-    OPS -.-> S
-    OPS -.-> G
+classes: {
+  key: {
+    style: {
+      fill: "#dbeafe"
+      stroke: "#2563eb"
+      font-color: "#1e3a8a"
+    }
+  }
+  ok: {
+    style: {
+      fill: "#dcfce7"
+      stroke: "#16a34a"
+      font-color: "#14532d"
+    }
+  }
+  warn: {
+    style: {
+      fill: "#fef3c7"
+      stroke: "#d97706"
+      font-color: "#78350f"
+    }
+  }
+  zone: {
+    style: {
+      fill: "#ede9fe"
+      stroke: "#7c3aed"
+      font-color: "#4c1d95"
+    }
+  }
+}
 
-    classDef key  fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
-    classDef ok   fill:#dcfce7,stroke:#16a34a,color:#14532d
-    classDef warn fill:#fef3c7,stroke:#d97706,color:#78350f
-    classDef zone fill:#ede9fe,stroke:#7c3aed,color:#4c1d95
-    class DB,FILE,AWS key
-    class JDBC,CDC,AUTO warn
-    class B,S,G ok
-    class OPS zone
+sources: Sources {
+  db: 온프렘 DB { class: key }
+  file: 사내 file { class: key }
+  aws: RDS · app log · event { class: key }
+}
+
+ingest: Ingestion {
+  jdbc: JDBC incremental read { class: warn }
+  cdc: CDC · DMS · connector { class: warn }
+  auto: S3 file ingestion { class: warn }
+}
+
+lakehouse: S3 + Delta {
+  b: "Bronze\nreplay 가능한 원본" { class: ok }
+  s: "Silver\n정제 · 표준화" { class: ok }
+  g: "Gold\n업무 지표 · serving" { class: ok }
+}
+
+ops: "job orchestration\ncheckpoint · retry · alert" { class: zone }
+
+sources.db -> ingest.jdbc
+ingest.jdbc -> lakehouse.b
+sources.db -> ingest.cdc
+ingest.cdc -> lakehouse.b
+sources.file -> ingest.auto
+ingest.auto -> lakehouse.b
+sources.aws -> ingest.cdc
+sources.aws -> ingest.auto
+lakehouse.b -> lakehouse.s
+lakehouse.s -> lakehouse.g
+ops -> ingest.jdbc { style.stroke-dash: 3 }
+ops -> ingest.cdc { style.stroke-dash: 3 }
+ops -> ingest.auto { style.stroke-dash: 3 }
+ops -> lakehouse.s { style.stroke-dash: 3 }
+ops -> lakehouse.g { style.stroke-dash: 3 }
 ```
 
 이 장의 질문은 "CX/DX로 source에 연결한 다음 무엇을 해야 하는가"다. 연결 자체보다 재실행,
@@ -100,19 +130,38 @@ refresh time, quality threshold, semantic definition과 downstream consumer를 �
 
 ## pipeline은 재실행 가능해야 한다
 
-```mermaid
-stateDiagram-v2
-    [*] --> Detect
-    Detect --> Read: 새 offset · file
-    Read --> Validate
-    Validate --> Quarantine: 품질 실패
-    Validate --> Commit: 정상
-    Commit --> Publish
-    Publish --> [*]
-    Read --> Retry: transient failure
-    Retry --> Read
-    Retry --> Alert: retry exhausted
-    Alert --> [*]
+```d2 layout=elk pad=40 title="수집 job이 감지·읽기·검증을 거쳐 커밋·발행으로 끝나거나, 품질 실패로 격리되고 재시도가 소진되면 알림으로 끝나는 상태 전이"
+direction: down
+
+start: "" {
+  shape: circle
+  width: 30
+}
+detect: Detect
+read: Read
+validate: Validate
+quarantine: Quarantine
+commit: Commit
+publish: Publish
+retry: Retry
+alert: Alert
+end: "" {
+  shape: circle
+  width: 30
+  style.multiple: true
+}
+
+start -> detect
+detect -> read: 새 offset · file
+read -> validate
+validate -> quarantine: 품질 실패
+validate -> commit: 정상
+commit -> publish
+publish -> end
+read -> retry: transient failure
+retry -> read
+retry -> alert: retry exhausted
+alert -> end
 ```
 
 checkpoint와 Delta transaction을 사용해 같은 input을 다시 받아도 결과가 중복되지 않도록 설계한다.

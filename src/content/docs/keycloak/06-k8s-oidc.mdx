@@ -38,20 +38,21 @@ API 서버는 서명만 검증한다. AD 비활성화·세션 종료는 새 발�
 
 ## 전체 그림
 
-```mermaid
-sequenceDiagram
-    participant U as kubectl + kubelogin
-    participant K as Keycloak
-    participant A as kube-apiserver
+```d2 pad=40 title="kubectl과 kubelogin이 Keycloak에서 ID token을 받아 kube-apiserver에 보내면, apiserver가 서명·claim을 검증하고 그룹 기준으로 RBAC을 판정하는 순서"
+shape: sequence_diagram
 
-    U->>K: 브라우저 열어 로그인 (Authorization Code + PKCE)
-    K-->>U: ID token (groups claim 포함)
-    U->>A: 요청 + Bearer ID token
-    A->>A: JWKS로 서명 검증 · iss/aud/exp 확인
-    A->>A: claim → 사용자명·그룹 매핑
-    A->>A: RBAC 판정 (그룹 기준)
-    A-->>U: 응답
-    Note over U: 토큰 캐시 · 만료 시 자동 갱신
+u: kubectl + kubelogin
+k: Keycloak
+a: kube-apiserver
+
+u -> k: "브라우저 열어 로그인 (Authorization Code + PKCE)"
+k -> u: "ID token (groups claim 포함)" { style.stroke-dash: 3 }
+u -> a: 요청 + Bearer ID token
+a -> a: JWKS로 서명 검증 · iss/aud/exp 확인
+a -> a: claim → 사용자명·그룹 매핑
+a -> a: "RBAC 판정 (그룹 기준)"
+a -> u: 응답 { style.stroke-dash: 3 }
+u.note: 토큰 캐시 · 만료 시 자동 갱신
 ```
 
 API 서버는 Keycloak에 **물어보러 가지 않는다** — 공개키(JWKS)로 서명을 검증할 뿐이다.

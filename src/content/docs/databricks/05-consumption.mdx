@@ -22,25 +22,59 @@ import TermIntro from '../../../components/docs/TermIntro.astro';
 
 ## 한 data product, 여러 소비 경로
 
-```mermaid
-flowchart LR
-    UC["Unity Catalog<br/>승인 table · view · model"] --> SQL["SQL warehouse"]
-    UC --> NB["Notebook · Spark · Python"]
-    UC --> ML["ML training · MLflow"]
-    SQL --> BI["Dashboard · BI tool"]
-    SQL --> APP["SQL/API consumer"]
-    NB --> EXP["탐색 · data science"]
-    ML --> SERVE["Model serving"]
-    SERVE --> APP
-    POLICY["row · column policy<br/>audit · lineage"] -.-> UC
+```d2 layout=elk pad=40 title="Unity Catalog가 승인한 테이블·모델이 SQL warehouse·노트북·ML 학습으로 갈라져 대시보드·앱·모델 서빙으로 이어지고, row·column 정책이 카탈로그에 걸리는 소비 경로"
+direction: down
 
-    classDef key  fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
-    classDef ok   fill:#dcfce7,stroke:#16a34a,color:#14532d
-    classDef warn fill:#fef3c7,stroke:#d97706,color:#78350f
-    classDef zone fill:#ede9fe,stroke:#7c3aed,color:#4c1d95
-    class UC,POLICY zone
-    class SQL,NB,ML ok
-    class BI,APP,EXP,SERVE key
+classes: {
+  key: {
+    style: {
+      fill: "#dbeafe"
+      stroke: "#2563eb"
+      font-color: "#1e3a8a"
+    }
+  }
+  ok: {
+    style: {
+      fill: "#dcfce7"
+      stroke: "#16a34a"
+      font-color: "#14532d"
+    }
+  }
+  warn: {
+    style: {
+      fill: "#fef3c7"
+      stroke: "#d97706"
+      font-color: "#78350f"
+    }
+  }
+  zone: {
+    style: {
+      fill: "#ede9fe"
+      stroke: "#7c3aed"
+      font-color: "#4c1d95"
+    }
+  }
+}
+
+uc: "Unity Catalog\n승인 table · view · model" { class: zone }
+sql: SQL warehouse { class: ok }
+nb: Notebook · Spark · Python { class: ok }
+ml: ML training · MLflow { class: ok }
+bi: Dashboard · BI tool { class: key }
+app: SQL/API consumer { class: key }
+exp: 탐색 · data science { class: key }
+serve: Model serving { class: key }
+policy: "row · column policy\naudit · lineage" { class: zone }
+
+uc -> sql
+uc -> nb
+uc -> ml
+sql -> bi
+sql -> app
+nb -> exp
+ml -> serve
+serve -> app
+policy -> uc { style.stroke-dash: 3 }
 ```
 
 이 장을 읽고 나면 workload마다 compute를 어떻게 분리하고, 같은 data를 사용하면서도 권한과 SLA를

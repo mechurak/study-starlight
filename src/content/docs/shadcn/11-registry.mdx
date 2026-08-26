@@ -22,21 +22,46 @@ import TermIntro from '../../../components/docs/TermIntro.astro';
 
 앱이 둘이 되면 이런 일이 시작된다.
 
-```mermaid
-flowchart TB
-    S["shadcn 공식"] --> A["앱 A<br/>button.tsx"]
-    S --> B["앱 B<br/>button.tsx"]
-    A --> A2["success variant 추가<br/>기본 크기 sm"]
-    B --> B2["로딩 상태 추가<br/>radius 다르게"]
-    A2 --> X["6개월 뒤<br/>같은 이름, 다른 물건<br/>= 드리프트"]
-    B2 --> X
+```d2 layout=elk pad=40 title="같은 공식 컴포넌트를 받은 앱 A와 앱 B가 각자 수정하다 6개월 뒤 같은 이름의 다른 물건이 되는 드리프트"
+direction: down
 
-    classDef bad  fill:#fee2e2,stroke:#dc2626,color:#7f1d1d
-    classDef warn fill:#fef3c7,stroke:#d97706,color:#78350f
-    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
-    class X bad
-    class A2,B2 warn
-    class S,A,B mute
+classes: {
+  bad: {
+    style: {
+      fill: "#fee2e2"
+      stroke: "#dc2626"
+      font-color: "#7f1d1d"
+    }
+  }
+  warn: {
+    style: {
+      fill: "#fef3c7"
+      stroke: "#d97706"
+      font-color: "#78350f"
+    }
+  }
+  mute: {
+    style: {
+      fill: "#f1f5f9"
+      stroke: "#94a3b8"
+      font-color: "#334155"
+    }
+  }
+}
+
+s: shadcn 공식 { class: mute }
+a: "앱 A\nbutton.tsx" { class: mute }
+b: "앱 B\nbutton.tsx" { class: mute }
+a2: "success variant 추가\n기본 크기 sm" { class: warn }
+b2: "로딩 상태 추가\nradius 다르게" { class: warn }
+x: "6개월 뒤\n같은 이름, 다른 물건\n= 드리프트" { class: bad }
+
+s -> a
+s -> b
+a -> a2
+b -> b2
+a2 -> x
+b2 -> x
 ```
 
 **소유권 모델의 대가**다. 자유롭게 고칠 수 있다는 건 자유롭게 갈라진다는 뜻이기도 하다.

@@ -22,21 +22,53 @@ import TermIntro from '../../../components/docs/TermIntro.astro';
 이 덱이 반복해 온 그림이 그대로 진단 지도다. 증상을 듣고 **어느 구간의 문제인지**부터
 가른 뒤 해당 장의 표로 간다.
 
-```mermaid
-flowchart TB
-    S["증상 접수"] --> Q1{"로그인 화면까지 가나?"}
-    Q1 -->|"안 감 / 에러 페이지"| E1["연동 설정 구간<br/>redirect URI · client · hostname<br/>(아래 표 A)"]
-    Q1 -->|"로그인 자체가 실패"| E2["AD 구간 (경계 ①)<br/>bind · LDAPS · sync<br/>(4장 표)"]
-    Q1 -->|"로그인은 되는데<br/>권한·정보가 이상"| Q2{"Evaluate에서<br/>토큰에 보이나?"}
-    Q2 -->|"안 보임"| E3["매퍼 구간 (경계 ①·②)<br/>LDAP 매퍼 · protocol mapper<br/>(4장 · 3장)"]
-    Q2 -->|"보임"| E4["전달·소비 구간<br/>oauth2-proxy · 앱 · API 서버<br/>(7장 사슬 · 아래 표 B)"]
+```d2 layout=elk pad=40 title="증상에서 출발해 로그인 화면 도달 여부와 토큰 claim 노출 여부로 갈라 연동 설정·AD·매퍼·전달 소비 구간 중 어디를 볼지 정하는 분기도"
+direction: down
 
-    classDef key  fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
-    classDef warn fill:#fef3c7,stroke:#d97706,color:#78350f
-    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
-    class S mute
-    class Q1,Q2 key
-    class E1,E2,E3,E4 warn
+classes: {
+  key: {
+    style: {
+      fill: "#dbeafe"
+      stroke: "#2563eb"
+      font-color: "#1e3a8a"
+    }
+  }
+  warn: {
+    style: {
+      fill: "#fef3c7"
+      stroke: "#d97706"
+      font-color: "#78350f"
+    }
+  }
+  mute: {
+    style: {
+      fill: "#f1f5f9"
+      stroke: "#94a3b8"
+      font-color: "#334155"
+    }
+  }
+}
+
+s: 증상 접수 { class: mute }
+q1: 로그인 화면까지 가나? {
+  shape: diamond
+  class: key
+}
+e1: "연동 설정 구간\nredirect URI · client · hostname\n(아래 표 A)" { class: warn }
+e2: "AD 구간 (경계 ①)\nbind · LDAPS · sync\n(4장 표)" { class: warn }
+q2: "Evaluate에서\n토큰에 보이나?" {
+  shape: diamond
+  class: key
+}
+e3: "매퍼 구간 (경계 ①·②)\nLDAP 매퍼 · protocol mapper\n(4장 · 3장)" { class: warn }
+e4: "전달·소비 구간\noauth2-proxy · 앱 · API 서버\n(7장 사슬 · 아래 표 B)" { class: warn }
+
+s -> q1
+q1 -> e1: 안 감 / 에러 페이지
+q1 -> e2: 로그인 자체가 실패
+q1 -> q2: "로그인은 되는데\n권한·정보가 이상"
+q2 -> e3: 안 보임
+q2 -> e4: 보임
 ```
 
 ## 도구 상자 — 다섯 개면 대부분 열린다

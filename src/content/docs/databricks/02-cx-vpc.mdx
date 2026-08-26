@@ -22,49 +22,80 @@ import TermIntro from '../../../components/docs/TermIntro.astro';
 
 ## 권장 큰 그림
 
-```mermaid
-flowchart LR
-    subgraph corp["사내망"]
-        USER["사용자 · BI"]
-        DB["업무 DB"]
-        DNS["사내 DNS"]
-    end
-    subgraph carrier["전용 연결"]
-        CX["Cloud Exchange"] --> DX["AWS Direct Connect"]
-    end
-    subgraph aws["회사 AWS 계정"]
-        DXGW["DX Gateway"] --> TGW["Transit Gateway"]
-        subgraph vpc["Databricks customer-managed VPC"]
-            FE["Front-end PrivateLink endpoint"]
-            BE["Back-end PrivateLink endpoints"]
-            COMP["Private subnets<br/>Classic compute"]
-            S3EP["S3 gateway endpoint"]
-            R53["Route 53 Resolver"]
-        end
-        S3["S3 Delta data"]
-    end
-    CTRL["Databricks control plane"]
+```d2 layout=elk pad=40 title="사내망에서 Cloud Exchange와 Direct Connect를 거쳐 DX Gateway·Transit Gateway로 들어오고, customer-managed VPC의 front-end·back-end PrivateLink와 S3 gateway endpoint로 갈라지는 네트워크 경로"
+direction: down
 
-    USER --> CX
-    DB --> CX
-    CX --> DX --> DXGW
-    DXGW --> TGW
-    TGW --> FE
-    TGW --> COMP
-    DNS <--> R53
-    USER --> FE --> CTRL
-    COMP --> BE --> CTRL
-    COMP --> S3EP --> S3
-    COMP --> TGW --> DXGW --> DX --> CX --> DB
+classes: {
+  key: {
+    style: {
+      fill: "#dbeafe"
+      stroke: "#2563eb"
+      font-color: "#1e3a8a"
+    }
+  }
+  ok: {
+    style: {
+      fill: "#dcfce7"
+      stroke: "#16a34a"
+      font-color: "#14532d"
+    }
+  }
+  warn: {
+    style: {
+      fill: "#fef3c7"
+      stroke: "#d97706"
+      font-color: "#78350f"
+    }
+  }
+  zone: {
+    style: {
+      fill: "#ede9fe"
+      stroke: "#7c3aed"
+      font-color: "#4c1d95"
+    }
+  }
+}
 
-    classDef key  fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
-    classDef ok   fill:#dcfce7,stroke:#16a34a,color:#14532d
-    classDef warn fill:#fef3c7,stroke:#d97706,color:#78350f
-    classDef zone fill:#ede9fe,stroke:#7c3aed,color:#4c1d95
-    class USER,DB,DNS key
-    class CX,DX,DXGW,TGW warn
-    class FE,BE,COMP,S3EP,R53,S3 ok
-    class CTRL zone
+corp: 사내망 {
+  user: 사용자 · BI { class: key }
+  db: 업무 DB { class: key }
+  dns: 사내 DNS { class: key }
+}
+
+carrier: 전용 연결 {
+  cx: Cloud Exchange { class: warn }
+  dx: AWS Direct Connect { class: warn }
+}
+
+aws: 회사 AWS 계정 {
+  dxgw: DX Gateway { class: warn }
+  tgw: Transit Gateway { class: warn }
+  vpc: Databricks customer-managed VPC {
+    fe: Front-end PrivateLink endpoint { class: ok }
+    be: Back-end PrivateLink endpoints { class: ok }
+    comp: "Private subnets\nClassic compute" { class: ok }
+    s3ep: S3 gateway endpoint { class: ok }
+    r53: Route 53 Resolver { class: ok }
+  }
+  s3: S3 Delta data { class: ok }
+}
+
+ctrl: Databricks control plane { class: zone }
+
+corp.user -> carrier.cx
+carrier.cx <-> carrier.dx
+carrier.dx <-> aws.dxgw
+aws.dxgw <-> aws.tgw
+aws.tgw -> aws.vpc.fe
+aws.tgw <-> aws.vpc.comp
+corp.dns <-> aws.vpc.r53
+corp.user -> aws.vpc.fe
+aws.vpc.fe -> ctrl
+aws.vpc.comp -> aws.vpc.be
+aws.vpc.be -> ctrl
+aws.vpc.comp -> aws.vpc.s3ep
+aws.vpc.s3ep -> aws.s3
+carrier.cx <-> corp.db
 ```
 
 `USER → workspace`와 `compute → data`는 별도 흐름이다. 사용자가 private URL로 workspace에

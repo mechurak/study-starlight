@@ -9,34 +9,55 @@ import { LinkCard } from '@astrojs/starlight/components';
 
 ## 전체 그림 한 장
 
-```mermaid
-flowchart LR
-    subgraph PROD["쓰는 쪽 (4장)"]
-        P["프로듀서<br/>acks=all · 멱등성 · 키 선택"]
-    end
-    subgraph K8S["온프렘 k8s — Strimzi (9~10장)"]
-        subgraph CLUSTER["Kafka 클러스터 (3장)"]
-            T["토픽 = 파티션들의 묶음 (2 · 7장)<br/>RF=3 · min.insync.replicas=2<br/>보존: delete 또는 compact"]
-        end
-        CC["컨트롤러 (KRaft) × 3"]
-        MON["Prometheus · Grafana<br/>랙 · URP · 디스크"]
-    end
-    subgraph CONS["읽는 쪽 (5~6장)"]
-        G1["컨슈머 그룹 A<br/>처리 후 커밋 + 멱등 처리"]
-        G2["컨슈머 그룹 B<br/>(독립 오프셋)"]
-    end
-    P --> T
-    T --> G1
-    T --> G2
-    CC -.->|"리더 선출 · 메타데이터"| T
-    MON -.->|"감시"| T
+```d2 layout=elk pad=40 title="프로듀서에서 온프렘 Strimzi 위의 토픽을 거쳐 컨슈머 그룹 둘로 이어지고, KRaft 컨트롤러와 모니터링이 클러스터에 붙는 덱 전체 지도"
+direction: down
 
-    classDef key  fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
-    classDef ok   fill:#dcfce7,stroke:#16a34a,color:#14532d
-    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
-    class T key
-    class P,G1,G2 ok
-    class CC,MON mute
+classes: {
+  key: {
+    style: {
+      fill: "#dbeafe"
+      stroke: "#2563eb"
+      font-color: "#1e3a8a"
+    }
+  }
+  ok: {
+    style: {
+      fill: "#dcfce7"
+      stroke: "#16a34a"
+      font-color: "#14532d"
+    }
+  }
+  mute: {
+    style: {
+      fill: "#f1f5f9"
+      stroke: "#94a3b8"
+      font-color: "#334155"
+    }
+  }
+}
+
+prod: "쓰는 쪽 (4장)" {
+  p: "프로듀서\nacks=all · 멱등성 · 키 선택" { class: ok }
+}
+
+k8s: 온프렘 k8s — Strimzi (9~10장) {
+  cluster: "Kafka 클러스터 (3장)" {
+    t: "토픽 = 파티션들의 묶음 (2 · 7장)\nRF=3 · min.insync.replicas=2\n보존: delete 또는 compact" { class: key }
+  }
+  cc: "컨트롤러 (KRaft) × 3" { class: mute }
+  mon: "Prometheus · Grafana\n랙 · URP · 디스크" { class: mute }
+}
+
+cons: "읽는 쪽 (5~6장)" {
+  g1: "컨슈머 그룹 A\n처리 후 커밋 + 멱등 처리" { class: ok }
+  g2: "컨슈머 그룹 B\n(독립 오프셋)" { class: ok }
+}
+
+prod.p -> k8s.cluster.t
+k8s.cluster.t -> cons.g1
+k8s.cluster.t -> cons.g2
+k8s.cc -> k8s.cluster.t: 리더 선출 · 메타데이터 { style.stroke-dash: 3 }
+k8s.mon -> k8s.cluster.t: 감시 { style.stroke-dash: 3 }
 ```
 
 ## 축이 되는 문장들

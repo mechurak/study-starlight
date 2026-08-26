@@ -88,18 +88,41 @@ shadcn/ui는 **라이브러리가 아니라 코드 배송 시스템**이다.
 shadcn/ui 컴포넌트는 스타일만 들어 있는 게 아니다.
 **동작과 접근성은 아래층의 프리미티브가 담당**한다.
 
-```mermaid
-flowchart TB
-    A["내 앱<br/>Button variant='outline'"] --> B["components/ui/button.tsx<br/>내 레포의 파일<br/>= 겉모습 결정"]
-    B --> C["프리미티브 (Base UI)<br/>npm 패키지<br/>= 키보드 · 포커스 · 화면낭독기"]
-    C --> D["브라우저"]
+```d2 layout=elk pad=40 title="앱이 내 레포의 ui 파일을 거쳐 npm 프리미티브로, 다시 브라우저로 내려가는 층 구조"
+direction: down
 
-    classDef warn fill:#fef3c7,stroke:#d97706,color:#78350f
-    classDef key  fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
-    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
-    class B warn
-    class C key
-    class A,D mute
+classes: {
+  warn: {
+    style: {
+      fill: "#fef3c7"
+      stroke: "#d97706"
+      font-color: "#78350f"
+    }
+  }
+  key: {
+    style: {
+      fill: "#dbeafe"
+      stroke: "#2563eb"
+      font-color: "#1e3a8a"
+    }
+  }
+  mute: {
+    style: {
+      fill: "#f1f5f9"
+      stroke: "#94a3b8"
+      font-color: "#334155"
+    }
+  }
+}
+
+a: "내 앱\nButton variant='outline'" { class: mute }
+b: "components/ui/button.tsx\n내 레포의 파일\n= 겉모습 결정" { class: warn }
+c: "프리미티브 (Base UI)\nnpm 패키지\n= 키보드 · 포커스 · 화면낭독기" { class: key }
+d: 브라우저 { class: mute }
+
+a -> b
+b -> c
+c -> d
 ```
 
 **소유권을 넘겨받는 건 노란 층뿐이다.** 파란 층은 여전히 npm 패키지다 — 그게 다행이다.

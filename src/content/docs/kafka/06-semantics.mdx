@@ -22,20 +22,42 @@ import TermIntro from '../../../components/docs/TermIntro.astro';
 
 유실도 중복도 근원은 같다. **두 동작이 원자적이지 않은데 그 사이에 장애가 나는 것**이다.
 
-```mermaid
-flowchart LR
-    subgraph PROD["프로듀서 쪽 틈"]
-        A["브로커 저장"] -->|"응답 유실 → 재시도"| B["중복 저장"]
-    end
-    subgraph CONS["컨슈머 쪽 틈"]
-        C["처리 완료"] -->|"커밋 전에 죽음"| D["재수신 = 중복 처리"]
-        E["커밋 완료"] -->|"처리 전에 죽음"| F["그 구간 유실"]
-    end
+```d2 layout=elk pad=40 title="프로듀서 쪽에서는 응답 유실 재시도로 중복이, 컨슈머 쪽에서는 커밋과 처리 순서에 따라 중복이나 유실이 생기는 틈"
+direction: right
 
-    classDef bad  fill:#fee2e2,stroke:#dc2626,color:#7f1d1d
-    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
-    class B,D,F bad
-    class A,C,E mute
+classes: {
+  bad: {
+    style: {
+      fill: "#fee2e2"
+      stroke: "#dc2626"
+      font-color: "#7f1d1d"
+    }
+  }
+  mute: {
+    style: {
+      fill: "#f1f5f9"
+      stroke: "#94a3b8"
+      font-color: "#334155"
+    }
+  }
+}
+
+prod: 프로듀서 쪽 틈 {
+  a: 브로커 저장 { class: mute }
+  b: 중복 저장 { class: bad }
+
+  a -> b: 응답 유실 → 재시도
+}
+
+cons: 컨슈머 쪽 틈 {
+  c: 처리 완료 { class: mute }
+  d: 재수신 = 중복 처리 { class: bad }
+  e: 커밋 완료 { class: mute }
+  f: 그 구간 유실 { class: bad }
+
+  c -> d: 커밋 전에 죽음
+  e -> f: 처리 전에 죽음
+}
 ```
 
 - 프로듀서 쪽 틈은 멱등성이 이미 막았다 ([4장](/kafka/04-producer/) — 기본 켜짐)

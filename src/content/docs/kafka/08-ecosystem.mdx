@@ -20,25 +20,56 @@ import TermIntro from '../../../components/docs/TermIntro.astro';
 
 ## 지도 — 무엇이 어디에 얹히나
 
-```mermaid
-flowchart LR
-    DB[("업무 DB")] -->|"Debezium (CDC)"| CON["Kafka Connect"]
-    CON --> K["Kafka<br/>(브로커 클러스터)"]
-    APP["서비스 앱들<br/>(클라이언트 라이브러리)"] --> K
-    K --> APP
-    K --> CON2["Kafka Connect"]
-    CON2 --> SINK[("검색 인덱스 · S3 · DW")]
-    K --> ST["Kafka Streams · Flink<br/>(집계 · 변환)"]
-    ST --> K
-    SR["스키마 레지스트리"] -.->|"형식 계약 검사"| APP
-    SR -.-> CON
+```d2 layout=elk pad=40 title="업무 DB의 CDC와 서비스 앱이 Kafka로 들어오고, Connect가 검색 인덱스·S3·DW로 내보내며, Streams와 스키마 레지스트리가 함께 붙는 생태계 지도"
+direction: down
 
-    classDef key  fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
-    classDef ok   fill:#dcfce7,stroke:#16a34a,color:#14532d
-    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
-    class K key
-    class CON,CON2,SR,ST ok
-    class DB,SINK,APP mute
+classes: {
+  key: {
+    style: {
+      fill: "#dbeafe"
+      stroke: "#2563eb"
+      font-color: "#1e3a8a"
+    }
+  }
+  ok: {
+    style: {
+      fill: "#dcfce7"
+      stroke: "#16a34a"
+      font-color: "#14532d"
+    }
+  }
+  mute: {
+    style: {
+      fill: "#f1f5f9"
+      stroke: "#94a3b8"
+      font-color: "#334155"
+    }
+  }
+}
+
+db: 업무 DB {
+  shape: cylinder
+  class: mute
+}
+con: Kafka Connect { class: ok }
+k: "Kafka\n(브로커 클러스터)" { class: key }
+app: "서비스 앱들\n(클라이언트 라이브러리)" { class: mute }
+con2: Kafka Connect { class: ok }
+sink: 검색 인덱스 · S3 · DW {
+  shape: cylinder
+  class: mute
+}
+st: "Kafka Streams · Flink\n(집계 · 변환)" { class: ok }
+sr: 스키마 레지스트리 { class: ok }
+
+db -> con: "Debezium (CDC)"
+con -> k
+app <-> k
+k -> con2
+con2 -> sink
+k <-> st
+sr -> app: 형식 계약 검사 { style.stroke-dash: 3 }
+sr -> con { style.stroke-dash: 3 }
 ```
 
 시작은 **브로커 + 클라이언트 라이브러리**뿐이다. 나머지는 전부 필요가 생겼을 때 얹는

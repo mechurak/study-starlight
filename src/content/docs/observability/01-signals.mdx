@@ -98,20 +98,44 @@ trace 4bf92f3577b34da6                                 총 3.2s
 셋 중 하나가 없으면 그 단계에서 조사가 추측으로 바뀐다.
 :::
 
-```mermaid
-flowchart LR
-    A["알림: 5xx 증가<br/>(메트릭)"] --> B["어느 서비스·어느 시각인가<br/>(메트릭 그래프)"]
-    B --> C["그 시각 그 파드가 뭐라고 했나<br/>(로그)"]
-    B --> D["느린 요청은 어느 구간에서 걸렸나<br/>(트레이스)"]
-    C --> E["원인"]
-    D --> E
+```d2 layout=elk pad=40 title="5xx 알림에서 메트릭 그래프로 서비스·시각을 좁히고 로그와 트레이스로 갈라져 원인에 이르는 흐름"
+direction: down
 
-    classDef warn fill:#fef3c7,stroke:#d97706,color:#78350f
-    classDef ok   fill:#dcfce7,stroke:#16a34a,color:#14532d
-    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
-    class A warn
-    class E ok
-    class B,C,D mute
+classes: {
+  warn: {
+    style: {
+      fill: "#fef3c7"
+      stroke: "#d97706"
+      font-color: "#78350f"
+    }
+  }
+  ok: {
+    style: {
+      fill: "#dcfce7"
+      stroke: "#16a34a"
+      font-color: "#14532d"
+    }
+  }
+  mute: {
+    style: {
+      fill: "#f1f5f9"
+      stroke: "#94a3b8"
+      font-color: "#334155"
+    }
+  }
+}
+
+a: "알림: 5xx 증가\n(메트릭)" { class: warn }
+b: "어느 서비스·어느 시각인가\n(메트릭 그래프)" { class: mute }
+c: "그 시각 그 파드가 뭐라고 했나\n(로그)" { class: mute }
+d: "느린 요청은 어느 구간에서 걸렸나\n(트레이스)" { class: mute }
+e: 원인 { class: ok }
+
+a -> b
+b -> c
+b -> d
+c -> e
+d -> e
 ```
 
 ### 한 신호만 있으면 어디서 막히나
@@ -162,48 +186,74 @@ flowchart LR
 이 덱이 쓰는 조합이다. **Grafana Labs 스택으로 통일하는 이유는 저장소가 하나로 모이기 때문**이다 —
 Loki도 Tempo도 오브젝트 스토리지에 쓴다. 저장소를 한 종류로 줄이는 건 큰 이득이다.
 
-```mermaid
-flowchart LR
-    subgraph src["대상"]
-        direction TB
-        APP["앱 (OTel SDK)"]
-        K8S["노드 · 파드 · 컨트롤 플레인"]
-    end
-    subgraph col["수집"]
-        direction TB
-        ALLOY["Grafana Alloy<br/>(DaemonSet + Deployment)"]
-    end
-    subgraph store["저장"]
-        direction TB
-        PROM["Prometheus<br/>로컬 TSDB"]
-        LOKI["Loki"]
-        TEMPO["Tempo"]
-    end
-    S3[("오브젝트 스토리지")]
-    GRAF["Grafana — 5장"]
-    AM["Alertmanager"]
+```d2 layout=elk pad=40 title="앱과 쿠버네티스에서 나온 신호가 Alloy와 Prometheus를 거쳐 Loki·Tempo·TSDB에 저장되고 Grafana와 Alertmanager로 이어지는 LGTM 스택 구성도"
+direction: down
 
-    APP --> ALLOY
-    K8S --> ALLOY
-    ALLOY -->|"로그"| LOKI
-    ALLOY -->|"트레이스 (OTLP)"| TEMPO
-    PROM -->|"긁어 간다 (pull)"| K8S
-    PROM -->|"긁어 간다 (pull)"| APP
-    LOKI --> S3
-    TEMPO --> S3
-    PROM --> AM
-    GRAF --> PROM
-    GRAF --> LOKI
-    GRAF --> TEMPO
+classes: {
+  key: {
+    style: {
+      fill: "#dbeafe"
+      stroke: "#2563eb"
+      font-color: "#1e3a8a"
+    }
+  }
+  ok: {
+    style: {
+      fill: "#dcfce7"
+      stroke: "#16a34a"
+      font-color: "#14532d"
+    }
+  }
+  warn: {
+    style: {
+      fill: "#fef3c7"
+      stroke: "#d97706"
+      font-color: "#78350f"
+    }
+  }
+  mute: {
+    style: {
+      fill: "#f1f5f9"
+      stroke: "#94a3b8"
+      font-color: "#334155"
+    }
+  }
+}
 
-    classDef key  fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
-    classDef ok   fill:#dcfce7,stroke:#16a34a,color:#14532d
-    classDef warn fill:#fef3c7,stroke:#d97706,color:#78350f
-    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
-    class S3 ok
-    class GRAF key
-    class AM warn
-    class APP,K8S,ALLOY,PROM,LOKI,TEMPO mute
+src: 대상 {
+  app: "앱 (OTel SDK)" { class: mute }
+  k8s: 노드 · 파드 · 컨트롤 플레인 { class: mute }
+}
+
+col: 수집 {
+  alloy: "Grafana Alloy\n(DaemonSet + Deployment)" { class: mute }
+}
+
+store: 저장 {
+  prom: "Prometheus\n로컬 TSDB" { class: mute }
+  loki: Loki { class: mute }
+  tempo: Tempo { class: mute }
+}
+
+s3: 오브젝트 스토리지 {
+  shape: cylinder
+  class: ok
+}
+graf: Grafana — 5장 { class: key }
+am: Alertmanager { class: warn }
+
+src.app -> col.alloy
+src.k8s -> col.alloy
+col.alloy -> store.loki: 로그
+col.alloy -> store.tempo: "트레이스 (OTLP)"
+store.prom -> src.k8s: "긁어 간다 (pull)"
+store.prom -> src.app: "긁어 간다 (pull)"
+store.loki -> s3
+store.tempo -> s3
+store.prom -> am
+graf -> store.prom
+graf -> store.loki
+graf -> store.tempo
 ```
 
 | 자리 | 무엇 | 왜 그것 |

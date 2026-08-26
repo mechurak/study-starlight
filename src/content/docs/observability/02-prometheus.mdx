@@ -309,23 +309,51 @@ CPU가 40%인데 DB 잠금으로 전부 실패하는 상황은 그 알림이 못
 
 이걸 쓰면 **긁을 대상과 알림 규칙을 CRD로 추가**하게 된다 — 설정 파일을 손대지 않는다.
 
-```mermaid
-flowchart LR
-    SM["ServiceMonitor<br/>(앱 팀이 만든다)"] --> OP["Prometheus Operator"]
-    PR["PrometheusRule<br/>(알림 규칙)"] --> OP
-    OP -->|"설정 생성·리로드"| P["Prometheus"]
-    P -->|"scrape"| T1["앱 /metrics"]
-    P -->|"scrape"| T2["node-exporter"]
-    P -->|"scrape"| T3["kube-state-metrics"]
-    P -->|"규칙이 참"| AM["Alertmanager"]
-    AM --> N["메일 · 메신저 · 전화"]
+```d2 layout=elk pad=40 title="ServiceMonitor와 PrometheusRule을 Operator가 설정으로 만들어 Prometheus가 대상들을 scrape하고 Alertmanager로 알림을 보내는 구조"
+direction: down
 
-    classDef key  fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
-    classDef warn fill:#fef3c7,stroke:#d97706,color:#78350f
-    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
-    class OP key
-    class AM,N warn
-    class SM,PR,P,T1,T2,T3 mute
+classes: {
+  key: {
+    style: {
+      fill: "#dbeafe"
+      stroke: "#2563eb"
+      font-color: "#1e3a8a"
+    }
+  }
+  warn: {
+    style: {
+      fill: "#fef3c7"
+      stroke: "#d97706"
+      font-color: "#78350f"
+    }
+  }
+  mute: {
+    style: {
+      fill: "#f1f5f9"
+      stroke: "#94a3b8"
+      font-color: "#334155"
+    }
+  }
+}
+
+sm: "ServiceMonitor\n(앱 팀이 만든다)" { class: mute }
+pr: "PrometheusRule\n(알림 규칙)" { class: mute }
+op: Prometheus Operator { class: key }
+p: Prometheus { class: mute }
+t1: 앱 /metrics { class: mute }
+t2: node-exporter { class: mute }
+t3: kube-state-metrics { class: mute }
+am: Alertmanager { class: warn }
+n: 메일 · 메신저 · 전화 { class: warn }
+
+sm -> op
+pr -> op
+op -> p: 설정 생성·리로드
+p -> t1: scrape
+p -> t2: scrape
+p -> t3: scrape
+p -> am: 규칙이 참
+am -> n
 ```
 
 기본 묶음에 들어오는 exporter 둘이 사실상 클러스터 감시의 바닥을 깐다 —

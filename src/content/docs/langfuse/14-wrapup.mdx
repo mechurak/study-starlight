@@ -11,30 +11,76 @@ import { LinkCard } from '@astrojs/starlight/components';
 
 ## 전체 지도
 
-```mermaid
-flowchart LR
-    APP["LLM 앱<br/>root · retrieval · tool · generation"] -->|"SDK / OTLP batch"| WEB["Langfuse Web"]
-    WEB --> S3[("S3 raw event")]
-    WEB --> REDIS[("Redis queue")]
-    REDIS --> WORKER["Worker"]
-    S3 --> WORKER
-    WORKER --> CH[("ClickHouse<br/>observation · score")]
-    WEB --> PG[("Postgres<br/>prompt · dataset · config")]
+```d2 layout=elk pad=40 title="앱의 관측이 Web·S3·Redis·Worker를 거쳐 ClickHouse에 쌓이고, 거기서 찾은 문제 사례가 dataset·실험·prompt 라벨을 거쳐 앱으로 돌아오는 덱 전체 지도"
+direction: down
 
-    CH --> FIND["낮은 score · 높은 cost · error"]
-    FIND --> DATA["dataset item"]
-    DATA --> EXP["experiment"]
-    EXP --> PROMPT["prompt production label"]
-    PROMPT --> APP
+classes: {
+  key: {
+    style: {
+      fill: "#dbeafe"
+      stroke: "#2563eb"
+      font-color: "#1e3a8a"
+    }
+  }
+  zone: {
+    style: {
+      fill: "#ede9fe"
+      stroke: "#7c3aed"
+      font-color: "#4c1d95"
+    }
+  }
+  ok: {
+    style: {
+      fill: "#dcfce7"
+      stroke: "#16a34a"
+      font-color: "#14532d"
+    }
+  }
+  warn: {
+    style: {
+      fill: "#fef3c7"
+      stroke: "#d97706"
+      font-color: "#78350f"
+    }
+  }
+}
 
-    classDef key  fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
-    classDef zone fill:#ede9fe,stroke:#7c3aed,color:#4c1d95
-    classDef warn fill:#fef3c7,stroke:#d97706,color:#78350f
-    classDef ok   fill:#dcfce7,stroke:#16a34a,color:#14532d
-    class APP,WEB key
-    class WORKER,FIND,DATA zone
-    class S3,REDIS,CH,PG warn
-    class EXP,PROMPT ok
+app: "LLM 앱\nroot · retrieval · tool · generation" { class: key }
+web: Langfuse Web { class: key }
+s3: S3 raw event {
+  shape: cylinder
+  class: warn
+}
+redis: Redis queue {
+  shape: cylinder
+  class: warn
+}
+worker: Worker { class: zone }
+ch: "ClickHouse\nobservation · score" {
+  shape: cylinder
+  class: warn
+}
+pg: "Postgres\nprompt · dataset · config" {
+  shape: cylinder
+  class: warn
+}
+find: 낮은 score · 높은 cost · error { class: zone }
+data: dataset item { class: zone }
+exp: experiment { class: ok }
+prompt: prompt production label { class: ok }
+
+app -> web: SDK / OTLP batch
+web -> s3
+web -> redis
+redis -> worker
+s3 -> worker
+worker -> ch
+web -> pg
+ch -> find
+find -> data
+data -> exp
+exp -> prompt
+prompt -> app
 ```
 
 왼쪽 절반은 **관측 data pipeline**, 오른쪽 절반은 **product improvement loop**다. Pipeline만 있으면 trace archive이고,

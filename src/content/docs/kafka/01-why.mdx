@@ -23,22 +23,41 @@ import TermIntro from '../../../components/docs/TermIntro.astro';
 실제로 서비스가 두세 개일 때는 그게 제일 단순하고 옳다. 서비스와 연동처가 늘면서
 다음이 전부 아프기 시작한다.
 
-```mermaid
-flowchart LR
-    subgraph BEFORE["직접 연동 — 생산자 N × 소비자 M"]
-        direction LR
-        S1["주문 서비스"] --> T1["알림"]
-        S1 --> T2["정산"]
-        S1 --> T3["통계"]
-        S2["회원 서비스"] --> T1
-        S2 --> T3
-        S3["새 서비스…"] --> T2
-    end
+```d2 layout=elk pad=40 title="가운데 로그가 없을 때 생산자 셋과 소비자 셋이 서로 직접 연결되어 선이 얽히는 모습"
+direction: right
 
-    classDef bad  fill:#fee2e2,stroke:#dc2626,color:#7f1d1d
-    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
-    class S1,S2,S3 bad
-    class T1,T2,T3 mute
+classes: {
+  bad: {
+    style: {
+      fill: "#fee2e2"
+      stroke: "#dc2626"
+      font-color: "#7f1d1d"
+    }
+  }
+  mute: {
+    style: {
+      fill: "#f1f5f9"
+      stroke: "#94a3b8"
+      font-color: "#334155"
+    }
+  }
+}
+
+before: 직접 연동 — 생산자 N × 소비자 M {
+  s1: 주문 서비스 { class: bad }
+  s2: 회원 서비스 { class: bad }
+  s3: 새 서비스… { class: bad }
+  t1: 알림 { class: mute }
+  t2: 정산 { class: mute }
+  t3: 통계 { class: mute }
+
+  s1 -> t1
+  s1 -> t2
+  s1 -> t3
+  s2 -> t1
+  s2 -> t3
+  s3 -> t2
+}
 ```
 
 | 통증 | 왜 아픈가 |
@@ -56,22 +75,47 @@ flowchart LR
 소비자는 로그에서 **각자의 속도로** 당겨 읽는다. 생산자는 소비자가 몇인지, 살아 있는지,
 얼마나 느린지 몰라도 된다 — **결합을 시간 축에서 끊는 것**, 이것이 Kafka를 놓는 목적이다.
 
-```mermaid
-flowchart LR
-    subgraph AFTER["가운데 로그 — 생산자 N + 소비자 M"]
-        direction LR
-        S1["주문 서비스"] --> K["Kafka<br/>(지워지지 않는 로그)"]
-        S2["회원 서비스"] --> K
-        K --> T1["알림"]
-        K --> T2["정산"]
-        K --> T3["통계 · 새 소비자<br/>(생산자 수정 없이 추가)"]
-    end
+```d2 layout=elk pad=40 title="가운데에 Kafka 로그를 두면 생산자와 소비자가 각각 로그 한 곳만 보고, 새 소비자를 생산자 수정 없이 붙일 수 있는 모습"
+direction: down
 
-    classDef ok   fill:#dcfce7,stroke:#16a34a,color:#14532d
-    classDef key  fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
-    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
-    class S1,S2,T1,T2,T3 ok
-    class K key
+classes: {
+  ok: {
+    style: {
+      fill: "#dcfce7"
+      stroke: "#16a34a"
+      font-color: "#14532d"
+    }
+  }
+  key: {
+    style: {
+      fill: "#dbeafe"
+      stroke: "#2563eb"
+      font-color: "#1e3a8a"
+    }
+  }
+  mute: {
+    style: {
+      fill: "#f1f5f9"
+      stroke: "#94a3b8"
+      font-color: "#334155"
+    }
+  }
+}
+
+after: 가운데 로그 — 생산자 N + 소비자 M {
+  s1: 주문 서비스 { class: ok }
+  s2: 회원 서비스 { class: ok }
+  k: "Kafka\n(지워지지 않는 로그)" { class: key }
+  t1: 알림 { class: ok }
+  t2: 정산 { class: ok }
+  t3: "통계 · 새 소비자\n(생산자 수정 없이 추가)" { class: ok }
+
+  s1 -> k
+  s2 -> k
+  k -> t1
+  k -> t2
+  k -> t3
+}
 ```
 
 | 통증 | 로그가 이렇게 푼다 |

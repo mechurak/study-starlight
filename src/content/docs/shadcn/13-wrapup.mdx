@@ -11,22 +11,52 @@ import ThemeSwitcher from '../../../components/demos/ThemeSwitcher.astro';
 
 ## 덱 전체를 한 장에
 
-```mermaid
-flowchart TB
-    A["shadcn/ui<br/>= 코드 배송 시스템<br/>컴포넌트가 내 레포로 온다"] --> B["소유권을 얻는다<br/>= 관리 책임이 생긴다"]
-    B --> C["관리의 단위 = 테마"]
-    C --> D["색 · 형태 · 글자<br/>컴포넌트 · 아이콘/폰트"]
-    D --> E["라이트/다크 두 벌"]
-    E --> F["레지스트리로 배포<br/>= 여러 앱이 한 출발점"]
+```d2 layout=elk pad=40 title="코드 배송 시스템이라는 정의에서 소유권과 관리 책임, 테마라는 관리 단위, 다섯 리소스와 두 벌, 레지스트리 배포까지 이어지는 덱 요약"
+direction: down
 
-    classDef key  fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
-    classDef ok   fill:#dcfce7,stroke:#16a34a,color:#14532d
-    classDef warn fill:#fef3c7,stroke:#d97706,color:#78350f
-    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
-    class C key
-    class D ok
-    class B warn
-    class A,E,F mute
+classes: {
+  key: {
+    style: {
+      fill: "#dbeafe"
+      stroke: "#2563eb"
+      font-color: "#1e3a8a"
+    }
+  }
+  ok: {
+    style: {
+      fill: "#dcfce7"
+      stroke: "#16a34a"
+      font-color: "#14532d"
+    }
+  }
+  warn: {
+    style: {
+      fill: "#fef3c7"
+      stroke: "#d97706"
+      font-color: "#78350f"
+    }
+  }
+  mute: {
+    style: {
+      fill: "#f1f5f9"
+      stroke: "#94a3b8"
+      font-color: "#334155"
+    }
+  }
+}
+
+a: "shadcn/ui\n= 코드 배송 시스템\n컴포넌트가 내 레포로 온다" { class: mute }
+b: "소유권을 얻는다\n= 관리 책임이 생긴다" { class: warn }
+c: 관리의 단위 = 테마 { class: key }
+d: "색 · 형태 · 글자\n컴포넌트 · 아이콘/폰트" { class: ok }
+e: 라이트/다크 두 벌 { class: mute }
+f: "레지스트리로 배포\n= 여러 앱이 한 출발점" { class: mute }
+
+a -> b
+b -> c
+c -> d
+d -> e
+e -> f
 ```
 
 ## 장별 한 줄

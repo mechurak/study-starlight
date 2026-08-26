@@ -117,25 +117,26 @@ OTel span 하나로 보내고 input/output은 해당 observation에, trace-wide 
 
 ## SDK에서 서버까지
 
-```mermaid
-sequenceDiagram
-    participant A as 애플리케이션
-    participant Q as SDK memory queue
-    participant W as Langfuse Web
-    participant S as S3 event bucket
-    participant R as Redis queue
-    participant K as Worker
-    participant C as ClickHouse
+```d2 pad=40 title="observation이 SDK 큐에서 batch로 Web에 올라가 S3와 Redis를 거치고, Worker가 읽어 검증·마스킹 후 ClickHouse에 적재되는 순서"
+shape: sequence_diagram
 
-    A->>Q: observation 종료
-    Q->>W: time/size 기준 batch
-    W->>S: raw event 저장
-    W->>R: S3 reference enqueue
-    W-->>Q: ingest 응답
-    K->>R: job consume
-    K->>S: raw event 읽기
-    K->>K: validate · enrich · mask
-    K->>C: observation/score 적재
+a: 애플리케이션
+q: SDK memory queue
+w: Langfuse Web
+s: S3 event bucket
+r: Redis queue
+k: Worker
+c: ClickHouse
+
+a -> q: observation 종료
+q -> w: time/size 기준 batch
+w -> s: raw event 저장
+w -> r: S3 reference enqueue
+w -> q: ingest 응답 { style.stroke-dash: 3 }
+k -> r: job consume
+k -> s: raw event 읽기
+k -> k: validate · enrich · mask
+k -> c: observation/score 적재
 ```
 
 Web의 2xx는 event가 최종 query table에 나타났다는 뜻이 아니다. queue backlog나 Worker 장애가 있으면 ingest는

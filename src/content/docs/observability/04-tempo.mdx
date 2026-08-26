@@ -177,23 +177,52 @@ events:
 메트릭과 로그는 앱이 가만히 있어도 어느 정도 모인다(노드 exporter, stdout).
 **추적은 다르다.** 요청이 서비스를 건널 때 트레이스 ID를 이어 주는 코드가 필요하다.
 
-```mermaid
-flowchart LR
-    U["요청"] --> A["서비스 A<br/>trace_id 생성"]
-    A -->|"traceparent 헤더"| B["서비스 B"]
-    B -->|"traceparent 헤더"| C["서비스 C"]
-    A -.->|"스팬"| COL["OTel Collector<br/>또는 Alloy"]
-    B -.->|"스팬"| COL
-    C -.->|"스팬"| COL
-    COL -->|"OTLP"| T["Tempo"]
-    T --> S3[("오브젝트 스토리지 — 온프렘 덱 6장")]
+```d2 layout=elk pad=40 title="요청이 서비스 A·B·C를 traceparent 헤더로 타고 가는 동안 각 서비스가 스팬을 Collector로 보내고 Tempo를 거쳐 오브젝트 스토리지에 저장되는 흐름"
+direction: down
 
-    classDef bad  fill:#fee2e2,stroke:#dc2626,color:#7f1d1d
-    classDef ok   fill:#dcfce7,stroke:#16a34a,color:#14532d
-    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
-    class S3 ok
-    class A,B,C bad
-    class U,COL,T mute
+classes: {
+  bad: {
+    style: {
+      fill: "#fee2e2"
+      stroke: "#dc2626"
+      font-color: "#7f1d1d"
+    }
+  }
+  ok: {
+    style: {
+      fill: "#dcfce7"
+      stroke: "#16a34a"
+      font-color: "#14532d"
+    }
+  }
+  mute: {
+    style: {
+      fill: "#f1f5f9"
+      stroke: "#94a3b8"
+      font-color: "#334155"
+    }
+  }
+}
+
+u: 요청 { class: mute }
+a: "서비스 A\ntrace_id 생성" { class: bad }
+b: 서비스 B { class: bad }
+c: 서비스 C { class: bad }
+col: "OTel Collector\n또는 Alloy" { class: mute }
+t: Tempo { class: mute }
+s3: 오브젝트 스토리지 — 온프렘 덱 6장 {
+  shape: cylinder
+  class: ok
+}
+
+u -> a
+a -> b: traceparent 헤더
+b -> c: traceparent 헤더
+a -> col: 스팬 { style.stroke-dash: 3 }
+b -> col: 스팬 { style.stroke-dash: 3 }
+c -> col: 스팬 { style.stroke-dash: 3 }
+col -> t: OTLP
+t -> s3
 ```
 
 빨간 부분 — **각 서비스에 계측이 들어가야 하는 자리**다. 방법은 셋.
@@ -332,16 +361,33 @@ Tempo는 트레이스를 보고 **메트릭을 만들어 낼 수 있다.**
 
 ## 세 신호를 잇기 — 이 장의 진짜 값
 
-```mermaid
-flowchart LR
-    M["메트릭<br/>p99가 튀었다"] -->|"exemplar"| T["트레이스<br/>그 순간의 느린 요청"]
-    T -->|"span 시각 · 서비스"| L["로그<br/>그 서비스의 그 시각"]
-    L -->|"trace_id"| T
+```d2 layout=elk pad=40 title="메트릭의 exemplar로 트레이스에 들어가고, 트레이스에서 로그로, 로그의 trace_id로 다시 트레이스로 돌아오는 세 신호의 왕복"
+direction: down
 
-    classDef key  fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
-    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
-    class T key
-    class M,L mute
+classes: {
+  key: {
+    style: {
+      fill: "#dbeafe"
+      stroke: "#2563eb"
+      font-color: "#1e3a8a"
+    }
+  }
+  mute: {
+    style: {
+      fill: "#f1f5f9"
+      stroke: "#94a3b8"
+      font-color: "#334155"
+    }
+  }
+}
+
+m: "메트릭\np99가 튀었다" { class: mute }
+t: "트레이스\n그 순간의 느린 요청" { class: key }
+l: "로그\n그 서비스의 그 시각" { class: mute }
+
+m -> t: exemplar
+t -> l: span 시각 · 서비스
+l -> t: trace_id
 ```
 
 <Steps>

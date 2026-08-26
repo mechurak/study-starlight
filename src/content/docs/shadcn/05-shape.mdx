@@ -184,19 +184,46 @@ Tailwind 4는 간격도 기준값 하나에서 파생시킨다.
 
 ## 형태 리소스 정리
 
-```mermaid
-flowchart LR
-    R["--radius<br/>0.625rem"] --> R2["rounded-sm/md/lg/xl<br/>계산으로 파생"]
-    S["--spacing<br/>0.25rem"] --> S2["p-1 · p-2 · p-4 …<br/>4의 배수"]
-    B["--border · --input · --ring"] --> B2["테두리 · 입력창 · 포커스"]
-    E["shadow-sm → lg"] --> E2["고도 순서"]
+```d2 layout=elk pad=40 title="radius·spacing·border·shadow 네 토큰이 각각 어떤 유틸리티 클래스로 파생되는지 짝지은 그림"
+direction: right
 
-    classDef key  fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
-    classDef ok   fill:#dcfce7,stroke:#16a34a,color:#14532d
-    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
-    class R,S key
-    class R2,S2 ok
-    class B,E,B2,E2 mute
+classes: {
+  key: {
+    style: {
+      fill: "#dbeafe"
+      stroke: "#2563eb"
+      font-color: "#1e3a8a"
+    }
+  }
+  ok: {
+    style: {
+      fill: "#dcfce7"
+      stroke: "#16a34a"
+      font-color: "#14532d"
+    }
+  }
+  mute: {
+    style: {
+      fill: "#f1f5f9"
+      stroke: "#94a3b8"
+      font-color: "#334155"
+    }
+  }
+}
+
+r: "--radius\n0.625rem" { class: key }
+r2: "rounded-sm/md/lg/xl\n계산으로 파생" { class: ok }
+s: "--spacing\n0.25rem" { class: key }
+s2: "p-1 · p-2 · p-4 …\n4의 배수" { class: ok }
+b: --border · --input · --ring { class: mute }
+b2: 테두리 · 입력창 · 포커스 { class: mute }
+e: shadow-sm → lg { class: mute }
+e2: 고도 순서 { class: mute }
+
+r -> r2
+s -> s2
+b -> b2
+e -> e2
 ```
 
 ## 5장 요약

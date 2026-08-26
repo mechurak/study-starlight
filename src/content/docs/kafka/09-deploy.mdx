@@ -29,21 +29,47 @@ Strimzi는 이것을 CRD와 컨트롤 루프로 바꾼다 — **YAML로 선언�
 
 ## Strimzi의 구조 — CRD 지도
 
-```mermaid
-flowchart LR
-    CO["Cluster Operator<br/>(Deployment)"] -->|"감시 · 수렴"| K["Kafka CRD<br/>클러스터 본체 정의"]
-    K --- NP1["KafkaNodePool<br/>controller 3대"]
-    K --- NP2["KafkaNodePool<br/>broker 3대 + 스토리지"]
-    CO --> T["KafkaTopic CRD<br/>토픽 = YAML"]
-    CO --> U["KafkaUser CRD<br/>계정 · ACL = YAML"]
-    CO --> C["KafkaConnect CRD<br/>(8장의 Connect도 CRD로)"]
+```d2 layout=elk pad=40 title="Cluster Operator가 Kafka·KafkaTopic·KafkaUser·KafkaConnect CRD를 감시하고, Kafka CRD에 controller와 broker NodePool이 딸리는 Strimzi 구성"
+direction: down
 
-    classDef key  fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
-    classDef ok   fill:#dcfce7,stroke:#16a34a,color:#14532d
-    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
-    class CO,K key
-    class NP1,NP2 ok
-    class T,U,C mute
+classes: {
+  key: {
+    style: {
+      fill: "#dbeafe"
+      stroke: "#2563eb"
+      font-color: "#1e3a8a"
+    }
+  }
+  ok: {
+    style: {
+      fill: "#dcfce7"
+      stroke: "#16a34a"
+      font-color: "#14532d"
+    }
+  }
+  mute: {
+    style: {
+      fill: "#f1f5f9"
+      stroke: "#94a3b8"
+      font-color: "#334155"
+    }
+  }
+}
+
+co: "Cluster Operator\n(Deployment)" { class: key }
+k: "Kafka CRD\n클러스터 본체 정의" { class: key }
+np1: "KafkaNodePool\ncontroller 3대" { class: ok }
+np2: "KafkaNodePool\nbroker 3대 + 스토리지" { class: ok }
+t: "KafkaTopic CRD\n토픽 = YAML" { class: mute }
+u: "KafkaUser CRD\n계정 · ACL = YAML" { class: mute }
+c: "KafkaConnect CRD\n(8장의 Connect도 CRD로)" { class: mute }
+
+co -> k: 감시 · 수렴
+k -- np1
+k -- np2
+co -> t
+co -> u
+co -> c
 ```
 
 토픽과 사용자까지 CRD라는 것이 핵심이다 — **토픽 생성이 Git에 남는 YAML**이 되어,
@@ -111,20 +137,44 @@ spec:
 
 Kafka 프로토콜의 접속은 2단계다 — 이걸 모르면 온프렘 노출에서 반드시 한 번 데인다.
 
-```mermaid
-flowchart LR
-    C["클라이언트"] -->|"① bootstrap 주소로 접속"| B["아무 브로커"]
-    B -->|"② 메타데이터 응답:<br/>파티션별 리더의 advertised 주소"| C
-    C -->|"③ 각 브로커에 직접 접속"| B1["브로커 1"]
-    C --> B2["브로커 2"]
-    C --> B3["브로커 3"]
+```d2 layout=elk pad=40 title="클라이언트가 bootstrap 주소로 아무 브로커에 붙어 메타데이터를 받은 뒤 각 브로커의 advertised 주소로 직접 접속하는 순서"
+direction: down
 
-    classDef key  fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
-    classDef warn fill:#fef3c7,stroke:#d97706,color:#78350f
-    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
-    class B warn
-    class B1,B2,B3 key
-    class C mute
+classes: {
+  key: {
+    style: {
+      fill: "#dbeafe"
+      stroke: "#2563eb"
+      font-color: "#1e3a8a"
+    }
+  }
+  warn: {
+    style: {
+      fill: "#fef3c7"
+      stroke: "#d97706"
+      font-color: "#78350f"
+    }
+  }
+  mute: {
+    style: {
+      fill: "#f1f5f9"
+      stroke: "#94a3b8"
+      font-color: "#334155"
+    }
+  }
+}
+
+c: 클라이언트 { class: mute }
+b: 아무 브로커 { class: warn }
+b1: 브로커 1 { class: key }
+b2: 브로커 2 { class: key }
+b3: 브로커 3 { class: key }
+
+c -> b: ① bootstrap 주소로 접속
+b -> c: "② 메타데이터 응답:\n파티션별 리더의 advertised 주소"
+c -> b1: ③ 각 브로커에 직접 접속
+c -> b2
+c -> b3
 ```
 
 bootstrap은 입구일 뿐, 클라이언트는 결국 **모든 브로커에 개별 접속**해야 한다.

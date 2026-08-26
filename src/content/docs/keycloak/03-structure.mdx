@@ -26,25 +26,47 @@ realm 하나가 사용자 풀 하나, SSO 영역 하나다. **같은 realm의 �
 로그인이 공유된다. 토큰의 발급자(`iss`)가 realm URL이라는 것을 [2장](/keycloak/02-oauth-oidc/)에서
 봤다 — realm을 나누면 발급자가 달라지고, 신뢰 관계도 갈라진다.
 
-```mermaid
-flowchart TB
-    master["master realm<br/>Keycloak 자체 관리 전용 — 앱을 붙이지 않는다"]
-    subgraph corp["corp realm — 업무는 전부 여기"]
-        users["Users / Groups / Roles"]
-        ldap["User Federation → AD (4장)"]
-        c1["client: 사내 포털"]
-        c2["client: grafana"]
-        c3["client: oauth2-proxy"]
-        c4["client: kubernetes"]
-    end
-    master -.별개의 공간.- corp
+```d2 layout=elk pad=40 title="관리 전용 master realm과, 사용자·federation·client 넷을 담은 corp realm이 별개의 공간으로 나뉜 구조"
+direction: down
 
-    classDef key  fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
-    classDef warn fill:#fef3c7,stroke:#d97706,color:#78350f
-    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
-    class corp key
-    class master warn
-    class users,ldap,c1,c2,c3,c4 mute
+classes: {
+  key: {
+    style: {
+      fill: "#dbeafe"
+      stroke: "#2563eb"
+      font-color: "#1e3a8a"
+    }
+  }
+  warn: {
+    style: {
+      fill: "#fef3c7"
+      stroke: "#d97706"
+      font-color: "#78350f"
+    }
+  }
+  mute: {
+    style: {
+      fill: "#f1f5f9"
+      stroke: "#94a3b8"
+      font-color: "#334155"
+    }
+  }
+}
+
+master: "master realm\nKeycloak 자체 관리 전용 — 앱을 붙이지 않는다" { class: warn }
+
+corp: corp realm — 업무는 전부 여기 {
+  class: key
+  grid-columns: 2
+  users: Users / Groups / Roles { class: mute }
+  ldap: "User Federation → AD (4장)" { class: mute }
+  c1: "client: 사내 포털" { class: mute }
+  c2: "client: grafana" { class: mute }
+  c3: "client: oauth2-proxy" { class: mute }
+  c4: "client: kubernetes" { class: mute }
+}
+
+master -- corp: 별개의 공간 { style.stroke-dash: 3 }
 ```
 
 | 개념 | 내용 |

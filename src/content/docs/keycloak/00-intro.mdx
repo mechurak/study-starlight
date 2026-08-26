@@ -62,16 +62,34 @@ AD는 LDAP·Kerberos라는 **사내망의 언어**를 쓰고, 웹 앱과 쿠버�
 OIDC·JWT라는 **웹의 언어**를 쓴다. 두 세계는 서로 직접 대화하지 못한다 —
 그 사이에서 통역하는 것이 Keycloak의 자리다.
 
-```mermaid
-flowchart LR
-    AD["AD<br/>LDAP · Kerberos의 세계"] --> KC["Keycloak<br/>통역사 (IdP)"]
-    KC --> APP["웹 앱들<br/>OIDC · JWT의 세계"]
-    KC --> K8S["쿠버네티스 API 서버"]
+```d2 layout=elk pad=40 title="AD가 Keycloak을 거쳐 웹 앱과 쿠버네티스 API 서버로 이어지는 통역사 구도"
+direction: right
 
-    classDef key  fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
-    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
-    class KC key
-    class AD,APP,K8S mute
+classes: {
+  key: {
+    style: {
+      fill: "#dbeafe"
+      stroke: "#2563eb"
+      font-color: "#1e3a8a"
+    }
+  }
+  mute: {
+    style: {
+      fill: "#f1f5f9"
+      stroke: "#94a3b8"
+      font-color: "#334155"
+    }
+  }
+}
+
+ad: "AD\nLDAP · Kerberos의 세계" { class: mute }
+kc: "Keycloak\n통역사 (IdP)" { class: key }
+app: "웹 앱들\nOIDC · JWT의 세계" { class: mute }
+k8s: 쿠버네티스 API 서버 { class: mute }
+
+ad -> kc
+kc -> app
+kc -> k8s
 ```
 
 ### 2. 매핑은 두 번 일어난다

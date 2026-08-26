@@ -11,34 +11,57 @@ import { Steps, LinkCard } from '@astrojs/starlight/components';
 
 ## 전체 지도
 
-```mermaid
-flowchart LR
-    subgraph SRC["원본"]
-        AD["AD<br/>계정 · 그룹 · 비밀번호"]
-    end
-    subgraph KC["Keycloak (corp realm)"]
-        FED["User Federation<br/>LDAP 매퍼 — 4장"]
-        MODEL["사용자 · 그룹 · 롤<br/>3장"]
-        PM["Protocol Mapper<br/>3장"]
-        SES["SSO 세션 · 토큰 수명<br/>5장"]
-        FED --> MODEL --> PM
-    end
-    subgraph CONSUMER["소비자"]
-        K8S["kube-apiserver<br/>6장"]
-        NATIVE["OIDC 네이티브 앱<br/>7장"]
-        PROXY["oauth2-proxy → 레거시 앱<br/>7장"]
-    end
-    AD -->|"LDAPS bind"| FED
-    PM -->|"JWT"| K8S
-    PM -->|"JWT"| NATIVE
-    PM -->|"JWT"| PROXY
+```d2 layout=elk pad=40 title="AD 원본이 Keycloak의 federation·모델·mapper를 거쳐 kube-apiserver·네이티브 앱·oauth2-proxy 세 소비자에게 JWT로 전달되는 덱 전체 지도"
+direction: down
 
-    classDef key  fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
-    classDef ok   fill:#dcfce7,stroke:#16a34a,color:#14532d
-    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
-    class FED,PM key
-    class MODEL,SES ok
-    class AD,K8S,NATIVE,PROXY mute
+classes: {
+  key: {
+    style: {
+      fill: "#dbeafe"
+      stroke: "#2563eb"
+      font-color: "#1e3a8a"
+    }
+  }
+  ok: {
+    style: {
+      fill: "#dcfce7"
+      stroke: "#16a34a"
+      font-color: "#14532d"
+    }
+  }
+  mute: {
+    style: {
+      fill: "#f1f5f9"
+      stroke: "#94a3b8"
+      font-color: "#334155"
+    }
+  }
+}
+
+src: 원본 {
+  ad: "AD\n계정 · 그룹 · 비밀번호" { class: mute }
+}
+
+kc: "Keycloak (corp realm)" {
+  fed: "User Federation\nLDAP 매퍼 — 4장" { class: key }
+  model: "사용자 · 그룹 · 롤\n3장" { class: ok }
+  pm: "Protocol Mapper\n3장" { class: key }
+  ses: "SSO 세션 · 토큰 수명\n5장" { class: ok }
+
+  fed -> model
+  model -> pm
+}
+
+consumer: 소비자 {
+  k8s: "kube-apiserver\n6장" { class: mute }
+  native: "OIDC 네이티브 앱\n7장" { class: mute }
+  proxy: "oauth2-proxy → 레거시 앱\n7장" { class: mute }
+}
+
+src.ad -> kc.fed: LDAPS bind
+kc.pm -> consumer.k8s: JWT
+kc.pm -> consumer.native: JWT
+kc.pm -> consumer.proxy: JWT
 ```
 
 그리고 이 상자 전체가 온프렘 k8s 위에서 돈다 — Operator·Postgres·HA가 [8장](/keycloak/08-deploy/),

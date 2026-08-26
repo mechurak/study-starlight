@@ -59,19 +59,38 @@ Tailwind를 처음 본다면 아래 세 줄만 알고 들어와도 충분하다.
 
 ## 이 덱이 다루는 것
 
-```mermaid
-flowchart TB
-    T["테마 — 앱의 시각적 결정 전체"]
-    T --> C1["색<br/>4장"]
-    T --> C2["형태<br/>둥글기 · 간격 · 그림자<br/>5장"]
-    T --> C3["글자<br/>6장"]
-    T --> C4["컴포넌트<br/>7장"]
-    T --> C5["아이콘 · 폰트<br/>8장"]
+```d2 layout=elk pad=40 title="테마가 색·형태·글자·컴포넌트·아이콘 폰트 다섯 갈래로 나뉘고 각각 4~8장이 맡는 지도"
+direction: right
 
-    classDef key  fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
-    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
-    class T key
-    class C1,C2,C3,C4,C5 mute
+classes: {
+  key: {
+    style: {
+      fill: "#dbeafe"
+      stroke: "#2563eb"
+      font-color: "#1e3a8a"
+    }
+  }
+  mute: {
+    style: {
+      fill: "#f1f5f9"
+      stroke: "#94a3b8"
+      font-color: "#334155"
+    }
+  }
+}
+
+t: 테마 — 앱의 시각적 결정 전체 { class: key }
+c1: "색\n4장" { class: mute }
+c2: "형태\n둥글기 · 간격 · 그림자\n5장" { class: mute }
+c3: "글자\n6장" { class: mute }
+c4: "컴포넌트\n7장" { class: mute }
+c5: "아이콘 · 폰트\n8장" { class: mute }
+
+t -> c1
+t -> c2
+t -> c3
+t -> c4
+t -> c5
 ```
 
 리소스 다섯 종을 하나씩 다루고, 그 다음 **두 벌로 만들기(다크 모드) → 직접 만들기 → 팀에 배포하기**로 간다.

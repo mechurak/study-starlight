@@ -129,19 +129,43 @@ pnpm add next-themes
 
 가장 흔하게 겪는 증상이다. **다크 모드로 설정했는데 새로고침하면 흰 화면이 잠깐 보인다.**
 
-```mermaid
-flowchart LR
-    A["서버가 HTML 생성<br/>사용자 취향을 모른다<br/>= 라이트"] --> B["브라우저가 그린다<br/>흰 화면 ⚡"]
-    B --> C["JS 로드 · 하이드레이션"]
-    C --> D["localStorage 확인<br/>.dark 추가"]
-    D --> E["다크로 바뀐다"]
+```d2 layout=elk pad=40 title="서버가 라이트로 렌더한 뒤 JS가 localStorage를 읽어 다크로 바꾸기까지 흰 화면이 한 번 번쩍이는 순서"
+direction: down
 
-    classDef bad  fill:#fee2e2,stroke:#dc2626,color:#7f1d1d
-    classDef ok   fill:#dcfce7,stroke:#16a34a,color:#14532d
-    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
-    class B bad
-    class E ok
-    class A,C,D mute
+classes: {
+  bad: {
+    style: {
+      fill: "#fee2e2"
+      stroke: "#dc2626"
+      font-color: "#7f1d1d"
+    }
+  }
+  ok: {
+    style: {
+      fill: "#dcfce7"
+      stroke: "#16a34a"
+      font-color: "#14532d"
+    }
+  }
+  mute: {
+    style: {
+      fill: "#f1f5f9"
+      stroke: "#94a3b8"
+      font-color: "#334155"
+    }
+  }
+}
+
+a: "서버가 HTML 생성\n사용자 취향을 모른다\n= 라이트" { class: mute }
+b: "브라우저가 그린다\n흰 화면 ⚡" { class: bad }
+c: JS 로드 · 하이드레이션 { class: mute }
+d: "localStorage 확인\n.dark 추가" { class: mute }
+e: 다크로 바뀐다 { class: ok }
+
+a -> b
+b -> c
+c -> d
+d -> e
 ```
 
 이 구성에서 원인은 명확하다 — **선택이 `localStorage`에만 있어 서버가 읽을 수 없다.**

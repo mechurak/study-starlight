@@ -159,21 +159,48 @@ shadcn/ui의 색 토큰에는 규칙이 하나 있다. **배경색을 정하면 
 
 가장 자주 겪는 함정이다. **CSS 변수를 정의하는 것만으로는 `bg-primary`가 만들어지지 않는다.**
 
-```mermaid
-flowchart LR
-    A[":root / .dark<br/>--primary: oklch(…)<br/>값을 정의한다"] --> B["@theme inline<br/>--color-primary: var(--primary)<br/>클래스를 만든다"]
-    B --> C["컴포넌트<br/>class='bg-primary'"]
-    X["② 를 빠뜨리면<br/>클래스가 없다"]
-    A -.-> X
+```d2 layout=elk pad=40 title="토큰 값 정의와 @theme inline 클래스 생성을 거쳐야 컴포넌트가 클래스를 쓸 수 있고, 두 번째를 빠뜨리면 클래스가 없다는 것을 보여주는 그림"
+direction: down
 
-    classDef key  fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
-    classDef ok   fill:#dcfce7,stroke:#16a34a,color:#14532d
-    classDef bad  fill:#fee2e2,stroke:#dc2626,color:#7f1d1d
-    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
-    class A key
-    class B ok
-    class C mute
-    class X bad
+classes: {
+  key: {
+    style: {
+      fill: "#dbeafe"
+      stroke: "#2563eb"
+      font-color: "#1e3a8a"
+    }
+  }
+  ok: {
+    style: {
+      fill: "#dcfce7"
+      stroke: "#16a34a"
+      font-color: "#14532d"
+    }
+  }
+  bad: {
+    style: {
+      fill: "#fee2e2"
+      stroke: "#dc2626"
+      font-color: "#7f1d1d"
+    }
+  }
+  mute: {
+    style: {
+      fill: "#f1f5f9"
+      stroke: "#94a3b8"
+      font-color: "#334155"
+    }
+  }
+}
+
+a: ":root / .dark\n--primary: oklch(…)\n값을 정의한다" { class: key }
+b: "@theme inline\n--color-primary: var(--primary)\n클래스를 만든다" { class: ok }
+c: "컴포넌트\nclass='bg-primary'" { class: mute }
+x: "② 를 빠뜨리면\n클래스가 없다" { class: bad }
+
+a -> b
+b -> c
+a -> x { style.stroke-dash: 3 }
 ```
 
 - **왼쪽** — 무슨 값인가. 테마마다, 라이트/다크마다 다르다

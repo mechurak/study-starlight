@@ -22,24 +22,50 @@ import TermIntro from '../../../components/docs/TermIntro.astro';
 
 ## 네 겹의 통제
 
-```mermaid
-flowchart TB
-    ID["1. Identity<br/>SSO · MFA · SCIM · service principal"]
-    NET["2. Network<br/>CX/DX · VPC · endpoint · egress"]
-    DATA["3. Data<br/>Unity Catalog · IAM · row/column policy"]
-    EVID["4. Evidence<br/>KMS · audit log · lineage · alert"]
-    USE["승인된 workload"]
+```d2 layout=elk pad=40 title="Identity → Network → Data → Evidence 순으로 통제가 쌓여 승인된 workload에 도달하는 네 층"
+direction: down
 
-    ID --> NET --> DATA --> EVID --> USE
+classes: {
+  key: {
+    style: {
+      fill: "#dbeafe"
+      stroke: "#2563eb"
+      font-color: "#1e3a8a"
+    }
+  }
+  ok: {
+    style: {
+      fill: "#dcfce7"
+      stroke: "#16a34a"
+      font-color: "#14532d"
+    }
+  }
+  warn: {
+    style: {
+      fill: "#fef3c7"
+      stroke: "#d97706"
+      font-color: "#78350f"
+    }
+  }
+  zone: {
+    style: {
+      fill: "#ede9fe"
+      stroke: "#7c3aed"
+      font-color: "#4c1d95"
+    }
+  }
+}
 
-    classDef key  fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
-    classDef ok   fill:#dcfce7,stroke:#16a34a,color:#14532d
-    classDef warn fill:#fef3c7,stroke:#d97706,color:#78350f
-    classDef zone fill:#ede9fe,stroke:#7c3aed,color:#4c1d95
-    class ID key
-    class NET warn
-    class DATA zone
-    class EVID,USE ok
+id: "1. Identity\nSSO · MFA · SCIM · service principal" { class: key }
+net: "2. Network\nCX/DX · VPC · endpoint · egress" { class: warn }
+data: "3. Data\nUnity Catalog · IAM · row/column policy" { class: zone }
+evid: "4. Evidence\nKMS · audit log · lineage · alert" { class: ok }
+use: 승인된 workload { class: ok }
+
+id -> net
+net -> data
+data -> evid
+evid -> use
 ```
 
 이 장의 질문은 "CX/DX와 PrivateLink를 구성하면 보안 검토가 끝나는가"다. 답은 아니다. private IP로

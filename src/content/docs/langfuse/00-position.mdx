@@ -35,25 +35,55 @@ prompt version이 바뀌었는지 보려면 실행 내부의 의미가 필요하
 
 ## 주변 도구와의 경계
 
-```mermaid
-flowchart TB
-    USER["사용자 요청"] --> APP["LLM 애플리케이션<br/>RAG · agent · workflow"]
-    APP --> GATE["LiteLLM<br/>인증 · budget · routing"]
-    GATE --> MODEL["모델 endpoint<br/>외부 API · 사내 vLLM"]
+```d2 layout=elk pad=40 title="사용자 요청이 애플리케이션과 LiteLLM을 거쳐 모델로 가는 본선 옆에서, Langfuse와 일반 관측 스택이 각각 무엇을 받아 가는지 보여주는 자리 지도"
+direction: down
 
-    APP -.-> LF["Langfuse<br/>동작 · cost · quality"]
-    GATE -.-> LF
-    APP -.-> APM["일반 관측 스택<br/>metric · log · OTel trace"]
-    LF --> LOOP["prompt · dataset · evaluation"]
+classes: {
+  key: {
+    style: {
+      fill: "#dbeafe"
+      stroke: "#2563eb"
+      font-color: "#1e3a8a"
+    }
+  }
+  zone: {
+    style: {
+      fill: "#ede9fe"
+      stroke: "#7c3aed"
+      font-color: "#4c1d95"
+    }
+  }
+  ok: {
+    style: {
+      fill: "#dcfce7"
+      stroke: "#16a34a"
+      font-color: "#14532d"
+    }
+  }
+  warn: {
+    style: {
+      fill: "#fef3c7"
+      stroke: "#d97706"
+      font-color: "#78350f"
+    }
+  }
+}
 
-    classDef key  fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
-    classDef zone fill:#ede9fe,stroke:#7c3aed,color:#4c1d95
-    classDef ok   fill:#dcfce7,stroke:#16a34a,color:#14532d
-    classDef warn fill:#fef3c7,stroke:#d97706,color:#78350f
-    class USER,APP key
-    class GATE,MODEL ok
-    class LF,LOOP zone
-    class APM warn
+user: 사용자 요청 { class: key }
+app: "LLM 애플리케이션\nRAG · agent · workflow" { class: key }
+gate: "LiteLLM\n인증 · budget · routing" { class: ok }
+model: "모델 endpoint\n외부 API · 사내 vLLM" { class: ok }
+lf: "Langfuse\n동작 · cost · quality" { class: zone }
+apm: "일반 관측 스택\nmetric · log · OTel trace" { class: warn }
+loop: prompt · dataset · evaluation { class: zone }
+
+user -> app
+app -> gate
+gate -> model
+app -> lf { style.stroke-dash: 3 }
+gate -> lf { style.stroke-dash: 3 }
+app -> apm { style.stroke-dash: 3 }
+lf -> loop
 ```
 
 Langfuse가 OpenTelemetry를 사용해도 Tempo 전체를 대체하지 않는다. DB query·HTTP client·CPU 포화는 일반 APM이

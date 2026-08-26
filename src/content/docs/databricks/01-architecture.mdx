@@ -22,37 +22,62 @@ import TermIntro from '../../../components/docs/TermIntro.astro';
 
 ## 전체 중 이 장의 자리
 
-```mermaid
-flowchart TB
-    subgraph databricks["Databricks 관리 영역"]
-        CTRL["Control plane<br/>UI · API · orchestration"]
-        UC["Unity Catalog metastore<br/>권한 · metadata · lineage"]
-        SV["Serverless compute plane<br/>Databricks 관리 compute"]
-    end
-    subgraph customer["회사 AWS 계정"]
-        CL["Classic compute plane<br/>EC2 in customer-managed VPC"]
-        S3["S3<br/>managed · external data"]
-        DB["RDS · 내부 API"]
-    end
-    ONP["온프렘 DB"]
+```d2 layout=elk pad=40 title="Databricks 관리 영역의 control plane·Unity Catalog·serverless compute와 회사 AWS 계정의 classic compute·S3·RDS, 그리고 온프렘 DB가 어떤 경로로 이어지는지 보여주는 구조도"
+direction: down
 
-    CTRL --> CL
-    CTRL --> SV
-    CL --> S3
-    CL --> DB
-    CL --> ONP
-    SV -. "NCC · 허용된 private/public path" .-> S3
-    SV -.-> DB
-    UC -. "논리 권한" .-> S3
+classes: {
+  key: {
+    style: {
+      fill: "#dbeafe"
+      stroke: "#2563eb"
+      font-color: "#1e3a8a"
+    }
+  }
+  ok: {
+    style: {
+      fill: "#dcfce7"
+      stroke: "#16a34a"
+      font-color: "#14532d"
+    }
+  }
+  warn: {
+    style: {
+      fill: "#fef3c7"
+      stroke: "#d97706"
+      font-color: "#78350f"
+    }
+  }
+  zone: {
+    style: {
+      fill: "#ede9fe"
+      stroke: "#7c3aed"
+      font-color: "#4c1d95"
+    }
+  }
+}
 
-    classDef key  fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
-    classDef ok   fill:#dcfce7,stroke:#16a34a,color:#14532d
-    classDef warn fill:#fef3c7,stroke:#d97706,color:#78350f
-    classDef zone fill:#ede9fe,stroke:#7c3aed,color:#4c1d95
-    class CTRL,UC zone
-    class SV warn
-    class CL,S3,DB ok
-    class ONP key
+databricks: Databricks 관리 영역 {
+  ctrl: "Control plane\nUI · API · orchestration" { class: zone }
+  uc: "Unity Catalog metastore\n권한 · metadata · lineage" { class: zone }
+  sv: "Serverless compute plane\nDatabricks 관리 compute" { class: warn }
+}
+
+customer: 회사 AWS 계정 {
+  cl: "Classic compute plane\nEC2 in customer-managed VPC" { class: ok }
+  s3: "S3\nmanaged · external data" { class: ok }
+  db: RDS · 내부 API { class: ok }
+}
+
+onp: 온프렘 DB { class: key }
+
+databricks.ctrl -> customer.cl
+databricks.ctrl -> databricks.sv
+customer.cl -> customer.s3
+customer.cl -> customer.db
+customer.cl -> onp
+databricks.sv -> customer.s3: NCC · 허용된 private/public path { style.stroke-dash: 3 }
+databricks.sv -> customer.db { style.stroke-dash: 3 }
+databricks.uc -> customer.s3: 논리 권한 { style.stroke-dash: 3 }
 ```
 
 이 장의 질문은 두 개다. "우리 AWS 계정에서 실제로 생성되는 resource는 무엇인가", 그리고
@@ -91,18 +116,20 @@ workspace 하나에서 모든 compute를 같은 방식으로 고를 필요는 �
 DB에서 증분 data를 읽어 S3 Delta table에 적재하고, serverless SQL warehouse가 허용된 S3 table을
 조회할 수 있다. 다만 같은 table을 본다고 해서 network policy까지 같은 것은 아니다.
 
-```mermaid
-sequenceDiagram
-    participant DB as 온프렘 DB
-    participant C as Classic ingest job
-    participant S3 as 회사 S3 Delta
-    participant UC as Unity Catalog
-    participant S as Serverless SQL
-    DB->>C: CX/DX private route로 증분 read
-    C->>S3: Bronze/Silver write
-    C->>UC: table·lineage 반영
-    S->>UC: SELECT 권한 확인
-    S->>S3: 허용된 storage path read
+```d2 pad=40 title="온프렘 DB에서 classic ingest job이 증분을 읽어 S3 Delta에 쓰고 Unity Catalog에 반영한 뒤, serverless SQL이 권한을 확인하고 읽는 순서도"
+shape: sequence_diagram
+
+db: 온프렘 DB
+c: Classic ingest job
+s3: 회사 S3 Delta
+uc: Unity Catalog
+s: Serverless SQL
+
+db -> c: CX/DX private route로 증분 read
+c -> s3: Bronze/Silver write
+c -> uc: table·lineage 반영
+s -> uc: SELECT 권한 확인
+s -> s3: 허용된 storage path read
 ```
 
 ## 참고 자료

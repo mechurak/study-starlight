@@ -33,22 +33,43 @@ Keycloak의 기본 전략은 **"access token은 아주 짧게, 갱신은 세션�
 
 ## 구조 — 세션과 토큰은 층이 다르다
 
-```mermaid
-flowchart TB
-    SSO["SSO 세션 (realm 수준)<br/>로그인 1회 = 세션 1개"]
-    CS1["클라이언트 세션<br/>앱 A"]
-    CS2["클라이언트 세션<br/>앱 B"]
-    T1["access token<br/>(분 단위, 스냅샷)"]
-    T2["access token<br/>(분 단위, 스냅샷)"]
-    SSO --> CS1 --> T1
-    SSO --> CS2 --> T2
+```d2 layout=elk pad=40 title="realm 수준 SSO 세션 하나가 앱 A·B의 클라이언트 세션으로 갈라지고 각각 access token을 발급하는 계층"
+direction: down
 
-    classDef key  fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
-    classDef ok   fill:#dcfce7,stroke:#16a34a,color:#14532d
-    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
-    class SSO key
-    class CS1,CS2 ok
-    class T1,T2 mute
+classes: {
+  key: {
+    style: {
+      fill: "#dbeafe"
+      stroke: "#2563eb"
+      font-color: "#1e3a8a"
+    }
+  }
+  ok: {
+    style: {
+      fill: "#dcfce7"
+      stroke: "#16a34a"
+      font-color: "#14532d"
+    }
+  }
+  mute: {
+    style: {
+      fill: "#f1f5f9"
+      stroke: "#94a3b8"
+      font-color: "#334155"
+    }
+  }
+}
+
+sso: "SSO 세션 (realm 수준)\n로그인 1회 = 세션 1개" { class: key }
+cs1: "클라이언트 세션\n앱 A" { class: ok }
+cs2: "클라이언트 세션\n앱 B" { class: ok }
+t1: "access token\n(분 단위, 스냅샷)" { class: mute }
+t2: "access token\n(분 단위, 스냅샷)" { class: mute }
+
+sso -> cs1
+cs1 -> t1
+sso -> cs2
+cs2 -> t2
 ```
 
 | 층 | 무엇 | 수명의 의미 |
@@ -115,19 +136,20 @@ offline_access scope를 **꼭 필요한 client에만** 열어 주는 것이 예�
 로그인은 한 곳(Keycloak)에서 일어나지만, **각 앱은 자기 세션을 따로 갖고 있다**
 (토큰 검증 후 자체 쿠키·세션 발급). 그래서 로그아웃은 전파 문제가 된다.
 
-```mermaid
-sequenceDiagram
-    participant U as 브라우저
-    participant A as 앱 A
-    participant K as Keycloak
-    participant B as 앱 B
+```d2 pad=40 title="앱 A에서 로그아웃하면 Keycloak이 SSO 세션을 끝내고 앱 B에 backchannel logout을 통지해 각 앱의 세션이 폐기되는 순서"
+shape: sequence_diagram
 
-    U->>A: 로그아웃 클릭
-    A->>K: RP-initiated logout (id_token_hint 포함)
-    K->>K: SSO 세션 종료
-    K--)B: backchannel logout 통지 (서버 대 서버)
-    B->>B: 자기 세션 폐기
-    K-->>U: 로그아웃 완료 → 앱으로 redirect
+u: 브라우저
+a: 앱 A
+k: Keycloak
+b: 앱 B
+
+u -> a: 로그아웃 클릭
+a -> k: "RP-initiated logout (id_token_hint 포함)"
+k -> k: SSO 세션 종료
+k -> b: "backchannel logout 통지 (서버 대 서버)" { style.stroke-dash: 3 }
+b -> b: 자기 세션 폐기
+k -> u: 로그아웃 완료 → 앱으로 redirect { style.stroke-dash: 3 }
 ```
 
 | 방식 | 동작 | 조건 |

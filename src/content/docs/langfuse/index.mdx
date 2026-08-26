@@ -17,24 +17,55 @@ LLM 애플리케이션은 같은 입력에도 모델·검색 결과·tool 상태
 Langfuse는 한 turn이나 agent run을 trace로 묶고 그 안의 LLM 호출·검색·tool 실행을 observation으로 남긴다.
 여기에 prompt version, token·cost와 score를 연결하면 **관측 → 평가 → 실험 → 배포 → 다시 관측**의 루프가 된다.
 
-```mermaid
-flowchart LR
-    APP["LLM 애플리케이션<br/>agent · RAG · chatbot"] -->|"OTel observation batch"| LF["Langfuse<br/>trace · cost · quality"]
-    LF --> FIND["문제 발견<br/>느림 · 비쌈 · 낮은 score"]
-    FIND --> DATA["dataset에 사례 추가"]
-    DATA --> EXP["prompt · model 실험"]
-    EXP -->|"검증된 version"| PROD["production label 배포"]
-    PROD --> APP
-    APP --> GATE["LiteLLM<br/>인증 · routing"]
+```d2 layout=elk pad=40 title="애플리케이션이 Langfuse로 관측을 보내고 문제 발견·dataset·실험·production 배포를 거쳐 다시 애플리케이션으로 돌아오는 개선 순환"
+direction: down
 
-    classDef key  fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
-    classDef zone fill:#ede9fe,stroke:#7c3aed,color:#4c1d95
-    classDef ok   fill:#dcfce7,stroke:#16a34a,color:#14532d
-    classDef warn fill:#fef3c7,stroke:#d97706,color:#78350f
-    class APP,LF key
-    class FIND,DATA zone
-    class EXP,PROD ok
-    class GATE warn
+classes: {
+  key: {
+    style: {
+      fill: "#dbeafe"
+      stroke: "#2563eb"
+      font-color: "#1e3a8a"
+    }
+  }
+  zone: {
+    style: {
+      fill: "#ede9fe"
+      stroke: "#7c3aed"
+      font-color: "#4c1d95"
+    }
+  }
+  ok: {
+    style: {
+      fill: "#dcfce7"
+      stroke: "#16a34a"
+      font-color: "#14532d"
+    }
+  }
+  warn: {
+    style: {
+      fill: "#fef3c7"
+      stroke: "#d97706"
+      font-color: "#78350f"
+    }
+  }
+}
+
+app: "LLM 애플리케이션\nagent · RAG · chatbot" { class: key }
+lf: "Langfuse\ntrace · cost · quality" { class: key }
+find: "문제 발견\n느림 · 비쌈 · 낮은 score" { class: zone }
+data: dataset에 사례 추가 { class: zone }
+exp: prompt · model 실험 { class: ok }
+prod: production label 배포 { class: ok }
+gate: "LiteLLM\n인증 · routing" { class: warn }
+
+app -> lf: OTel observation batch
+lf -> find
+find -> data
+data -> exp
+exp -> prod: 검증된 version
+prod -> app
+app -> gate
 ```
 
 **2026년 8월 18일 기준** Langfuse v4와 최신 GA SDK를 기준으로 확인했다. Cloud는 2026년 11월 16일까지
