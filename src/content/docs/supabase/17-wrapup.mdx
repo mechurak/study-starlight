@@ -11,31 +11,33 @@ import { Steps, Card, CardGrid, LinkCard } from '@astrojs/starlight/components';
 
 ## 전체 그림 되짚기
 
-```mermaid
-flowchart TB
-    U["사용자"]
-    U --> V["Vercel — 실행 계층<br/>렌더링 · 라우팅 · 요청 단위 서버 코드"]
-    U -.->|"직접 연결"| S
+```d2 layout=elk pad=40 title="Vercel은 실행 계층, Supabase는 상태 계층 — Auth·Storage·Realtime·Edge Functions가 모두 Postgres + RLS 위에 있다"
+direction: down
 
-    subgraph S["Supabase — 상태 계층"]
-      direction LR
-      A["Auth<br/>JWT 발급"]
-      P[("Postgres + RLS")]
-      ST["Storage"]
-      RT["Realtime"]
-      EF["Edge Functions"]
-      A --> P
-      ST --> P
-      RT --> P
-      EF --> P
-    end
+classes: {
+  key: { style: { fill: "#dbeafe"; stroke: "#2563eb"; font-color: "#1e3a8a" } }
+  mute: { style: { fill: "#f1f5f9"; stroke: "#94a3b8"; font-color: "#334155" } }
+}
 
-    V --> S
+u: 사용자 { class: mute }
+v: "Vercel — 실행 계층\n렌더링 · 라우팅 · 요청 단위 서버 코드" { class: mute }
 
-    classDef key  fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
-    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
-    class P key
-    class U,V,A,ST,RT,EF mute
+s: Supabase — 상태 계층 {
+  a: "Auth\nJWT 발급" { class: mute }
+  p: Postgres + RLS { shape: cylinder; class: key }
+  st: Storage { class: mute }
+  rt: Realtime { class: mute }
+  ef: Edge Functions { class: mute }
+
+  a -> p
+  st -> p
+  rt -> p
+  ef -> p
+}
+
+u -> v
+u -> s: 직접 연결 { style.stroke-dash: 3 }
+v -> s
 ```
 
 **한 문장:** Auth가 발급한 JWT를 Postgres의 RLS가 해석해서 행 단위로 접근을 판정한다.

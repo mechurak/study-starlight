@@ -18,18 +18,23 @@ import { Tabs, TabItem, Steps, Card, CardGrid, LinkCard } from '@astrojs/starlig
 | 결과물 / 입력 | JWT를 발급한다 | JWT의 클레임을 읽는다 |
 | 다루는 장 | 6장 | [7장](/supabase/07-rls/) |
 
-```mermaid
-flowchart LR
-    L["로그인"] --> A["Auth 가 JWT 발급"]
-    A --> P["PostgREST 가 풀어<br/>세션 변수에 주입"]
-    P --> R["RLS 가 읽고 판정"]
+```d2 layout=elk pad=40 title="로그인으로 발급된 JWT를 PostgREST가 세션 변수에 주입하고 RLS가 읽어 판정하는 4단계"
+direction: down
 
-    classDef ok   fill:#dcfce7,stroke:#16a34a,color:#14532d
-    classDef key  fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
-    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
-    class A ok
-    class R key
-    class L,P mute
+classes: {
+  ok: { style: { fill: "#dcfce7"; stroke: "#16a34a"; font-color: "#14532d" } }
+  key: { style: { fill: "#dbeafe"; stroke: "#2563eb"; font-color: "#1e3a8a" } }
+  mute: { style: { fill: "#f1f5f9"; stroke: "#94a3b8"; font-color: "#334155" } }
+}
+
+l: 로그인 { class: mute }
+a: Auth 가 JWT 발급 { class: ok }
+p: "PostgREST 가 풀어\n세션 변수에 주입" { class: mute }
+r: RLS 가 읽고 판정 { class: key }
+
+l -> a
+a -> p
+p -> r
 ```
 
 Auth를 직접 만들면 최소한 이만큼을 다뤄야 한다 —
@@ -86,17 +91,18 @@ Auth를 직접 만들면 최소한 이만큼을 다뤄야 한다 —
 
 ### access token과 refresh token
 
-```mermaid
-sequenceDiagram
-    participant C as 클라이언트
-    participant A as Auth
+```d2 pad=40 title="비밀번호 로그인으로 받은 access token과 refresh token이 만료 임박 시 회전되며 갱신되는 순서"
+shape: sequence_diagram
 
-    C->>A: signInWithPassword
-    A-->>C: access_token (1시간) + refresh_token (장기)
-    Note over C: access_token 으로 API 호출
-    C->>A: 만료 임박 → refresh_token 으로 갱신
-    A-->>C: 새 access_token + 새 refresh_token
-    Note over C: refresh_token 은 1회용 — 회전된다
+c: 클라이언트
+a: Auth
+
+c -> a: signInWithPassword
+a -> c: access_token (1시간) + refresh_token (장기) { style.stroke-dash: 3 }
+c.n1: access_token 으로 API 호출
+c -> a: 만료 임박 → refresh_token 으로 갱신
+a -> c: 새 access_token + 새 refresh_token { style.stroke-dash: 3 }
+c.n2: refresh_token 은 1회용 — 회전된다
 ```
 
 - **access token** — 짧게 산다(기본 1시간). 모든 API 요청에 실린다.
@@ -149,24 +155,25 @@ const { data, error } = await supabase.auth.signUp({
 이메일 확인이 켜져 있으면 `data.user`는 오지만 **`data.session`은 `null`** 이다.
 확인 메일의 링크를 눌러야 세션이 생긴다.
 
-```mermaid
-sequenceDiagram
-    participant U as 사용자
-    participant App as 앱
-    participant A as Auth
-    participant M as 메일
+```d2 pad=40 title="메일 확인 가입 흐름 — signUp 후 확인 메일의 링크를 눌러 code를 받고 exchangeCodeForSession으로 세션을 얻는 순서"
+shape: sequence_diagram
 
-    U->>App: 가입 폼 제출
-    App->>A: signUp(email, password)
-    A->>M: 확인 메일 발송 (토큰 포함 링크)
-    A-->>App: user (session 은 null)
-    App-->>U: "메일을 확인하세요"
-    U->>M: 링크 클릭
-    M->>A: GET /auth/v1/verify?token=...
-    A-->>U: emailRedirectTo 로 리다이렉트 (code 포함)
-    U->>App: /auth/callback?code=...
-    App->>A: exchangeCodeForSession(code)
-    A-->>App: session 발급
+u: 사용자
+app: 앱
+a: Auth
+m: 메일
+
+u -> app: 가입 폼 제출
+app -> a: signUp(email, password)
+a -> m: 확인 메일 발송 (토큰 포함 링크)
+a -> app: user (session 은 null) { style.stroke-dash: 3 }
+app -> u: "\"메일을 확인하세요\"" { style.stroke-dash: 3 }
+u -> m: 링크 클릭
+m -> a: GET /auth/v1/verify?token=...
+a -> u: emailRedirectTo 로 리다이렉트 (code 포함) { style.stroke-dash: 3 }
+u -> app: /auth/callback?code=...
+app -> a: exchangeCodeForSession(code)
+a -> app: session 발급 { style.stroke-dash: 3 }
 ```
 
 로컬 개발에서는 `http://127.0.0.1:54324`(Mailpit)에서 메일을 확인한다.
@@ -335,20 +342,21 @@ export async function GET(request: Request) {
 PKCE(Proof Key for Code Exchange)가 서버 사이드 렌더링 환경의 기본 플로우다 —
 브라우저가 만든 비밀값(verifier)을 증명으로 요구해, 코드만 가로채서는 세션을 얻지 못하게 한다.
 
-```mermaid
-sequenceDiagram
-    participant B as 브라우저
-    participant P as OAuth 제공자
-    participant S as 우리 서버
-    participant A as Supabase Auth
+```d2 pad=40 title="PKCE 흐름 — 브라우저가 만든 code_verifier를 서버가 code와 함께 교환해 세션을 쿠키에 저장하는 순서"
+shape: sequence_diagram
 
-    B->>B: code_verifier 생성 → 해시(code_challenge)
-    B->>P: 인증 요청 + code_challenge
-    P-->>B: 리다이렉트 (?code=...)
-    B->>S: /auth/callback?code=...
-    S->>A: exchangeCodeForSession(code + code_verifier)
-    A-->>S: session (쿠키에 저장)
-    S-->>B: 리다이렉트 + Set-Cookie
+b: 브라우저
+p: OAuth 제공자
+s: 우리 서버
+a: Supabase Auth
+
+b -> b: code_verifier 생성 → 해시(code_challenge)
+b -> p: 인증 요청 + code_challenge
+p -> b: 리다이렉트 (?code=...) { style.stroke-dash: 3 }
+b -> s: /auth/callback?code=...
+s -> a: exchangeCodeForSession(code + code_verifier)
+a -> s: session (쿠키에 저장) { style.stroke-dash: 3 }
+s -> b: 리다이렉트 + Set-Cookie { style.stroke-dash: 3 }
 ```
 
 - **토큰이 URL 프래그먼트에 노출되지 않는다** — implicit 플로우보다 안전하다

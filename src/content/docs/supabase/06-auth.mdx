@@ -29,19 +29,20 @@ Supabase는 Google의 로그인 결과를 받아 자기 세션으로 바꾸고, 
 
 ## Google 로그인이 네 시스템을 거치는 이유
 
-```mermaid
-sequenceDiagram
-    participant U as 사용자
-    participant App as 우리 앱 (Vercel)
-    participant G as Google
-    participant S as Supabase Auth
+```d2 pad=40 title="Google 로그인 시 인증 결과가 Supabase callback과 앱 callback을 거쳐 code로 전달되고 세션으로 교환되는 순서"
+shape: sequence_diagram
 
-    U->>App: Google로 로그인 클릭
-    App->>G: Google 인증 화면으로 이동
-    G-->>S: 허용된 Supabase callback으로 결과 전달
-    S-->>App: 허용된 앱 callback으로 code 전달
-    App->>S: code를 Supabase session으로 교환
-    S-->>App: access token + refresh token
+u: 사용자
+app: 우리 앱 (Vercel)
+g: Google
+s: Supabase Auth
+
+u -> app: Google로 로그인 클릭
+app -> g: Google 인증 화면으로 이동
+g -> s: 허용된 Supabase callback으로 결과 전달 { style.stroke-dash: 3 }
+s -> app: 허용된 앱 callback으로 code 전달 { style.stroke-dash: 3 }
+app -> s: code를 Supabase session으로 교환
+s -> app: access token + refresh token { style.stroke-dash: 3 }
 ```
 
 Google은 아무 사이트에나 사용자 로그인 결과를 보내면 안 된다. 그래서 Google Cloud에

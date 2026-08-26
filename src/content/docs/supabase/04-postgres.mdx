@@ -88,22 +88,22 @@ alter table public.posts
   add foreign key (author_id) references public.profiles (id) on delete cascade;
 ```
 
-```mermaid
-flowchart LR
-    AU[("auth.users<br/>Supabase 관리 · API 비노출")]
-    PR[("public.profiles<br/>내가 만든다 · API 노출")]
-    PO[("public.posts")]
+```d2 layout=elk pad=40 title="auth.users에서 트리거로 public.profiles가 생기고 posts는 author_id로 profiles를 참조하며 RLS는 auth.uid()로 판정한다"
+direction: down
 
-    AU -->|"가입 트리거로 행 생성"| PR
-    PR -->|"author_id 외래 키"| PO
-    AU -.->|"auth.uid() 로 RLS 판정"| PO
+classes: {
+  ok: { style: { fill: "#dcfce7"; stroke: "#16a34a"; font-color: "#14532d" } }
+  key: { style: { fill: "#dbeafe"; stroke: "#2563eb"; font-color: "#1e3a8a" } }
+  mute: { style: { fill: "#f1f5f9"; stroke: "#94a3b8"; font-color: "#334155" } }
+}
 
-    classDef key  fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
-    classDef ok   fill:#dcfce7,stroke:#16a34a,color:#14532d
-    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
-    class AU key
-    class PR ok
-    class PO mute
+au: "auth.users\nSupabase 관리 · API 비노출" { shape: cylinder; class: key }
+pr: "public.profiles\n내가 만든다 · API 노출" { shape: cylinder; class: ok }
+po: public.posts { shape: cylinder; class: mute }
+
+au -> pr: 가입 트리거로 행 생성
+pr -> po: author_id 외래 키
+au -> po: "auth.uid() 로 RLS 판정" { style.stroke-dash: 3 }
 ```
 
 **FK는 `profiles`를 향하고, 권한 판정은 `auth.uid()`를 향한다.**

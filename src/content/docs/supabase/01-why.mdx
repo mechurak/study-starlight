@@ -23,25 +23,35 @@ import { Tabs, TabItem, Card, CardGrid, LinkCard } from '@astrojs/starlight/comp
 문제는 이게 다 **제품의 차별점이 아니라는 것**이다. 어느 서비스나 똑같이 필요하다.
 BaaS(Backend as a Service)는 이 목록을 통째로 제품으로 사 오는 접근이다.
 
-```mermaid
-flowchart LR
-    subgraph DIY["직접 구축"]
-      direction TB
-      A1["프론트엔드"] --> A2["API 서버"]
-      A2 --> A3[("DB")]
-      A2 --> A4["Auth 로직"]
-      A2 --> A5["파일 스토리지"]
-      A2 --> A6["WebSocket 서버"]
-    end
-    subgraph BAAS["BaaS"]
-      direction TB
-      B1["프론트엔드"] --> B2["관리형 백엔드"]
-    end
+```d2 layout=elk pad=40 title="직접 구축은 API 서버·Auth·스토리지·WebSocket을 각각 만들어야 하고, BaaS는 관리형 백엔드 하나로 끝난다"
+direction: right
 
-    classDef warn fill:#fef3c7,stroke:#d97706,color:#78350f
-    classDef ok   fill:#dcfce7,stroke:#16a34a,color:#14532d
-    class A2,A4,A5,A6 warn
-    class B2 ok
+classes: {
+  ok: { style: { fill: "#dcfce7"; stroke: "#16a34a"; font-color: "#14532d" } }
+  warn: { style: { fill: "#fef3c7"; stroke: "#d97706"; font-color: "#78350f" } }
+}
+
+diy: 직접 구축 {
+  a1: 프론트엔드
+  a2: API 서버 { class: warn }
+  a3: DB { shape: cylinder }
+  a4: Auth 로직 { class: warn }
+  a5: 파일 스토리지 { class: warn }
+  a6: WebSocket 서버 { class: warn }
+
+  a1 -> a2
+  a2 -> a3
+  a2 -> a4
+  a2 -> a5
+  a2 -> a6
+}
+
+baas: BaaS {
+  b1: 프론트엔드
+  b2: 관리형 백엔드 { class: ok }
+
+  b1 -> b2
+}
 ```
 
 ## Supabase의 한 줄 정의
@@ -121,17 +131,19 @@ Supabase의 구성 요소는 대부분 **개별 오픈소스 프로젝트**다
 (Postgres, PostgREST, GoTrue, Realtime, Storage API, Supavisor…).
 `docker compose`로 셀프호스팅할 수 있고, 실제로 그렇게 운영하는 곳이 있다.
 
-```mermaid
-flowchart LR
-    C["Supabase Cloud<br/>프로젝트 생성 → 즉시 사용"]
-    S["셀프호스팅<br/>docker compose · Kubernetes · BYOC"]
-    C -.->|"pg_dump · 마이그레이션 파일"| S
-    S -.->|"같은 스키마 · 같은 정책"| C
+```d2 layout=elk pad=40 title="Supabase Cloud와 셀프호스팅은 pg_dump·마이그레이션 파일로 오갈 수 있고 스키마와 정책이 같다"
+direction: down
 
-    classDef ok   fill:#dcfce7,stroke:#16a34a,color:#14532d
-    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
-    class C ok
-    class S mute
+classes: {
+  ok: { style: { fill: "#dcfce7"; stroke: "#16a34a"; font-color: "#14532d" } }
+  mute: { style: { fill: "#f1f5f9"; stroke: "#94a3b8"; font-color: "#334155" } }
+}
+
+c: "Supabase Cloud\n프로젝트 생성 → 즉시 사용" { class: ok }
+s: "셀프호스팅\ndocker compose · Kubernetes · BYOC" { class: mute }
+
+c -> s: pg_dump · 마이그레이션 파일 { style.stroke-dash: 3 }
+s -> c: 같은 스키마 · 같은 정책 { style.stroke-dash: 3 }
 ```
 
 현실적으로는 대부분 셀프호스팅하지 않는다.

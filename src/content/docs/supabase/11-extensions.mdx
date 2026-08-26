@@ -21,18 +21,23 @@ Supabase는 50개 이상의 확장을 미리 준비해 두고 **토글 하나로
 큐가 필요하다고 Redis를 붙이는 대신 —
 **같은 DB 안에서 해결되는 경우가 많다.**
 
-```mermaid
-flowchart LR
-    N["필요한 기능"] --> Q{"별도 인프라가<br/>정말 필요한가?"}
-    Q -->|"확장으로 됨"| E["pgvector · pg_cron<br/>pgmq · wrappers"]
-    Q -->|"규모가 넘어섬"| X["전용 시스템<br/>분리"]
+```d2 layout=elk pad=40 title="필요한 기능에 별도 인프라가 정말 필요한지 판단 — 확장으로 되면 pgvector·pg_cron·pgmq·wrappers, 규모가 넘어서면 전용 시스템 분리"
+direction: down
 
-    classDef ok   fill:#dcfce7,stroke:#16a34a,color:#14532d
-    classDef warn fill:#fef3c7,stroke:#d97706,color:#78350f
-    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
-    class E ok
-    class X warn
-    class N,Q mute
+classes: {
+  ok: { style: { fill: "#dcfce7"; stroke: "#16a34a"; font-color: "#14532d" } }
+  warn: { style: { fill: "#fef3c7"; stroke: "#d97706"; font-color: "#78350f" } }
+  mute: { style: { fill: "#f1f5f9"; stroke: "#94a3b8"; font-color: "#334155" } }
+}
+
+n: 필요한 기능 { class: mute }
+q: "별도 인프라가\n정말 필요한가?" { shape: diamond; class: mute }
+e: "pgvector · pg_cron\npgmq · wrappers" { class: ok }
+x: "전용 시스템\n분리" { class: warn }
+
+n -> q
+q -> e: 확장으로 됨
+q -> x: 규모가 넘어섬
 ```
 
 ## 설치와 관리
@@ -58,17 +63,24 @@ where installed_version is not null;
 
 ### 무엇을 푸는가
 
-```mermaid
-flowchart LR
-    T["텍스트<br/>'환불 정책이 뭔가요'"] --> E["임베딩 모델"]
-    E --> V["벡터<br/>0.02, -0.31, ..."]
-    V --> S["벡터 인덱스에서<br/>가장 가까운 이웃 검색"]
-    S --> R["의미가 비슷한 문서"]
+```d2 layout=elk pad=40 title="텍스트가 임베딩 모델을 거쳐 벡터가 되고 벡터 인덱스의 최근접 이웃 검색으로 의미가 비슷한 문서를 찾는 흐름"
+direction: down
 
-    classDef key  fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
-    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
-    class V key
-    class T,E,S,R mute
+classes: {
+  key: { style: { fill: "#dbeafe"; stroke: "#2563eb"; font-color: "#1e3a8a" } }
+  mute: { style: { fill: "#f1f5f9"; stroke: "#94a3b8"; font-color: "#334155" } }
+}
+
+t: "텍스트\n'환불 정책이 뭔가요'" { class: mute }
+e: 임베딩 모델 { class: mute }
+v: "벡터\n0.02, -0.31, ..." { class: key }
+s: "벡터 인덱스에서\n가장 가까운 이웃 검색" { class: mute }
+r: 의미가 비슷한 문서 { class: mute }
+
+t -> e
+e -> v
+v -> s
+s -> r
 ```
 
 키워드가 겹치지 않아도 **의미가 비슷하면 찾아낸다.**
@@ -270,20 +282,27 @@ DB 안에서 외부 API 키가 필요할 때(예: pg_net으로 웹훅 호출) �
 
 "매일 밤 미발송 알림을 모아 이메일로 보낸다"를 외부 인프라 0개로 만든다.
 
-```mermaid
-flowchart LR
-    A["pg_cron<br/>매일 02:00"] --> B["SQL: 대상 조회<br/>→ pgmq.send()"]
-    B --> C["pg_cron<br/>1분마다"]
-    C --> D["pg_net 으로<br/>Edge Function 호출"]
-    D --> E["Edge Function<br/>큐 읽기 → 메일 발송"]
-    E --> F["pgmq.delete()<br/>또는 재시도"]
+```d2 layout=elk pad=40 title="pg_cron이 대상을 pgmq에 넣고 다시 pg_cron이 pg_net으로 Edge Function을 불러 메일을 보낸 뒤 큐에서 지우는 흐름"
+direction: down
 
-    classDef ok   fill:#dcfce7,stroke:#16a34a,color:#14532d
-    classDef warn fill:#fef3c7,stroke:#d97706,color:#78350f
-    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
-    class A ok
-    class E warn
-    class B,C,D,F mute
+classes: {
+  ok: { style: { fill: "#dcfce7"; stroke: "#16a34a"; font-color: "#14532d" } }
+  warn: { style: { fill: "#fef3c7"; stroke: "#d97706"; font-color: "#78350f" } }
+  mute: { style: { fill: "#f1f5f9"; stroke: "#94a3b8"; font-color: "#334155" } }
+}
+
+a: "pg_cron\n매일 02:00" { class: ok }
+b: "SQL: 대상 조회\n→ pgmq.send()" { class: mute }
+c: "pg_cron\n1분마다" { class: mute }
+d: "pg_net 으로\nEdge Function 호출" { class: mute }
+e: "Edge Function\n큐 읽기 → 메일 발송" { class: warn }
+f: "pgmq.delete()\n또는 재시도" { class: mute }
+
+a -> b
+b -> c
+c -> d
+d -> e
+e -> f
 ```
 
 - 큐도, 스케줄러도, 워커도 전부 프로젝트 안에 있다

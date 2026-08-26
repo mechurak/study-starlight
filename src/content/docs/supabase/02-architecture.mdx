@@ -11,36 +11,44 @@ import { Tabs, TabItem, LinkCard } from '@astrojs/starlight/components';
 
 ## 전체 그림
 
-```mermaid
-flowchart TB
-    CL["클라이언트<br/>브라우저 · 모바일 · 서버"]
-    CL --> EV["Envoy<br/>API 게이트웨이 · 인증 · 라우팅"]
+```d2 layout=elk pad=40 title="Supabase 아키텍처 — Envoy 게이트웨이 뒤에 PostgREST·Auth·Realtime·Storage·pg_graphql·Edge Functions가 있고 전부 PostgreSQL 위에 얹힌다"
+direction: down
 
-    EV --> PR["PostgREST<br/>/rest/v1"]
-    EV --> GT["Auth (GoTrue)<br/>/auth/v1"]
-    EV --> RT["Realtime<br/>/realtime/v1"]
-    EV --> ST["Storage API<br/>/storage/v1"]
-    EV --> GQ["pg_graphql<br/>/graphql/v1"]
-    EV --> EF["Edge Functions<br/>/functions/v1"]
+classes: {
+  key: { style: { fill: "#dbeafe"; stroke: "#2563eb"; font-color: "#1e3a8a" } }
+  warn: { style: { fill: "#fef3c7"; stroke: "#d97706"; font-color: "#78350f" } }
+  mute: { style: { fill: "#f1f5f9"; stroke: "#94a3b8"; font-color: "#334155" } }
+}
 
-    PR --> PG[("PostgreSQL")]
-    GT --> PG
-    RT --> PG
-    ST --> PG
-    GQ --> PG
-    EF --> PG
+cl: "클라이언트\n브라우저 · 모바일 · 서버" { class: mute }
+ev: "Envoy\nAPI 게이트웨이 · 인증 · 라우팅" { class: warn }
+pr: "PostgREST\n/rest/v1" { class: mute }
+gt: "Auth (GoTrue)\n/auth/v1" { class: mute }
+rt: "Realtime\n/realtime/v1" { class: mute }
+st: "Storage API\n/storage/v1" { class: mute }
+gq: "pg_graphql\n/graphql/v1" { class: mute }
+ef: "Edge Functions\n/functions/v1" { class: mute }
+pg: PostgreSQL { shape: cylinder; class: key }
+s3: 오브젝트 스토리지 + CDN { class: mute }
+app: "외부 앱 · ORM\nPrisma · Drizzle" { class: mute }
+sv: "Supavisor\n커넥션 풀러" { class: warn }
 
-    ST --> S3["오브젝트 스토리지 + CDN"]
-
-    APP["외부 앱 · ORM<br/>Prisma · Drizzle"] --> SV["Supavisor<br/>커넥션 풀러"]
-    SV --> PG
-
-    classDef key  fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
-    classDef warn fill:#fef3c7,stroke:#d97706,color:#78350f
-    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
-    class PG key
-    class EV,SV warn
-    class CL,PR,GT,RT,ST,GQ,EF,S3,APP mute
+cl -> ev
+ev -> pr
+ev -> gt
+ev -> rt
+ev -> st
+ev -> gq
+ev -> ef
+pr -> pg
+gt -> pg
+rt -> pg
+st -> pg
+gq -> pg
+ef -> pg
+st -> s3
+app -> sv
+sv -> pg
 ```
 
 **프로젝트 URL 하나(`https://<ref>.supabase.co`)로 전부 접근한다.**
@@ -50,23 +58,23 @@ flowchart TB
 
 `supabase.from('posts').select('*')`를 호출했을 때 실제로 벌어지는 일.
 
-```mermaid
-sequenceDiagram
-    autonumber
-    participant C as 클라이언트
-    participant E as Envoy
-    participant P as PostgREST
-    participant D as Postgres
+```d2 pad=40 title="클라이언트 요청이 Envoy와 PostgREST를 거쳐 Postgres에 닿고 RLS로 행이 걸러지는 순서"
+shape: sequence_diagram
 
-    C->>E: GET /rest/v1/posts?select=*<br/>apikey + Authorization Bearer
-    E->>E: apikey 검증 → 프로젝트 식별
-    E->>P: 요청 전달
-    P->>P: JWT 검증 → role 클레임 추출
-    P->>D: set local role = 'authenticated'<br/>set local request.jwt.claims = '...'
-    P->>D: SELECT * FROM posts
-    Note over D: RLS 정책이 auth.uid() 기준으로 행 필터링
-    D-->>P: 허용된 행만
-    P-->>C: JSON 응답
+c: 클라이언트
+e: Envoy
+p: PostgREST
+d: Postgres
+
+c -> e: "① GET /rest/v1/posts?select=*\napikey + Authorization Bearer"
+e -> e: ② apikey 검증 → 프로젝트 식별
+e -> p: ③ 요청 전달
+p -> p: ④ JWT 검증 → role 클레임 추출
+p -> d: "⑤ set local role = 'authenticated'\nset local request.jwt.claims = '...'"
+p -> d: ⑥ SELECT * FROM posts
+d.note: RLS 정책이 auth.uid() 기준으로 행 필터링
+d -> p: ⑦ 허용된 행만 { style.stroke-dash: 3 }
+p -> c: ⑧ JSON 응답 { style.stroke-dash: 3 }
 ```
 
 5번 줄이 이 문서 전체의 핵심이다.
@@ -240,24 +248,30 @@ Supavisor가 앞단에서 연결을 모아 소수의 실제 연결로 다중화�
 
 이 그림이 Supabase 보안 모델의 전부다.
 
-```mermaid
-flowchart LR
-    PK["publishable key<br/>sb_publishable_..."] -->|"로그인 안 함"| ANON["role: anon"]
-    PK -->|"+ 사용자 JWT"| AUTH["role: authenticated<br/>auth.uid() = 사용자 ID"]
-    SK["secret key<br/>sb_secret_..."] --> SR["role: service_role"]
+```d2 layout=elk pad=40 title="publishable key는 anon 또는 authenticated 역할로 RLS 평가를 받고, secret key는 service_role로 RLS를 우회한다"
+direction: down
 
-    ANON --> RLS["RLS 정책 평가"]
-    AUTH --> RLS
-    SR --> BYPASS["RLS 우회 — 전체 접근"]
+classes: {
+  ok: { style: { fill: "#dcfce7"; stroke: "#16a34a"; font-color: "#14532d" } }
+  bad: { style: { fill: "#fee2e2"; stroke: "#dc2626"; font-color: "#7f1d1d" } }
+  key: { style: { fill: "#dbeafe"; stroke: "#2563eb"; font-color: "#1e3a8a" } }
+  mute: { style: { fill: "#f1f5f9"; stroke: "#94a3b8"; font-color: "#334155" } }
+}
 
-    classDef ok   fill:#dcfce7,stroke:#16a34a,color:#14532d
-    classDef bad  fill:#fee2e2,stroke:#dc2626,color:#7f1d1d
-    classDef key  fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
-    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
-    class PK ok
-    class SK,BYPASS bad
-    class RLS key
-    class ANON,AUTH,SR mute
+pk: "publishable key\nsb_publishable_..." { class: ok }
+sk: "secret key\nsb_secret_..." { class: bad }
+anon: "role: anon" { class: mute }
+auth: "role: authenticated\nauth.uid() = 사용자 ID" { class: mute }
+sr: "role: service_role" { class: mute }
+rls: RLS 정책 평가 { class: key }
+bypass: RLS 우회 — 전체 접근 { class: bad }
+
+pk -> anon: 로그인 안 함
+pk -> auth: + 사용자 JWT
+sk -> sr
+anon -> rls
+auth -> rls
+sr -> bypass
 ```
 
 - **publishable key는 브라우저에 노출해도 된다.** 로그인 전에는 `anon` 역할의 GRANT와 RLS 정책 범위만 허용한다

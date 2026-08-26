@@ -90,18 +90,26 @@ alter table posts alter column status set not null;     -- 3) 제약 추가
 
 컬럼 이름을 `name` → `full_name`으로 바꾸는 경우.
 
-```mermaid
-flowchart LR
-    S1["1. full_name 추가<br/>nullable"] --> S2["2. 앱: 양쪽에 쓰기<br/>읽기는 name"]
-    S2 --> S3["3. 기존 데이터 백필"]
-    S3 --> S4["4. 앱: full_name 읽기"]
-    S4 --> S5["5. 앱: name 쓰기 중단"]
-    S5 --> S6["6. name 컬럼 삭제"]
+```d2 layout=elk pad=40 title="무중단 컬럼 이름 변경 6단계 — nullable 추가, 양쪽 쓰기, 백필, 읽기 전환, 쓰기 중단, 옛 컬럼 삭제"
+direction: down
 
-    classDef ok   fill:#dcfce7,stroke:#16a34a,color:#14532d
-    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
-    class S1,S6 ok
-    class S2,S3,S4,S5 mute
+classes: {
+  ok: { style: { fill: "#dcfce7"; stroke: "#16a34a"; font-color: "#14532d" } }
+  mute: { style: { fill: "#f1f5f9"; stroke: "#94a3b8"; font-color: "#334155" } }
+}
+
+s1: "1. full_name 추가\nnullable" { class: ok }
+s2: "2. 앱: 양쪽에 쓰기\n읽기는 name" { class: mute }
+s3: 3. 기존 데이터 백필 { class: mute }
+s4: "4. 앱: full_name 읽기" { class: mute }
+s5: "5. 앱: name 쓰기 중단" { class: mute }
+s6: 6. name 컬럼 삭제 { class: ok }
+
+s1 -> s2
+s2 -> s3
+s3 -> s4
+s4 -> s5
+s5 -> s6
 ```
 
 각 단계가 **배포 하나**다. 이전 버전의 앱과도 호환되어야 한다.
@@ -111,22 +119,23 @@ flowchart LR
 
 ## 브랜칭
 
-```mermaid
-flowchart TB
-    M["main 브랜치<br/>= 프로덕션 프로젝트"]
-    PR1["PR #101<br/>Preview Branch — 독립 DB"]
-    PR2["PR #102<br/>Preview Branch — 독립 DB"]
-    ST["staging<br/>Persistent Branch"]
+```d2 layout=elk pad=40 title="main 브랜치에서 PR마다 독립 DB를 가진 Preview Branch가 갈라지고 머지하면 마이그레이션이 적용되며, staging은 Persistent Branch로 붙어 있다"
+direction: down
 
-    M -.->|"PR 생성 시 분기"| PR1
-    M -.-> PR2
-    PR1 -->|"머지 → 마이그레이션 적용"| M
-    M --- ST
+classes: {
+  ok: { style: { fill: "#dcfce7"; stroke: "#16a34a"; font-color: "#14532d" } }
+  mute: { style: { fill: "#f1f5f9"; stroke: "#94a3b8"; font-color: "#334155" } }
+}
 
-    classDef ok   fill:#dcfce7,stroke:#16a34a,color:#14532d
-    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
-    class M ok
-    class PR1,PR2,ST mute
+m: "main 브랜치\n= 프로덕션 프로젝트" { class: ok }
+pr1: "PR #101\nPreview Branch — 독립 DB" { class: mute }
+pr2: "PR #102\nPreview Branch — 독립 DB" { class: mute }
+st: "staging\nPersistent Branch" { class: mute }
+
+m -> pr1: PR 생성 시 분기 { style.stroke-dash: 3 }
+m -> pr2: { style.stroke-dash: 3 }
+pr1 -> m: 머지 → 마이그레이션 적용
+m -- st
 ```
 
 - **Preview Branch** — PR마다 자동 생성. 비활동 시 일시정지, PR 종료 시 삭제
@@ -158,22 +167,31 @@ flowchart TB
 원격 대상 확인과 `db push`, 설정·시크릿·Edge Functions 명령은
 [3B장 원격 프로젝트 명령어](/supabase/03-remote-cli/)에 작업 순서대로 모아 두었다.
 
-```mermaid
-flowchart LR
-    P["git push"] --> L["Lint · 타입 검사"]
-    L --> DB["supabase db reset<br/>마이그레이션 검증"]
-    DB --> T["pgTAP 정책 테스트<br/>+ 앱 테스트"]
-    T --> TY["타입 파일 최신성 확인"]
-    TY --> PRQ{"main 브랜치?"}
-    PRQ -->|"아니오"| PV["프리뷰 배포"]
-    PRQ -->|"예"| DP["db push + functions deploy<br/>+ Vercel 프로덕션"]
+```d2 layout=elk pad=40 title="CI 파이프라인 — push부터 lint·db reset·pgTAP·타입 확인을 거쳐 main이면 프로덕션 배포, 아니면 프리뷰 배포"
+direction: down
 
-    classDef ok   fill:#dcfce7,stroke:#16a34a,color:#14532d
-    classDef warn fill:#fef3c7,stroke:#d97706,color:#78350f
-    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
-    class DB ok
-    class DP warn
-    class P,L,T,TY,PRQ,PV mute
+classes: {
+  ok: { style: { fill: "#dcfce7"; stroke: "#16a34a"; font-color: "#14532d" } }
+  warn: { style: { fill: "#fef3c7"; stroke: "#d97706"; font-color: "#78350f" } }
+  mute: { style: { fill: "#f1f5f9"; stroke: "#94a3b8"; font-color: "#334155" } }
+}
+
+p: git push { class: mute }
+l: Lint · 타입 검사 { class: mute }
+db: "supabase db reset\n마이그레이션 검증" { class: ok }
+t: "pgTAP 정책 테스트\n+ 앱 테스트" { class: mute }
+ty: 타입 파일 최신성 확인 { class: mute }
+prq: "main 브랜치?" { shape: diamond; class: mute }
+pv: 프리뷰 배포 { class: mute }
+dp: "db push + functions deploy\n+ Vercel 프로덕션" { class: warn }
+
+p -> l
+l -> db
+db -> t
+t -> ty
+ty -> prq
+prq -> pv: 아니오
+prq -> dp: 예
 ```
 
 **가장 가치 있는 스텝은 `supabase db reset`이다.**

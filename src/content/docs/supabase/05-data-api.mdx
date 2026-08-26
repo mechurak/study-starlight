@@ -22,19 +22,25 @@ GET /rest/v1/posts?select=*&id=eq.1
 **할 수 있는 것과 없는 것의 경계를 아는 게** 이 장의 목표이고,
 경계를 넘어가면 **뷰나 데이터베이스 함수(RPC)** 로 내려간다.
 
-```mermaid
-flowchart LR
-    Q["필요한 쿼리"] --> C{"Data API 로<br/>표현되는가?"}
-    C -->|"예"| API["supabase.from(...)"]
-    C -->|"집계 · 윈도우 함수<br/>임의 조인"| V["뷰를 만든다"]
-    C -->|"원자성 · 조건 분기<br/>복잡한 로직"| R["RPC 함수를 만든다"]
+```d2 layout=elk pad=40 title="필요한 쿼리를 Data API로 표현할 수 있는지에 따라 from() · 뷰 · RPC 함수 중 하나를 고르는 판단"
+direction: down
 
-    classDef ok   fill:#dcfce7,stroke:#16a34a,color:#14532d
-    classDef key  fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
-    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
-    class API ok
-    class V,R key
-    class Q,C mute
+classes: {
+  ok: { style: { fill: "#dcfce7"; stroke: "#16a34a"; font-color: "#14532d" } }
+  key: { style: { fill: "#dbeafe"; stroke: "#2563eb"; font-color: "#1e3a8a" } }
+  mute: { style: { fill: "#f1f5f9"; stroke: "#94a3b8"; font-color: "#334155" } }
+}
+
+q: 필요한 쿼리 { class: mute }
+c: "Data API 로\n표현되는가?" { shape: diamond; class: mute }
+api: "supabase.from(...)" { class: ok }
+v: 뷰를 만든다 { class: key }
+r: RPC 함수를 만든다 { class: key }
+
+q -> c
+c -> api: 예
+c -> v: "집계 · 윈도우 함수\n임의 조인"
+c -> r: "원자성 · 조건 분기\n복잡한 로직"
 ```
 
 ### 클라이언트 생성 옵션

@@ -214,23 +214,29 @@ supabase.channel('room:42', { config: { private: true } })
 
 ## 무엇을 언제 쓰나
 
-```mermaid
-flowchart TD
-    Q1{"DB 에 저장되는<br/>데이터의 변경인가?"}
-    Q1 -->|"아니오"| B1["Broadcast<br/>커서 · 타이핑 · 임시 알림"]
-    Q1 -->|"예"| Q2{"동시 구독자가<br/>수천 명 규모인가?"}
-    Q2 -->|"아니오"| PC["Postgres Changes<br/>가장 간단"]
-    Q2 -->|"예"| BD["Broadcast from Database<br/>트리거 + 브로드캐스트"]
-    Q3{"누가 접속해 있는지<br/>알아야 하나?"} --> P["Presence"]
+```d2 layout=elk pad=40 title="Realtime 세 방식 고르기 — DB 변경인지, 구독자가 수천 명인지에 따라 Broadcast·Postgres Changes·Broadcast from Database를 나누고 접속 여부는 Presence가 맡는다"
+direction: down
 
-    classDef ok   fill:#dcfce7,stroke:#16a34a,color:#14532d
-    classDef warn fill:#fef3c7,stroke:#d97706,color:#78350f
-    classDef key  fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
-    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
-    class B1,BD ok
-    class PC warn
-    class P key
-    class Q1,Q2,Q3 mute
+classes: {
+  ok: { style: { fill: "#dcfce7"; stroke: "#16a34a"; font-color: "#14532d" } }
+  warn: { style: { fill: "#fef3c7"; stroke: "#d97706"; font-color: "#78350f" } }
+  key: { style: { fill: "#dbeafe"; stroke: "#2563eb"; font-color: "#1e3a8a" } }
+  mute: { style: { fill: "#f1f5f9"; stroke: "#94a3b8"; font-color: "#334155" } }
+}
+
+q1: "DB 에 저장되는\n데이터의\n변경인가?" { shape: diamond; class: mute }
+b1: "Broadcast\n커서 · 타이핑 · 임시 알림" { class: ok }
+q2: "동시 구독자가\n수천 명\n규모인가?" { shape: diamond; class: mute }
+pc: "Postgres Changes\n가장 간단" { class: warn }
+bd: "Broadcast from Database\n트리거 + 브로드캐스트" { class: ok }
+q3: "누가 접속해\n있는지\n알아야 하나?" { shape: diamond; class: mute }
+p: Presence { class: key }
+
+q1 -> b1: 아니오
+q1 -> q2: 예
+q2 -> pc: 아니오
+q2 -> bd: 예
+q3 -> p
 ```
 
 **시작은 Postgres Changes로 해도 된다.** 가장 코드가 적다.

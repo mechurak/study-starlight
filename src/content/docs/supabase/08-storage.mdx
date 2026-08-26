@@ -11,20 +11,26 @@ import { Tabs, TabItem, FileTree, LinkCard } from '@astrojs/starlight/components
 
 ## Storage의 구조
 
-```mermaid
-flowchart LR
-    C["클라이언트"] --> API["Storage API<br/>/storage/v1"]
-    API --> META[("Postgres<br/>storage.buckets<br/>storage.objects")]
-    API --> OBJ["오브젝트 스토리지<br/>S3 계열"]
-    OBJ --> CDN["글로벌 CDN"]
-    CDN --> C
+```d2 layout=elk pad=40 title="Storage API가 메타데이터는 Postgres에, 파일은 오브젝트 스토리지에 두고 CDN으로 내보내며 RLS로 접근을 판정한다"
+direction: down
 
-    META -.->|"RLS 정책으로 접근 판정"| API
+classes: {
+  key: { style: { fill: "#dbeafe"; stroke: "#2563eb"; font-color: "#1e3a8a" } }
+  mute: { style: { fill: "#f1f5f9"; stroke: "#94a3b8"; font-color: "#334155" } }
+}
 
-    classDef key  fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
-    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
-    class META key
-    class C,API,OBJ,CDN mute
+c: 클라이언트 { class: mute }
+api: "Storage API\n/storage/v1" { class: mute }
+meta: "Postgres\nstorage.buckets\nstorage.objects" { shape: cylinder; class: key }
+obj: "오브젝트 스토리지\nS3 계열" { class: mute }
+cdn: 글로벌 CDN { class: mute }
+
+c -> api
+api -> meta
+api -> obj
+obj -> cdn
+cdn -> c
+meta -> api: RLS 정책으로 접근 판정 { style.stroke-dash: 3 }
 ```
 
 **파일 바이트**는 오브젝트 스토리지에, **메타데이터**는 Postgres에 있다.
@@ -275,21 +281,22 @@ create table public.attachments (
 
 ### 서명 업로드 흐름
 
-```mermaid
-sequenceDiagram
-    participant C as 클라이언트
-    participant S as 서버 (Route Handler)
-    participant ST as Storage
-    participant DB as Postgres
+```d2 pad=40 title="서명된 업로드 URL 흐름 — 서버가 검증 후 URL을 주고 클라이언트가 Storage에 직접 올린 뒤 서버가 행을 만든다"
+shape: sequence_diagram
 
-    C->>S: 업로드 요청 (파일명, 크기, 타입)
-    S->>S: 권한 · 용량 · 확장자 검증
-    S->>ST: createSignedUploadUrl()
-    ST-->>S: 서명된 URL + 토큰
-    S-->>C: URL 전달
-    C->>ST: 파일 직접 업로드 (서버를 거치지 않음)
-    C->>S: 업로드 완료 알림
-    S->>DB: attachments 행 생성
+c: 클라이언트
+s: 서버 (Route Handler)
+st: Storage
+db: Postgres
+
+c -> s: 업로드 요청 (파일명, 크기, 타입)
+s -> s: 권한 · 용량 · 확장자 검증
+s -> st: createSignedUploadUrl()
+st -> s: 서명된 URL + 토큰 { style.stroke-dash: 3 }
+s -> c: URL 전달 { style.stroke-dash: 3 }
+c -> st: 파일 직접 업로드 (서버를 거치지 않음)
+c -> s: 업로드 완료 알림
+s -> db: attachments 행 생성
 ```
 
 :::tip[핵심]

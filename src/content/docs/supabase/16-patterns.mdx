@@ -180,23 +180,24 @@ const channel = supabase.channel(`room:${roomId}`, { config: { private: true } }
 
 ## 결제 연동
 
-```mermaid
-sequenceDiagram
-    participant B as 브라우저
-    participant V as Vercel Route Handler
-    participant ST as Stripe
-    participant EF as Supabase Edge Function
-    participant DB as Postgres
+```d2 pad=40 title="결제 흐름 — Vercel Route Handler가 Stripe Checkout Session을 만들고, 결제 완료 웹훅을 Edge Function이 서명 검증·멱등 확인 후 Postgres에 반영한다"
+shape: sequence_diagram
 
-    B->>V: 결제 시작
-    V->>V: getClaims() 로 사용자 확인
-    V->>ST: Checkout Session 생성 (secret key)
-    ST-->>V: 결제 URL
-    V-->>B: 리다이렉트
-    B->>ST: 결제 완료
-    ST->>EF: 웹훅 (checkout.session.completed)
-    EF->>EF: 서명 검증 + 멱등 확인
-    EF->>DB: subscriptions 업데이트 (secret key)
+b: 브라우저
+v: Vercel Route Handler
+st: Stripe
+ef: Supabase Edge Function
+db: Postgres
+
+b -> v: 결제 시작
+v -> v: getClaims() 로 사용자 확인
+v -> st: Checkout Session 생성 (secret key)
+st -> v: 결제 URL { style.stroke-dash: 3 }
+v -> b: 리다이렉트 { style.stroke-dash: 3 }
+b -> st: 결제 완료
+st -> ef: 웹훅 (checkout.session.completed)
+ef -> ef: 서명 검증 + 멱등 확인
+ef -> db: subscriptions 업데이트 (secret key)
 ```
 
 **왜 결제 시작은 Vercel, 웹훅은 Supabase인가?**
@@ -318,27 +319,41 @@ RAG(Retrieval-Augmented Generation, 검색 증강 생성)는
 그래서 파이프라인이 둘로 나뉜다 — 문서를 미리 벡터로 색인해 두는 쪽과,
 질문이 올 때 유사 문서를 찾아 LLM에 전달하는 쪽.
 
-```mermaid
-flowchart LR
-    subgraph IDX["색인 — 비동기"]
-      direction TB
-      D["문서 업로드"] --> T["Edge Function<br/>청크 분할"]
-      T --> E1["임베딩 생성<br/>LLM API"]
-      E1 --> V1[("documents<br/>+ embedding")]
-    end
-    subgraph QRY["질의 — 동기"]
-      direction TB
-      Q["사용자 질문"] --> E2["임베딩 생성"]
-      E2 --> M["match_documents RPC<br/>RLS 적용"]
-      M --> L["LLM 에 컨텍스트 전달"]
-      L --> A["답변 스트리밍"]
-    end
-    M --> V1
+```d2 layout=elk pad=40 title="RAG 구조 — 비동기 색인은 문서를 청크로 나눠 임베딩을 저장하고, 동기 질의는 match_documents RPC로 그 벡터를 찾아 LLM에 넘긴다"
+grid-columns: 2
 
-    classDef key  fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
-    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
-    class V1,M key
-    class D,T,E1,Q,E2,L,A mute
+classes: {
+  key: { style: { fill: "#dbeafe"; stroke: "#2563eb"; font-color: "#1e3a8a" } }
+  mute: { style: { fill: "#f1f5f9"; stroke: "#94a3b8"; font-color: "#334155" } }
+}
+
+idx: 색인 — 비동기 {
+  grid-rows: 4
+  d: 문서 업로드 { class: mute }
+  t: "Edge Function\n청크 분할" { class: mute }
+  e1: "임베딩 생성\nLLM API" { class: mute }
+  v1: "documents\n+ embedding" { shape: cylinder; class: key }
+
+  d -> t
+  t -> e1
+  e1 -> v1
+}
+
+qry: 질의 — 동기 {
+  grid-rows: 5
+  q: 사용자 질문 { class: mute }
+  e2: 임베딩 생성 { class: mute }
+  m: "match_documents RPC\nRLS 적용" { class: key }
+  l: LLM 에 컨텍스트 전달 { class: mute }
+  a: 답변 스트리밍 { class: mute }
+
+  q -> e2
+  e2 -> m
+  m -> l
+  l -> a
+}
+
+qry.m -> idx.v1
 ```
 
 - **RLS가 그대로 적용된다** — 사용자가 접근 가능한 문서에서만 검색된다.

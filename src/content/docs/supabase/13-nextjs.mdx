@@ -44,21 +44,26 @@ SUPABASE_SECRET_KEY=sb_secret_xxxxx
 
 ## 클라이언트 4종
 
-```mermaid
-flowchart LR
-    B["브라우저<br/>client.ts"] --> S["Supabase"]
-    SC["서버 컴포넌트 · 액션<br/>server.ts"] --> S
-    MW["Proxy<br/>proxy.ts"] --> S
-    AD["관리자<br/>admin.ts — server-only"] --> S
+```d2 layout=elk pad=40 title="브라우저·서버 컴포넌트·Proxy·관리자 네 종류의 Supabase 클라이언트가 각각 다른 파일에서 만들어진다"
+direction: right
 
-    classDef ok   fill:#dcfce7,stroke:#16a34a,color:#14532d
-    classDef bad  fill:#fee2e2,stroke:#dc2626,color:#7f1d1d
-    classDef key  fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
-    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
-    class B,SC ok
-    class AD bad
-    class S key
-    class MW mute
+classes: {
+  ok: { style: { fill: "#dcfce7"; stroke: "#16a34a"; font-color: "#14532d" } }
+  bad: { style: { fill: "#fee2e2"; stroke: "#dc2626"; font-color: "#7f1d1d" } }
+  key: { style: { fill: "#dbeafe"; stroke: "#2563eb"; font-color: "#1e3a8a" } }
+  mute: { style: { fill: "#f1f5f9"; stroke: "#94a3b8"; font-color: "#334155" } }
+}
+
+b: "브라우저\nclient.ts" { class: ok }
+sc: "서버 컴포넌트 · 액션\nserver.ts" { class: ok }
+mw: "Proxy\nproxy.ts" { class: mute }
+ad: "관리자\nadmin.ts — server-only" { class: bad }
+s: Supabase { class: key }
+
+b -> s
+sc -> s
+mw -> s
+ad -> s
 ```
 
 앞의 셋은 **RLS가 적용되는 경로**이고, `admin.ts`만 우회한다.

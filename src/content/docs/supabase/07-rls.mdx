@@ -59,22 +59,28 @@ alter table public.posts force row level security;
 
 둘 다 통과해야 접근할 수 있다.
 
-```mermaid
-flowchart LR
-    R["요청 (role: authenticated)"] --> G{"GRANT<br/>테이블 접근 권한이 있나?"}
-    G -->|"없음"| D1["거부 (42501)"]
-    G -->|"있음"| P{"POLICY<br/>이 행에 접근해도 되나?"}
-    P -->|"정책 불통과"| D2["해당 행 제외"]
-    P -->|"통과"| OK["허용"]
+```d2 layout=elk pad=40 title="GRANT로 테이블 접근을 먼저 확인하고 통과하면 POLICY가 행 단위로 판정하는 두 단계 관문"
+direction: down
 
-    classDef ok   fill:#dcfce7,stroke:#16a34a,color:#14532d
-    classDef bad  fill:#fee2e2,stroke:#dc2626,color:#7f1d1d
-    classDef warn fill:#fef3c7,stroke:#d97706,color:#78350f
-    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
-    class OK ok
-    class D1 bad
-    class D2 warn
-    class R,G,P mute
+classes: {
+  ok: { style: { fill: "#dcfce7"; stroke: "#16a34a"; font-color: "#14532d" } }
+  bad: { style: { fill: "#fee2e2"; stroke: "#dc2626"; font-color: "#7f1d1d" } }
+  warn: { style: { fill: "#fef3c7"; stroke: "#d97706"; font-color: "#78350f" } }
+  mute: { style: { fill: "#f1f5f9"; stroke: "#94a3b8"; font-color: "#334155" } }
+}
+
+r: "요청 (role: authenticated)" { class: mute }
+g: "GRANT\n테이블 접근 권한이 있나?" { shape: diamond; class: mute }
+d1: 거부 (42501) { class: bad }
+p: "POLICY\n이 행에 접근해도 되나?" { shape: diamond; class: mute }
+d2: 해당 행 제외 { class: warn }
+allow: 허용 { class: ok }
+
+r -> g
+g -> d1: 없음
+g -> p: 있음
+p -> d2: 정책 불통과
+p -> allow: 통과
 ```
 
 Supabase는 기본적으로 `public` 스키마 테이블에 모든 권한을 GRANT해 둔다

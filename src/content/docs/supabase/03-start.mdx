@@ -11,17 +11,25 @@ import { Steps, Tabs, TabItem, FileTree, LinkCard } from '@astrojs/starlight/com
 
 ## 두 갈래 시작 경로
 
-```mermaid
-flowchart LR
-    A["대시보드에서 바로"] --> A1["클릭으로 테이블 생성"] --> A2["즉시 API 사용"]
-    B["CLI 로 로컬 시작"] --> B1["supabase start"] --> B2["마이그레이션으로 스키마 관리"] --> B3["db push 로 배포"]
+```d2 layout=elk pad=40 title="대시보드에서 바로 시작하는 경로와 CLI로 로컬에서 시작해 마이그레이션으로 배포하는 경로"
+direction: down
 
-    classDef warn fill:#fef3c7,stroke:#d97706,color:#78350f
-    classDef ok   fill:#dcfce7,stroke:#16a34a,color:#14532d
-    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
-    class A,A1,A2 warn
-    class B ok
-    class B1,B2,B3 mute
+classes: {
+  ok: { style: { fill: "#dcfce7"; stroke: "#16a34a"; font-color: "#14532d" } }
+  warn: { style: { fill: "#fef3c7"; stroke: "#d97706"; font-color: "#78350f" } }
+  mute: { style: { fill: "#f1f5f9"; stroke: "#94a3b8"; font-color: "#334155" } }
+}
+
+dash: 대시보드에서 바로 { class: warn }
+dash1: 클릭으로 테이블 생성 { class: warn }
+dash2: 즉시 API 사용 { class: warn }
+cli: CLI 로 로컬 시작 { class: ok }
+cli1: supabase start { class: mute }
+cli2: 마이그레이션으로 스키마 관리 { class: mute }
+cli3: db push 로 배포 { class: mute }
+
+dash -> dash1 -> dash2
+cli -> cli1 -> cli2 -> cli3
 ```
 
 **A 경로**는 감을 잡는 데 좋다. 5분이면 동작하는 것을 본다.
@@ -470,19 +478,28 @@ secret = "env(GITHUB_SECRET)"
 
 ## 3장 요약
 
-```mermaid
-flowchart LR
-    A["supabase migration new"] --> B["SQL 작성"]
-    B --> C["supabase db reset<br/>로컬 검증"]
-    C --> D["gen types<br/>타입 갱신"]
-    D --> E["앱 코드 수정 + 테스트"]
-    E --> F["git commit / PR"]
-    F --> G["CI 에서 supabase db push"]
+```d2 layout=elk pad=40 title="마이그레이션 작업 흐름 — migration new부터 SQL 작성·로컬 검증·타입 갱신·PR을 거쳐 CI의 db push까지"
+direction: down
 
-    classDef ok   fill:#dcfce7,stroke:#16a34a,color:#14532d
-    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
-    class C,G ok
-    class A,B,D,E,F mute
+classes: {
+  ok: { style: { fill: "#dcfce7"; stroke: "#16a34a"; font-color: "#14532d" } }
+  mute: { style: { fill: "#f1f5f9"; stroke: "#94a3b8"; font-color: "#334155" } }
+}
+
+a: supabase migration new { class: mute }
+b: SQL 작성 { class: mute }
+c: "supabase db reset\n로컬 검증" { class: ok }
+d: "gen types\n타입 갱신" { class: mute }
+e: 앱 코드 수정 + 테스트 { class: mute }
+f: git commit / PR { class: mute }
+g: CI 에서 supabase db push { class: ok }
+
+a -> b
+b -> c
+c -> d
+d -> e
+e -> f
+f -> g
 ```
 
 - 대시보드는 **탐색과 디버깅용**, 스키마 변경의 진실은 `migrations/`

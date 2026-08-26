@@ -63,20 +63,27 @@ AI/벡터는 "이런 게 있다" 수준까지만.
 
 ## 전체를 관통하는 흐름
 
-```mermaid
-flowchart LR
-    L["로그인"] --> J["Auth 가 JWT 발급<br/>sub = 사용자 UUID"]
-    J --> R["요청에 Bearer 로 실림"]
-    R --> P["PostgREST 가 JWT 를 풀어<br/>Postgres 세션 변수에 주입"]
-    P --> RLS["RLS 정책이<br/>auth.uid() 로 행을 필터"]
-    RLS --> D["허용된 행만 응답"]
+```d2 layout=elk pad=40 title="로그인부터 RLS 필터까지 — JWT가 Postgres 세션으로 전달되어 행을 걸러내는 흐름"
+direction: down
 
-    classDef key  fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
-    classDef ok   fill:#dcfce7,stroke:#16a34a,color:#14532d
-    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
-    class RLS key
-    class D ok
-    class L,J,R,P mute
+classes: {
+  ok: { style: { fill: "#dcfce7"; stroke: "#16a34a"; font-color: "#14532d" } }
+  key: { style: { fill: "#dbeafe"; stroke: "#2563eb"; font-color: "#1e3a8a" } }
+  mute: { style: { fill: "#f1f5f9"; stroke: "#94a3b8"; font-color: "#334155" } }
+}
+
+login: 로그인 { class: mute }
+jwt: "Auth 가 JWT 발급\nsub = 사용자 UUID" { class: mute }
+req: 요청에 Bearer 로 실림 { class: mute }
+pgrst: "PostgREST 가 JWT 를 풀어\nPostgres 세션 변수에 주입" { class: mute }
+rls: "RLS 정책이\nauth.uid() 로 행을 필터" { class: key }
+resp: 허용된 행만 응답 { class: ok }
+
+login -> jwt
+jwt -> req
+req -> pgrst
+pgrst -> rls
+rls -> resp
 ```
 
 :::tip[핵심]

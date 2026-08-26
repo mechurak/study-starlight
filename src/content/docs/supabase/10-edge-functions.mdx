@@ -266,16 +266,22 @@ Deno.serve(async (req) => {
 
 DB 변경을 계기로 함수를 자동 실행한다.
 
-```mermaid
-flowchart LR
-    A["orders 테이블<br/>INSERT"] --> T["Database Webhook<br/>pg_net 기반 트리거"]
-    T --> F["Edge Function<br/>send-order-email"]
-    F --> E["외부 서비스<br/>Resend · Slack"]
+```d2 layout=elk pad=40 title="orders 테이블 INSERT가 Database Webhook을 거쳐 Edge Function을 부르고 외부 서비스로 나가는 흐름"
+direction: down
 
-    classDef key  fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
-    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
-    class F key
-    class A,T,E mute
+classes: {
+  key: { style: { fill: "#dbeafe"; stroke: "#2563eb"; font-color: "#1e3a8a" } }
+  mute: { style: { fill: "#f1f5f9"; stroke: "#94a3b8"; font-color: "#334155" } }
+}
+
+a: "orders 테이블\nINSERT" { class: mute }
+t: "Database Webhook\npg_net 기반 트리거" { class: mute }
+f: "Edge Function\nsend-order-email" { class: key }
+e: "외부 서비스\nResend · Slack" { class: mute }
+
+a -> t
+t -> f
+f -> e
 ```
 
 - 대시보드 **Database → Webhooks**에서 테이블·이벤트·대상 URL을 설정한다

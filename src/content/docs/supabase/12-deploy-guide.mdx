@@ -26,27 +26,33 @@ import { Steps, LinkCard } from '@astrojs/starlight/components';
 | Vercel | Next.js 빌드·함수·프리뷰·TLS | 영속 데이터 |
 | Cloudflare | 도메인의 DNS 레코드 | 이 구성에서는 앱 실행과 CDN |
 
-```mermaid
-flowchart LR
-    DEV["GitHub 저장소"] -->|"push"| V["Vercel<br/>Next.js"]
-    V -->|"Data API"| S["Supabase<br/>Postgres + RLS"]
-    CF["Cloudflare DNS"] -->|"CNAME · DNS only"| V
+```d2 layout=elk pad=40 title="GitHub push로 Vercel에 배포되고 Cloudflare DNS가 CNAME으로 가리키며, 브라우저 로그인이 Supabase Auth와 Google을 거쳐 세션 쿠키로 돌아오는 6단계"
+direction: down
 
-    B["브라우저"] -->|"1. 로그인 시작"| V
-    V -->|"2. authorize"| A["Supabase Auth"]
-    A -->|"3. 사용자 인증"| G["Google"]
-    G -->|"4. Supabase callback"| A
-    A -->|"5. 앱 callback"| V
-    V -->|"6. 세션 쿠키"| B
+classes: {
+  ok: { style: { fill: "#dcfce7"; stroke: "#16a34a"; font-color: "#14532d" } }
+  warn: { style: { fill: "#fef3c7"; stroke: "#d97706"; font-color: "#78350f" } }
+  key: { style: { fill: "#dbeafe"; stroke: "#2563eb"; font-color: "#1e3a8a" } }
+  mute: { style: { fill: "#f1f5f9"; stroke: "#94a3b8"; font-color: "#334155" } }
+}
 
-    classDef key  fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
-    classDef ok   fill:#dcfce7,stroke:#16a34a,color:#14532d
-    classDef warn fill:#fef3c7,stroke:#d97706,color:#78350f
-    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
-    class S,A key
-    class V ok
-    class G warn
-    class DEV,CF,B mute
+dev: GitHub 저장소 { class: mute }
+v: "Vercel\nNext.js" { class: ok }
+s: "Supabase\nPostgres + RLS" { class: key }
+cf: Cloudflare DNS { class: mute }
+b: 브라우저 { class: mute }
+a: Supabase Auth { class: key }
+g: Google { class: warn }
+
+dev -> v: push
+v -> s: Data API
+cf -> v: CNAME · DNS only
+b -> v: 1. 로그인 시작
+v -> a: 2. authorize
+a -> g: 3. 사용자 인증
+g -> a: 4. Supabase callback
+a -> v: 5. 앱 callback
+v -> b: 6. 세션 쿠키
 ```
 
 위 그림은 배포 뒤의 **실행 트래픽**을 보여준다. 설정할 때는 반대 방향으로 값을 복사하는 일이 많다.

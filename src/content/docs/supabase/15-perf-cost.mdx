@@ -11,23 +11,34 @@ import { Tabs, TabItem, LinkCard } from '@astrojs/starlight/components';
 
 ## 성능 문제의 지도
 
-```mermaid
-flowchart TB
-    P["페이지가 느리다"] --> A{"어디가 느린가?"}
-    A --> A1["네트워크 왕복<br/>리전 불일치 · N+1"]
-    A --> A2["쿼리 자체<br/>인덱스 없음 · RLS 비효율"]
-    A --> A3["연결 대기<br/>커넥션 고갈"]
-    A --> A4["렌더링<br/>함수 콜드 스타트"]
+```d2 layout=elk pad=40 title="페이지가 느릴 때 네트워크 왕복·쿼리 자체·연결 대기·렌더링 넷 중 어디인지 나누고 각각의 대응을 붙인 진단표"
+direction: down
 
-    A1 --> S1["리전 정렬 · 쿼리 병합"]
-    A2 --> S2["EXPLAIN ANALYZE · 인덱스"]
-    A3 --> S3["Supavisor · 풀 크기"]
-    A4 --> S4["캐싱 · 정적화"]
+classes: {
+  key: { style: { fill: "#dbeafe"; stroke: "#2563eb"; font-color: "#1e3a8a" } }
+  mute: { style: { fill: "#f1f5f9"; stroke: "#94a3b8"; font-color: "#334155" } }
+}
 
-    classDef key  fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
-    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
-    class A2,S2 key
-    class P,A,A1,A3,A4,S1,S3,S4 mute
+p: 페이지가 느리다 { class: mute }
+a: "어디가 느린가?" { shape: diamond; class: mute }
+a1: "네트워크 왕복\n리전 불일치 · N+1" { class: mute }
+a2: "쿼리 자체\n인덱스 없음 ·\nRLS 비효율" { class: key }
+a3: "연결 대기\n커넥션 고갈" { class: mute }
+a4: "렌더링\n함수 콜드 스타트" { class: mute }
+s1: "리전 정렬 ·\n쿼리 병합" { class: mute }
+s2: "EXPLAIN ANALYZE ·\n인덱스" { class: key }
+s3: Supavisor · 풀 크기 { class: mute }
+s4: 캐싱 · 정적화 { class: mute }
+
+p -> a
+a -> a1
+a -> a2
+a -> a3
+a -> a4
+a1 -> s1
+a2 -> s2
+a3 -> s3
+a4 -> s4
 ```
 
 **대부분은 쿼리다.** 그리고 그 대부분은 **인덱스 부재**다.
