@@ -44,24 +44,32 @@ import { Steps, Card, CardGrid, Tabs, TabItem } from '@astrojs/starlight/compone
 
 ## 문제마다 반복하는 3단계
 
-```mermaid
-flowchart LR
-    Q["문제를 연다"] --> S1["① 컨텍스트 전환<br/>지문의 명령을 그대로 복사"]
-    S1 --> S2["② 네임스페이스 확인<br/>지문이 지정했으면 반드시 -n"]
-    S2 --> SOLVE["푼다"]
-    SOLVE --> S3["③ 검산<br/>만든 것을 눈으로 확인"]
-    S3 --> NEXT["다음 문제"]
-    SKIP1["① 을 빠뜨리면"] -.->|"정답을 만들어도 0점 ❌"| S1
-    SKIP2["② 를 틀리면"] -.->|"그 문제 전부 0점 ❌"| S2
+```d2 layout=elk pad=40 title="문제를 열면 컨텍스트 전환 · 네임스페이스 확인을 먼저 하고 푼 뒤 검산하는 3단계 루틴, 그리고 앞의 두 단계를 빠뜨리면 0점이 되는 이유"
+direction: down
+classes: {
+  ok: { style: { fill: "#dcfce7"; stroke: "#16a34a"; font-color: "#14532d" } }
+  bad: { style: { fill: "#fee2e2"; stroke: "#dc2626"; font-color: "#7f1d1d" } }
+  warn: { style: { fill: "#fef3c7"; stroke: "#d97706"; font-color: "#78350f" } }
+  key: { style: { fill: "#dbeafe"; stroke: "#2563eb"; font-color: "#1e3a8a" } }
+  mute: { style: { fill: "#f1f5f9"; stroke: "#94a3b8"; font-color: "#334155" } }
+  zone: { style: { fill: "#ede9fe"; stroke: "#7c3aed"; font-color: "#4c1d95" } }
+}
+q: 문제를 연다 { class: mute }
+s1: ① 컨텍스트 전환\n지문의 명령을 그대로 복사 { class: key }
+s2: ② 네임스페이스 확인\n지문이 지정했으면 반드시 -n { class: key }
+solve: 푼다 { class: mute }
+s3: ③ 검산\n만든 것을 눈으로 확인 { class: ok }
+next: 다음 문제 { class: mute }
+skip1: ① 을 빠뜨리면 { class: bad }
+skip2: ② 를 틀리면 { class: bad }
 
-    classDef key fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
-    classDef bad fill:#fee2e2,stroke:#dc2626,color:#7f1d1d
-    classDef ok fill:#dcfce7,stroke:#16a34a,color:#14532d
-    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
-    class S1,S2 key
-    class SKIP1,SKIP2 bad
-    class S3 ok
-    class Q,SOLVE,NEXT mute
+q -> s1
+s1 -> s2
+s2 -> solve
+solve -> s3
+s3 -> next
+skip1 -> s1: 정답을 만들어도 0점 ❌ { style.stroke-dash: 3 }
+skip2 -> s2: 그 문제 전부 0점 ❌ { style.stroke-dash: 3 }
 ```
 
 ```bash
@@ -263,26 +271,34 @@ sudo vim /etc/kubernetes/manifests/etcd.yaml    # volumes.hostPath.path 를 새 
 
 **빈 파일에서 시작하지 않는 세 경로.**
 
-```mermaid
-flowchart LR
-    NEED["YAML 이 필요하다"] --> P1["① 명령형 생성기<br/>k create … $do > f.yaml"]
-    NEED --> P2["② 공식 문서 복사<br/>NetworkPolicy · affinity · PV …"]
-    NEED --> P3["③ 기존 리소스 복사<br/>k get pod web -o yaml > new.yaml"]
-    P3 --> CLEAN["uid · resourceVersion<br/>creationTimestamp · status 를 지운다"]
-    P1 --> EDIT["필요한 필드만 편집"]
-    P2 --> EDIT
-    CLEAN --> EDIT
-    EDIT --> V["k apply --dry-run=server<br/>k diff -f"]
-    BAD["빈 파일에 직접 타이핑"] -.->|"가장 느리고 가장 틀리기 쉽다 ❌"| NEED
+```d2 layout=elk pad=40 title="YAML 이 필요할 때 명령형 생성기 · 공식 문서 복사 · 기존 리소스 복사 세 경로를 거쳐 편집하고 dry-run 으로 검증하는 흐름, 빈 파일에 직접 타이핑을 피하는 이유"
+direction: down
+classes: {
+  ok: { style: { fill: "#dcfce7"; stroke: "#16a34a"; font-color: "#14532d" } }
+  bad: { style: { fill: "#fee2e2"; stroke: "#dc2626"; font-color: "#7f1d1d" } }
+  warn: { style: { fill: "#fef3c7"; stroke: "#d97706"; font-color: "#78350f" } }
+  key: { style: { fill: "#dbeafe"; stroke: "#2563eb"; font-color: "#1e3a8a" } }
+  mute: { style: { fill: "#f1f5f9"; stroke: "#94a3b8"; font-color: "#334155" } }
+  zone: { style: { fill: "#ede9fe"; stroke: "#7c3aed"; font-color: "#4c1d95" } }
+}
+need: YAML 이 필요하다 { class: mute }
+p1: "① 명령형 생성기\nk create … \$do > f.yaml" { class: ok }
+p2: ② 공식 문서 복사\nNetworkPolicy · affinity · PV … { class: ok }
+p3: ③ 기존 리소스 복사\nk get pod web -o yaml > new.yaml { class: ok }
+clean: uid · resourceVersion\ncreationTimestamp · status 를 지운다 { class: mute }
+edit: 필요한 필드만 편집 { class: mute }
+v: k apply --dry-run=server\nk diff -f { class: key }
+bad: 빈 파일에 직접 타이핑 { class: bad }
 
-    classDef ok fill:#dcfce7,stroke:#16a34a,color:#14532d
-    classDef bad fill:#fee2e2,stroke:#dc2626,color:#7f1d1d
-    classDef key fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
-    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
-    class P1,P2,P3 ok
-    class BAD bad
-    class V key
-    class NEED,EDIT,CLEAN mute
+need -> p1
+need -> p2
+need -> p3
+p3 -> clean
+p1 -> edit
+p2 -> edit
+clean -> edit
+edit -> v
+bad -> need: 가장 느리고 가장 틀리기 쉽다 ❌ { style.stroke-dash: 3 }
 ```
 
 ```bash
@@ -333,25 +349,33 @@ k diff -f web.yaml
 
 ### 시간 관리
 
-```mermaid
-flowchart LR
-    S["시험 시작"] --> R0["30초 루틴<br/>alias · do · vimrc"]
-    R0 --> R1["1차 순회<br/>3분 안에 풀리는 것을 전부 처리"]
-    R1 --> RULE{"5분 룰"}
-    RULE -->|"실마리가 안 보인다"| FLAG["플래그 걸고 넘어간다"]
-    RULE -->|"풀린다"| SOLVE["푼다"]
-    FLAG --> R2["2차 순회<br/>남은 문제를 배점 순으로"]
-    SOLVE --> R2
-    R2 --> LAST["마지막 10분<br/>검산"]
+```d2 layout=elk pad=40 title="시험 시작의 30초 루틴부터 1차 순회 · 5분 룰 · 2차 순회를 거쳐 마지막 10분 검산까지의 시간 배분"
+direction: down
+classes: {
+  ok: { style: { fill: "#dcfce7"; stroke: "#16a34a"; font-color: "#14532d" } }
+  bad: { style: { fill: "#fee2e2"; stroke: "#dc2626"; font-color: "#7f1d1d" } }
+  warn: { style: { fill: "#fef3c7"; stroke: "#d97706"; font-color: "#78350f" } }
+  key: { style: { fill: "#dbeafe"; stroke: "#2563eb"; font-color: "#1e3a8a" } }
+  mute: { style: { fill: "#f1f5f9"; stroke: "#94a3b8"; font-color: "#334155" } }
+  zone: { style: { fill: "#ede9fe"; stroke: "#7c3aed"; font-color: "#4c1d95" } }
+}
+s: 시험 시작 { class: mute }
+r0: 30초 루틴\nalias · do · vimrc { class: key }
+r1: 1차 순회\n3분 안에 풀리는 것을 전부 처리 { class: mute }
+rule: 5분 룰 { shape: diamond; class: key }
+flag: 플래그 걸고 넘어간다 { class: warn }
+solve: 푼다 { class: mute }
+r2: 2차 순회\n남은 문제를 배점 순으로 { class: mute }
+last: 마지막 10분\n검산 { class: ok }
 
-    classDef key fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
-    classDef ok fill:#dcfce7,stroke:#16a34a,color:#14532d
-    classDef warn fill:#fef3c7,stroke:#d97706,color:#78350f
-    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
-    class R0,RULE key
-    class LAST ok
-    class FLAG warn
-    class S,R1,R2,SOLVE mute
+s -> r0
+r0 -> r1
+r1 -> rule
+rule -> flag: 실마리가 안 보인다
+rule -> solve: 풀린다
+flag -> r2
+solve -> r2
+r2 -> last
 ```
 
 - **문제당 평균 7분.** 하지만 균일하지 않다

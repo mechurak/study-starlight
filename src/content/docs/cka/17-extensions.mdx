@@ -15,23 +15,32 @@ Interface · CustomResourceDefinition**이다. 앞의 셋은 실행·네트워�
 
 핵심 기능 중 상당수가 **인터페이스만 정의되어 있고 구현은 밖에 있다.**
 
-```mermaid
-flowchart TB
-    K8S["Kubernetes 코어<br/>인터페이스만 정의한다"]
-    K8S --> CRI["CRI<br/>컨테이너 실행"] --> I1["containerd · CRI-O"]
-    K8S --> CNI["CNI<br/>Pod 네트워크·IP"] --> I2["Calico · Cilium · Flannel"]
-    K8S --> CSI["CSI<br/>볼륨 생성·마운트"] --> I3["EBS CSI · Ceph · local-path"]
-    K8S --> CRD["CRD + 컨트롤러<br/>새로운 리소스 종류"] --> I4["cert-manager · Prometheus Operator"]
-    NONE["플러그인이 없으면<br/>아무것도 안 된다 ⚠️"] -.- K8S
+```d2 layout=elk pad=40 title="Kubernetes 코어가 정의한 CRI · CNI · CSI · CRD 네 인터페이스와 각각의 구현체, 그리고 플러그인이 없으면 아무것도 안 된다는 경고"
+direction: down
 
-    classDef core fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
-    classDef iface fill:#fef3c7,stroke:#d97706,color:#78350f
-    classDef warn fill:#fee2e2,stroke:#dc2626,color:#7f1d1d
-    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
-    class K8S core
-    class CRI,CNI,CSI,CRD iface
-    class NONE warn
-    class I1,I2,I3,I4 mute
+classes: {
+  key: { style: { fill: "#dbeafe"; stroke: "#2563eb"; font-color: "#1e3a8a" } }
+  warn: { style: { fill: "#fef3c7"; stroke: "#d97706"; font-color: "#78350f" } }
+  bad: { style: { fill: "#fee2e2"; stroke: "#dc2626"; font-color: "#7f1d1d" } }
+  mute: { style: { fill: "#f1f5f9"; stroke: "#94a3b8"; font-color: "#334155" } }
+}
+
+k8s: Kubernetes 코어\n인터페이스만 정의한다 { class: key }
+cri: CRI\n컨테이너 실행 { class: warn }
+cni: CNI\nPod 네트워크·IP { class: warn }
+csi: CSI\n볼륨 생성·마운트 { class: warn }
+crd: CRD + 컨트롤러\n새로운 리소스 종류 { class: warn }
+i1: containerd · CRI-O { class: mute }
+i2: Calico · Cilium ·\nFlannel { class: mute }
+i3: EBS CSI · Ceph ·\nlocal-path { class: mute }
+i4: cert-manager ·\nPrometheus Operator { class: mute }
+none: 플러그인이 없으면\n아무것도 안 된다 ⚠️ { class: bad }
+
+k8s -> cri -> i1
+k8s -> cni -> i2
+k8s -> csi -> i3
+k8s -> crd -> i4
+none -- k8s: { style.stroke-dash: 3 }
 ```
 
 | 인터페이스 | 무엇을 위임하나 | 구현체 예 |
@@ -84,25 +93,34 @@ Pod마다 IP를 주고 노드 사이를 잇는 방법은 환경마다 다르다 
 kubelet이 Pod 샌드박스(Pod의 컨테이너들이 공유할 네트워크 네임스페이스 껍데기)를
 만들 때 **CNI 플러그인을 실행**한다.
 
-```mermaid
-flowchart LR
-    KL["kubelet"] -->|"ADD 호출"| CNI["CNI 플러그인"]
-    CONF["/etc/cni/net.d/<br/>JSON 설정 · 사전순 첫 번째를 쓴다"] -.-> CNI
-    BIN["/opt/cni/bin/<br/>바이너리"] -.-> CNI
-    CNI --> S1["① 인터페이스 생성"]
-    S1 --> S2["② IP 할당 · IPAM"]
-    S2 --> S3["③ 라우팅 설정"]
-    S3 --> OK["Pod 이 통신 가능 ✅"]
-    FAIL["CNI 가 없거나 고장"] -.->|"ContainerCreating 에서 멈춘다<br/>노드는 NotReady ❌"| CNI
+```d2 layout=elk pad=40 title="kubelet 의 ADD 호출로 시작해 인터페이스 생성 · IP 할당 · 라우팅 3단계를 거쳐 Pod 통신이 가능해지는 CNI 흐름과, CNI 가 고장나면 ContainerCreating 에서 멈추는 실패 경로"
+direction: down
 
-    classDef key fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
-    classDef ok fill:#dcfce7,stroke:#16a34a,color:#14532d
-    classDef bad fill:#fee2e2,stroke:#dc2626,color:#7f1d1d
-    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
-    class CNI key
-    class OK ok
-    class FAIL bad
-    class KL,CONF,BIN,S1,S2,S3 mute
+classes: {
+  key: { style: { fill: "#dbeafe"; stroke: "#2563eb"; font-color: "#1e3a8a" } }
+  ok: { style: { fill: "#dcfce7"; stroke: "#16a34a"; font-color: "#14532d" } }
+  bad: { style: { fill: "#fee2e2"; stroke: "#dc2626"; font-color: "#7f1d1d" } }
+  mute: { style: { fill: "#f1f5f9"; stroke: "#94a3b8"; font-color: "#334155" } }
+}
+
+kl: kubelet { class: mute }
+cni: CNI 플러그인 { class: key }
+conf: /etc/cni/net.d/\nJSON 설정 ·\n사전순 첫 번째를 쓴다 { class: mute }
+bin: /opt/cni/bin/\n바이너리 { class: mute }
+s1: ① 인터페이스 생성 { class: mute }
+s2: ② IP 할당 · IPAM { class: mute }
+s3: ③ 라우팅 설정 { class: mute }
+ok: Pod 이 통신 가능 ✅ { class: ok }
+fail: CNI 가 없거나 고장 { class: bad }
+
+kl -> cni: ADD 호출
+conf -> cni: { style.stroke-dash: 3 }
+bin -> cni: { style.stroke-dash: 3 }
+cni -> s1
+s1 -> s2
+s2 -> s3
+s3 -> ok
+fail -> cni: ContainerCreating 에서 멈춘다\n노드는 NotReady ❌ { style.stroke-dash: 3 }
 ```
 
 ② 의 IP 할당은 IPAM(IP Address Management — 주소 할당 관리) 플러그인의 몫이다.
@@ -163,19 +181,25 @@ Kubernetes 프로젝트가 만든 공용 사이드카가 맡는다** — 벤더�
 정해 준다 — 볼륨이 안 만들어지면 `external-provisioner`, 만들어졌는데 노드에
 안 붙으면 `external-attacher` 쪽이다.
 
-```mermaid
-flowchart LR
-    PVC["PVC 가 Pending"] --> Q{"StorageClass 는 있는가"}
-    Q -->|없다| A1["StorageClass 를 만든다"]
-    Q -->|있다| A2["프로비저너 Pod 이 살아 있는가<br/>kubectl get pods -n kube-system | grep csi"]
-    A2 --> A3["로그 확인<br/>kubectl logs … -c csi-provisioner"]
+```d2 layout=elk pad=40 title="PVC 가 Pending 일 때 StorageClass 유무로 갈라져 프로비저너 Pod 과 로그를 확인하는 진단 순서"
+direction: down
 
-    classDef key fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
-    classDef bad fill:#fee2e2,stroke:#dc2626,color:#7f1d1d
-    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
-    class A2 key
-    class A1 bad
-    class PVC,Q,A3 mute
+classes: {
+  key: { style: { fill: "#dbeafe"; stroke: "#2563eb"; font-color: "#1e3a8a" } }
+  bad: { style: { fill: "#fee2e2"; stroke: "#dc2626"; font-color: "#7f1d1d" } }
+  mute: { style: { fill: "#f1f5f9"; stroke: "#94a3b8"; font-color: "#334155" } }
+}
+
+pvc: PVC 가 Pending { class: mute }
+q: StorageClass 는 있는가 { shape: diamond; class: mute }
+a1: StorageClass 를 만든다 { class: bad }
+a2: "프로비저너 Pod 이 살아 있는가\nkubectl get pods -n kube-system | grep csi" { class: key }
+a3: 로그 확인\nkubectl logs … -c csi-provisioner { class: mute }
+
+pvc -> q
+q -> a1: 없다
+q -> a2: 있다
+a2 -> a3
 ```
 
 PVC가 `Pending`인데 StorageClass는 있다면
@@ -229,23 +253,30 @@ spec:
 
 ### CRD를 만들면 무슨 일이 생기나
 
-```mermaid
-flowchart LR
-    CRD["CRD 적용"] --> EP["API 서버에 새 엔드포인트<br/>/apis/ops.example.com/v1/backups"]
-    EP --> A["kubectl get/create/delete backup<br/>즉시 동작 ✅"]
-    EP --> B["kubectl explain backup.spec<br/>스키마가 있으니 동작 ✅"]
-    EP --> C["검증도 API 서버가 해준다 ✅"]
-    EP --> D["그런데 아무 일도 일어나지 않는다 ⚠️<br/>보고 행동하는 컨트롤러가 없다"]
-    D --> OP["→ 그 컨트롤러가 오퍼레이터"]
+```d2 layout=elk pad=40 title="CRD 를 적용하면 API 엔드포인트가 생겨 kubectl 조회 · explain · 검증까지 되지만, 보고 행동하는 컨트롤러가 없어 아무 일도 일어나지 않는다는 것을 보여 주는 그림"
+direction: down
 
-    classDef ok fill:#dcfce7,stroke:#16a34a,color:#14532d
-    classDef warn fill:#fef3c7,stroke:#d97706,color:#78350f
-    classDef key fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
-    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
-    class A,B,C ok
-    class D warn
-    class OP key
-    class CRD,EP mute
+classes: {
+  ok: { style: { fill: "#dcfce7"; stroke: "#16a34a"; font-color: "#14532d" } }
+  warn: { style: { fill: "#fef3c7"; stroke: "#d97706"; font-color: "#78350f" } }
+  key: { style: { fill: "#dbeafe"; stroke: "#2563eb"; font-color: "#1e3a8a" } }
+  mute: { style: { fill: "#f1f5f9"; stroke: "#94a3b8"; font-color: "#334155" } }
+}
+
+crd: CRD 적용 { class: mute }
+ep: API 서버에 새 엔드포인트\n/apis/ops.example.com\n/v1/backups { class: mute }
+a: kubectl\nget/create/delete\nbackup\n즉시 동작 ✅ { class: ok }
+b: kubectl explain\nbackup.spec\n스키마가 있으니\n동작 ✅ { class: ok }
+c: 검증도\nAPI 서버가\n해준다 ✅ { class: ok }
+d: 그런데 아무 일도\n일어나지 않는다 ⚠️\n보고 행동하는\n컨트롤러가 없다 { class: warn }
+op: → 그 컨트롤러가 오퍼레이터 { class: key }
+
+crd -> ep
+ep -> a
+ep -> b
+ep -> c
+ep -> d
+d -> op
 ```
 
 ```bash
@@ -299,18 +330,23 @@ Deployment·StatefulSet은 "Pod을 몇 개 띄운다"까지만 안다. 그런데
 "이 상태여야 한다"를 CR(Custom Resource — CRD가 정의한 종류의 실제 오브젝트)로 선언하면,
 오퍼레이터가 그 상태를 만들고 유지한다. CRD가 클래스라면 CR은 인스턴스다.
 
-```mermaid
-flowchart LR
-    U["사용자"] -->|"CR 생성<br/>kind: Certificate"| API["kube-apiserver"]
-    API -->|"watch"| OP["Operator Pod<br/>cert-manager"]
-    OP -->|"Secret · Ingress 등 생성"| API
-    OP -->|"status.conditions 갱신"| API
-    API -->|"describe 로 읽는다"| U
+```d2 layout=elk pad=40 title="사용자가 CR 을 만들고 오퍼레이터 Pod 이 watch 로 받아 리소스를 만들고 status.conditions 를 갱신하면 사용자가 describe 로 읽는 순환"
+direction: right
 
-    classDef key fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
-    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
-    class OP key
-    class U,API mute
+classes: {
+  key: { style: { fill: "#dbeafe"; stroke: "#2563eb"; font-color: "#1e3a8a" } }
+  mute: { style: { fill: "#f1f5f9"; stroke: "#94a3b8"; font-color: "#334155" } }
+}
+
+u: 사용자 { class: mute }
+api: kube-apiserver { class: mute }
+op: Operator Pod\ncert-manager { class: key }
+
+u -> api: CR 생성\nkind: Certificate
+api -> op: watch
+op -> api: Secret · Ingress 등 생성
+op -> api: status.conditions 갱신
+api -> u: describe 로 읽는다
 ```
 
 | 오퍼레이터 | CR 예 |
@@ -354,19 +390,28 @@ helm install cert-manager jetstack/cert-manager \
 
 **CR을 만들었는데 아무 일도 안 일어날 때**
 
-```mermaid
-flowchart TD
-    S["CR 을 만들었는데 반응이 없다"] --> C1["① describe 의 status.conditions 와 Events"]
-    C1 -->|"단서가 없다"| C2["② 오퍼레이터 로그"]
-    C2 -->|"단서가 없다"| C3["③ 오퍼레이터 Pod 이 살아 있는가"]
-    C3 -->|"죽었다"| C4["Pod 로그 · RBAC 확인"]
-    C1 -.-> CMD1["kubectl describe certificate my-cert"]
-    C2 -.-> CMD2["kubectl logs -n cert-manager deploy/cert-manager --tail=100"]
+```d2 layout=elk pad=40 title="CR 에 반응이 없을 때 describe 의 status.conditions 와 Events, 오퍼레이터 로그, 오퍼레이터 Pod 생존 순으로 내려가는 진단 순서"
+direction: down
 
-    classDef key fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
-    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
-    class C1 key
-    class S,C2,C3,C4,CMD1,CMD2 mute
+classes: {
+  key: { style: { fill: "#dbeafe"; stroke: "#2563eb"; font-color: "#1e3a8a" } }
+  mute: { style: { fill: "#f1f5f9"; stroke: "#94a3b8"; font-color: "#334155" } }
+}
+
+s: CR 을 만들었는데 반응이 없다 { class: mute }
+c1: ① describe 의 status.conditions 와 Events { class: key }
+c2: ② 오퍼레이터 로그 { class: mute }
+c3: ③ 오퍼레이터 Pod 이 살아 있는가 { class: mute }
+c4: Pod 로그 · RBAC 확인 { class: mute }
+cmd1: kubectl describe certificate my-cert { class: mute }
+cmd2: kubectl logs -n cert-manager deploy/cert-manager --tail=100 { class: mute }
+
+s -> c1
+c1 -> c2: 단서가 없다
+c2 -> c3: 단서가 없다
+c3 -> c4: 죽었다
+c1 -> cmd1: { style.stroke-dash: 3 }
+c2 -> cmd2: { style.stroke-dash: 3 }
 ```
 
 ```bash
@@ -414,19 +459,28 @@ CRI·CNI·CSI는 "코어가 아예 구현을 안 갖고 있는" 자리였다. �
 정도이고, 나머지는 **이름과 역할만 알아 두면 충분하다** — 직접 구성하는 문제로
 나오지는 않는 편이다.
 
-```mermaid
-flowchart LR
-    API["kube-apiserver"]
-    API --> W["Admission webhook<br/>요청을 가로채 고치거나 거부 · 14장"]
-    API --> AG["API Aggregation<br/>별도 API 서버를 /apis 아래에<br/>metrics-server 가 이 방식"]
-    KL["kubelet"] --> DP["Device Plugin<br/>GPU 등을 노드 리소스로 노출"]
-    SCH["scheduler"] --> EX["Scheduler Extender<br/>다중 스케줄러 · 7장"]
-    CLOUD["Cloud Controller Manager<br/>클라우드별 노드·LB·라우트"] --> API
+```d2 layout=elk pad=40 title="kube-apiserver · kubelet · scheduler 에 각각 붙는 admission webhook, API aggregation, device plugin, scheduler extender 와 cloud controller manager 확장점"
+direction: down
 
-    classDef key fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
-    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
-    class API,KL,SCH key
-    class W,AG,DP,EX,CLOUD mute
+classes: {
+  key: { style: { fill: "#dbeafe"; stroke: "#2563eb"; font-color: "#1e3a8a" } }
+  mute: { style: { fill: "#f1f5f9"; stroke: "#94a3b8"; font-color: "#334155" } }
+}
+
+api: kube-apiserver { class: key }
+kl: kubelet { class: key }
+sch: scheduler { class: key }
+w: Admission webhook\n요청을 가로채 고치거나\n거부 · 14장 { class: mute }
+ag: API Aggregation\n별도 API 서버를 /apis 아래에\nmetrics-server 가 이 방식 { class: mute }
+dp: Device Plugin\nGPU 등을 노드\n리소스로 노출 { class: mute }
+ex: Scheduler Extender\n다중 스케줄러 · 7장 { class: mute }
+cloud: Cloud Controller\nManager\n클라우드별 노드·LB·라우트 { class: mute }
+
+api -> w
+api -> ag
+kl -> dp
+sch -> ex
+cloud -> api
 ```
 
 | 확장 | 무엇 |

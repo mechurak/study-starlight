@@ -31,16 +31,18 @@ import { Tabs, TabItem, Card, CardGrid, LinkCard } from '@astrojs/starlight/comp
 
 ## 해결 시도의 역사
 
-```mermaid
-timeline
-    title CSS 스타일링 접근의 변천
-    2005 : 시맨틱 클래스 : .article-title
-    2010 : OOCSS · SMACSS : 재사용 단위를 정의하려는 시도
-    2013 : BEM : .block__element--modifier
-    2015 : CSS Modules : 빌드 타임에 이름을 유일하게
-    2016 : CSS-in-JS : styled-components · emotion
-    2017 : Tailwind : 이름 짓기를 포기한다
-    2025 : Tailwind v4 : CSS 자체가 설정 파일이 됨
+```d2 layout=elk pad=40 title="CSS 스타일링 접근의 변천 — 2005년 시맨틱 클래스, 2010년 OOCSS · SMACSS, 2013년 BEM, 2015년 CSS Modules, 2016년 CSS-in-JS, 2017년 Tailwind, 2025년 Tailwind v4 를 연대순으로 이은 사슬"
+direction: down
+
+y2005: 2005 · 시맨틱 클래스\n.article-title
+y2010: 2010 · OOCSS · SMACSS\n재사용 단위를 정의하려는 시도
+y2013: 2013 · BEM\n.block__element--modifier
+y2015: 2015 · CSS Modules\n빌드 타임에 이름을 유일하게
+y2016: 2016 · CSS-in-JS\nstyled-components · emotion
+y2017: 2017 · Tailwind\n이름 짓기를 포기한다
+y2025: 2025 · Tailwind v4\nCSS 자체가 설정 파일이 됨
+
+y2005 -> y2010 -> y2013 -> y2015 -> y2016 -> y2017 -> y2025
 ```
 
 ### BEM — 규율로 해결하기

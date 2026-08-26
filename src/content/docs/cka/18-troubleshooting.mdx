@@ -52,26 +52,32 @@ Service, DNS, CNI, 정책.
 
 층을 정하는 질문은 셋, 치는 명령은 두 줄이다.
 
-```mermaid
-flowchart TD
-    START["문제를 연다"] --> Q1{"kubectl get nodes<br/>응답이 오는가?"}
-    Q1 -->|"안 온다"| L3["3 · 컨트롤 플레인 층<br/>crictl · journalctl 로 내려간다"]
-    Q1 -->|"온다"| Q2{"노드가 전부<br/>Ready 인가?"}
-    Q2 -->|"NotReady 가 있다"| L2["2 · 노드 층<br/>kubelet 과 CNI 를 본다"]
-    Q2 -->|"전부 Ready"| Q3{"kubectl get pods -A<br/>전부 Running · Ready 인가?"}
-    Q3 -->|"아니다"| L1["1 · 애플리케이션 층<br/>describe → logs"]
-    Q3 -->|"Running 인데 통신이 안 된다"| L4["4 · 네트워크 층<br/>안에서 밖으로 한 겹씩"]
+```d2 layout=elk pad=40 title="kubectl get nodes 응답 여부 · 노드 Ready 여부 · Pod Running 여부로 갈라져 애플리케이션 · 노드 · 컨트롤 플레인 · 네트워크 네 층 중 어디로 내려갈지 정하는 분기"
+direction: down
+classes: {
+  ok: { style: { fill: "#dcfce7"; stroke: "#16a34a"; font-color: "#14532d" } }
+  bad: { style: { fill: "#fee2e2"; stroke: "#dc2626"; font-color: "#7f1d1d" } }
+  warn: { style: { fill: "#fef3c7"; stroke: "#d97706"; font-color: "#78350f" } }
+  key: { style: { fill: "#dbeafe"; stroke: "#2563eb"; font-color: "#1e3a8a" } }
+  mute: { style: { fill: "#f1f5f9"; stroke: "#94a3b8"; font-color: "#334155" } }
+  zone: { style: { fill: "#ede9fe"; stroke: "#7c3aed"; font-color: "#4c1d95" } }
+}
+start: 문제를 연다 { class: mute }
+q1: kubectl get nodes\n응답이 오는가? { shape: diamond; class: mute }
+q2: 노드가 전부\nReady 인가? { shape: diamond; class: mute }
+q3: kubectl get pods -A\n전부 Running ·\nReady 인가? { shape: diamond; class: mute }
+l3: 3 · 컨트롤 플레인 층\ncrictl · journalctl 로\n내려간다 { class: bad }
+l2: 2 · 노드 층\nkubelet 과 CNI 를 본다 { class: warn }
+l1: 1 · 애플리케이션 층\ndescribe → logs { class: key }
+l4: 4 · 네트워크 층\n안에서 밖으로 한 겹씩 { class: zone }
 
-    classDef app fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
-    classDef node fill:#fef3c7,stroke:#d97706,color:#78350f
-    classDef cp fill:#fee2e2,stroke:#dc2626,color:#7f1d1d
-    classDef zone fill:#ede9fe,stroke:#7c3aed,color:#4c1d95
-    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
-    class L1 app
-    class L2 node
-    class L3 cp
-    class L4 zone
-    class START mute
+start -> q1
+q1 -> l3: 안 온다
+q1 -> q2: 온다
+q2 -> l2: NotReady 가 있다
+q2 -> q3: 전부 Ready
+q3 -> l1: 아니다
+q3 -> l4: Running 인데 통신이 안 된다
 ```
 
 ```bash
@@ -98,17 +104,25 @@ kubectl get pods -A | grep -vE 'Running|Completed'    # Q3
 
 **순서가 중요하다.**
 
-```mermaid
-flowchart LR
-    D["kubectl describe<br/>★ Events"] --> L["kubectl logs<br/>--previous"] --> Y["kubectl get -o yaml<br/>정확한 값"]
-    SKIP["로그부터 본다"] -.->|"스케줄링 · 볼륨 · 이미지 문제는<br/>아무것도 안 나온다 ❌"| X["시간 낭비"]
+```d2 layout=elk pad=40 title="describe 의 Events 를 먼저 보고 logs --previous, get -o yaml 순으로 가는 순서와, 로그부터 보면 스케줄링 · 볼륨 · 이미지 문제에서 아무것도 안 나오는 이유"
+direction: down
+classes: {
+  ok: { style: { fill: "#dcfce7"; stroke: "#16a34a"; font-color: "#14532d" } }
+  bad: { style: { fill: "#fee2e2"; stroke: "#dc2626"; font-color: "#7f1d1d" } }
+  warn: { style: { fill: "#fef3c7"; stroke: "#d97706"; font-color: "#78350f" } }
+  key: { style: { fill: "#dbeafe"; stroke: "#2563eb"; font-color: "#1e3a8a" } }
+  mute: { style: { fill: "#f1f5f9"; stroke: "#94a3b8"; font-color: "#334155" } }
+  zone: { style: { fill: "#ede9fe"; stroke: "#7c3aed"; font-color: "#4c1d95" } }
+}
+d: kubectl describe\n★ Events { class: ok }
+l: kubectl logs\n--previous { class: ok }
+y: kubectl get -o yaml\n정확한 값 { class: ok }
+skip: 로그부터 본다 { class: mute }
+x: 시간 낭비 { class: bad }
 
-    classDef ok fill:#dcfce7,stroke:#16a34a,color:#14532d
-    classDef bad fill:#fee2e2,stroke:#dc2626,color:#7f1d1d
-    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
-    class D,L,Y ok
-    class X bad
-    class SKIP mute
+d -> l
+l -> y
+skip -> x: 스케줄링 · 볼륨 · 이미지 문제는\n아무것도 안 나온다 ❌ { style.stroke-dash: 3 }
 ```
 
 `describe`(Events) → `logs` → `-o yaml`.
@@ -127,29 +141,40 @@ kubelet도 만들라는 지시를 받았다. Pod의 STATUS는 그 마지막 걸�
 
 STATUS를 보는 순간 다음 명령이 정해져야 한다.
 
-```mermaid
-flowchart LR
-    S["kubectl get pods"] --> ST{"STATUS"}
+```d2 layout=elk pad=40 title="Pod 의 STATUS 값 열 가지별로 스케줄링 · 볼륨 · 이미지 · 앱 · 리소스 · 설정 중 어디를 볼지와 다음 명령이 정해지는 진단 지도"
+direction: right
+classes: {
+  ok: { style: { fill: "#dcfce7"; stroke: "#16a34a"; font-color: "#14532d" } }
+  bad: { style: { fill: "#fee2e2"; stroke: "#dc2626"; font-color: "#7f1d1d" } }
+  warn: { style: { fill: "#fef3c7"; stroke: "#d97706"; font-color: "#78350f" } }
+  key: { style: { fill: "#dbeafe"; stroke: "#2563eb"; font-color: "#1e3a8a" } }
+  mute: { style: { fill: "#f1f5f9"; stroke: "#94a3b8"; font-color: "#334155" } }
+  zone: { style: { fill: "#ede9fe"; stroke: "#7c3aed"; font-color: "#4c1d95" } }
+}
+s: kubectl\nget pods { class: mute }
+st: STATUS { shape: diamond }
+p1: 스케줄링\ndescribe → Events { class: warn }
+p2: 볼륨 · 네트워크\ndescribe →\nEvents { class: warn }
+p3: 이미지\ndescribe → Events { class: warn }
+p4: 앱\n★ logs --previous { class: bad }
+p5: 앱\nlogs · exit code { class: bad }
+p6: 리소스\ndescribe →\nLast State { class: bad }
+p7: 설정\nConfigMap/Secret\n확인 { class: key }
+p8: readinessProbe\ndescribe → Events { class: key }
+p9: finalizer · 노드\nget pod -o yaml { class: key }
+p10: restartPolicy\nJob 여부 확인 { class: key }
 
-    ST -->|Pending| P1["스케줄링<br/>describe → Events"]
-    ST -->|ContainerCreating| P2["볼륨 · 네트워크<br/>describe → Events"]
-    ST -->|ImagePullBackOff| P3["이미지<br/>describe → Events"]
-    ST -->|CrashLoopBackOff| P4["앱<br/>★ logs --previous"]
-    ST -->|Error| P5["앱<br/>logs · exit code"]
-    ST -->|OOMKilled| P6["리소스<br/>describe → Last State"]
-    ST -->|CreateContainerConfigError| P7["설정<br/>ConfigMap/Secret 확인"]
-    ST -->|"Running 인데 0/1"| P8["readinessProbe<br/>describe → Events"]
-    ST -->|"Terminating 지속"| P9["finalizer · 노드<br/>get pod -o yaml"]
-    ST -->|"Completed 반복"| P10["restartPolicy<br/>Job 여부 확인"]
-
-    classDef sched fill:#fef3c7,stroke:#d97706,color:#78350f
-    classDef app fill:#fee2e2,stroke:#dc2626,color:#7f1d1d
-    classDef cfg fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
-    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
-    class P1,P2,P3 sched
-    class P4,P5,P6 app
-    class P7,P8,P9,P10 cfg
-    class S mute
+s -> st
+st -> p1: Pending
+st -> p2: ContainerCreating
+st -> p3: ImagePullBackOff
+st -> p4: CrashLoopBackOff
+st -> p5: Error
+st -> p6: OOMKilled
+st -> p7: CreateContainer\nConfigError
+st -> p8: Running 인데 0/1
+st -> p9: Terminating 지속
+st -> p10: Completed 반복
 ```
 
 | STATUS | 층 | 첫 명령 |
@@ -183,21 +208,32 @@ kubectl describe pod web | grep -A20 Events
 
 Events 메시지 하나가 원인을 그대로 지목한다.
 
-```mermaid
-flowchart LR
-    E{"Events 메시지"}
-    E -->|"Insufficient cpu/memory"| R1["request 여유 부족<br/>→ request 낮추거나 노드 추가"]
-    E -->|"had untolerated taint"| R2["taint<br/>→ toleration 추가 또는 taint 제거"]
-    E -->|"didn't match node affinity/selector"| R3["라벨 불일치<br/>→ 노드 라벨 또는 셀렉터 수정"]
-    E -->|"node(s) were unschedulable"| R4["cordon<br/>→ kubectl uncordon"]
-    E -->|"unbound immediate PersistentVolumeClaims"| R5["PVC 미바인딩<br/>→ 13장"]
-    E -->|"didn't match pod anti-affinity rules"| R6["antiAffinity<br/>→ 7장"]
-    E -->|"Events 자체가 없다"| R7["스케줄러가 죽었다<br/>또는 schedulerName 오타<br/>→ 컨트롤 플레인 확인"]
+```d2 layout=elk pad=40 title="스케줄링 실패 시 Events 메시지 일곱 가지별 원인과 대응, Events 자체가 없으면 스케줄러를 의심한다는 분기"
+direction: right
+classes: {
+  ok: { style: { fill: "#dcfce7"; stroke: "#16a34a"; font-color: "#14532d" } }
+  bad: { style: { fill: "#fee2e2"; stroke: "#dc2626"; font-color: "#7f1d1d" } }
+  warn: { style: { fill: "#fef3c7"; stroke: "#d97706"; font-color: "#78350f" } }
+  key: { style: { fill: "#dbeafe"; stroke: "#2563eb"; font-color: "#1e3a8a" } }
+  mute: { style: { fill: "#f1f5f9"; stroke: "#94a3b8"; font-color: "#334155" } }
+  zone: { style: { fill: "#ede9fe"; stroke: "#7c3aed"; font-color: "#4c1d95" } }
+}
+e: Events 메시지 { shape: diamond }
+r1: request 여유 부족\n→ request 낮추거나\n노드 추가 { class: warn }
+r2: taint\n→ toleration 추가\n또는 taint 제거 { class: warn }
+r3: 라벨 불일치\n→ 노드 라벨 또는\n셀렉터 수정 { class: warn }
+r4: cordon\n→ kubectl uncordon { class: warn }
+r5: PVC 미바인딩\n→ 13장 { class: warn }
+r6: antiAffinity\n→ 7장 { class: warn }
+r7: 스케줄러가 죽었다\n또는 schedulerName\n오타\n→ 컨트롤 플레인 확인 { class: bad }
 
-    classDef norm fill:#fef3c7,stroke:#d97706,color:#78350f
-    classDef alarm fill:#fee2e2,stroke:#dc2626,color:#7f1d1d
-    class R1,R2,R3,R4,R5,R6 norm
-    class R7 alarm
+e -> r1: Insufficient\ncpu/memory
+e -> r2: had untolerated\ntaint
+e -> r3: didn't match node\naffinity/selector
+e -> r4: node(s) were\nunschedulable
+e -> r5: unbound immediate\nPersistentVolumeClaims
+e -> r6: didn't match pod\nanti-affinity rules
+e -> r7: Events 자체가\n없다
 ```
 
 | 메시지 | 원인 | 조치 |
@@ -258,26 +294,38 @@ kubectl describe pod web | grep -A15 'Last State'
 
 **exit code 하나로 절반이 좁혀진다.**
 
-```mermaid
-flowchart LR
-    C["CrashLoopBackOff"] --> LOG["logs --previous"]
-    LOG --> Q{"로그가 있는가"}
-    Q -->|"있다"| EC{"Exit Code"}
-    Q -->|"비어 있는데 계속 죽는다"| PR["liveness 프로브 의심<br/>Events 에 Liveness probe failed 반복"]
+```d2 layout=elk pad=40 title="CrashLoopBackOff 에서 logs --previous 로 로그 유무를 가르고, 로그가 있으면 Exit Code 0 · 1 · 2 · 126 · 127 · 137 · 143 별 원인으로, 없으면 liveness 프로브를 의심하는 진단"
+direction: down
+classes: {
+  ok: { style: { fill: "#dcfce7"; stroke: "#16a34a"; font-color: "#14532d" } }
+  bad: { style: { fill: "#fee2e2"; stroke: "#dc2626"; font-color: "#7f1d1d" } }
+  warn: { style: { fill: "#fef3c7"; stroke: "#d97706"; font-color: "#78350f" } }
+  key: { style: { fill: "#dbeafe"; stroke: "#2563eb"; font-color: "#1e3a8a" } }
+  mute: { style: { fill: "#f1f5f9"; stroke: "#94a3b8"; font-color: "#334155" } }
+  zone: { style: { fill: "#ede9fe"; stroke: "#7c3aed"; font-color: "#4c1d95" } }
+}
+c: CrashLoopBackOff { class: mute }
+log: logs\n--previous { class: mute }
+q: 로그가 있는가 { shape: diamond }
+ec: Exit Code { shape: diamond }
+pr: liveness 프로브 의심\nEvents 에 Liveness\nprobe failed 반복 { class: warn }
+e0: "정상 종료했는데\nrestartPolicy: Always\n→ sleep 이 필요하거나\nJob 이어야 한다" { class: bad }
+e1: 앱 에러\n→ 로그를 읽는다 { class: warn }
+e126: 실행 권한 없음\n→ command 경로·권한 { class: warn }
+e127: 명령을 못 찾음\n→ command 오타\n또는 바이너리 없음 { class: bad }
+e137: SIGKILL\n→ OOMKilled\n또는 liveness 실패 { class: bad }
+e143: SIGTERM\n→ 정상 종료 신호 { class: warn }
 
-    EC -->|0| E0["정상 종료했는데 restartPolicy: Always<br/>→ sleep 이 필요하거나 Job 이어야 한다"]
-    EC -->|"1 · 2"| E1["앱 에러 → 로그를 읽는다"]
-    EC -->|126| E126["실행 권한 없음 → command 경로·권한"]
-    EC -->|127| E127["명령을 못 찾음<br/>→ command 오타 또는 바이너리 없음"]
-    EC -->|137| E137["SIGKILL → OOMKilled 또는 liveness 실패"]
-    EC -->|143| E143["SIGTERM → 정상 종료 신호"]
-
-    classDef bad fill:#fee2e2,stroke:#dc2626,color:#7f1d1d
-    classDef warn fill:#fef3c7,stroke:#d97706,color:#78350f
-    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
-    class E0,E127,E137 bad
-    class E1,E126,E143,PR warn
-    class C,LOG mute
+c -> log
+log -> q
+q -> ec: 있다
+q -> pr: 비어 있는데\n계속 죽는다
+ec -> e0: "0"
+ec -> e1: 1 · 2
+ec -> e126: "126"
+ec -> e127: "127"
+ec -> e137: "137"
+ec -> e143: "143"
 ```
 
 | Exit Code | 의미 | 다음 행동 |
@@ -325,17 +373,23 @@ kubectl get pod web -o jsonpath='{.spec.containers[0].resources}'
 
 **둘은 다른 사건이다.**
 
-```mermaid
-flowchart LR
-    A["컨테이너가 limits.memory 초과"] --> A1["OOMKilled<br/>해당 컨테이너만 재시작"]
-    B["노드 전체 메모리 부족"] --> B1["kubelet 이 Pod 을 축출<br/>Evicted · QoS 순서대로"]
+```d2 layout=elk pad=40 title="컨테이너가 limits.memory 를 넘으면 그 컨테이너만 OOMKilled 로 재시작되고, 노드 전체 메모리가 부족하면 kubelet 이 QoS 순서대로 Pod 을 축출하는 두 경로의 구분"
+direction: down
+classes: {
+  ok: { style: { fill: "#dcfce7"; stroke: "#16a34a"; font-color: "#14532d" } }
+  bad: { style: { fill: "#fee2e2"; stroke: "#dc2626"; font-color: "#7f1d1d" } }
+  warn: { style: { fill: "#fef3c7"; stroke: "#d97706"; font-color: "#78350f" } }
+  key: { style: { fill: "#dbeafe"; stroke: "#2563eb"; font-color: "#1e3a8a" } }
+  mute: { style: { fill: "#f1f5f9"; stroke: "#94a3b8"; font-color: "#334155" } }
+  zone: { style: { fill: "#ede9fe"; stroke: "#7c3aed"; font-color: "#4c1d95" } }
+}
+a: 컨테이너가 limits.memory 초과 { class: mute }
+a1: OOMKilled\n해당 컨테이너만 재시작 { class: bad }
+b: 노드 전체 메모리 부족 { class: mute }
+b1: kubelet 이 Pod 을 축출\nEvicted · QoS 순서대로 { class: warn }
 
-    classDef c1 fill:#fee2e2,stroke:#dc2626,color:#7f1d1d
-    classDef c2 fill:#fef3c7,stroke:#d97706,color:#78350f
-    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
-    class A1 c1
-    class B1 c2
-    class A,B mute
+a -> a1
+b -> b1
 ```
 
 :::caution[함정]
@@ -386,19 +440,26 @@ kubectl describe pod web | grep -A10 Events
 
 **컨테이너는 살아 있는데 Service에서 빠진다.** 그래서 "연결이 안 된다"로 보인다.
 
-```mermaid
-flowchart LR
-    P["Pod<br/>Running · 0/1"] -->|"readinessProbe 실패"| NR["Ready 조건 False"]
-    NR --> EP["EndpointSlice 에서 제외"]
-    EP --> SVC["Service<br/>엔드포인트가 비어 있다"]
-    SVC --> C["클라이언트<br/>연결 실패 ❌"]
+```d2 layout=elk pad=40 title="readinessProbe 실패가 Ready 조건 False → EndpointSlice 제외 → Service 엔드포인트 비어 있음 → 클라이언트 연결 실패로 이어지는 경로"
+direction: down
+classes: {
+  ok: { style: { fill: "#dcfce7"; stroke: "#16a34a"; font-color: "#14532d" } }
+  bad: { style: { fill: "#fee2e2"; stroke: "#dc2626"; font-color: "#7f1d1d" } }
+  warn: { style: { fill: "#fef3c7"; stroke: "#d97706"; font-color: "#78350f" } }
+  key: { style: { fill: "#dbeafe"; stroke: "#2563eb"; font-color: "#1e3a8a" } }
+  mute: { style: { fill: "#f1f5f9"; stroke: "#94a3b8"; font-color: "#334155" } }
+  zone: { style: { fill: "#ede9fe"; stroke: "#7c3aed"; font-color: "#4c1d95" } }
+}
+p: Pod\nRunning · 0/1 { class: mute }
+nr: Ready 조건 False { class: warn }
+ep: EndpointSlice 에서 제외 { class: warn }
+svc: Service\n엔드포인트가 비어 있다 { class: warn }
+c: 클라이언트\n연결 실패 ❌ { class: bad }
 
-    classDef bad fill:#fee2e2,stroke:#dc2626,color:#7f1d1d
-    classDef warn fill:#fef3c7,stroke:#d97706,color:#78350f
-    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
-    class C bad
-    class NR,EP,SVC warn
-    class P mute
+p -> nr: readinessProbe 실패
+nr -> ep
+ep -> svc
+svc -> c
 ```
 
 - **readinessProbe가 실패하고 있다** — 컨테이너는 살아 있다
@@ -483,19 +544,31 @@ kubectl logs job/import
 
 로그가 어디를 거쳐 오는지 알면 `kubectl`이 죽었을 때 어디를 봐야 하는지도 안다.
 
-```mermaid
-flowchart LR
-    APP["컨테이너<br/>stdout · stderr"] --> F["/var/log/pods/&lt;ns&gt;_&lt;pod&gt;_&lt;uid&gt;/&lt;container&gt;/0.log"]
-    F --> SYM["/var/log/containers/<br/>심볼릭 링크"]
-    F --> KL["kubelet"] --> API["kube-apiserver"] --> KC["kubectl logs"]
-    FILE["앱이 파일에 쓴다"] -.->|"kubectl 로 안 보인다 ❌"| X["stdout 이 아니다"]
+```d2 layout=elk pad=40 title="컨테이너 stdout 이 노드의 로그 파일을 거쳐 kubelet · API 서버 · kubectl logs 까지 오는 경로와, 앱이 파일에 쓰면 kubectl 로 안 보이는 이유"
+direction: down
+classes: {
+  ok: { style: { fill: "#dcfce7"; stroke: "#16a34a"; font-color: "#14532d" } }
+  bad: { style: { fill: "#fee2e2"; stroke: "#dc2626"; font-color: "#7f1d1d" } }
+  warn: { style: { fill: "#fef3c7"; stroke: "#d97706"; font-color: "#78350f" } }
+  key: { style: { fill: "#dbeafe"; stroke: "#2563eb"; font-color: "#1e3a8a" } }
+  mute: { style: { fill: "#f1f5f9"; stroke: "#94a3b8"; font-color: "#334155" } }
+  zone: { style: { fill: "#ede9fe"; stroke: "#7c3aed"; font-color: "#4c1d95" } }
+}
+app: 컨테이너\nstdout · stderr { class: mute }
+f: "/var/log/pods/<ns>_<pod>_<uid>/<container>/0.log" { class: mute }
+sym: /var/log/containers/\n심볼릭 링크 { class: ok }
+kl: kubelet { class: mute }
+api: kube-apiserver { class: mute }
+kc: kubectl logs { class: ok }
+file: 앱이 파일에 쓴다 { class: mute }
+x: stdout 이 아니다 { class: bad }
 
-    classDef ok fill:#dcfce7,stroke:#16a34a,color:#14532d
-    classDef bad fill:#fee2e2,stroke:#dc2626,color:#7f1d1d
-    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
-    class KC,SYM ok
-    class X bad
-    class APP,F,KL,API,FILE mute
+app -> f
+f -> sym
+f -> kl
+kl -> api
+api -> kc
+file -> x: kubectl 로 안 보인다 ❌ { style.stroke-dash: 3 }
 ```
 
 - 컨테이너는 **stdout / stderr**로 로그를 낸다. 파일에 쓰면 kubectl로 안 보인다
@@ -549,29 +622,40 @@ kubectl get nodes
 kubectl describe node node01 | grep -A15 Conditions
 ```
 
-```mermaid
-flowchart TD
-    N["노드가 NotReady"] --> C{"describe node → Conditions"}
-    C -->|"Ready: False<br/>cni plugin not initialized"| C1["CNI 미설치 · 고장<br/>→ CNI Pod 상태, /etc/cni/net.d/"]
-    C -->|"Ready: Unknown<br/>NodeStatusUnknown"| C2["kubelet 이 보고를 멈췄다<br/>→ ssh 후 journalctl -u kubelet"]
-    C -->|"MemoryPressure: True"| C3["메모리 부족 → 축출 시작"]
-    C -->|"DiskPressure: True"| C4["디스크 부족 → 이미지 GC, 축출"]
-    C -->|"PIDPressure: True"| C5["프로세스 수 초과"]
+```d2 layout=elk pad=40 title="노드 NotReady 일 때 describe node 의 Conditions 다섯 가지별 원인과, kubelet 이 멈춘 경우 journalctl 로그 메시지별 조치"
+direction: down
+classes: {
+  ok: { style: { fill: "#dcfce7"; stroke: "#16a34a"; font-color: "#14532d" } }
+  bad: { style: { fill: "#fee2e2"; stroke: "#dc2626"; font-color: "#7f1d1d" } }
+  warn: { style: { fill: "#fef3c7"; stroke: "#d97706"; font-color: "#78350f" } }
+  key: { style: { fill: "#dbeafe"; stroke: "#2563eb"; font-color: "#1e3a8a" } }
+  mute: { style: { fill: "#f1f5f9"; stroke: "#94a3b8"; font-color: "#334155" } }
+  zone: { style: { fill: "#ede9fe"; stroke: "#7c3aed"; font-color: "#4c1d95" } }
+}
+n: 노드가 NotReady { class: mute }
+c: describe node\n→ Conditions { shape: diamond }
+c1: CNI 미설치 · 고장\n→ CNI Pod 상태,\n/etc/cni/net.d/ { class: zone }
+c2: kubelet 이 보고를\n멈췄다\n→ ssh 후\njournalctl -u kubelet { class: warn }
+c3: 메모리 부족\n→ 축출 시작 { class: warn }
+c4: 디스크 부족\n→ 이미지 GC,\n축출 { class: warn }
+c5: 프로세스 수 초과 { class: warn }
+j: journalctl 로그 { shape: diamond }
+s1: swapoff -a { class: warn }
+s2: "containerd\nSystemdCgroup = true" { class: warn }
+s3: kubeadm certs renew { class: warn }
+s4: API 서버가 죽었다\n→ 컨트롤 플레인\n층으로 { class: bad }
 
-    C2 --> J{"journalctl 로그"}
-    J -->|"running with swap on"| S1["swapoff -a"]
-    J -->|"cgroup driver … != …"| S2["containerd SystemdCgroup = true"]
-    J -->|"x509: certificate has expired"| S3["kubeadm certs renew"]
-    J -->|"connection refused"| S4["API 서버가 죽었다<br/>→ 컨트롤 플레인 층으로"]
-
-    classDef zone fill:#ede9fe,stroke:#7c3aed,color:#4c1d95
-    classDef node fill:#fef3c7,stroke:#d97706,color:#78350f
-    classDef cp fill:#fee2e2,stroke:#dc2626,color:#7f1d1d
-    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
-    class C1 zone
-    class C2,C3,C4,C5,S1,S2,S3 node
-    class S4 cp
-    class N mute
+n -> c
+c -> c1: "Ready: False\ncni plugin\nnot initialized"
+c -> c2: Ready: Unknown\nNodeStatusUnknown
+c -> c3: MemoryPressure: True
+c -> c4: DiskPressure: True
+c -> c5: PIDPressure: True
+c2 -> j
+j -> s1: running with swap on
+j -> s2: cgroup driver\n… != …
+j -> s3: "x509: certificate has expired"
+j -> s4: connection refused
 ```
 
 | Condition | 원인 |
@@ -671,21 +755,30 @@ kubectl get nodes
 
 **아래가 죽으면 위가 전부 죽는다.** 그래서 고치는 순서가 정해진다.
 
-```mermaid
-flowchart BT
-    DISK["노드 디스크 · systemd"] --> KLT["kubelet"]
-    KLT --> ETCD["etcd<br/>스태틱 Pod"]
-    ETCD --> API["kube-apiserver"]
-    API --> SCH["kube-scheduler"]
-    API --> CM["kube-controller-manager"]
-    API --> KC["kubectl · 모든 조작"]
+```d2 layout=elk pad=40 title="노드 디스크와 kubelet 위에 etcd · kube-apiserver 가 서고 그 위에 scheduler · controller-manager · kubectl 이 얹히는 컨트롤 플레인 의존 순서"
+direction: up
+classes: {
+  ok: { style: { fill: "#dcfce7"; stroke: "#16a34a"; font-color: "#14532d" } }
+  bad: { style: { fill: "#fee2e2"; stroke: "#dc2626"; font-color: "#7f1d1d" } }
+  warn: { style: { fill: "#fef3c7"; stroke: "#d97706"; font-color: "#78350f" } }
+  key: { style: { fill: "#dbeafe"; stroke: "#2563eb"; font-color: "#1e3a8a" } }
+  mute: { style: { fill: "#f1f5f9"; stroke: "#94a3b8"; font-color: "#334155" } }
+  zone: { style: { fill: "#ede9fe"; stroke: "#7c3aed"; font-color: "#4c1d95" } }
+}
+disk: 노드 디스크 · systemd { class: mute }
+klt: kubelet { class: mute }
+etcd: etcd\n스태틱 Pod { class: bad }
+api: kube-apiserver { class: bad }
+sch: kube-scheduler { class: key }
+cm: kube-controller-manager { class: key }
+kc: kubectl · 모든 조작 { class: key }
 
-    classDef base fill:#f1f5f9,stroke:#94a3b8,color:#334155
-    classDef core fill:#fee2e2,stroke:#dc2626,color:#7f1d1d
-    classDef up fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
-    class DISK,KLT base
-    class ETCD,API core
-    class SCH,CM,KC up
+disk -> klt
+klt -> etcd
+etcd -> api
+api -> sch
+api -> cm
+api -> kc
 ```
 
 **etcd가 죽으면 API 서버도 못 뜬다.** API 서버 로그에 etcd 관련 에러가 있으면
@@ -718,20 +811,28 @@ watch sudo crictl ps                              # 다시 뜨는지 지켜본�
 
 **증상이 다르다.** 이 비대칭이 판별의 실마리다.
 
-```mermaid
-flowchart LR
-    D["Deployment 를 만든다"] --> Q1{"ReplicaSet · Pod 이<br/>생기는가"}
-    Q1 -->|"안 생긴다"| CM["kube-controller-manager 가 죽었다<br/>죽은 노드도 NotReady 로 안 바뀐다"]
-    Q1 -->|"생긴다"| Q2{"Pod 이 스케줄되는가"}
-    Q2 -->|"영원히 Pending<br/>Events 가 비어 있다"| SCH["kube-scheduler 가 죽었다"]
-    Q2 -->|"Running"| OK["둘 다 정상 ✅"]
+```d2 layout=elk pad=40 title="Deployment 를 하나 만들어 ReplicaSet · Pod 생성 여부와 스케줄 여부로 kube-controller-manager 와 kube-scheduler 중 무엇이 죽었는지 가려내는 순서"
+direction: down
+classes: {
+  ok: { style: { fill: "#dcfce7"; stroke: "#16a34a"; font-color: "#14532d" } }
+  bad: { style: { fill: "#fee2e2"; stroke: "#dc2626"; font-color: "#7f1d1d" } }
+  warn: { style: { fill: "#fef3c7"; stroke: "#d97706"; font-color: "#78350f" } }
+  key: { style: { fill: "#dbeafe"; stroke: "#2563eb"; font-color: "#1e3a8a" } }
+  mute: { style: { fill: "#f1f5f9"; stroke: "#94a3b8"; font-color: "#334155" } }
+  zone: { style: { fill: "#ede9fe"; stroke: "#7c3aed"; font-color: "#4c1d95" } }
+}
+d: Deployment 를 만든다 { class: mute }
+q1: ReplicaSet · Pod 이\n생기는가 { shape: diamond }
+cm: kube-controller-manager 가 죽었다\n죽은 노드도 NotReady 로 안 바뀐다 { class: bad }
+q2: Pod 이 스케줄되는가 { shape: diamond }
+sch: kube-scheduler 가 죽었다 { class: bad }
+ok: 둘 다 정상 ✅ { class: ok }
 
-    classDef ok fill:#dcfce7,stroke:#16a34a,color:#14532d
-    classDef bad fill:#fee2e2,stroke:#dc2626,color:#7f1d1d
-    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
-    class OK ok
-    class CM,SCH bad
-    class D mute
+d -> q1
+q1 -> cm: 안 생긴다
+q1 -> q2: 생긴다
+q2 -> sch: 영원히 Pending\nEvents 가 비어 있다
+q2 -> ok: Running
 ```
 
 | 죽은 것 | 증상 |
@@ -807,26 +908,40 @@ API 서버의 `--client-ca-file`은 `kubectl`·kubelet 등 **API로 들어오는
 
 **한 겹씩 벗긴다.** 처음 실패하는 겹이 곧 원인이다.
 
-```mermaid
-flowchart TD
-    L1["① 앱이 포트를 열었는가<br/>exec → localhost:8080"] -->|실패| F1["앱 · 포트 설정"]
-    L1 -->|성공| L2["② Pod IP 로 직접<br/>임시 Pod → 10.244.1.5:8080"]
-    L2 -->|실패| F2["CNI · NetworkPolicy"]
-    L2 -->|성공| L3["③ Service ClusterIP 로<br/>get endpoints 먼저 확인"]
-    L3 -->|"엔드포인트가 비어 있다"| F3["라벨 불일치 · Pod 미Ready"]
-    L3 -->|"엔드포인트는 있는데 안 된다"| F3b["kube-proxy"]
-    L3 -->|성공| L4["④ DNS 이름으로<br/>nslookup web-svc"]
-    L4 -->|실패| F4["CoreDNS · dnsPolicy"]
-    L4 -->|성공| L5["⑤ 외부에서<br/>NodePort · Ingress"]
-    L5 -->|실패| F5["NodePort 범위 · 방화벽 · LB · Ingress 규칙"]
-    L5 -->|성공| OK["정상 ✅"]
+```d2 layout=elk pad=40 title="앱 포트 · Pod IP · Service ClusterIP · DNS 이름 · 외부 노출 순으로 안에서 밖으로 한 겹씩 확인하며 각 단계 실패 시 의심할 곳을 짚는 네트워크 진단 사다리"
+direction: down
+classes: {
+  ok: { style: { fill: "#dcfce7"; stroke: "#16a34a"; font-color: "#14532d" } }
+  bad: { style: { fill: "#fee2e2"; stroke: "#dc2626"; font-color: "#7f1d1d" } }
+  warn: { style: { fill: "#fef3c7"; stroke: "#d97706"; font-color: "#78350f" } }
+  key: { style: { fill: "#dbeafe"; stroke: "#2563eb"; font-color: "#1e3a8a" } }
+  mute: { style: { fill: "#f1f5f9"; stroke: "#94a3b8"; font-color: "#334155" } }
+  zone: { style: { fill: "#ede9fe"; stroke: "#7c3aed"; font-color: "#4c1d95" } }
+}
+l1: ① 앱이 포트를 열었는가\nexec → localhost:8080 { class: key }
+l2: ② Pod IP 로 직접\n임시 Pod →\n10.244.1.5:8080 { class: key }
+l3: ③ Service ClusterIP 로\nget endpoints 먼저 확인 { class: key }
+l4: ④ DNS 이름으로\nnslookup web-svc { class: key }
+l5: ⑤ 외부에서\nNodePort · Ingress { class: key }
+f1: 앱 · 포트 설정 { class: bad }
+f2: CNI · NetworkPolicy { class: bad }
+f3: 라벨 불일치 · Pod 미Ready { class: bad }
+f3b: kube-proxy { class: bad }
+f4: CoreDNS · dnsPolicy { class: bad }
+f5: NodePort 범위 · 방화벽\n· LB · Ingress 규칙 { class: bad }
+ok: 정상 ✅ { class: ok }
 
-    classDef ok fill:#dcfce7,stroke:#16a34a,color:#14532d
-    classDef bad fill:#fee2e2,stroke:#dc2626,color:#7f1d1d
-    classDef step fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
-    class OK ok
-    class F1,F2,F3,F3b,F4,F5 bad
-    class L1,L2,L3,L4,L5 step
+l1 -> f1: 실패
+l1 -> l2: 성공
+l2 -> f2: 실패
+l2 -> l3: 성공
+l3 -> f3: 엔드포인트가 비어 있다
+l3 -> f3b: 엔드포인트는 있는데\n안 된다
+l3 -> l4: 성공
+l4 -> f4: 실패
+l4 -> l5: 성공
+l5 -> f5: 실패
+l5 -> ok: 성공
 ```
 
 ```bash
@@ -916,18 +1031,24 @@ kubectl describe node node01 | grep -A5 Conditions
 - **MemoryPressure** → **QoS 순서**로 축출 (BestEffort → Burstable → Guaranteed)
 - 축출된 Pod은 `Failed` 상태로 남는다. 상위 컨트롤러가 새로 만든다
 
-```mermaid
-flowchart LR
-    MP["MemoryPressure: True"] --> E1["BestEffort<br/>request·limit 없음"] --> E2["Burstable<br/>request &lt; limit"] --> E3["Guaranteed<br/>request = limit"]
+```d2 layout=elk pad=40 title="MemoryPressure 상황에서 BestEffort · Burstable · Guaranteed 순으로 축출되는 QoS 우선순위"
+direction: down
+classes: {
+  ok: { style: { fill: "#dcfce7"; stroke: "#16a34a"; font-color: "#14532d" } }
+  bad: { style: { fill: "#fee2e2"; stroke: "#dc2626"; font-color: "#7f1d1d" } }
+  warn: { style: { fill: "#fef3c7"; stroke: "#d97706"; font-color: "#78350f" } }
+  key: { style: { fill: "#dbeafe"; stroke: "#2563eb"; font-color: "#1e3a8a" } }
+  mute: { style: { fill: "#f1f5f9"; stroke: "#94a3b8"; font-color: "#334155" } }
+  zone: { style: { fill: "#ede9fe"; stroke: "#7c3aed"; font-color: "#4c1d95" } }
+}
+mp: "MemoryPressure: True" { class: mute }
+e1: BestEffort\nrequest·limit 없음 { class: bad }
+e2: "Burstable\nrequest < limit" { class: warn }
+e3: "Guaranteed\nrequest = limit" { class: ok }
 
-    classDef first fill:#fee2e2,stroke:#dc2626,color:#7f1d1d
-    classDef mid fill:#fef3c7,stroke:#d97706,color:#78350f
-    classDef last fill:#dcfce7,stroke:#16a34a,color:#14532d
-    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
-    class E1 first
-    class E2 mid
-    class E3 last
-    class MP mute
+mp -> e1
+e1 -> e2
+e2 -> e3
 ```
 
 **왼쪽부터 축출된다.** `Guaranteed`가 가장 오래 버틴다.
