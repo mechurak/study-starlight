@@ -32,24 +32,31 @@ Pending Pod이 있으면 노드를 늘린다.
 
 셋은 계층이 다르다. **차례로 물려 있다.**
 
-```mermaid
-flowchart LR
-    LOAD["부하 증가"] --> HPA["HPA<br/>Pod 개수를 늘린다"]
-    HPA --> Q{"노드에 자리가<br/>있는가"}
-    Q -->|"있다"| OK["새 Pod 이 뜬다 ✅"]
-    Q -->|"없다"| PEND["Pod 이 Pending"]
-    PEND --> CA["Cluster Autoscaler<br/>노드를 늘린다"]
-    CA --> OK
-    VPA["VPA<br/>Pod 하나의 크기를 키운다"] -.->|"다른 축이다"| HPA
+```d2 layout=elk pad=40 title="부하가 늘면 HPA 가 Pod 을 늘리고 자리가 없으면 Cluster Autoscaler 가 노드를 늘리며 VPA 는 Pod 하나의 크기를 키우는 다른 축이라는 관계"
+direction: down
 
-    classDef key fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
-    classDef ok fill:#dcfce7,stroke:#16a34a,color:#14532d
-    classDef warn fill:#fef3c7,stroke:#d97706,color:#78350f
-    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
-    class HPA,CA key
-    class OK ok
-    class PEND warn
-    class LOAD,Q,VPA mute
+classes: {
+  key: { style: { fill: "#dbeafe"; stroke: "#2563eb"; font-color: "#1e3a8a" } }
+  ok: { style: { fill: "#dcfce7"; stroke: "#16a34a"; font-color: "#14532d" } }
+  warn: { style: { fill: "#fef3c7"; stroke: "#d97706"; font-color: "#78350f" } }
+  mute: { style: { fill: "#f1f5f9"; stroke: "#94a3b8"; font-color: "#334155" } }
+}
+
+load: 부하 증가 { class: mute }
+hpa: "HPA\nPod 개수를 늘린다" { class: key }
+q: "노드에 자리가\n있는가" { shape: diamond; class: mute }
+ok: "새 Pod 이 뜬다 ✅" { class: ok }
+pend: Pod 이 Pending { class: warn }
+ca: "Cluster Autoscaler\n노드를 늘린다" { class: key }
+vpa: "VPA\nPod 하나의 크기를 키운다" { class: mute }
+
+load -> hpa
+hpa -> q
+q -> ok: 있다
+q -> pend: 없다
+pend -> ca
+ca -> ok
+vpa -> hpa: 다른 축이다 { style.stroke-dash: 3 }
 ```
 
 | 이름 | 무엇을 늘리나 | 어디에 있나 |
@@ -104,21 +111,29 @@ kubectl patch deploy metrics-server -n kube-system --type=json \
 
 ### 메트릭은 어디서 오는가
 
-```mermaid
-flowchart LR
-    K["kubelet<br/>cAdvisor"] --> MS["metrics-server<br/>메모리에만 저장"]
-    MS -->|"metrics.k8s.io<br/>APIService 등록"| API["kube-apiserver"]
-    API --> HPA["HPA 컨트롤러"]
-    API --> TOP["kubectl top"]
-    HPA -->|"replicas 조정"| D["Deployment"]
-    PROM["장기·커스텀 메트릭이 필요하면<br/>Prometheus + adapter"] -.-> API
+```d2 layout=elk pad=40 title="kubelet cAdvisor 의 지표가 metrics-server 를 거쳐 metrics.k8s.io API 로 올라가 HPA 컨트롤러와 kubectl top 이 쓰는 경로"
+direction: down
 
-    classDef key fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
-    classDef warn fill:#fef3c7,stroke:#d97706,color:#78350f
-    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
-    class MS key
-    class PROM warn
-    class K,API,HPA,TOP,D mute
+classes: {
+  key: { style: { fill: "#dbeafe"; stroke: "#2563eb"; font-color: "#1e3a8a" } }
+  warn: { style: { fill: "#fef3c7"; stroke: "#d97706"; font-color: "#78350f" } }
+  mute: { style: { fill: "#f1f5f9"; stroke: "#94a3b8"; font-color: "#334155" } }
+}
+
+k: "kubelet\ncAdvisor" { class: mute }
+ms: "metrics-server\n메모리에만 저장" { class: key }
+api: kube-apiserver { class: mute }
+hpa: HPA 컨트롤러 { class: mute }
+ktop: kubectl top { class: mute }
+d: Deployment { class: mute }
+prom: "장기·커스텀 메트릭이 필요하면\nPrometheus + adapter" { class: warn }
+
+k -> ms
+ms -> api: "metrics.k8s.io\nAPIService 등록"
+api -> hpa
+api -> ktop
+hpa -> d: replicas 조정
+prom -> api: { style.stroke-dash: 3 }
 ```
 
 - 출발점은 각 노드 kubelet에 내장된 **cAdvisor**(Container Advisor — 컨테이너 사용량 수집기)다 — 이름만 알면 된다
@@ -166,22 +181,30 @@ spec:
 
 ### HPA가 개수를 정하는 방식
 
-```mermaid
-flowchart LR
-    M["현재 지표<br/>CPU 평균 90%"] --> C["ceil( 현재 개수 × 현재지표 / 목표지표 )"]
-    T["목표 지표<br/>70%"] --> C
-    R["현재 3개"] --> C
-    C --> CALC["3 × 90/70 = 3.86"] --> UP["올림 → 4개"]
-    TOL["비율이 0.9 ~ 1.1 이면<br/>움직이지 않는다 · tolerance"] -.->|"진동 방지"| C
+```d2 layout=elk pad=40 title="HPA 가 현재 개수 × 현재지표 / 목표지표 를 올림해 목표 replicas 를 정하고 tolerance 로 진동을 막는 계산"
+direction: down
 
-    classDef key fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
-    classDef ok fill:#dcfce7,stroke:#16a34a,color:#14532d
-    classDef warn fill:#fef3c7,stroke:#d97706,color:#78350f
-    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
-    class C key
-    class UP ok
-    class TOL warn
-    class M,T,R,CALC mute
+classes: {
+  key: { style: { fill: "#dbeafe"; stroke: "#2563eb"; font-color: "#1e3a8a" } }
+  ok: { style: { fill: "#dcfce7"; stroke: "#16a34a"; font-color: "#14532d" } }
+  warn: { style: { fill: "#fef3c7"; stroke: "#d97706"; font-color: "#78350f" } }
+  mute: { style: { fill: "#f1f5f9"; stroke: "#94a3b8"; font-color: "#334155" } }
+}
+
+m: "현재 지표\nCPU 평균 90%" { class: mute }
+t: "목표 지표\n70%" { class: mute }
+r: 현재 3개 { class: mute }
+c: "ceil( 현재 개수 × 현재지표 / 목표지표 )" { class: key }
+calc: 3 × 90/70 = 3.86 { class: mute }
+up: 올림 → 4개 { class: ok }
+tol: "비율이 0.9 ~ 1.1 이면\n움직이지 않는다 · tolerance" { class: warn }
+
+m -> c
+t -> c
+r -> c
+c -> calc
+calc -> up
+tol -> c: 진동 방지 { style.stroke-dash: 3 }
 ```
 
 **목표 개수 = ceil( 현재 개수 × (현재 지표 / 목표 지표) )**
@@ -205,23 +228,28 @@ kubectl get hpa
 # web   Deployment/web   cpu: 45%/70%    2        10       3         5m
 ```
 
-```mermaid
-flowchart TD
-    T{"TARGETS 표시"}
-    T -->|"45%/70%"| OK["정상 동작 중 ✅"]
-    T -->|"unknown/70%"| U{"원인 둘 중 하나"}
-    U --> U1["① kubectl top pods 가 되는가<br/>→ metrics-server 확인"]
-    U --> U2["② Deployment 에 resources.requests.cpu 가 있는가<br/>→ 없으면 계산 불가"]
-    T -->|"none"| N["대상 워크로드를 못 찾는다<br/>scaleTargetRef 확인"]
+```d2 layout=elk pad=40 title="HPA 의 TARGETS 표시가 정상 · unknown · none 일 때 각각 무엇을 확인해야 하는지"
+direction: down
 
-    classDef ok fill:#dcfce7,stroke:#16a34a,color:#14532d
-    classDef bad fill:#fee2e2,stroke:#dc2626,color:#7f1d1d
-    classDef warn fill:#fef3c7,stroke:#d97706,color:#78350f
-    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
-    class OK ok
-    class N bad
-    class U1,U2 warn
-    class T,U mute
+classes: {
+  ok: { style: { fill: "#dcfce7"; stroke: "#16a34a"; font-color: "#14532d" } }
+  bad: { style: { fill: "#fee2e2"; stroke: "#dc2626"; font-color: "#7f1d1d" } }
+  warn: { style: { fill: "#fef3c7"; stroke: "#d97706"; font-color: "#78350f" } }
+  mute: { style: { fill: "#f1f5f9"; stroke: "#94a3b8"; font-color: "#334155" } }
+}
+
+t: TARGETS 표시 { shape: diamond; class: mute }
+ok: "정상 동작 중 ✅" { class: ok }
+u: 원인 둘 중 하나 { shape: diamond; class: mute }
+u1: "① kubectl top pods 가 되는가\n→ metrics-server 확인" { class: warn }
+u2: "② Deployment 에 resources.requests.cpu 가 있는가\n→ 없으면 계산 불가" { class: warn }
+n: "대상 워크로드를 못 찾는다\nscaleTargetRef 확인" { class: bad }
+
+t -> ok: 45%/70%
+t -> u: unknown/70%
+u -> u1
+u -> u2
+t -> n: none
 ```
 
 | TARGETS 표시 | 뜻 |
@@ -271,20 +299,27 @@ metrics:
         averageValue: "1000"
 ```
 
-```mermaid
-flowchart LR
-    M1["CPU 계산 → 4개"] --> MAX{"가장 큰 값을 택한다"}
-    M2["메모리 계산 → 6개"] --> MAX
-    M3["커스텀 계산 → 3개"] --> MAX
-    MAX --> R["6개로 확장"]
-    NOTE["하나라도 넘치면 늘어난다<br/>축소는 전부 여유가 있어야 한다"] -.- MAX
+```d2 layout=elk pad=40 title="여러 메트릭의 계산 결과 중 가장 큰 값을 택해 확장하고 축소는 전부 여유가 있어야 한다는 규칙"
+direction: right
 
-    classDef key fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
-    classDef ok fill:#dcfce7,stroke:#16a34a,color:#14532d
-    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
-    class MAX key
-    class R ok
-    class M1,M2,M3,NOTE mute
+classes: {
+  key: { style: { fill: "#dbeafe"; stroke: "#2563eb"; font-color: "#1e3a8a" } }
+  ok: { style: { fill: "#dcfce7"; stroke: "#16a34a"; font-color: "#14532d" } }
+  mute: { style: { fill: "#f1f5f9"; stroke: "#94a3b8"; font-color: "#334155" } }
+}
+
+m1: CPU 계산 → 4개 { class: mute }
+m2: 메모리 계산 → 6개 { class: mute }
+m3: 커스텀 계산 → 3개 { class: mute }
+max: "가장 큰 값을\n택한다" { shape: diamond; class: key }
+r: 6개로 확장 { class: ok }
+note: "하나라도 넘치면\n늘어난다\n축소는 전부\n여유가 있어야 한다" { class: mute }
+
+m1 -> max
+m2 -> max
+m3 -> max
+max -> r
+note -- max
 ```
 
 - 여러 메트릭이 있으면 **각각 계산해서 가장 큰 값을 택한다**
@@ -318,18 +353,25 @@ spec:
           periodSeconds: 60
 ```
 
-```mermaid
-flowchart LR
-    UP["scaleUp<br/>stabilizationWindow 0"] --> F["빠르게 늘린다 ⚡"]
-    DOWN["scaleDown<br/>stabilizationWindow 300"] --> S["5분 관찰 후 천천히 줄인다 🐢"]
-    DIS["selectPolicy: Disabled"] -.->|"그 방향으로는 아예 안 움직인다"| BOTH["scaleUp 또는 scaleDown"]
+```d2 layout=elk pad=40 title="scaleUp 은 stabilizationWindow 0 으로 빠르게 scaleDown 은 300 으로 천천히 움직이고 selectPolicy Disabled 는 그 방향을 아예 막는다"
+direction: down
 
-    classDef ok fill:#dcfce7,stroke:#16a34a,color:#14532d
-    classDef warn fill:#fef3c7,stroke:#d97706,color:#78350f
-    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
-    class F ok
-    class S warn
-    class UP,DOWN,DIS,BOTH mute
+classes: {
+  ok: { style: { fill: "#dcfce7"; stroke: "#16a34a"; font-color: "#14532d" } }
+  warn: { style: { fill: "#fef3c7"; stroke: "#d97706"; font-color: "#78350f" } }
+  mute: { style: { fill: "#f1f5f9"; stroke: "#94a3b8"; font-color: "#334155" } }
+}
+
+up: "scaleUp\nstabilizationWindow 0" { class: mute }
+f: 빠르게 늘린다 ⚡ { class: ok }
+down: "scaleDown\nstabilizationWindow 300" { class: mute }
+s: 5분 관찰 후 천천히 줄인다 🐢 { class: warn }
+dis: "selectPolicy: Disabled" { class: mute }
+both: scaleUp 또는 scaleDown { class: mute }
+
+up -> f
+down -> s
+dis -> both: 그 방향으로는 아예 안 움직인다 { style.stroke-dash: 3 }
 ```
 
 - **기본은 "빠르게 늘리고 천천히 줄인다"** — 축소 안정화 창이 300초다
@@ -371,19 +413,26 @@ flowchart LR
 
 ## HPA에서 자주 걸리는 것들
 
-```mermaid
-flowchart LR
-    S["kubectl scale deploy web --replicas=8"] --> HPA["HPA 가 붙어 있다"]
-    HPA -->|"다음 평가 주기 · 15초"| BACK["계산값으로 되돌린다 ❌"]
-    FIX1["HPA 를 지운다"] -.-> OK["수동 스케일이 유지된다"]
-    FIX2["minReplicas 를 바꾼다"] -.-> OK
+```d2 layout=elk pad=40 title="HPA 가 붙은 Deployment 를 kubectl scale 로 바꿔도 다음 평가 주기에 계산값으로 되돌아가고 HPA 삭제나 minReplicas 변경만 유지되는 흐름"
+direction: down
 
-    classDef bad fill:#fee2e2,stroke:#dc2626,color:#7f1d1d
-    classDef ok fill:#dcfce7,stroke:#16a34a,color:#14532d
-    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
-    class BACK bad
-    class OK ok
-    class S,HPA,FIX1,FIX2 mute
+classes: {
+  bad: { style: { fill: "#fee2e2"; stroke: "#dc2626"; font-color: "#7f1d1d" } }
+  ok: { style: { fill: "#dcfce7"; stroke: "#16a34a"; font-color: "#14532d" } }
+  mute: { style: { fill: "#f1f5f9"; stroke: "#94a3b8"; font-color: "#334155" } }
+}
+
+s: kubectl scale deploy web --replicas=8 { class: mute }
+hpa: HPA 가 붙어 있다 { class: mute }
+back: "계산값으로 되돌린다 ❌" { class: bad }
+fix1: HPA 를 지운다 { class: mute }
+fix2: minReplicas 를 바꾼다 { class: mute }
+ok: 수동 스케일이 유지된다 { class: ok }
+
+s -> hpa
+hpa -> back: 다음 평가 주기 · 15초
+fix1 -> ok: { style.stroke-dash: 3 }
+fix2 -> ok: { style.stroke-dash: 3 }
 ```
 
 :::caution[함정 1]

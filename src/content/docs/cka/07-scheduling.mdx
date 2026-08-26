@@ -9,20 +9,27 @@ import { Steps, Card, CardGrid, Tabs, TabItem, Badge } from '@astrojs/starlight/
 
 ## 스케줄러가 하는 일 — 다시
 
-```mermaid
-flowchart LR
-    W["watch<br/>spec.nodeName 이 비어 있는 Pod"] --> F["Filtering<br/>놓을 수 없는 노드를 거른다"]
-    F --> S["Scoring<br/>남은 노드에 점수를 매긴다"]
-    S --> B["Binding<br/>spec.nodeName 을 채운다"]
-    B --> KL["kubelet 이 가져가 실행"]
-    F -->|"남은 노드가 0"| P["Pending<br/>Events 에 이유가 찍힌다"]
+```d2 layout=elk pad=40 title="kube-scheduler 가 watch · Filtering · Scoring · Binding 을 거쳐 kubelet 에 넘기고 남은 노드가 0 이면 Pending 이 되는 흐름"
+direction: down
 
-    classDef key fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
-    classDef bad fill:#fee2e2,stroke:#dc2626,color:#7f1d1d
-    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
-    class F,S key
-    class P bad
-    class W,B,KL mute
+classes: {
+  key: { style: { fill: "#dbeafe"; stroke: "#2563eb"; font-color: "#1e3a8a" } }
+  bad: { style: { fill: "#fee2e2"; stroke: "#dc2626"; font-color: "#7f1d1d" } }
+  mute: { style: { fill: "#f1f5f9"; stroke: "#94a3b8"; font-color: "#334155" } }
+}
+
+w: "watch\nspec.nodeName 이 비어 있는 Pod" { class: mute }
+f: "Filtering\n놓을 수 없는 노드를 거른다" { class: key }
+s: "Scoring\n남은 노드에 점수를 매긴다" { class: key }
+b: "Binding\nspec.nodeName 을 채운다" { class: mute }
+kl: kubelet 이 가져가 실행 { class: mute }
+p: "Pending\nEvents 에 이유가 찍힌다" { class: bad }
+
+w -> f
+f -> s
+s -> b
+b -> kl
+f -> p: 남은 노드가 0
 ```
 
 <Steps>
@@ -56,16 +63,22 @@ Filtering·Scoring에 반영시키는 것이 이 절의 도구들이다.
 
 **방향이 반대인 두 축**이 핵심이다.
 
-```mermaid
-flowchart LR
-    POD["Pod"] -->|"nodeSelector · nodeAffinity<br/>내가 갈 노드를 고른다"| NODE["노드"]
-    NODE -->|"taint<br/>내가 받을 Pod을 거부한다"| POD
-    POD2["Pod"] -->|"podAffinity · antiAffinity<br/>다른 Pod 기준으로"| POD3["다른 Pod"]
+```d2 layout=elk pad=40 title="Pod 이 노드를 고르는 nodeSelector·nodeAffinity, 노드가 Pod 을 거부하는 taint, Pod 끼리 기준을 삼는 podAffinity 세 방향"
+direction: right
 
-    classDef pod fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
-    classDef node fill:#fef3c7,stroke:#d97706,color:#78350f
-    class POD,POD2,POD3 pod
-    class NODE node
+classes: {
+  pod: { style: { fill: "#dbeafe"; stroke: "#2563eb"; font-color: "#1e3a8a" } }
+  node: { style: { fill: "#fef3c7"; stroke: "#d97706"; font-color: "#78350f" } }
+}
+
+pod: Pod { class: pod }
+node: 노드 { class: node }
+pod2: Pod { class: pod }
+pod3: 다른 Pod { class: pod }
+
+pod -> node: "nodeSelector · nodeAffinity\n내가 갈 노드를 고른다"
+node -> pod: "taint\n내가 받을 Pod을 거부한다"
+pod2 -> pod3: "podAffinity · antiAffinity\n다른 Pod 기준으로"
 ```
 
 | 도구 | 관점 | 성격 |
@@ -160,20 +173,26 @@ Scoring 단계에서 작동한다. `weight`(1~100)로 **점수만 준다.**
 </TabItem>
 </Tabs>
 
-```mermaid
-flowchart LR
-    R["requiredDuringScheduling…"] --> FIL["Filtering 에서 작동<br/>못 맞추면 Pending ❌"]
-    P["preferredDuringScheduling…"] --> SCO["Scoring 에서 작동<br/>weight 만큼 점수 ✅"]
-    I["…IgnoredDuringExecution"] --> EX["이미 뜬 Pod 은<br/>조건이 깨져도 안 쫓아낸다"]
+```d2 layout=elk pad=40 title="required 는 Filtering 에서 preferred 는 Scoring 에서 작동하고 IgnoredDuringExecution 은 이미 뜬 Pod 을 쫓아내지 않는다는 대응"
+direction: right
 
-    classDef bad fill:#fee2e2,stroke:#dc2626,color:#7f1d1d
-    classDef ok fill:#dcfce7,stroke:#16a34a,color:#14532d
-    classDef warn fill:#fef3c7,stroke:#d97706,color:#78350f
-    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
-    class FIL bad
-    class SCO ok
-    class EX warn
-    class R,P,I mute
+classes: {
+  bad: { style: { fill: "#fee2e2"; stroke: "#dc2626"; font-color: "#7f1d1d" } }
+  ok: { style: { fill: "#dcfce7"; stroke: "#16a34a"; font-color: "#14532d" } }
+  warn: { style: { fill: "#fef3c7"; stroke: "#d97706"; font-color: "#78350f" } }
+  mute: { style: { fill: "#f1f5f9"; stroke: "#94a3b8"; font-color: "#334155" } }
+}
+
+r: requiredDuringScheduling… { class: mute }
+p: preferredDuringScheduling… { class: mute }
+i: …IgnoredDuringExecution { class: mute }
+fil: "Filtering 에서 작동\n못 맞추면 Pending ❌" { class: bad }
+sco: "Scoring 에서 작동\nweight 만큼 점수 ✅" { class: ok }
+ex: "이미 뜬 Pod 은\n조건이 깨져도 안 쫓아낸다" { class: warn }
+
+r -> fil
+p -> sco
+i -> ex
 ```
 
 ### 긴 이름 읽는 법과 연산자
@@ -191,19 +210,26 @@ flowchart LR
 
 **AND / OR 구조**
 
-```mermaid
-flowchart TB
-    NST["nodeSelectorTerms"]
-    NST -->|OR| T1["term 1"]
-    NST -->|OR| T2["term 2"]
-    T1 -->|AND| E1["matchExpression a"]
-    T1 -->|AND| E2["matchExpression b"]
-    T2 -->|AND| E3["matchExpression c"]
+```d2 layout=elk pad=40 title="nodeSelectorTerms 안의 term 끼리는 OR, 한 term 안의 matchExpression 끼리는 AND 로 묶이는 구조"
+direction: down
 
-    classDef or fill:#fef3c7,stroke:#d97706,color:#78350f
-    classDef and fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
-    class T1,T2 or
-    class E1,E2,E3 and
+classes: {
+  or: { style: { fill: "#fef3c7"; stroke: "#d97706"; font-color: "#78350f" } }
+  and: { style: { fill: "#dbeafe"; stroke: "#2563eb"; font-color: "#1e3a8a" } }
+}
+
+nst: nodeSelectorTerms
+t1: term 1 { class: or }
+t2: term 2 { class: or }
+e1: matchExpression a { class: and }
+e2: matchExpression b { class: and }
+e3: matchExpression c { class: and }
+
+nst -> t1: OR
+nst -> t2: OR
+t1 -> e1: AND
+t1 -> e2: AND
+t2 -> e3: AND
 ```
 
 - `nodeSelectorTerms` 의 항목들끼리는 **OR**
@@ -230,29 +256,34 @@ spec:
 
 **`topologyKey`가 무엇을 "같은 곳"으로 볼지 정한다.** 이게 핵심이다.
 
-```mermaid
-flowchart TB
-    subgraph Z1["zone ap-northeast-2a"]
-      subgraph N1["node01"]
-        W1["web"]
-      end
-      subgraph N2["node02"]
-        W2["web"]
-      end
-    end
-    subgraph Z2["zone ap-northeast-2c"]
-      subgraph N3["node03"]
-        W3["web"]
-      end
-    end
+```d2 layout=elk pad=40 title="topologyKey 를 hostname 으로 두면 노드마다, zone 으로 두면 zone 마다 Pod 이 하나씩 퍼지는 차이"
+direction: down
 
-    K1["topologyKey<br/>kubernetes.io/hostname"] -.->|"노드마다 하나씩"| N1
-    K2["topologyKey<br/>topology.kubernetes.io/zone"] -.->|"zone 마다 하나씩"| Z1
+classes: {
+  key: { style: { fill: "#dbeafe"; stroke: "#2563eb"; font-color: "#1e3a8a" } }
+  pod: { style: { fill: "#dcfce7"; stroke: "#16a34a"; font-color: "#14532d" } }
+}
 
-    classDef key fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
-    classDef pod fill:#dcfce7,stroke:#16a34a,color:#14532d
-    class K1,K2 key
-    class W1,W2,W3 pod
+k1: "topologyKey\nkubernetes.io/hostname" { class: key }
+k2: "topologyKey\ntopology.kubernetes.io/zone" { class: key }
+
+z1: zone ap-northeast-2a {
+  n1: node01 {
+    w1: web { class: pod }
+  }
+  n2: node02 {
+    w2: web { class: pod }
+  }
+}
+z2: zone ap-northeast-2c {
+  n3: node03 {
+    w3: web { class: pod }
+  }
+}
+
+
+k1 -> z1.n1: "노드마다\n하나씩" { style.stroke-dash: 3 }
+k2 -> z1: "zone 마다\n하나씩" { style.stroke-dash: 3 }
 ```
 
 - `kubernetes.io/hostname` → **노드 단위**로 (한 노드에 하나씩)
@@ -278,22 +309,29 @@ kubectl describe node node01 | grep -A3 Taints
 
 **effect 셋의 차이는 "새 Pod"과 "이미 있는 Pod"을 각각 어떻게 하느냐다.**
 
-```mermaid
-flowchart LR
-    T{"taint effect"}
-    T -->|NoSchedule| A1["새 Pod: 배치 안 함 ❌"]
-    T -->|NoSchedule| A2["기존 Pod: 그대로 둔다 ✅"]
-    T -->|PreferNoSchedule| B1["새 Pod: 되도록 피함<br/>자리 없으면 배치 ⚠️"]
-    T -->|PreferNoSchedule| B2["기존 Pod: 그대로 둔다 ✅"]
-    T -->|NoExecute| C1["새 Pod: 배치 안 함 ❌"]
-    T -->|NoExecute| C2["기존 Pod: 쫓아낸다 ❌"]
+```d2 layout=elk pad=40 title="taint 의 NoSchedule · PreferNoSchedule · NoExecute 가 새 Pod 과 기존 Pod 에 각각 어떻게 작용하는지"
+direction: right
 
-    classDef bad fill:#fee2e2,stroke:#dc2626,color:#7f1d1d
-    classDef ok fill:#dcfce7,stroke:#16a34a,color:#14532d
-    classDef warn fill:#fef3c7,stroke:#d97706,color:#78350f
-    class A1,C1,C2 bad
-    class A2,B2 ok
-    class B1 warn
+classes: {
+  bad: { style: { fill: "#fee2e2"; stroke: "#dc2626"; font-color: "#7f1d1d" } }
+  ok: { style: { fill: "#dcfce7"; stroke: "#16a34a"; font-color: "#14532d" } }
+  warn: { style: { fill: "#fef3c7"; stroke: "#d97706"; font-color: "#78350f" } }
+}
+
+t: taint effect { shape: diamond }
+a1: "새 Pod: 배치 안 함 ❌" { class: bad }
+a2: "기존 Pod: 그대로 둔다 ✅" { class: ok }
+b1: "새 Pod: 되도록 피함\n자리 없으면 배치 ⚠️" { class: warn }
+b2: "기존 Pod: 그대로 둔다 ✅" { class: ok }
+c1: "새 Pod: 배치 안 함 ❌" { class: bad }
+c2: "기존 Pod: 쫓아낸다 ❌" { class: bad }
+
+t -> a1: NoSchedule
+t -> a2: NoSchedule
+t -> b1: PreferNoSchedule
+t -> b2: PreferNoSchedule
+t -> c1: NoExecute
+t -> c2: NoExecute
 ```
 
 | effect | 의미 |
@@ -334,24 +372,30 @@ toleration 블록도 필드 이름을 외워 쓰기보다 공식
 
 ### taint × toleration 조합표
 
-```mermaid
-flowchart LR
-    Q1{"노드에 taint 가 있나"}
-    Q1 -->|없다| R1["아무 Pod 이나 올 수 있다"]
-    Q1 -->|있다| Q2{"Pod 에 맞는 toleration 이 있나"}
-    Q2 -->|없다| R2["이 노드에는 못 온다 ❌"]
-    Q2 -->|있다| R3["올 수 있다<br/>단 온다는 보장은 없다 ⚠️"]
-    R3 --> Q3{"유도하고 싶은가"}
-    Q3 -->|"그렇다"| R4["nodeSelector · nodeAffinity 를<br/>같이 써야 그 노드로 간다 ✅"]
+```d2 layout=elk pad=40 title="노드 taint 유무와 Pod toleration 유무로 갈리는 배치 가능 여부와, toleration 은 허용일 뿐 유도는 nodeAffinity 가 해야 한다는 결정 트리"
+direction: down
 
-    classDef ok fill:#dcfce7,stroke:#16a34a,color:#14532d
-    classDef bad fill:#fee2e2,stroke:#dc2626,color:#7f1d1d
-    classDef warn fill:#fef3c7,stroke:#d97706,color:#78350f
-    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
-    class R1,R4 ok
-    class R2 bad
-    class R3 warn
-    class Q1,Q2,Q3 mute
+classes: {
+  ok: { style: { fill: "#dcfce7"; stroke: "#16a34a"; font-color: "#14532d" } }
+  bad: { style: { fill: "#fee2e2"; stroke: "#dc2626"; font-color: "#7f1d1d" } }
+  warn: { style: { fill: "#fef3c7"; stroke: "#d97706"; font-color: "#78350f" } }
+  mute: { style: { fill: "#f1f5f9"; stroke: "#94a3b8"; font-color: "#334155" } }
+}
+
+q1: 노드에 taint 가 있나 { shape: diamond; class: mute }
+q2: Pod 에 맞는 toleration 이 있나 { shape: diamond; class: mute }
+q3: 유도하고 싶은가 { shape: diamond; class: mute }
+r1: 아무 Pod 이나 올 수 있다 { class: ok }
+r2: "이 노드에는 못 온다 ❌" { class: bad }
+r3: "올 수 있다\n단 온다는 보장은 없다 ⚠️" { class: warn }
+r4: "nodeSelector · nodeAffinity 를\n같이 써야 그 노드로 간다 ✅" { class: ok }
+
+q1 -> r1: 없다
+q1 -> q2: 있다
+q2 -> r2: 없다
+q2 -> r3: 있다
+r3 -> q3
+q3 -> r4: 그렇다
 ```
 
 :::tip[시험]
@@ -375,17 +419,19 @@ toleration만으로는 "그 노드로 간다"가 보장되지 않는다.
 
 **노드가 죽어도 Pod이 5분 동안 안 옮겨가는 이유**가 여기 있다.
 
-```mermaid
-sequenceDiagram
-    participant N as 노드
-    participant CM as node 컨트롤러
-    participant P as Pod
-    N--xCM: 하트비트 중단
-    CM->>N: not-ready / unreachable taint 부착 · NoExecute
-    Note over P: 모든 Pod 에 자동 toleration<br/>tolerationSeconds 300
-    P->>P: 300초 버틴다
-    P--xN: 300초 후 축출
-    Note over P: 상위 컨트롤러가 다른 노드에 새로 만든다
+```d2 pad=40 title="노드 하트비트가 끊기면 node 컨트롤러가 NoExecute taint 를 붙이고 Pod 이 tolerationSeconds 300 초를 버틴 뒤 축출되는 순서"
+shape: sequence_diagram
+
+n: 노드
+cm: node 컨트롤러
+p: Pod
+
+n -> cm: 하트비트 중단 { style.stroke-dash: 3 }
+cm -> n: not-ready / unreachable taint 부착 · NoExecute
+p.n1: "모든 Pod 에 자동 toleration\ntolerationSeconds 300"
+p -> p: 300초 버틴다
+p -> n: 300초 후 축출 { style.stroke-dash: 3 }
+p.n2: 상위 컨트롤러가 다른 노드에 새로 만든다
 ```
 
 - 모든 Pod에는 `not-ready` / `unreachable`에 대한 **5분(300초) toleration이 자동으로 붙는다**
@@ -402,23 +448,27 @@ kubectl taint node controlplane node-role.kubernetes.io/control-plane:NoSchedule
 
 ### cordon · drain · uncordon
 
-```mermaid
-stateDiagram-v2
-    [*] --> Ready: 정상
-    Ready --> SchedulingDisabled: kubectl cordon
-    SchedulingDisabled --> Ready: kubectl uncordon
-    Ready --> Drained: kubectl drain
-    Drained --> Ready: kubectl uncordon
+```d2 layout=elk pad=40 title="Ready 노드가 cordon 으로 SchedulingDisabled, drain 으로 Drained 가 되고 uncordon 으로 돌아오는 상태 전이"
+direction: down
 
-    note right of SchedulingDisabled
-      새 Pod 만 막는다.
-      기존 Pod 은 그대로 돈다.
-    end note
+classes: {
+  mute: { style: { fill: "#f1f5f9"; stroke: "#94a3b8"; font-color: "#334155" } }
+}
 
-    note right of Drained
-      cordon + 기존 Pod 축출.
-      PDB 를 존중해 기다린다.
-    end note
+start: "" { shape: circle; style: { fill: "#334155"; stroke: "#334155" }; width: 24; height: 24 }
+ready: Ready
+sd: SchedulingDisabled
+drained: Drained
+nsd: "새 Pod 만 막는다.\n기존 Pod 은 그대로 돈다." { class: mute }
+ndr: "cordon + 기존 Pod 축출.\nPDB 를 존중해 기다린다." { class: mute }
+
+start -> ready: 정상
+ready -> sd: kubectl cordon
+sd -> ready: kubectl uncordon
+ready -> drained: kubectl drain
+drained -> ready: kubectl uncordon
+sd -- nsd: { style.stroke-dash: 3 }
+drained -- ndr: { style.stroke-dash: 3 }
 ```
 
 ```bash
@@ -462,23 +512,24 @@ spec:
 
 **`maxSkew`는 도메인 간 개수 차이의 허용치다.**
 
-```mermaid
-flowchart LR
-    subgraph OK["maxSkew 1 · 허용 ✅"]
-      A1["zone A<br/>Pod 3개"]
-      A2["zone B<br/>Pod 2개"]
-      A3["차이 1"]
-    end
-    subgraph NG["maxSkew 1 · 위반 ❌"]
-      B1["zone A<br/>Pod 3개"]
-      B2["zone B<br/>Pod 1개"]
-      B3["차이 2 → DoNotSchedule 이면 Pending"]
-    end
+```d2 layout=elk pad=40 title="maxSkew 1 에서 zone 간 Pod 수 차이가 1 이면 허용되고 2 면 DoNotSchedule 로 Pending 이 되는 대비"
+direction: right
 
-    classDef ok fill:#dcfce7,stroke:#16a34a,color:#14532d
-    classDef bad fill:#fee2e2,stroke:#dc2626,color:#7f1d1d
-    class A1,A2,A3 ok
-    class B1,B2,B3 bad
+classes: {
+  ok: { style: { fill: "#dcfce7"; stroke: "#16a34a"; font-color: "#14532d" } }
+  bad: { style: { fill: "#fee2e2"; stroke: "#dc2626"; font-color: "#7f1d1d" } }
+}
+
+ok: "maxSkew 1 · 허용 ✅" {
+  a1: "zone A\nPod 3개" { class: ok }
+  a2: "zone B\nPod 2개" { class: ok }
+  a3: 차이 1 { class: ok }
+}
+ng: "maxSkew 1 · 위반 ❌" {
+  b1: "zone A\nPod 3개" { class: bad }
+  b2: "zone B\nPod 1개" { class: bad }
+  b3: 차이 2 → DoNotSchedule 이면 Pending { class: bad }
+}
 ```
 
 - `maxSkew: 1` 이면 zone A에 3개일 때 zone B는 최소 2개여야 한다
@@ -509,18 +560,20 @@ spec:
   priorityClassName: high-priority
 ```
 
-```mermaid
-sequenceDiagram
-    participant H as 높은 우선순위 Pod
-    participant S as scheduler
-    participant N as 노드 · 자리 없음
-    participant L as 낮은 우선순위 Pod
-    H->>S: 스케줄 요청
-    S->>N: Filtering — 맞는 노드가 없다
-    S->>L: 축출 (preempt)
-    Note over L: describe 에 Preempted by … 기록
-    S->>H: 확보된 자리에 binding
-    L->>S: 다시 스케줄링 시도 (다른 노드일 수 있다)
+```d2 pad=40 title="높은 우선순위 Pod 을 위해 scheduler 가 낮은 우선순위 Pod 을 축출하고 그 자리에 binding 하는 preemption 순서"
+shape: sequence_diagram
+
+h: 높은 우선순위 Pod
+s: scheduler
+n: 노드 · 자리 없음
+l: 낮은 우선순위 Pod
+
+h -> s: 스케줄 요청
+s -> n: Filtering — 맞는 노드가 없다
+s -> l: "축출 (preempt)"
+l.n1: describe 에 Preempted by … 기록
+s -> h: 확보된 자리에 binding
+l -> s: "다시 스케줄링 시도 (다른 노드일 수 있다)"
 ```
 
 - 자리가 없으면 스케줄러가 **낮은 우선순위 Pod을 쫓아내고** 자리를 만든다
@@ -614,20 +667,28 @@ kubectl get nodes                           # SchedulingDisabled 표시 확인
 
 Events 메시지로 원인이 거의 확정된다.
 
-```mermaid
-flowchart LR
-    E{"describe pod → Events"}
-    E -->|"Insufficient cpu / memory"| R1["request 여유 부족<br/>describe node 의 Allocated resources"]
-    E -->|"had untolerated taint"| R2["toleration 없음<br/>describe node 의 Taints"]
-    E -->|"didn't match node affinity/selector"| R3["라벨 불일치<br/>get nodes --show-labels"]
-    E -->|"were unschedulable"| R4["cordon 되어 있다<br/>kubectl uncordon"]
-    E -->|"unbound immediate PersistentVolumeClaims"| R5["PVC 가 Bound 안 됨 · 13장"]
-    E -->|"메시지가 없다"| R6["스케줄러가 죽었거나<br/>schedulerName 오타"]
+```d2 layout=elk pad=40 title="describe pod 의 Events 메시지별로 Pending 원인과 확인할 명령을 잇는 갈래"
+direction: right
 
-    classDef norm fill:#fef3c7,stroke:#d97706,color:#78350f
-    classDef alarm fill:#fee2e2,stroke:#dc2626,color:#7f1d1d
-    class R1,R2,R3,R4,R5 norm
-    class R6 alarm
+classes: {
+  norm: { style: { fill: "#fef3c7"; stroke: "#d97706"; font-color: "#78350f" } }
+  alarm: { style: { fill: "#fee2e2"; stroke: "#dc2626"; font-color: "#7f1d1d" } }
+}
+
+e: "describe pod\n→ Events" { shape: diamond }
+r1: "request 여유 부족\ndescribe node 의\nAllocated resources" { class: norm }
+r2: "toleration 없음\ndescribe node 의 Taints" { class: norm }
+r3: "라벨 불일치\nget nodes --show-labels" { class: norm }
+r4: "cordon 되어 있다\nkubectl uncordon" { class: norm }
+r5: "PVC 가 Bound 안 됨\n· 13장" { class: norm }
+r6: "스케줄러가 죽었거나\nschedulerName 오타" { class: alarm }
+
+e -> r1: "Insufficient\ncpu / memory"
+e -> r2: had untolerated taint
+e -> r3: "didn't match\nnode affinity/selector"
+e -> r4: were unschedulable
+e -> r5: "unbound immediate\nPersistentVolumeClaims"
+e -> r6: 메시지가 없다
 ```
 
 | 메시지 | 원인 |
