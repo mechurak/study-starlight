@@ -19,23 +19,34 @@ import { Steps, Card, CardGrid, Tabs, TabItem, FileTree } from '@astrojs/starlig
 - 차트를 **만드는** 게 아니라 **설치하고 값을 바꾸는** 쪽이다
 - 실제로 CNI(Pod 네트워크 플러그인 — 17장)·Ingress 컨트롤러·모니터링은 전부 이 둘 중 하나로 설치한다
 
-```mermaid
-flowchart LR
-    subgraph H["Helm — 템플릿 + 값 주입"]
-      CH["Chart<br/>Go 템플릿"] --> VAL["Values 주입"] --> REL["Release<br/>상태를 추적한다"]
-    end
-    subgraph K["Kustomize — 베이스 + 오버레이"]
-      BASE["base/<br/>평범한 YAML"] --> OVR["overlays/prod<br/>패치를 얹는다"] --> OUT["최종 YAML<br/>상태 추적 없음"]
-    end
-    REL -.->|"별도 바이너리"| BIN["helm"]
-    OUT -.->|"kubectl 에 내장"| KUB["kubectl -k"]
+```d2 layout=elk pad=40 title="Helm의 차트·값·릴리스와 Kustomize의 베이스·오버레이 흐름 대비"
+direction: down
 
-    classDef helm fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
-    classDef kust fill:#dcfce7,stroke:#16a34a,color:#14532d
-    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
-    class CH,VAL,REL helm
-    class BASE,OVR,OUT kust
-    class BIN,KUB mute
+classes: {
+  helm: { style: { fill: "#dbeafe"; stroke: "#2563eb"; font-color: "#1e3a8a" } }
+  kust: { style: { fill: "#dcfce7"; stroke: "#16a34a"; font-color: "#14532d" } }
+  mute: { style: { fill: "#f1f5f9"; stroke: "#94a3b8"; font-color: "#334155" } }
+}
+
+h: Helm —\n템플릿 + 값 주입 {
+  ch: Chart\nGo 템플릿 { class: helm }
+  val: Values 주입 { class: helm }
+  rel: Release\n상태를 추적한다 { class: helm }
+  ch -> val -> rel
+}
+
+k: Kustomize —\n베이스 + 오버레이 {
+  base: base/\n평범한 YAML { class: kust }
+  ovr: overlays/prod\n패치를 얹는다 { class: kust }
+  out: 최종 YAML\n상태 추적 없음 { class: kust }
+  base -> ovr -> out
+}
+
+bin: helm { class: mute }
+kub: kubectl -k { class: mute }
+
+h.rel -> bin: 별도 바이너리 { style.stroke-dash: 3 }
+k.out -> kub: kubectl 에 내장 { style.stroke-dash: 3 }
 ```
 
 | | Helm | Kustomize |
@@ -200,17 +211,21 @@ helm install my-ingress ingress-nginx/ingress-nginx --dry-run --debug
 (서버 쪽 검증까지 받으려면 `--dry-run=server`).
 값이 제대로 꽂혔는지 눈으로 보는 목적이면 `template`이 가볍고 빠르다.
 
-```mermaid
-flowchart LR
-    Q["이 차트의 어떤 값을 바꾸시오"] --> S1["helm show values 차트<br/>키 이름을 찾는다"]
-    S1 --> S2["--set 키=값<br/>또는 -f values.yaml"]
-    S2 --> S3["helm template 로 결과 확인"]
-    S3 --> S4["helm install / upgrade"]
+```d2 layout=elk pad=40 title="차트 값을 바꾸라는 문제를 helm show values부터 upgrade까지 푸는 순서"
+direction: down
 
-    classDef key fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
-    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
-    class S1 key
-    class Q,S2,S3,S4 mute
+classes: {
+  key: { style: { fill: "#dbeafe"; stroke: "#2563eb"; font-color: "#1e3a8a" } }
+  mute: { style: { fill: "#f1f5f9"; stroke: "#94a3b8"; font-color: "#334155" } }
+}
+
+q: 이 차트의 어떤 값을 바꾸시오 { class: mute }
+s1: helm show values 차트\n키 이름을 찾는다 { class: key }
+s2: --set 키=값\n또는 -f values.yaml { class: mute }
+s3: helm template 로 결과 확인 { class: mute }
+s4: helm install / upgrade { class: mute }
+
+q -> s1 -> s2 -> s3 -> s4
 ```
 
 :::tip[시험]
@@ -239,20 +254,28 @@ helm rollback my-ingress 1 -n ingress-nginx --wait --timeout 5m
 helm uninstall my-ingress -n ingress-nginx
 ```
 
-```mermaid
-flowchart LR
-    U["helm upgrade"] --> Q{"값 처리 방식을<br/>어떻게 정했는가"}
-    Q -->|"-f 또는 --set"| NEW["이번에 준 값을 적용한다"]
-    Q -->|"--reuse-values"| KEEP["이전 사용자 값에<br/>이번 값을 병합한다"]
-    Q -->|"--reset-values"| RESET["대상 차트 기본값에서<br/>다시 시작한다 ⚠️"]
-    UN["helm uninstall"] -->|"CRD 는 남긴다 ⚠️<br/>의도된 동작 · 데이터 보호"| CRD["CustomResourceDefinition"]
+```d2 layout=elk pad=40 title="helm upgrade의 값 처리 옵션 세 가지와 uninstall이 CRD를 남기는 동작"
+direction: down
 
-    classDef ok fill:#dcfce7,stroke:#16a34a,color:#14532d
-    classDef warn fill:#fef3c7,stroke:#d97706,color:#78350f
-    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
-    class NEW,KEEP ok
-    class RESET,CRD warn
-    class U,Q,UN mute
+classes: {
+  ok: { style: { fill: "#dcfce7"; stroke: "#16a34a"; font-color: "#14532d" } }
+  warn: { style: { fill: "#fef3c7"; stroke: "#d97706"; font-color: "#78350f" } }
+  mute: { style: { fill: "#f1f5f9"; stroke: "#94a3b8"; font-color: "#334155" } }
+}
+
+u: helm upgrade { class: mute }
+q: 값 처리 방식을\n어떻게 정했는가 { shape: diamond; class: mute }
+new: 이번에 준 값을\n적용한다 { class: ok }
+keep: 이전 사용자 값에\n이번 값을\n병합한다 { class: ok }
+reset: 대상 차트\n기본값에서\n다시 시작한다 ⚠️ { class: warn }
+un: helm uninstall { class: mute }
+crd: CustomResourceDefinition { class: warn }
+
+u -> q
+q -> new: -f 또는 --set
+q -> keep: --reuse-values
+q -> reset: --reset-values
+un -> crd: CRD 는 남긴다 ⚠️\n의도된 동작 · 데이터 보호
 ```
 
 :::caution[함정 1]
@@ -337,19 +360,25 @@ labels:
 [Declarative Management of Kubernetes Objects Using Kustomize](https://kubernetes.io/docs/tasks/manage-kubernetes-objects/kustomization/)
 페이지를 열어 예제를 복사해 오는 게 정석이다.
 
-```mermaid
-flowchart LR
-    B["base/<br/>deployment.yaml · service.yaml"] --> D["overlays/dev<br/>replicas 1 · nginx:latest"]
-    B --> P["overlays/prod<br/>replicas 5 · nginx:1.28 · namePrefix prod-"]
-    D --> OD["kubectl apply -k overlays/dev"]
-    P --> OP["kubectl apply -k overlays/prod"]
+```d2 layout=elk pad=40 title="하나의 base를 dev·prod 오버레이가 각각 패치해 apply되는 구조"
+direction: down
 
-    classDef key fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
-    classDef ok fill:#dcfce7,stroke:#16a34a,color:#14532d
-    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
-    class B key
-    class OD,OP ok
-    class D,P mute
+classes: {
+  key: { style: { fill: "#dbeafe"; stroke: "#2563eb"; font-color: "#1e3a8a" } }
+  ok: { style: { fill: "#dcfce7"; stroke: "#16a34a"; font-color: "#14532d" } }
+  mute: { style: { fill: "#f1f5f9"; stroke: "#94a3b8"; font-color: "#334155" } }
+}
+
+b: base/\ndeployment.yaml · service.yaml { class: key }
+d: overlays/dev\nreplicas 1 · nginx:latest { class: mute }
+p: overlays/prod\nreplicas 5 · nginx:1.28 · namePrefix prod- { class: mute }
+od: kubectl apply -k overlays/dev { class: ok }
+op: kubectl apply -k overlays/prod { class: ok }
+
+b -> d
+b -> p
+d -> od
+p -> op
 ```
 
 ### 오버레이 — 이름·네임스페이스·이미지 바꾸기
@@ -470,19 +499,24 @@ kubectl kustomize overlays/prod | grep -A2 'kind: ConfigMap'
 
 **이것이 6장의 "ConfigMap을 바꿔도 Pod이 안 바뀐다" 문제를 구조적으로 푼다.**
 
-```mermaid
-flowchart LR
-    CM["configMapGenerator<br/>LOG_LEVEL=warn"] --> H1["이름에 내용 해시가 붙는다<br/>app-config-7g5bd8f2mk"]
-    H1 --> D1["Deployment 의 참조도<br/>자동으로 갱신된다"]
-    CHG["값을 debug 로 바꾼다"] --> H2["새 해시<br/>app-config-2k9xf4m1qp"]
-    H2 --> D2["Deployment 템플릿이 바뀐다<br/>→ 자동 롤아웃 ✅"]
+```d2 layout=elk pad=40 title="configMapGenerator의 이름 해시가 값 변경 시 자동 롤아웃을 일으키는 원리"
+direction: down
 
-    classDef key fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
-    classDef ok fill:#dcfce7,stroke:#16a34a,color:#14532d
-    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
-    class H1,H2 key
-    class D2 ok
-    class CM,CHG,D1 mute
+classes: {
+  key: { style: { fill: "#dbeafe"; stroke: "#2563eb"; font-color: "#1e3a8a" } }
+  ok: { style: { fill: "#dcfce7"; stroke: "#16a34a"; font-color: "#14532d" } }
+  mute: { style: { fill: "#f1f5f9"; stroke: "#94a3b8"; font-color: "#334155" } }
+}
+
+cm: configMapGenerator\nLOG_LEVEL=warn { class: mute }
+h1: 이름에 내용 해시가 붙는다\napp-config-7g5bd8f2mk { class: key }
+d1: Deployment 의 참조도\n자동으로 갱신된다 { class: mute }
+chg: 값을 debug 로 바꾼다 { class: mute }
+h2: 새 해시\napp-config-2k9xf4m1qp { class: key }
+d2: Deployment 템플릿이 바뀐다\n→ 자동 롤아웃 ✅ { class: ok }
+
+cm -> h1 -> d1
+chg -> h2 -> d2
 ```
 
 - `configMapGenerator`/`secretGenerator`가 만든 이름에는 **내용 해시**가 붙는다
@@ -496,19 +530,23 @@ generatorOptions:
 
 ## 언제 무엇을 쓰나
 
-```mermaid
-flowchart TD
-    Q{"누가 만든 것인가"}
-    Q -->|"남이 만든 것<br/>Ingress 컨트롤러 · Prometheus · CNI"| H["Helm<br/>설정 표면이 넓고<br/>버전 관리·롤백이 필요하다"]
-    Q -->|"내가 만든 앱"| K["Kustomize<br/>환경별 변형<br/>YAML 을 그대로 읽고 싶다"]
-    BOTH["배타적이지 않다"] -.->|"helm template 결과를<br/>Kustomize 로 패치하는 조합도 흔하다"| Q
+```d2 layout=elk pad=40 title="남이 만든 것은 Helm, 내 앱은 Kustomize라는 선택 기준과 둘의 조합"
+direction: down
 
-    classDef helm fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
-    classDef kust fill:#dcfce7,stroke:#16a34a,color:#14532d
-    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
-    class H helm
-    class K kust
-    class Q,BOTH mute
+classes: {
+  helm: { style: { fill: "#dbeafe"; stroke: "#2563eb"; font-color: "#1e3a8a" } }
+  kust: { style: { fill: "#dcfce7"; stroke: "#16a34a"; font-color: "#14532d" } }
+  mute: { style: { fill: "#f1f5f9"; stroke: "#94a3b8"; font-color: "#334155" } }
+}
+
+q: 누가 만든 것인가 { shape: diamond; class: mute }
+h: Helm\n설정 표면이 넓고\n버전 관리·롤백이 필요하다 { class: helm }
+k: Kustomize\n환경별 변형\nYAML 을 그대로 읽고 싶다 { class: kust }
+both: 배타적이지 않다 { class: mute }
+
+q -> h: 남이 만든 것\nIngress 컨트롤러 · Prometheus · CNI
+q -> k: 내가 만든 앱
+both -> q: helm template 결과를\nKustomize 로 패치하는 조합도 흔하다 { style.stroke-dash: 3 }
 ```
 
 ```bash

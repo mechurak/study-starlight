@@ -51,24 +51,26 @@ import { Steps, Card, CardGrid, Tabs, TabItem, FileTree, Badge } from '@astrojs/
 
 한 장으로 보면 어디서 무엇이 걸리는지가 보인다.
 
-```mermaid
-flowchart LR
-    A["노드 준비<br/>swap off · 커널 모듈 · sysctl"] --> B["런타임 설치<br/>containerd · SystemdCgroup"]
-    B --> C["패키지 설치<br/>kubelet · kubeadm · kubectl"]
-    C --> D["kubeadm init<br/>컨트롤 플레인 생성"]
-    D --> E["kubeconfig 복사<br/>admin.conf → ~/.kube/config"]
-    E --> F["CNI 설치<br/>이걸 안 하면 NotReady"]
-    F --> G["워커 join<br/>kubeadm join"]
-    G --> H["kubectl get nodes<br/>전부 Ready ✅"]
+```d2 layout=elk pad=40 title="노드 준비부터 kubeadm init·CNI 설치·워커 join까지 클러스터 구축 순서"
+direction: down
 
-    classDef prep fill:#f1f5f9,stroke:#94a3b8,color:#334155
-    classDef core fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
-    classDef gate fill:#fef3c7,stroke:#d97706,color:#78350f
-    classDef ok fill:#dcfce7,stroke:#16a34a,color:#14532d
-    class A,B,C prep
-    class D,E,G core
-    class F gate
-    class H ok
+classes: {
+  prep: { style: { fill: "#f1f5f9"; stroke: "#94a3b8"; font-color: "#334155" } }
+  core: { style: { fill: "#dbeafe"; stroke: "#2563eb"; font-color: "#1e3a8a" } }
+  gate: { style: { fill: "#fef3c7"; stroke: "#d97706"; font-color: "#78350f" } }
+  ok: { style: { fill: "#dcfce7"; stroke: "#16a34a"; font-color: "#14532d" } }
+}
+
+a: 노드 준비\nswap off · 커널 모듈 · sysctl { class: prep }
+b: 런타임 설치\ncontainerd · SystemdCgroup { class: prep }
+c: 패키지 설치\nkubelet · kubeadm · kubectl { class: prep }
+d: kubeadm init\n컨트롤 플레인 생성 { class: core }
+e: kubeconfig 복사\nadmin.conf → ~/.kube/config { class: core }
+f: CNI 설치\n이걸 안 하면 NotReady { class: gate }
+g: 워커 join\nkubeadm join { class: core }
+h: kubectl get nodes\n전부 Ready ✅ { class: ok }
+
+a -> b -> c -> d -> e -> f -> g -> h
 ```
 
 **노란 칸(CNI)이 가장 자주 빠뜨리는 단계**다. 여기가 비면 노드가 영원히 `NotReady`다.
@@ -165,19 +167,23 @@ sudo chown $(id -u):$(id -g) $HOME/.kube/config
 
 `init`이 하는 일 —
 
-```mermaid
-flowchart LR
-    P1["1 사전 검사<br/>preflight"] --> P2["2 인증서 생성<br/>/etc/kubernetes/pki/"]
-    P2 --> P3["3 kubeconfig 생성<br/>admin.conf 등"]
-    P3 --> P4["4 스태틱 Pod 매니페스트<br/>/etc/kubernetes/manifests/"]
-    P4 --> P5["5 kubelet 시작"]
-    P5 --> P6["6 부트스트랩 토큰 생성"]
-    P6 --> P7["7 애드온 설치<br/>CoreDNS · kube-proxy"]
+```d2 layout=elk pad=40 title="kubeadm init이 내부에서 수행하는 일곱 단계"
+direction: down
 
-    classDef key fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
-    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
-    class P2,P4 key
-    class P1,P3,P5,P6,P7 mute
+classes: {
+  key: { style: { fill: "#dbeafe"; stroke: "#2563eb"; font-color: "#1e3a8a" } }
+  mute: { style: { fill: "#f1f5f9"; stroke: "#94a3b8"; font-color: "#334155" } }
+}
+
+p1: 1 사전 검사\npreflight { class: mute }
+p2: 2 인증서 생성\n/etc/kubernetes/pki/ { class: key }
+p3: 3 kubeconfig 생성\nadmin.conf 등 { class: mute }
+p4: 4 스태틱 Pod 매니페스트\n/etc/kubernetes/manifests/ { class: key }
+p5: 5 kubelet 시작 { class: mute }
+p6: 6 부트스트랩 토큰 생성 { class: mute }
+p7: 7 애드온 설치\nCoreDNS · kube-proxy { class: mute }
+
+p1 -> p2 -> p3 -> p4 -> p5 -> p6 -> p7
 ```
 
 **파란 두 칸이 트러블슈팅에서 계속 돌아오는 곳**이다 — 인증서와 스태틱 Pod 매니페스트.
@@ -311,22 +317,26 @@ openssl x509 -pubkey -in /etc/kubernetes/pki/ca.crt \
 모든 컴포넌트가 apiserver하고만 이야기하므로(2장) **apiserver가 기준점**이고,
 나머지는 그보다 낮을 수만 있다.
 
-```mermaid
-flowchart TD
-    API["kube-apiserver<br/>1.35 · 기준점"]
-    API -->|"1 마이너 낮은 것까지"| CM["controller-manager<br/>scheduler<br/>1.34 ~ 1.35"]
-    API -->|"3 마이너 낮은 것까지"| KL["kubelet<br/>1.32 ~ 1.35"]
-    API -->|"±1 마이너"| KC["kubectl<br/>1.34 ~ 1.36"]
-    KL -->|"같은 노드에서 동일"| KP["kube-proxy"]
+```d2 layout=elk pad=40 title="kube-apiserver를 기준으로 한 컴포넌트별 버전 스큐 허용 범위"
+direction: down
 
-    classDef base fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
-    classDef near fill:#fef3c7,stroke:#d97706,color:#78350f
-    classDef wide fill:#dcfce7,stroke:#16a34a,color:#14532d
-    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
-    class API base
-    class CM,KC near
-    class KL wide
-    class KP mute
+classes: {
+  base: { style: { fill: "#dbeafe"; stroke: "#2563eb"; font-color: "#1e3a8a" } }
+  near: { style: { fill: "#fef3c7"; stroke: "#d97706"; font-color: "#78350f" } }
+  wide: { style: { fill: "#dcfce7"; stroke: "#16a34a"; font-color: "#14532d" } }
+  mute: { style: { fill: "#f1f5f9"; stroke: "#94a3b8"; font-color: "#334155" } }
+}
+
+api: kube-apiserver\n1.35 · 기준점 { class: base }
+cm: controller-manager\nscheduler\n1.34 ~ 1.35 { class: near }
+kl: kubelet\n1.32 ~ 1.35 { class: wide }
+kc: kubectl\n1.34 ~ 1.36 { class: near }
+kp: kube-proxy { class: mute }
+
+api -> cm: 1 마이너 낮은 것까지
+api -> kl: 3 마이너 낮은 것까지
+api -> kc: ±1 마이너
+kl -> kp: 같은 노드에서 동일
 ```
 
 | 컴포넌트 | 허용 범위 |
@@ -491,21 +501,31 @@ flowchart TD
 
 ### 업그레이드 순서 요약 — 이것만 외우면 된다
 
-```mermaid
-flowchart LR
-    S1["1 저장소 URL 변경"] --> S2["2 kubeadm 설치"] --> S3{"3 어느 노드인가"}
-    S3 -->|"첫 컨트롤 플레인"| A["kubeadm upgrade apply vX.Y.Z"]
-    S3 -->|"나머지 전부"| N["kubeadm upgrade node"]
-    A --> S4["4 drain"]
-    N --> S4
-    S4 --> S5["5 kubelet · kubectl 설치"] --> S6["6 daemon-reload + restart"] --> S7["7 uncordon"]
+```d2 layout=elk pad=40 title="저장소 변경부터 uncordon까지의 kubeadm 업그레이드 절차와 노드별 분기"
+direction: down
 
-    classDef diff fill:#fee2e2,stroke:#dc2626,color:#7f1d1d
-    classDef same fill:#f1f5f9,stroke:#94a3b8,color:#334155
-    classDef key fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
-    class A,N diff
-    class S3 key
-    class S1,S2,S4,S5,S6,S7 same
+classes: {
+  diff: { style: { fill: "#fee2e2"; stroke: "#dc2626"; font-color: "#7f1d1d" } }
+  same: { style: { fill: "#f1f5f9"; stroke: "#94a3b8"; font-color: "#334155" } }
+  key: { style: { fill: "#dbeafe"; stroke: "#2563eb"; font-color: "#1e3a8a" } }
+}
+
+s1: 1 저장소 URL 변경 { class: same }
+s2: 2 kubeadm 설치 { class: same }
+s3: 3 어느 노드인가 { shape: diamond; class: key }
+a: kubeadm upgrade apply vX.Y.Z { class: diff }
+n: kubeadm upgrade node { class: diff }
+s4: 4 drain { class: same }
+s5: 5 kubelet · kubectl 설치 { class: same }
+s6: 6 daemon-reload + restart { class: same }
+s7: 7 uncordon { class: same }
+
+s1 -> s2 -> s3
+s3 -> a: 첫 컨트롤 플레인
+s3 -> n: 나머지 전부
+a -> s4
+n -> s4
+s4 -> s5 -> s6 -> s7
 ```
 
 **차이는 3번 하나뿐이다.** 첫 노드만 `apply`, 나머지는 전부 `node`.
@@ -541,20 +561,26 @@ sudo kubeadm certs renew apiserver              # 하나만
 - **`kubeadm upgrade`를 하면 인증서가 자동 갱신된다** — 매년 업그레이드하면 신경 쓸 일이 없다
 - 갱신 후 컨트롤 플레인 스태틱 Pod을 **재시작**해야 반영된다
 
-```mermaid
-flowchart LR
-    R["kubeadm certs renew all"] --> F["/etc/kubernetes/pki/ 갱신<br/>admin.conf 도 갱신"]
-    F --> RS["스태틱 Pod 재시작<br/>매니페스트를 잠시 옮겼다 되돌린다"]
-    F --> CP["~/.kube/config 를 다시 복사<br/>★ 빠뜨리면 kubectl 이 계속 x509 에러"]
-    RS --> OK["반영 완료 ✅"]
-    CP --> OK
+```d2 layout=elk pad=40 title="kubeadm certs renew 이후 스태틱 Pod 재시작과 kubeconfig 재복사가 모두 필요한 이유"
+direction: down
 
-    classDef ok fill:#dcfce7,stroke:#16a34a,color:#14532d
-    classDef warn fill:#fef3c7,stroke:#d97706,color:#78350f
-    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
-    class OK ok
-    class CP warn
-    class R,F,RS mute
+classes: {
+  ok: { style: { fill: "#dcfce7"; stroke: "#16a34a"; font-color: "#14532d" } }
+  warn: { style: { fill: "#fef3c7"; stroke: "#d97706"; font-color: "#78350f" } }
+  mute: { style: { fill: "#f1f5f9"; stroke: "#94a3b8"; font-color: "#334155" } }
+}
+
+r: kubeadm certs renew all { class: mute }
+f: /etc/kubernetes/pki/ 갱신\nadmin.conf 도 갱신 { class: mute }
+rs: 스태틱 Pod 재시작\n매니페스트를 잠시 옮겼다 되돌린다 { class: mute }
+cp: ~/.kube/config 를 다시 복사\n★ 빠뜨리면 kubectl 이 계속 x509 에러 { class: warn }
+fine: 반영 완료 ✅ { class: ok }
+
+r -> f
+f -> rs
+f -> cp
+rs -> fine
+cp -> fine
 ```
 
 :::caution[함정]
@@ -709,22 +735,29 @@ sudo ETCDCTL_API=3 etcdctl \
 
 복구는 **파일을 푸는 일과, etcd Pod이 그 파일을 보게 하는 일** 둘로 나뉜다.
 
-```mermaid
-flowchart LR
-    SNAP[("/opt/etcd-backup.db")] -->|"snapshot restore<br/>--data-dir=/var/lib/etcd-restore"| NEW["새 데이터 디렉터리<br/>/var/lib/etcd-restore"]
-    OLD["기존 /var/lib/etcd<br/>건드리지 않는다"] -.-> X["여기로 restore 하면<br/>디렉터리가 비어 있지 않다며 실패 ❌"]
-    NEW --> M["etcd.yaml 의<br/>hostPath.path 를 새 경로로"]
-    M --> KL["kubelet 이 변경을 감지<br/>etcd Pod 재생성"]
-    KL --> OK["1~2분 후 API 서버 복귀 ✅"]
+```d2 layout=elk pad=40 title="etcd 스냅샷을 새 데이터 디렉터리로 복원하고 매니페스트 경로를 바꾸는 절차"
+direction: down
 
-    classDef ok fill:#dcfce7,stroke:#16a34a,color:#14532d
-    classDef bad fill:#fee2e2,stroke:#dc2626,color:#7f1d1d
-    classDef key fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
-    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
-    class OK ok
-    class X bad
-    class M key
-    class SNAP,NEW,OLD,KL mute
+classes: {
+  ok: { style: { fill: "#dcfce7"; stroke: "#16a34a"; font-color: "#14532d" } }
+  bad: { style: { fill: "#fee2e2"; stroke: "#dc2626"; font-color: "#7f1d1d" } }
+  key: { style: { fill: "#dbeafe"; stroke: "#2563eb"; font-color: "#1e3a8a" } }
+  mute: { style: { fill: "#f1f5f9"; stroke: "#94a3b8"; font-color: "#334155" } }
+}
+
+snap: /opt/etcd-backup.db { shape: cylinder; class: mute }
+new: 새 데이터 디렉터리\n/var/lib/etcd-restore { class: mute }
+old: 기존 /var/lib/etcd\n건드리지 않는다 { class: mute }
+x: 여기로 restore 하면\n디렉터리가 비어 있지 않다며 실패 ❌ { class: bad }
+m: etcd.yaml 의\nhostPath.path 를 새 경로로 { class: key }
+kl: kubelet 이 변경을 감지\netcd Pod 재생성 { class: mute }
+fine: 1~2분 후 API 서버 복귀 ✅ { class: ok }
+
+snap -> new: snapshot restore\n--data-dir=/var/lib/etcd-restore
+old -> x: { style.stroke-dash: 3 }
+new -> m
+m -> kl
+kl -> fine
 ```
 
 <Steps>
@@ -804,33 +837,40 @@ HA를 실제로 구축하는 문제는 로드밸런서까지 준비해야 해서
 
 etcd가 컨트롤 플레인 노드 **안에** 있다.
 
-```mermaid
-flowchart LR
-    LB["로드밸런서<br/>haproxy<br/>keepalived"]
-    subgraph N1["컨트롤 플레인 1"]
-      direction LR
-      A1["apiserver"] --- E1[("etcd")]
-    end
-    subgraph N2["컨트롤 플레인 2"]
-      direction LR
-      A2["apiserver"] --- E2[("etcd")]
-    end
-    subgraph N3["컨트롤 플레인 3"]
-      direction LR
-      A3["apiserver"] --- E3[("etcd")]
-    end
-    LB --> A1
-    LB --> A2
-    LB --> A3
-    E1 <-->|"Raft"| E2
-    E2 <-->|"Raft"| E3
+```d2 layout=elk pad=40 title="스택드 etcd HA — 컨트롤 플레인 3대가 각자 etcd를 품고 Raft로 묶이는 구성"
+direction: down
 
-    classDef api fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
-    classDef db fill:#fef3c7,stroke:#d97706,color:#78350f
-    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
-    class A1,A2,A3 api
-    class E1,E2,E3 db
-    class LB mute
+classes: {
+  api: { style: { fill: "#dbeafe"; stroke: "#2563eb"; font-color: "#1e3a8a" } }
+  db: { style: { fill: "#fef3c7"; stroke: "#d97706"; font-color: "#78350f" } }
+  mute: { style: { fill: "#f1f5f9"; stroke: "#94a3b8"; font-color: "#334155" } }
+}
+
+lb: 로드밸런서\nhaproxy\nkeepalived { class: mute }
+
+n1: 컨트롤 플레인 1 {
+  a1: apiserver { class: api }
+  e1: etcd { shape: cylinder; class: db }
+  a1 -- e1
+}
+
+n2: 컨트롤 플레인 2 {
+  a2: apiserver { class: api }
+  e2: etcd { shape: cylinder; class: db }
+  a2 -- e2
+}
+
+n3: 컨트롤 플레인 3 {
+  a3: apiserver { class: api }
+  e3: etcd { shape: cylinder; class: db }
+  a3 -- e3
+}
+
+lb -> n1.a1
+lb -> n2.a2
+lb -> n3.a3
+n1.e1 <-> n2.e2: Raft
+n2.e2 <-> n3.e3: Raft
 ```
 
 - 노드 3대면 끝. 구성이 단순
@@ -842,40 +882,42 @@ flowchart LR
 
 etcd가 **별도 클러스터**로 분리된다.
 
-```mermaid
-flowchart LR
-    LB["로드밸런서"]
-    subgraph CP["컨트롤 플레인 3대"]
-      direction TB
-      A1["apiserver"]
-      A2["apiserver"]
-      A3["apiserver"]
-    end
-    subgraph ET["etcd 클러스터 3대 — 별도 노드"]
-      direction TB
-      E1[("etcd")]
-      E2[("etcd")]
-      E3[("etcd")]
-    end
-    X["external etcd<br/>endpoint 목록"]
-    LB --> A1
-    LB --> A2
-    LB --> A3
-    A1 --> X
-    A2 --> X
-    A3 --> X
-    X --> E1
-    X --> E2
-    X --> E3
-    E1 <-->|"Raft"| E2
-    E2 <-->|"Raft"| E3
+```d2 layout=elk pad=40 title="외부 etcd HA — 컨트롤 플레인 3대와 별도 노드의 etcd 클러스터 3대 구성"
+direction: down
 
-    classDef api fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
-    classDef db fill:#fef3c7,stroke:#d97706,color:#78350f
-    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
-    class A1,A2,A3 api
-    class E1,E2,E3 db
-    class LB,X mute
+classes: {
+  api: { style: { fill: "#dbeafe"; stroke: "#2563eb"; font-color: "#1e3a8a" } }
+  db: { style: { fill: "#fef3c7"; stroke: "#d97706"; font-color: "#78350f" } }
+  mute: { style: { fill: "#f1f5f9"; stroke: "#94a3b8"; font-color: "#334155" } }
+}
+
+lb: 로드밸런서 { class: mute }
+
+cp: 컨트롤 플레인 3대 {
+  a1: apiserver { class: api }
+  a2: apiserver { class: api }
+  a3: apiserver { class: api }
+}
+
+x: external etcd\nendpoint 목록 { class: mute }
+
+et: etcd 클러스터 3대 — 별도 노드 {
+  e1: etcd { shape: cylinder; class: db }
+  e2: etcd { shape: cylinder; class: db }
+  e3: etcd { shape: cylinder; class: db }
+}
+
+lb -> cp.a1
+lb -> cp.a2
+lb -> cp.a3
+cp.a1 -> x
+cp.a2 -> x
+cp.a3 -> x
+x -> et.e1
+x -> et.e2
+x -> et.e3
+et.e1 <-> et.e2: Raft
+et.e2 <-> et.e3: Raft
 ```
 
 - 노드 6대 이상 필요
@@ -1042,18 +1084,25 @@ sudo iptables -F && sudo iptables -t nat -F
 
 **두 명령이 하는 일이 다르다.**
 
-```mermaid
-flowchart LR
-    D["kubectl delete node"] --> D1["API 오브젝트만 삭제<br/>노드의 프로세스는 계속 돈다"]
-    R["kubeadm reset"] --> R1["설정·데이터 실제 삭제<br/>인증서 · 매니페스트 · etcd 멤버"]
-    C["컨트롤 플레인 노드 제거"] --> C1["etcdctl member remove 도<br/>같이 해야 한다"]
+```d2 layout=elk pad=40 title="delete node·kubeadm reset·컨트롤 플레인 제거가 각각 실제로 지우는 범위"
+direction: right
 
-    classDef warn fill:#fef3c7,stroke:#d97706,color:#78350f
-    classDef bad fill:#fee2e2,stroke:#dc2626,color:#7f1d1d
-    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
-    class D1 warn
-    class R1,C1 bad
-    class D,R,C mute
+classes: {
+  warn: { style: { fill: "#fef3c7"; stroke: "#d97706"; font-color: "#78350f" } }
+  bad: { style: { fill: "#fee2e2"; stroke: "#dc2626"; font-color: "#7f1d1d" } }
+  mute: { style: { fill: "#f1f5f9"; stroke: "#94a3b8"; font-color: "#334155" } }
+}
+
+d: kubectl delete node { class: mute }
+d1: API 오브젝트만 삭제\n노드의 프로세스는 계속 돈다 { class: warn }
+r: kubeadm reset { class: mute }
+r1: 설정·데이터 실제 삭제\n인증서 · 매니페스트 · etcd 멤버 { class: bad }
+c: 컨트롤 플레인 노드 제거 { class: mute }
+c1: etcdctl member remove 도\n같이 해야 한다 { class: bad }
+
+d -> d1
+r -> r1
+c -> c1
 ```
 
 - `kubectl delete node`는 **오브젝트만 지운다.** 노드의 프로세스는 계속 돈다
