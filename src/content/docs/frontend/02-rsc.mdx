@@ -21,18 +21,22 @@ Pages Router는 여전히 동작하지만, 새 프로젝트의 기본은 App Rou
 <Tabs>
 <TabItem label="기존 React 앱">
 
-```mermaid
-flowchart LR
-    A["서버<br/>빈 HTML"] --> B["브라우저<br/>JS 번들 전부 다운로드"]
-    B --> C["React 실행<br/>컴포넌트 렌더"]
-    C --> D["useEffect 발동<br/>fetch 시작"]
-    D --> E["로딩 스피너"]
-    E --> F["데이터 도착<br/>다시 렌더"]
+```d2 layout=elk pad=40 title="클라이언트 전용 렌더의 순서 — 빈 HTML부터 데이터 도착 후 재렌더까지"
+direction: down
 
-    classDef bad  fill:#fee2e2,stroke:#dc2626,color:#7f1d1d
-    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
-    class A,E bad
-    class B,C,D,F mute
+classes: {
+  bad: { style: { fill: "#fee2e2"; stroke: "#dc2626"; font-color: "#7f1d1d" } }
+  mute: { style: { fill: "#f1f5f9"; stroke: "#94a3b8"; font-color: "#334155" } }
+}
+
+a: 서버\n빈 HTML { class: bad }
+b: 브라우저\nJS 번들 전부 다운로드 { class: mute }
+c: React 실행\n컴포넌트 렌더 { class: mute }
+d: useEffect 발동\nfetch 시작 { class: mute }
+e: 로딩 스피너 { class: bad }
+f: 데이터 도착\n다시 렌더 { class: mute }
+
+a -> b -> c -> d -> e -> f
 ```
 
 - 사용자는 **흰 화면 → 스켈레톤 → 실제 내용** 세 단계를 본다
@@ -42,16 +46,20 @@ flowchart LR
 </TabItem>
 <TabItem label="서버 컴포넌트">
 
-```mermaid
-flowchart LR
-    A["서버<br/>컴포넌트 실행<br/>DB 직접 조회"] --> B["완성된 HTML<br/>+ 최소 JS"]
-    B --> C["브라우저<br/>바로 보임"]
-    C --> D["인터랙션 필요한<br/>부분만 하이드레이션"]
+```d2 layout=elk pad=40 title="서버 컴포넌트 렌더의 순서 — 서버에서 DB를 조회해 완성된 HTML을 보내고 일부만 하이드레이션한다"
+direction: down
 
-    classDef ok   fill:#dcfce7,stroke:#16a34a,color:#14532d
-    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
-    class A,C ok
-    class B,D mute
+classes: {
+  ok: { style: { fill: "#dcfce7"; stroke: "#16a34a"; font-color: "#14532d" } }
+  mute: { style: { fill: "#f1f5f9"; stroke: "#94a3b8"; font-color: "#334155" } }
+}
+
+a: 서버\n컴포넌트 실행\nDB 직접 조회 { class: ok }
+b: "완성된 HTML\n+ 최소 JS" { class: mute }
+c: 브라우저\n바로 보임 { class: ok }
+d: 인터랙션 필요한\n부분만 하이드레이션 { class: mute }
+
+a -> b -> c -> d
 ```
 
 - 데이터 조회가 **컴포넌트 안에서** 일어난다. `await db.query(...)`를 바로 쓴다
@@ -120,20 +128,27 @@ export function Counter() {
 가장 흔한 오해다. `use client`는 그 파일 하나가 아니라 **거기서부터 아래 전부**를
 클라이언트로 만든다.
 
-```mermaid
-flowchart TB
-    P["app/page.tsx — 서버"] --> H["Header — 서버"]
-    P --> S["SearchBox — 'use client' ← 경계"]
-    P --> L["PostList — 서버"]
-    S --> SG["Suggestions — 표시 없어도 클라이언트"]
-    SG --> HL["Highlight — 역시 클라이언트"]
+```d2 layout=elk pad=40 title="'use client' 경계 아래로는 전부 클라이언트가 되는 컴포넌트 트리"
+direction: down
 
-    classDef ok   fill:#dcfce7,stroke:#16a34a,color:#14532d
-    classDef warn fill:#fef3c7,stroke:#d97706,color:#78350f
-    classDef bad  fill:#fee2e2,stroke:#dc2626,color:#7f1d1d
-    class P,H,L ok
-    class S warn
-    class SG,HL bad
+classes: {
+  ok: { style: { fill: "#dcfce7"; stroke: "#16a34a"; font-color: "#14532d" } }
+  warn: { style: { fill: "#fef3c7"; stroke: "#d97706"; font-color: "#78350f" } }
+  bad: { style: { fill: "#fee2e2"; stroke: "#dc2626"; font-color: "#7f1d1d" } }
+}
+
+p: "app/page.tsx — 서버" { class: ok }
+h: "Header — 서버" { class: ok }
+s: "SearchBox — 'use client' ← 경계" { class: warn }
+l: "PostList — 서버" { class: ok }
+sg: "Suggestions — 표시 없어도 클라이언트" { class: bad }
+hl: "Highlight — 역시 클라이언트" { class: bad }
+
+p -> h
+p -> s
+p -> l
+s -> sg
+sg -> hl
 ```
 
 :::caution[함정]
@@ -240,19 +255,25 @@ Prisma의 모델 객체에는 메서드가 붙어 있어 직렬화되지 않는�
 
 서버 컴포넌트의 렌더 결과는 HTML만이 아니다. **RSC 페이로드**라는 별도 형식도 함께 간다.
 
-```mermaid
-flowchart LR
-    A["서버 컴포넌트<br/>렌더"] --> B["RSC 페이로드<br/>직렬화된 트리"]
-    B --> C["HTML<br/>첫 방문용"]
-    B --> D["클라이언트 이동 시<br/>이 페이로드만 전송"]
-    D --> E["React 가 기존 트리에 merge<br/>클라이언트 상태 유지"]
+```d2 layout=elk pad=40 title="RSC 페이로드가 첫 방문 HTML과 클라이언트 이동 시 트리 merge로 갈라지는 흐름"
+direction: down
 
-    classDef key  fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
-    classDef ok   fill:#dcfce7,stroke:#16a34a,color:#14532d
-    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
-    class B key
-    class E ok
-    class A,C,D mute
+classes: {
+  key: { style: { fill: "#dbeafe"; stroke: "#2563eb"; font-color: "#1e3a8a" } }
+  ok: { style: { fill: "#dcfce7"; stroke: "#16a34a"; font-color: "#14532d" } }
+  mute: { style: { fill: "#f1f5f9"; stroke: "#94a3b8"; font-color: "#334155" } }
+}
+
+a: 서버 컴포넌트\n렌더 { class: mute }
+b: RSC 페이로드\n직렬화된 트리 { class: key }
+c: HTML\n첫 방문용 { class: mute }
+d: 클라이언트 이동 시\n이 페이로드만 전송 { class: mute }
+e: React 가 기존 트리에 merge\n클라이언트 상태 유지 { class: ok }
+
+a -> b
+b -> c
+b -> d
+d -> e
 ```
 
 - 첫 방문 → HTML을 받아 즉시 보인다

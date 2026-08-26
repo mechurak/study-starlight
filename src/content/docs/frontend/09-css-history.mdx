@@ -191,20 +191,26 @@ const Alert = styled.div`
 - 안 쓴 클래스는 **생성되지 않는다**
 - 그래서 CSS 파일 크기가 **프로젝트 규모와 거의 무관**하게 유지된다
 
-```mermaid
-flowchart LR
-    B["BEM · 5년 누적<br/>컴포넌트마다 새 클래스"] --> B2["CSS 가 단조 증가 ❌"]
-    M["CSS Modules<br/>파일마다 새 클래스"] --> M2["여전히 증가 ⚠️"]
-    T["Tailwind<br/>고정된 유틸리티 조합"] --> T2["규모와 거의 무관 ✅"]
+```d2 layout=elk pad=40 title="BEM·CSS Modules·Tailwind가 규모에 따라 CSS 양이 어떻게 달라지는지 비교"
+direction: right
 
-    classDef bad  fill:#fee2e2,stroke:#dc2626,color:#7f1d1d
-    classDef warn fill:#fef3c7,stroke:#d97706,color:#78350f
-    classDef ok   fill:#dcfce7,stroke:#16a34a,color:#14532d
-    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
-    class B2 bad
-    class M2 warn
-    class T2 ok
-    class B,M,T mute
+classes: {
+  bad: { style: { fill: "#fee2e2"; stroke: "#dc2626"; font-color: "#7f1d1d" } }
+  warn: { style: { fill: "#fef3c7"; stroke: "#d97706"; font-color: "#78350f" } }
+  ok: { style: { fill: "#dcfce7"; stroke: "#16a34a"; font-color: "#14532d" } }
+  mute: { style: { fill: "#f1f5f9"; stroke: "#94a3b8"; font-color: "#334155" } }
+}
+
+b: "BEM · 5년 누적\n컴포넌트마다 새 클래스" { class: mute }
+b2: "CSS 가 단조 증가 ❌" { class: bad }
+m: "CSS Modules\n파일마다 새 클래스" { class: mute }
+m2: "여전히 증가 ⚠️" { class: warn }
+t: "Tailwind\n고정된 유틸리티 조합" { class: mute }
+t2: "규모와 거의 무관 ✅" { class: ok }
+
+b -> b2
+m -> m2
+t -> t2
 ```
 
 Tailwind 쪽이 작은 이유는 압축을 잘해서가 아니라

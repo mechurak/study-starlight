@@ -47,21 +47,29 @@ import { Card, CardGrid, LinkCard } from '@astrojs/starlight/components';
 4. **Server Function에 인증 검사 누락** → 그건 공개 엔드포인트다
 5. **`cssVariables: false`로 init** → 되돌리기 매우 어렵다
 
-```mermaid
-flowchart LR
-    A["1. 레이아웃 use client"] --> R1["언제든 고칠 수 있다"]
-    B["2. 동적 클래스 조립"] --> R1
-    D["4. 인증 누락"] --> R2["즉시 고쳐야 한다 ⚠️"]
-    C["3. 원시 색 하드코딩"] --> R3["되돌리기 비쌈 🔒"]
-    E["5. cssVariables: false"] --> R3
+```d2 layout=elk pad=40 title="다섯 가지 흔한 실수를 되돌리기 비용별로 묶은 그림"
+direction: right
 
-    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
-    classDef bad  fill:#fee2e2,stroke:#dc2626,color:#7f1d1d
-    classDef warn fill:#fef3c7,stroke:#d97706,color:#78350f
-    class R1 mute
-    class R2 bad
-    class R3 warn
-    class A,B,C,D,E mute
+classes: {
+  mute: { style: { fill: "#f1f5f9"; stroke: "#94a3b8"; font-color: "#334155" } }
+  bad: { style: { fill: "#fee2e2"; stroke: "#dc2626"; font-color: "#7f1d1d" } }
+  warn: { style: { fill: "#fef3c7"; stroke: "#d97706"; font-color: "#78350f" } }
+}
+
+a: "1. 레이아웃 use client" { class: mute }
+b: "2. 동적 클래스 조립" { class: mute }
+c: "3. 원시 색 하드코딩" { class: mute }
+d: "4. 인증 누락" { class: mute }
+e: "5. cssVariables: false" { class: mute }
+r1: 언제든 고칠 수 있다 { class: mute }
+r2: "즉시 고쳐야 한다 ⚠️" { class: bad }
+r3: "되돌리기 비쌈 🔒" { class: warn }
+
+a -> r1
+b -> r1
+d -> r2
+c -> r3
+e -> r3
 ```
 
 **3번과 5번은 되돌리기가 특히 비싸다.**

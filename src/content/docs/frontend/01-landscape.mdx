@@ -12,23 +12,22 @@ import { Card, CardGrid, Tabs, TabItem, LinkCard } from '@astrojs/starlight/comp
 초심자가 가장 많이 하는 오해가 "Next.js vs Tailwind vs shadcn 중에 뭘 골라야 하나"다.
 셋은 고르는 대상이 아니라 **쌓는 층**이다.
 
-```mermaid
-flowchart TB
-    A["shadcn/ui — 컴포넌트<br/>버튼 · 다이얼로그 · 폼이 어떻게 생기고 동작하는가"]
-    B["Tailwind CSS — 스타일 언어<br/>그 생김새를 어떤 문법으로 기술하는가"]
-    C["Next.js — 실행 환경<br/>그 컴포넌트를 언제 · 어디서 실행하는가"]
-    D["React — UI 모델<br/>상태가 바뀌면 화면이 바뀐다"]
+```d2 layout=elk pad=40 title="shadcn/ui → Tailwind CSS → Next.js → React 네 층의 역할 사슬"
+direction: down
 
-    A --> B --> C --> D
+classes: {
+  ok: { style: { fill: "#dcfce7"; stroke: "#16a34a"; font-color: "#14532d" } }
+  key: { style: { fill: "#dbeafe"; stroke: "#2563eb"; font-color: "#1e3a8a" } }
+  warn: { style: { fill: "#fef3c7"; stroke: "#d97706"; font-color: "#78350f" } }
+  mute: { style: { fill: "#f1f5f9"; stroke: "#94a3b8"; font-color: "#334155" } }
+}
 
-    classDef warn fill:#fef3c7,stroke:#d97706,color:#78350f
-    classDef ok   fill:#dcfce7,stroke:#16a34a,color:#14532d
-    classDef key  fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
-    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
-    class A warn
-    class B ok
-    class C key
-    class D mute
+a: "shadcn/ui — 컴포넌트\n버튼 · 다이얼로그 · 폼이 어떻게 생기고 동작하는가" { class: warn }
+b: "Tailwind CSS — 스타일 언어\n그 생김새를 어떤 문법으로 기술하는가" { class: ok }
+c: "Next.js — 실행 환경\n그 컴포넌트를 언제 · 어디서 실행하는가" { class: key }
+d: "React — UI 모델\n상태가 바뀌면 화면이 바뀐다" { class: mute }
+
+a -> b -> c -> d
 ```
 
 각 층은 아래 층을 **전제**하지 대체하지 않는다. 한 문장씩 하면 —
@@ -48,19 +47,21 @@ flowchart TB
 
 ### Next.js 이전 — 번들과 워터폴
 
-```mermaid
-sequenceDiagram
-    participant B as 브라우저
-    participant C as CDN
-    participant A as API 서버
-    B->>C: index.html 요청
-    C-->>B: 거의 빈 HTML + 1.2MB JS
-    Note over B: 흰 화면. JS 다운로드·파싱 대기
-    B->>A: /api/user
-    A-->>B: JSON
-    B->>A: /api/posts (user 를 받은 뒤에야 가능)
-    A-->>B: JSON
-    Note over B: 이제서야 첫 화면
+```d2 layout=elk pad=40 title="전통적 SPA의 로딩 순서 — 빈 HTML을 받고 JS를 기다린 뒤 API를 순차 호출한다"
+shape: sequence_diagram
+
+b: 브라우저
+c: CDN
+a: API 서버
+
+b -> c: index.html 요청
+c -> b: "거의 빈 HTML + 1.2MB JS" { style.stroke-dash: 3 }
+b.n1: 흰 화면. JS 다운로드·파싱 대기
+b -> a: /api/user
+a -> b: JSON { style.stroke-dash: 3 }
+b -> a: "/api/posts (user 를 받은 뒤에야 가능)"
+a -> b: JSON { style.stroke-dash: 3 }
+b.n2: 이제서야 첫 화면
 ```
 
 - **번들이 크다** — 화면에 안 보이는 코드까지 전부 브라우저로 간다

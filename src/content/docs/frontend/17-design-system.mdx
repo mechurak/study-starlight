@@ -107,22 +107,30 @@ Material 3에는 **shadcn 기본 컴포넌트에 없는 구조적 특징**이 �
 이럴 때 **16장의 "variant 추가"가 정당한 수정**이 된다.
 `ui/button.tsx`의 베이스 클래스를 `rounded-full`로 바꾸는 것이다.
 
-```mermaid
-flowchart LR
-    D["디자인 시스템 채택"] --> T["① 토큰 매핑<br/>색 · radius · 폰트"]
-    T --> Q{"이걸로 80%가<br/>해결되는가"}
-    Q -->|"예 — 대부분"| OK["끝 ✅"]
-    Q -->|"구조가 다르다"| C["② ui/ 수정<br/>높이 · 패딩 · 알약 모양<br/>16장 규칙 준수"]
-    C --> OK
+```d2 layout=elk pad=40 title="디자인 시스템 채택 — 토큰 매핑으로 대부분 끝나고 구조가 다를 때만 ui/를 수정한다"
+direction: down
 
-    classDef key  fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
-    classDef warn fill:#fef3c7,stroke:#d97706,color:#78350f
-    classDef ok   fill:#dcfce7,stroke:#16a34a,color:#14532d
-    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
-    class T key
-    class C warn
-    class OK ok
-    class D,Q mute
+classes: {
+  key: { style: { fill: "#dbeafe"; stroke: "#2563eb"; font-color: "#1e3a8a" } }
+  warn: { style: { fill: "#fef3c7"; stroke: "#d97706"; font-color: "#78350f" } }
+  ok: { style: { fill: "#dcfce7"; stroke: "#16a34a"; font-color: "#14532d" } }
+  mute: { style: { fill: "#f1f5f9"; stroke: "#94a3b8"; font-color: "#334155" } }
+}
+
+d: 디자인 시스템 채택 { class: mute }
+t: "① 토큰 매핑\n색 · radius · 폰트" { class: key }
+q: "이걸로 80%가\n해결되는가" {
+  class: mute
+  shape: diamond
+}
+done: "끝 ✅" { class: ok }
+c: "② ui/ 수정\n높이 · 패딩 · 알약 모양\n16장 규칙 준수" { class: warn }
+
+d -> t
+t -> q
+q -> done: "예 — 대부분"
+q -> c: 구조가 다르다
+c -> done
 ```
 
 ### Radix Colors

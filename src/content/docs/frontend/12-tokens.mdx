@@ -35,20 +35,20 @@ import ThemeCompare from '../../../components/demos/ThemeCompare.astro';
 
 토큰을 한 층으로 만들면 금방 무너진다. 실무에서는 **세 층**으로 나눈다.
 
-```mermaid
-flowchart TB
-    A["1. 원시 토큰 (primitive)<br/>--indigo-600: oklch(0.51 0.23 277)<br/>순수한 값 · 의미 없음"]
-    B["2. 의미 토큰 (semantic)<br/>--primary: var(--indigo-600)<br/>역할을 부여한다"]
-    C["3. 컴포넌트 토큰 (component)<br/>--button-bg: var(--primary)<br/>특정 컴포넌트 전용"]
+```d2 layout=elk pad=40 title="원시 토큰 → 의미 토큰 → 컴포넌트 토큰 3단 계층"
+direction: down
 
-    A --> B --> C
+classes: {
+  mute: { style: { fill: "#f1f5f9"; stroke: "#94a3b8"; font-color: "#334155" } }
+  key: { style: { fill: "#dbeafe"; stroke: "#2563eb"; font-color: "#1e3a8a" } }
+  warn: { style: { fill: "#fef3c7"; stroke: "#d97706"; font-color: "#78350f" } }
+}
 
-    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
-    classDef key  fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
-    classDef warn fill:#fef3c7,stroke:#d97706,color:#78350f
-    class A mute
-    class B key
-    class C warn
+a: "1. 원시 토큰 (primitive)\n--indigo-600: oklch(0.51 0.23 277)\n순수한 값 · 의미 없음" { class: mute }
+b: "2. 의미 토큰 (semantic)\n--primary: var(--indigo-600)\n역할을 부여한다" { class: key }
+c: "3. 컴포넌트 토큰 (component)\n--button-bg: var(--primary)\n특정 컴포넌트 전용" { class: warn }
+
+a -> b -> c
 ```
 
 **대부분의 프로젝트는 1·2단만 있으면 충분하다.**
@@ -114,22 +114,27 @@ flowchart TB
 
 **바탕색을 정하면 그 위의 글자색이 따라온다.** 이 짝이 대비를 보장한다.
 
-```mermaid
-flowchart LR
-    P["--primary<br/>바탕"] --> PF["--primary-foreground<br/>그 위의 글자"]
-    M["--muted<br/>바탕"] --> MF["--muted-foreground<br/>그 위의 글자"]
-    PF --> R["항상 함께 쓴다<br/>bg-primary text-primary-foreground ✅"]
-    MF --> R
-    X["한쪽만 바꾸면<br/>대비가 깨진다 ❌"]
+```d2 layout=elk pad=40 title="바탕 토큰과 foreground 토큰을 짝으로 함께 써야 대비가 유지된다"
+direction: down
 
-    classDef key  fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
-    classDef ok   fill:#dcfce7,stroke:#16a34a,color:#14532d
-    classDef bad  fill:#fee2e2,stroke:#dc2626,color:#7f1d1d
-    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
-    class P,M key
-    class R ok
-    class X bad
-    class PF,MF mute
+classes: {
+  key: { style: { fill: "#dbeafe"; stroke: "#2563eb"; font-color: "#1e3a8a" } }
+  ok: { style: { fill: "#dcfce7"; stroke: "#16a34a"; font-color: "#14532d" } }
+  bad: { style: { fill: "#fee2e2"; stroke: "#dc2626"; font-color: "#7f1d1d" } }
+  mute: { style: { fill: "#f1f5f9"; stroke: "#94a3b8"; font-color: "#334155" } }
+}
+
+p: "--primary\n바탕" { class: key }
+pf: "--primary-foreground\n그 위의 글자" { class: mute }
+m: "--muted\n바탕" { class: key }
+mf: "--muted-foreground\n그 위의 글자" { class: mute }
+r: "항상 함께 쓴다\nbg-primary text-primary-foreground ✅" { class: ok }
+x: "한쪽만 바꾸면\n대비가 깨진다 ❌" { class: bad }
+
+p -> pf
+m -> mf
+pf -> r
+mf -> r
 ```
 
 컴포넌트는 `bg-primary text-primary-foreground`를 **항상 함께** 쓴다.
@@ -188,17 +193,20 @@ CSS 변수를 정의하는 것만으로는 `bg-primary` 유틸리티가 생기�
 }
 ```
 
-```mermaid
-flowchart LR
-    A[":root / .dark<br/>--primary: oklch(...)<br/>값을 정의"] --> B["@theme inline<br/>--color-primary: var(--primary)<br/>유틸리티를 생성"]
-    B --> C["컴포넌트<br/>class='bg-primary'"]
+```d2 layout=elk pad=40 title="CSS 변수 정의에서 @theme inline 유틸리티 생성을 거쳐 컴포넌트 클래스로 이어지는 경로"
+direction: down
 
-    classDef key  fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
-    classDef ok   fill:#dcfce7,stroke:#16a34a,color:#14532d
-    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
-    class A key
-    class B ok
-    class C mute
+classes: {
+  key: { style: { fill: "#dbeafe"; stroke: "#2563eb"; font-color: "#1e3a8a" } }
+  ok: { style: { fill: "#dcfce7"; stroke: "#16a34a"; font-color: "#14532d" } }
+  mute: { style: { fill: "#f1f5f9"; stroke: "#94a3b8"; font-color: "#334155" } }
+}
+
+a: ":root / .dark\n--primary: oklch(...)\n값을 정의" { class: key }
+b: "@theme inline\n--color-primary: var(--primary)\n유틸리티를 생성" { class: ok }
+c: "컴포넌트\nclass='bg-primary'" { class: mute }
+
+a -> b -> c
 ```
 
 - **왼쪽** — 무슨 값인가. 테마마다 다르다

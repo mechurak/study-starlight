@@ -171,25 +171,36 @@ init 직후 `globals.css`를 열어보면 학습 효과가 크다.
 `--style` 플래그나 `shadcn/create`에서 고른다.
 **나중에 못 바꾸므로** 프로젝트 시작 전에 웹사이트에서 실물을 비교해 보는 게 좋다.
 
-```mermaid
-flowchart TD
-    I["shadcn init"] --> A{"cssVariables"}
-    A -->|"true ✅"| OK["토큰 기반<br/>테마 교체 가능"]
-    A -->|"false ❌"| BAD["하드코딩 색<br/>17장 불가"]
-    I --> B["baseColor 선택<br/>zinc · slate · stone …"]
-    I --> C["style 선택<br/>8가지"]
-    B --> L["🔒 나중에 못 바꿈"]
-    C --> L
-    OK --> L2["🔒 나중에 못 바꿈"]
+```d2 layout=elk pad=40 title="shadcn init에서 cssVariables·baseColor·style 선택이 나중에 못 바꾸는 결정으로 이어지는 갈래"
+direction: down
 
-    classDef ok   fill:#dcfce7,stroke:#16a34a,color:#14532d
-    classDef bad  fill:#fee2e2,stroke:#dc2626,color:#7f1d1d
-    classDef warn fill:#fef3c7,stroke:#d97706,color:#78350f
-    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
-    class OK ok
-    class BAD bad
-    class L,L2 warn
-    class I,A,B,C mute
+classes: {
+  ok: { style: { fill: "#dcfce7"; stroke: "#16a34a"; font-color: "#14532d" } }
+  bad: { style: { fill: "#fee2e2"; stroke: "#dc2626"; font-color: "#7f1d1d" } }
+  warn: { style: { fill: "#fef3c7"; stroke: "#d97706"; font-color: "#78350f" } }
+  mute: { style: { fill: "#f1f5f9"; stroke: "#94a3b8"; font-color: "#334155" } }
+}
+
+i: shadcn init { class: mute }
+a: cssVariables {
+  class: mute
+  shape: diamond
+}
+good: "토큰 기반\n테마 교체 가능" { class: ok }
+nope: "하드코딩 색\n17장 불가" { class: bad }
+b: "baseColor 선택\nzinc · slate · stone …" { class: mute }
+c: "style 선택\n8가지" { class: mute }
+l: "🔒 나중에 못 바꿈" { class: warn }
+l2: "🔒 나중에 못 바꿈" { class: warn }
+
+i -> a
+a -> good: "true ✅"
+a -> nope: "false ❌"
+i -> b
+i -> c
+b -> l
+c -> l
+good -> l2
 ```
 
 ## CLI 다루기

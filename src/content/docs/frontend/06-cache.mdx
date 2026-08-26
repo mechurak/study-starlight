@@ -186,21 +186,23 @@ export default function Page() {
 
 ## 세 가지가 한 페이지에 공존한다
 
-```mermaid
-flowchart TB
-    subgraph shell["정적 껍데기 — CDN 에서 즉시"]
-        A["헤더 · 내비게이션<br/>순수 계산"]
-        B["블로그 목록<br/>'use cache'"]
-        C["사용자 설정 자리<br/>Suspense fallback"]
-    end
-    C -.->|"요청 시 스트리밍"| D["cookies() 읽어<br/>실제 설정 표시"]
+```d2 layout=elk pad=40 title="CDN에서 즉시 오는 정적 껍데기와 요청 시 스트리밍되는 사용자 설정"
+direction: down
 
-    classDef ok   fill:#dcfce7,stroke:#16a34a,color:#14532d
-    classDef key  fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
-    classDef warn fill:#fef3c7,stroke:#d97706,color:#78350f
-    class A ok
-    class B key
-    class C,D warn
+classes: {
+  ok: { style: { fill: "#dcfce7"; stroke: "#16a34a"; font-color: "#14532d" } }
+  key: { style: { fill: "#dbeafe"; stroke: "#2563eb"; font-color: "#1e3a8a" } }
+  warn: { style: { fill: "#fef3c7"; stroke: "#d97706"; font-color: "#78350f" } }
+}
+
+shell: "정적 껍데기 — CDN 에서 즉시" {
+  a: "헤더 · 내비게이션\n순수 계산" { class: ok }
+  b: "블로그 목록\n'use cache'" { class: key }
+  c: "사용자 설정 자리\nSuspense fallback" { class: warn }
+}
+d: "cookies() 읽어\n실제 설정 표시" { class: warn }
+
+shell.c -> d: 요청 시 스트리밍 { style.stroke-dash: 3 }
 ```
 
 - **초록** — 빌드 타임에 확정. 순수 계산, 모듈 import

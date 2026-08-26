@@ -195,17 +195,22 @@ Base UI / Radix / React Aria가 **이 전부를 처리**한다.
 
 ## 점검하기
 
-```mermaid
-flowchart LR
-    A["자동 도구<br/>eslint-plugin-jsx-a11y<br/>axe DevTools · Lighthouse"] --> C["문제의 30~40% ⚠️"]
-    B["수동 점검<br/>마우스 없이 조작<br/>200% 확대 · VoiceOver"] --> D["나머지 60~70% ✅"]
+```d2 layout=elk pad=40 title="자동 도구가 잡는 30~40%와 수동 점검이 잡는 나머지 60~70%"
+direction: right
 
-    classDef warn fill:#fef3c7,stroke:#d97706,color:#78350f
-    classDef ok   fill:#dcfce7,stroke:#16a34a,color:#14532d
-    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
-    class C warn
-    class D ok
-    class A,B mute
+classes: {
+  warn: { style: { fill: "#fef3c7"; stroke: "#d97706"; font-color: "#78350f" } }
+  ok: { style: { fill: "#dcfce7"; stroke: "#16a34a"; font-color: "#14532d" } }
+  mute: { style: { fill: "#f1f5f9"; stroke: "#94a3b8"; font-color: "#334155" } }
+}
+
+a: "자동 도구\neslint-plugin-jsx-a11y\naxe DevTools · Lighthouse" { class: mute }
+c: "문제의 30~40% ⚠️" { class: warn }
+b: "수동 점검\n마우스 없이 조작\n200% 확대 · VoiceOver" { class: mute }
+d: "나머지 60~70% ✅" { class: ok }
+
+a -> c
+b -> d
 ```
 
 <Steps>

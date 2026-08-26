@@ -49,16 +49,22 @@ Next.js는 라우팅 설정 파일을 쓰지 않는다. **폴더 이름이 경�
 
 App Router의 중요한 장점인데 잘 알려져 있지 않다.
 
-```mermaid
-flowchart TB
-    A["app/layout.tsx<br/>사이드바 · 스크롤 위치 유지"] --> B["app/dashboard/layout.tsx<br/>탭 상태 유지"]
-    B --> C["dashboard/reports/page.tsx<br/>← 이동 시 이것만 교체"]
-    B --> D["dashboard/settings/page.tsx<br/>← 이것으로"]
+```d2 layout=elk pad=40 title="중첩 레이아웃은 유지되고 page만 교체되는 라우트 트리"
+direction: down
 
-    classDef ok   fill:#dcfce7,stroke:#16a34a,color:#14532d
-    classDef warn fill:#fef3c7,stroke:#d97706,color:#78350f
-    class A,B ok
-    class C,D warn
+classes: {
+  ok: { style: { fill: "#dcfce7"; stroke: "#16a34a"; font-color: "#14532d" } }
+  warn: { style: { fill: "#fef3c7"; stroke: "#d97706"; font-color: "#78350f" } }
+}
+
+a: "app/layout.tsx\n사이드바 · 스크롤 위치 유지" { class: ok }
+b: "app/dashboard/layout.tsx\n탭 상태 유지" { class: ok }
+c: "dashboard/reports/page.tsx\n← 이동 시 이것만 교체" { class: warn }
+d: "dashboard/settings/page.tsx\n← 이것으로" { class: warn }
+
+a -> b
+b -> c
+b -> d
 ```
 
 - `/dashboard/reports` → `/dashboard/settings` 이동 시 **바뀌는 건 page뿐**이다
@@ -301,23 +307,38 @@ Next.js 팀이 문서에서 명시적으로 경고하는 지점이다.
 - **Server Function은 별도 라우트가 아니다.** matcher가 그 경로를 제외하면 함께 빠진다
 - matcher를 리팩터링하다 인증이 조용히 사라지는 사고가 실제로 발생한다
 
-```mermaid
-flowchart TD
-    R["요청"] --> P{"proxy.ts matcher 에<br/>걸리는가"}
-    P -->|"걸린다"| C1["쿠키 확인 → 리다이렉트"]
-    P -->|"안 걸린다"| C2["그냥 통과"]
-    C1 --> D["데이터에 닿는 지점"]
-    C2 --> D
-    D --> A{"여기서 다시<br/>인증·인가를 하는가"}
-    A -->|"한다"| OK["안전 ✅"]
-    A -->|"proxy 를 믿는다"| BAD["Server Function 직접 호출로 우회 가능 ❌"]
+```d2 layout=elk pad=40 title="proxy.ts matcher를 지나 데이터 지점에서 인증·인가를 다시 하는지에 따라 갈리는 판단"
+direction: down
 
-    classDef ok   fill:#dcfce7,stroke:#16a34a,color:#14532d
-    classDef bad  fill:#fee2e2,stroke:#dc2626,color:#7f1d1d
-    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
-    class OK ok
-    class BAD bad
-    class R,P,C1,C2,D,A mute
+classes: {
+  ok: { style: { fill: "#dcfce7"; stroke: "#16a34a"; font-color: "#14532d" } }
+  bad: { style: { fill: "#fee2e2"; stroke: "#dc2626"; font-color: "#7f1d1d" } }
+  mute: { style: { fill: "#f1f5f9"; stroke: "#94a3b8"; font-color: "#334155" } }
+}
+
+r: 요청 { class: mute }
+p: "proxy.ts matcher 에\n걸리는가" {
+  class: mute
+  shape: diamond
+}
+c1: 쿠키 확인 → 리다이렉트 { class: mute }
+c2: 그냥 통과 { class: mute }
+d: 데이터에 닿는 지점 { class: mute }
+a: "여기서 다시\n인증·인가를 하는가" {
+  class: mute
+  shape: diamond
+}
+safe: 안전 ✅ { class: ok }
+risk: "Server Function 직접 호출로 우회 가능 ❌" { class: bad }
+
+r -> p
+p -> c1: 걸린다
+p -> c2: 안 걸린다
+c1 -> d
+c2 -> d
+d -> a
+a -> safe: 한다
+a -> risk: "proxy 를 믿는다"
 ```
 
 :::tip[핵심]

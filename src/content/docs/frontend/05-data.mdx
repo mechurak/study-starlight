@@ -144,17 +144,19 @@ export default function Page() {
 Header가 먼저 보이고, Feed가 500ms에, Stats가 2초에 각각 **도착하는 대로** 채워진다.
 전체가 2초를 기다리지 않는다.
 
-```mermaid
-sequenceDiagram
-    participant B as 브라우저
-    participant S as 서버
-    B->>S: GET /dashboard
-    S-->>B: HTML — 헤더 + 스켈레톤 2개
-    Note over B: 0.1초 — 이미 뭔가 보인다
-    S-->>B: Feed HTML 조각
-    Note over B: 0.5초 — 피드 채워짐
-    S-->>B: Stats HTML 조각
-    Note over B: 2.0초 — 완성
+```d2 layout=elk pad=40 title="스트리밍 SSR 순서 — 스켈레톤이 먼저 오고 피드·통계 조각이 차례로 도착한다"
+shape: sequence_diagram
+
+b: 브라우저
+s: 서버
+
+b -> s: GET /dashboard
+s -> b: "HTML — 헤더 + 스켈레톤 2개" { style.stroke-dash: 3 }
+b.n1: "0.1초 — 이미 뭔가 보인다"
+s -> b: Feed HTML 조각 { style.stroke-dash: 3 }
+b.n2: "0.5초 — 피드 채워짐"
+s -> b: Stats HTML 조각 { style.stroke-dash: 3 }
+b.n3: "2.0초 — 완성"
 ```
 
 - 하나의 HTTP 응답이 **끊기지 않고 계속 흘러온다** (chunked transfer)

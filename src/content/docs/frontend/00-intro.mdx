@@ -56,20 +56,24 @@ React Native, 모바일 앱.
 
 ## 전체를 관통하는 질문
 
-```mermaid
-flowchart LR
-    Q["이 코드는<br/>어디서 실행되는가?"] --> B["빌드 타임<br/>Tailwind 클래스 스캔"]
-    Q --> S["서버 요청 시<br/>서버 컴포넌트의 DB 조회"]
-    Q --> C["브라우저<br/>useState 로 열리는 드롭다운"]
+```d2 layout=elk pad=40 title="이 코드는 어디서 실행되는가 — 빌드 타임·서버 요청 시·브라우저 세 갈래"
+direction: right
 
-    classDef ok   fill:#dcfce7,stroke:#16a34a,color:#14532d
-    classDef key  fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
-    classDef warn fill:#fef3c7,stroke:#d97706,color:#78350f
-    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
-    class B ok
-    class S key
-    class C warn
-    class Q mute
+classes: {
+  ok: { style: { fill: "#dcfce7"; stroke: "#16a34a"; font-color: "#14532d" } }
+  key: { style: { fill: "#dbeafe"; stroke: "#2563eb"; font-color: "#1e3a8a" } }
+  warn: { style: { fill: "#fef3c7"; stroke: "#d97706"; font-color: "#78350f" } }
+  mute: { style: { fill: "#f1f5f9"; stroke: "#94a3b8"; font-color: "#334155" } }
+}
+
+q: 이 코드는\n어디서 실행되는가? { class: mute }
+b: 빌드 타임\nTailwind 클래스 스캔 { class: ok }
+s: 서버 요청 시\n서버 컴포넌트의 DB 조회 { class: key }
+c: 브라우저\nuseState 로 열리는 드롭다운 { class: warn }
+
+q -> b
+q -> s
+q -> c
 ```
 
 :::tip[핵심]

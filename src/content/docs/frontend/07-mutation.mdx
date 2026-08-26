@@ -46,14 +46,16 @@ export default function NewPost() {
 
 ### 여기서 무슨 일이 일어나는가
 
-```mermaid
-sequenceDiagram
-    participant B as 브라우저
-    participant S as 서버
-    B->>S: form submit → POST (현재 라우트로)
-    Note over S: createPost 실행<br/>DB 쓰기 + revalidateTag
-    S-->>B: 갱신된 RSC 페이로드
-    Note over B: 화면이 새 데이터로 갱신됨<br/>페이지 이동 없음
+```d2 layout=elk pad=40 title="폼 제출이 Server Function을 거쳐 갱신된 RSC 페이로드로 돌아오는 순서"
+shape: sequence_diagram
+
+b: 브라우저
+s: 서버
+
+b -> s: "form submit → POST (현재 라우트로)"
+s.n1: "createPost 실행\nDB 쓰기 + revalidateTag"
+s -> b: 갱신된 RSC 페이로드 { style.stroke-dash: 3 }
+b.n2: "화면이 새 데이터로 갱신됨\n페이지 이동 없음"
 ```
 
 - 별도 API 라우트가 없다. **함수 참조 자체가 엔드포인트**가 된다
@@ -185,22 +187,40 @@ export async function updatePost(_: State, formData: FormData) {
 }
 ```
 
-```mermaid
-flowchart LR
-    R["Server Function 호출"] --> A{"1. 인증<br/>누구인가"}
-    A -->|"없음"| X1["거부 ❌"]
-    A -->|"있음"| V{"2. 검증<br/>형식이 맞는가"}
-    V -->|"실패"| X2["거부 ❌"]
-    V -->|"통과"| Z{"3. 인가<br/>이 리소스를 바꿔도 되나"}
-    Z -->|"아니오"| X3["거부 ❌"]
-    Z -->|"예"| E["4. 실행 + 재검증 ✅"]
+```d2 layout=elk pad=40 title="Server Function이 인증·검증·인가 세 관문을 지나야 실행에 닿는 순서"
+direction: down
 
-    classDef ok   fill:#dcfce7,stroke:#16a34a,color:#14532d
-    classDef bad  fill:#fee2e2,stroke:#dc2626,color:#7f1d1d
-    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
-    class E ok
-    class X1,X2,X3 bad
-    class R,A,V,Z mute
+classes: {
+  ok: { style: { fill: "#dcfce7"; stroke: "#16a34a"; font-color: "#14532d" } }
+  bad: { style: { fill: "#fee2e2"; stroke: "#dc2626"; font-color: "#7f1d1d" } }
+  mute: { style: { fill: "#f1f5f9"; stroke: "#94a3b8"; font-color: "#334155" } }
+}
+
+r: Server Function 호출 { class: mute }
+a: "1. 인증\n누구인가" {
+  class: mute
+  shape: diamond
+}
+x1: 거부 ❌ { class: bad }
+v: "2. 검증\n형식이 맞는가" {
+  class: mute
+  shape: diamond
+}
+x2: 거부 ❌ { class: bad }
+z: "3. 인가\n이 리소스를 바꿔도 되나" {
+  class: mute
+  shape: diamond
+}
+x3: 거부 ❌ { class: bad }
+e: "4. 실행 + 재검증 ✅" { class: ok }
+
+r -> a
+a -> x1: 없음
+a -> v: 있음
+v -> x2: 실패
+v -> z: 통과
+z -> x3: 아니오
+z -> e: 예
 ```
 
 **인증 → 검증 → 인가 → 실행.** 이 네 단계를 모든 Server Function에서 반복한다.

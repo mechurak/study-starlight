@@ -155,19 +155,27 @@ if (!parsed.success) return { error: '...' }
 
 ### 검증 시점
 
-```mermaid
-flowchart LR
-    T["입력 중<br/>onChange"] --> BAD["다 치기도 전에<br/>빨갛게 된다 ❌"]
-    B["blur 후<br/>mode: 'onBlur'"] --> OK1["필드를 떠날 때 검증 ✅"]
-    S["제출 시<br/>기본값 onSubmit"] --> OK2["가장 보수적 ✅"]
-    S --> R["제출 후에는<br/>onChange 로 전환하면 자연스럽다"]
+```d2 layout=elk pad=40 title="검증 시점별 결과 — 입력 중·blur 후·제출 시 각각 사용자에게 어떻게 보이는가"
+direction: right
 
-    classDef bad  fill:#fee2e2,stroke:#dc2626,color:#7f1d1d
-    classDef ok   fill:#dcfce7,stroke:#16a34a,color:#14532d
-    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
-    class BAD bad
-    class OK1,OK2,R ok
-    class T,B,S mute
+classes: {
+  bad: { style: { fill: "#fee2e2"; stroke: "#dc2626"; font-color: "#7f1d1d" } }
+  ok: { style: { fill: "#dcfce7"; stroke: "#16a34a"; font-color: "#14532d" } }
+  mute: { style: { fill: "#f1f5f9"; stroke: "#94a3b8"; font-color: "#334155" } }
+}
+
+t: "입력 중\nonChange" { class: mute }
+nope: "다 치기도 전에\n빨갛게 된다 ❌" { class: bad }
+b: "blur 후\nmode: 'onBlur'" { class: mute }
+ok1: "필드를 떠날 때 검증 ✅" { class: ok }
+s: "제출 시\n기본값 onSubmit" { class: mute }
+ok2: "가장 보수적 ✅" { class: ok }
+r: "제출 후에는\nonChange 로 전환하면 자연스럽다" { class: ok }
+
+t -> nope
+b -> ok1
+s -> ok2
+s -> r
 ```
 
 검증 시점 기본값은 `onSubmit`이다.

@@ -25,20 +25,20 @@ shadcn/ui는 **가능성**을 줄 뿐이다. 위 세 가지는 팀이 만들어�
 
 ## 세 개의 층으로 나눈다
 
-```mermaid
-flowchart TB
-    A["components/ui/<br/>shadcn 원본 — 되도록 손대지 않는다<br/>Button · Card · Dialog · Input…"]
-    B["components/shared/<br/>우리 확장 — 프로젝트 공통<br/>PageHeader · EmptyState · DataTable · ConfirmDialog"]
-    C["app/(app)/**/_components/<br/>도메인 컴포넌트 — 이 화면 전용<br/>InvoiceRow · MemberInviteForm"]
+```d2 layout=elk pad=40 title="components/ui → components/shared → 도메인 컴포넌트 3단 배치"
+direction: down
 
-    A --> B --> C
+classes: {
+  key: { style: { fill: "#dbeafe"; stroke: "#2563eb"; font-color: "#1e3a8a" } }
+  ok: { style: { fill: "#dcfce7"; stroke: "#16a34a"; font-color: "#14532d" } }
+  warn: { style: { fill: "#fef3c7"; stroke: "#d97706"; font-color: "#78350f" } }
+}
 
-    classDef key  fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
-    classDef ok   fill:#dcfce7,stroke:#16a34a,color:#14532d
-    classDef warn fill:#fef3c7,stroke:#d97706,color:#78350f
-    class A key
-    class B ok
-    class C warn
+a: "components/ui/\nshadcn 원본 — 되도록 손대지 않는다\nButton · Card · Dialog · Input…" { class: key }
+b: "components/shared/\n우리 확장 — 프로젝트 공통\nPageHeader · EmptyState · DataTable · ConfirmDialog" { class: ok }
+c: "app/(app)/**/_components/\n도메인 컴포넌트 — 이 화면 전용\nInvoiceRow · MemberInviteForm" { class: warn }
+
+a -> b -> c
 ```
 
 - **위층은 아래층을 모른다.** `ui/`는 도메인을 절대 모른다
@@ -195,19 +195,22 @@ export function EmptyState({
 세 번째가 이 스택이 제공하는 답이다.
 **우리 컴포넌트도 `shadcn add`로 설치되게 만든다.**
 
-```mermaid
-flowchart LR
-    A["registry/<br/>컴포넌트 소스"] --> B["registry.json<br/>목록 정의"]
-    B --> C["shadcn build<br/>→ public/r/*.json"]
-    C --> D["정적 호스팅<br/>registry.acme.com"]
-    D --> E["다른 프로젝트<br/>shadcn add @acme/empty-state"]
+```d2 layout=elk pad=40 title="자체 레지스트리 흐름 — 컴포넌트 소스에서 빌드·정적 호스팅을 거쳐 다른 프로젝트가 설치한다"
+direction: down
 
-    classDef ok   fill:#dcfce7,stroke:#16a34a,color:#14532d
-    classDef key  fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
-    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
-    class C ok
-    class E key
-    class A,B,D mute
+classes: {
+  ok: { style: { fill: "#dcfce7"; stroke: "#16a34a"; font-color: "#14532d" } }
+  key: { style: { fill: "#dbeafe"; stroke: "#2563eb"; font-color: "#1e3a8a" } }
+  mute: { style: { fill: "#f1f5f9"; stroke: "#94a3b8"; font-color: "#334155" } }
+}
+
+a: "registry/\n컴포넌트 소스" { class: mute }
+b: "registry.json\n목록 정의" { class: mute }
+c: "shadcn build\n→ public/r/*.json" { class: ok }
+d: "정적 호스팅\nregistry.acme.com" { class: mute }
+e: "다른 프로젝트\nshadcn add @acme/empty-state" { class: key }
+
+a -> b -> c -> d -> e
 ```
 
 **서버가 필요 없다.** 정적 JSON 파일을 서빙하면 끝이다 —

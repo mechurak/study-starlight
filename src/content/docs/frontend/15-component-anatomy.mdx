@@ -37,18 +37,21 @@ export { Button, buttonVariants }
 
 세 줄짜리 구조다. 나머지는 클래스 문자열의 길이일 뿐이다.
 
-```mermaid
-flowchart LR
-    A["cva<br/>클래스 조합 정의"] --> B["cn<br/>사용자 오버라이드 병합"]
-    B --> C["...props<br/>나머지는 통과"]
-    C --> D["프리미티브 / DOM"]
+```d2 layout=elk pad=40 title="cva로 조합한 클래스가 cn 병합과 props 통과를 거쳐 프리미티브에 닿는 순서"
+direction: down
 
-    classDef key  fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
-    classDef ok   fill:#dcfce7,stroke:#16a34a,color:#14532d
-    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
-    class A key
-    class B ok
-    class C,D mute
+classes: {
+  key: { style: { fill: "#dbeafe"; stroke: "#2563eb"; font-color: "#1e3a8a" } }
+  ok: { style: { fill: "#dcfce7"; stroke: "#16a34a"; font-color: "#14532d" } }
+  mute: { style: { fill: "#f1f5f9"; stroke: "#94a3b8"; font-color: "#334155" } }
+}
+
+a: "cva\n클래스 조합 정의" { class: key }
+b: "cn\n사용자 오버라이드 병합" { class: ok }
+c: "...props\n나머지는 통과" { class: mute }
+d: "프리미티브 / DOM" { class: mute }
+
+a -> b -> c -> d
 ```
 
 `buttonVariants`를 **함께 export**하는 것이 중요하다. 이유는 뒤에서 본다.

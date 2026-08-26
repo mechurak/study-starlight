@@ -50,16 +50,22 @@ export default function RootLayout({ children }) {
 
 이 구조를 도넛(donut)이라고 부른다. **테두리만 클라이언트, 구멍은 서버.**
 
-```mermaid
-flowchart TB
-    P["Providers — 클라이언트 (테두리)"] --> D["Dashboard — 서버 (구멍)"]
-    D --> R["RevenueChart — 서버"]
-    D --> K["DateRangePicker — 클라이언트"]
+```d2 layout=elk pad=40 title="클라이언트 Providers가 테두리가 되고 그 안에 서버 컴포넌트가 구멍처럼 들어가는 트리"
+direction: down
 
-    classDef warn fill:#fef3c7,stroke:#d97706,color:#78350f
-    classDef ok   fill:#dcfce7,stroke:#16a34a,color:#14532d
-    class P,K warn
-    class D,R ok
+classes: {
+  ok: { style: { fill: "#dcfce7"; stroke: "#16a34a"; font-color: "#14532d" } }
+  warn: { style: { fill: "#fef3c7"; stroke: "#d97706"; font-color: "#78350f" } }
+}
+
+p: "Providers — 클라이언트 (테두리)" { class: warn }
+d: "Dashboard — 서버 (구멍)" { class: ok }
+r: "RevenueChart — 서버" { class: ok }
+k: "DateRangePicker — 클라이언트" { class: warn }
+
+p -> d
+d -> r
+d -> k
 ```
 
 :::tip[핵심]
@@ -229,21 +235,38 @@ export const getLocalDraft = () => localStorage.getItem('draft')
 
 ## 결정 트리와 흔한 실수
 
-```mermaid
-flowchart TB
-    A{"이 컴포넌트에 상태·이벤트·<br/>브라우저 API 가 필요한가"} -->|아니오| B["서버 컴포넌트<br/>아무것도 안 붙인다 ✅"]
-    A -->|예| C{"그 부분만<br/>떼어낼 수 있는가"}
-    C -->|예| D["떼어낸 조각에만<br/>'use client'"]
-    C -->|아니오| E{"상태를 URL 로<br/>올릴 수 있는가"}
-    E -->|예| F["searchParams 로 옮기고<br/>서버 컴포넌트 유지 ✅"]
-    E -->|아니오| G["클라이언트 컴포넌트로 만들고<br/>데이터는 props 로 받는다"]
+```d2 layout=elk pad=40 title="상태·이벤트가 필요한지부터 시작해 'use client'를 어디에 붙일지 정하는 결정 트리"
+direction: down
 
-    classDef ok   fill:#dcfce7,stroke:#16a34a,color:#14532d
-    classDef warn fill:#fef3c7,stroke:#d97706,color:#78350f
-    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
-    class B,F ok
-    class D,G warn
-    class A,C,E mute
+classes: {
+  ok: { style: { fill: "#dcfce7"; stroke: "#16a34a"; font-color: "#14532d" } }
+  warn: { style: { fill: "#fef3c7"; stroke: "#d97706"; font-color: "#78350f" } }
+  mute: { style: { fill: "#f1f5f9"; stroke: "#94a3b8"; font-color: "#334155" } }
+}
+
+a: "이 컴포넌트에 상태·\n이벤트·브라우저 API 가\n필요한가" {
+  class: mute
+  shape: diamond
+}
+b: "서버 컴포넌트\n아무것도 안 붙인다 ✅" { class: ok }
+c: "그 부분만\n떼어낼 수 있는가" {
+  class: mute
+  shape: diamond
+}
+d: "떼어낸 조각에만\n'use client'" { class: warn }
+e: "상태를 URL 로\n올릴 수 있는가" {
+  class: mute
+  shape: diamond
+}
+f: "searchParams 로 옮기고\n서버 컴포넌트\n유지 ✅" { class: ok }
+g: "클라이언트 컴포넌트로\n만들고 데이터는\nprops 로 받는다" { class: warn }
+
+a -> b: 아니오
+a -> c: 예
+c -> d: 예
+c -> e: 아니오
+e -> f: 예
+e -> g: 아니오
 ```
 
 ### 자주 하는 실수 모음

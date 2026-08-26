@@ -75,18 +75,21 @@ variant와 size 축이 독립적으로 조합된다. (해부는 [15장](/fronten
 
 shadcn/ui 컴포넌트는 스타일만 있는 게 아니다. **동작과 접근성은 프리미티브가 담당**한다.
 
-```mermaid
-flowchart TB
-    A["내 앱<br/>Button variant='outline'"] --> B["components/ui/button.tsx<br/>= shadcn 이 복사해 준 코드<br/>Tailwind 클래스 + cva"]
-    B --> C["Base UI (또는 Radix / React Aria)<br/>포커스 트랩 · 키보드 · ARIA · 포지셔닝"]
-    C --> D["브라우저 DOM"]
+```d2 layout=elk pad=40 title="내 앱에서 shadcn 복사 코드와 Base UI를 거쳐 브라우저 DOM에 닿는 4층"
+direction: down
 
-    classDef warn fill:#fef3c7,stroke:#d97706,color:#78350f
-    classDef key  fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
-    classDef mute fill:#f1f5f9,stroke:#94a3b8,color:#334155
-    class B warn
-    class C key
-    class A,D mute
+classes: {
+  warn: { style: { fill: "#fef3c7"; stroke: "#d97706"; font-color: "#78350f" } }
+  key: { style: { fill: "#dbeafe"; stroke: "#2563eb"; font-color: "#1e3a8a" } }
+  mute: { style: { fill: "#f1f5f9"; stroke: "#94a3b8"; font-color: "#334155" } }
+}
+
+a: "내 앱\nButton variant='outline'" { class: mute }
+b: "components/ui/button.tsx\n= shadcn 이 복사해 준 코드\nTailwind 클래스 + cva" { class: warn }
+c: "Base UI (또는 Radix / React Aria)\n포커스 트랩 · 키보드 · ARIA · 포지셔닝" { class: key }
+d: 브라우저 DOM { class: mute }
+
+a -> b -> c -> d
 ```
 
 **shadcn/ui가 소유권을 주는 건 위쪽 두 층뿐이다.**
