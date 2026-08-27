@@ -274,6 +274,33 @@ kubectl create rolebinding dev-user-binding --role=developer --user=dev-user -n 
 edit로 고칠 때 이 필드를 놓치면 계속 403이다.
 :::
 
+기존 Role을 고치는 문제는 `kubectl edit`가 기본이다 —
+*Add a new rule in the existing role developer to grant the dev-user permissions to create
+deployments in the blue namespace. Remember to add api group "apps"*.
+
+```bash
+kubectl edit role developer -n blue
+```
+
+```yaml
+# rules 배열에 항목을 추가한다
+- apiGroups: ["apps"]
+  resources: ["deployments"]
+  verbs: ["create"]
+```
+
+:::caution[함정 — Deployment는 apps 그룹]
+Pod는 core group이라 `apiGroups: [""]`지만 Deployment는 `apps`다. 빈 문자열로 두면
+rule이 있어도 권한이 안 먹는다 — 문제가 "api group을 잊지 말라"고 강조하는 이유다.
+:::
+
+:::caution[함정 — RoleBinding의 roleRef는 immutable]
+Role의 rules와 RoleBinding의 subjects는 edit로 자유롭게 고치지만, `roleRef`는 수정
+불가라 저장이 거부된다. 연결된 Role 이름이 틀렸으면 RoleBinding을 지우고 다시 만든다.
+정리하면 — **새로 만들 땐 `kubectl create role/rolebinding`, 고칠 땐 `kubectl edit`,
+roleRef가 틀렸을 때만 삭제 후 재생성.**
+:::
+
 ### ClusterRole — Practice Test: Cluster Roles
 
 원본 풀이: [20-Practice-Test-Cluster-Roles.md](https://github.com/kodekloudhub/certified-kubernetes-administrator-course/blob/master/docs/07-Security/20-Practice-Test-Cluster-Roles.md)
@@ -295,7 +322,8 @@ kubectl create clusterrolebinding michelle-storage-admin \
 
 노드·PV·StorageClass처럼 **클러스터 범위 리소스에는 Role이 아니라 ClusterRole**이다 —
 가르는 기준은 [cka 14장](/cka/14-rbac/). rules YAML을 직접 써야 하면 공식
-[RBAC 문서](https://kubernetes.io/docs/reference/access-authn-authz/rbac/)의 예시에서 복사한다.
+[RBAC 문서](https://kubernetes.io/docs/reference/access-authn-authz/rbac/)의 예시에서 복사하거나,
+`kubectl create role ... --dry-run=client -o yaml`로 뼈대를 뽑아 고치는 쪽이 문서 검색보다 빠르다.
 
 ## 워크로드 신원과 이미지 접근
 
