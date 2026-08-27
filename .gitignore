@@ -1,6 +1,8 @@
 # build output
 dist/
 public/d2/
+# scripts/d2-measure.mjs --png 산출물
+.d2-measure/
 # generated types
 .astro/
 
