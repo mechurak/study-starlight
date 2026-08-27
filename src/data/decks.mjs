@@ -3,7 +3,7 @@
 
 // 카테고리는 "어디부터 볼지" 고르는 굵은 묶음이다. 세분화는 아래 태그가 담당하므로
 // 여기서 덱 하나를 두고 오래 고민하게 되면 카테고리가 아니라 태그를 손볼 때다.
-// tone은 mermaid classDef · DeckMap과 같은 여섯 팔레트에서 고른다. 'bad'(빨강)는
+// tone은 DeckMap과 같은 공통 의미 팔레트(docs/content-authoring.md)에서 고른다. 'bad'(빨강)는
 // 그 팔레트에서 "문제·오류"를 뜻하므로 상시 식별색으로 쓰지 않는다.
 const categories = [
 	{

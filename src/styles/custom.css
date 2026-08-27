@@ -1,5 +1,4 @@
-/* 본문 폰트 — Pretendard (시스템 폴백은 Starlight이 자동으로 붙인다).
-   Mermaid SVG도 astro.config의 fontFamily로 같은 계열을 쓴다. */
+/* 본문 폰트 — Pretendard (시스템 폴백은 Starlight이 자동으로 붙인다). */
 :root {
   --sl-font: 'Pretendard Variable';
 

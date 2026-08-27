@@ -6,7 +6,6 @@ import starlightSidebarTopics from 'starlight-sidebar-topics';
 import starlightThemeRapide from 'starlight-theme-rapide';
 import starlightImageZoom from 'starlight-image-zoom';
 import astroD2 from 'astro-d2';
-import mermaid from 'astro-mermaid';
 import { topics } from './src/data/decks.mjs';
 
 export default defineConfig({
@@ -16,27 +15,14 @@ export default defineConfig({
 	site: 'https://study.upggu.com',
 	// starlight-image-zoom 0.15는 Astro 7의 Sätteri를 아직 지원하지 않는다.
 	markdown: { processor: unified() },
-	vite: {
-		build: {
-			// Mermaid의 파서 코어가 약 662kB다. 그보다 커지는 새 회귀는 계속 경고한다.
-			chunkSizeWarningLimit: 700,
-		},
-	},
 	integrations: [
-		// 다이어그램 integration은 starlight보다 먼저 와야 각 코드 펜스를 가로챈다.
+		// 다이어그램 integration은 starlight보다 먼저 와야 D2 코드 펜스를 가로챈다.
 		astroD2({
 			layout: 'elk',
 			pad: 40,
 			theme: { default: '0', dark: '200' },
 			// Cloudflare Pages에 D2 바이너리를 설치하지 않고 WASM 기반 D2.js로 생성한다.
 			experimental: { useD2js: true },
-		}),
-		mermaid({
-			autoTheme: true,
-			enableLog: false,
-			mermaidConfig: {
-				fontFamily: 'Pretendard Variable, Pretendard, sans-serif',
-			},
 		}),
 		starlight({
 			title: 'Study Note',

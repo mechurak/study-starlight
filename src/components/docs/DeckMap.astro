@@ -15,7 +15,7 @@
     desc   그 덩어리가 다루는 것
     note   답하는 질문 / 층 / 도메인 — 덱마다 세 번째 열이 달랐던 그 값
     items  장을 하나씩 나열해야 하는 덱용 (shadcn) — [텍스트, href][]
-    tone   mermaid classDef와 같은 의미 팔레트
+    tone   공통 의미 팔레트 — docs/content-authoring.md "의미 팔레트" 절
 
   desc · note는 평문이다. `코드`와 **굵게**만 아래에서 직접 처리한다.
 */
@@ -84,7 +84,7 @@ const format = (s: string) =>
     gap: 0;
   }
 
-  /* 의미 팔레트 — docs/content-authoring.md의 mermaid classDef와 같은 여섯 색 */
+  /* 의미 팔레트 — docs/content-authoring.md "의미 팔레트" 절과 같은 여섯 색 */
   .deckmap__step[data-tone='key']  { --dm-line: #2563eb; --dm-bg: #dbeafe; --dm-fg: #1e3a8a; }
   .deckmap__step[data-tone='ok']   { --dm-line: #16a34a; --dm-bg: #dcfce7; --dm-fg: #14532d; }
   .deckmap__step[data-tone='warn'] { --dm-line: #d97706; --dm-bg: #fef3c7; --dm-fg: #78350f; }

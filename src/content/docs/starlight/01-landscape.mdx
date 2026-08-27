@@ -238,7 +238,7 @@ API로 블록을 조작해야 하고, 판정자가 없고, 되돌리기가 서�
 학습 코퍼스가 크고 v3 API가 안정된 Docusaurus는 AI가 설정·컴포넌트 코드를 쓸 때 정확도가
 높다. **Starlight는 0.x라 모델의 사전 지식이 낡은 버전을 가리키는 일이 실제로 생긴다.**
 이 레포의 대응은 규칙 파일이다 — `_baseline.md`가 기준 버전(Starlight 0.41 · Astro 7)을
-못 박고 "레포 실물이 정본"을 선언하며, `docs/content-authoring.md`가 MDX·Mermaid 함정을
+못 박고 "레포 실물이 정본"을 선언하며, `docs/content-authoring.md`가 MDX·D2 함정을
 목록화한다. AI의 낡은 사전 지식은 더 좋은 모델이 아니라 **레포 안의 규칙 파일로 덮는다.**
 
 :::tip[규칙은 대화가 아니라 파일에 둔다]
@@ -273,7 +273,7 @@ Fumadocs는 "문서 사이트를 조립하는 부품 세트"에 가깝다. React
 
 - **본문이 Starlight 문법에 물려 있다** — `:::tip` aside, `<Steps>`·`<Tabs>` 내장 컴포넌트를 전 페이지가 쓴다
 - **커스텀 컴포넌트 전부 재작성** — `TermIntro`·`DeckMap`·사이드바 override는 Astro 컴포넌트라 React로 다시 써야 한다
-- **파이프라인 재구축** — D2·Mermaid 다이어그램 통합, topics 기반 덱 구조, Pagefind 검색(대체제인 Orama는 한국어 토크나이징을 따로 설정해야 한다)
+- **파이프라인 재구축** — D2 다이어그램 통합, topics 기반 덱 구조, Pagefind 검색(대체제인 Orama는 한국어 토크나이징을 따로 설정해야 한다)
 
 :::tip[재사용할 판정 절차]
 새 도구 추천은 두 단계로 판정한다 — ① 위 갈림길 트리에 다시 넣어 **처음부터라도 그걸

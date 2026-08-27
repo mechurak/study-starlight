@@ -74,4 +74,4 @@ DGX Spark·A100·향후 B300을 **Kubernetes 위의 추론 전용 플랫폼**으
 - Kubernetes scheduler가 model memory를 이해한다고 쓰지 않는다. GPU family·MIG profile·full-node 요구는
   label·taint·affinity·검증된 runtime preset으로 명시한다.
 - Spark·A100·B300용 runtime image의 architecture·CUDA·driver 호환을 각각 검증한다.
-- 생성형 장식 이미지보다 Mermaid와 공식 구조도를 우선하고, 공식 이미지는 `SourceFigure`로 출처를 남긴다.
+- 생성형 장식 이미지보다 D2와 공식 구조도를 우선하고, 공식 이미지는 `SourceFigure`로 출처를 남긴다.

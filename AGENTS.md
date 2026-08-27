@@ -43,11 +43,11 @@ dev 서버는 백그라운드 모드로 띄운다: `pnpm astro dev --background`
 
 ## 절대 깨뜨리면 안 되는 것
 
-- `astro.config.mjs`에서 `astroD2()`와 `mermaid()`가 모두 `starlight()`보다 먼저 와야 한다.
+- `astro.config.mjs`에서 `astroD2()`가 `starlight()`보다 먼저 와야 한다.
 - `src/data/decks.mjs`의 topic `items`는 확장자 없는 slug 문자열이다. 파일명을 바꾸면 같이 바꾼다.
 - 랜딩(`/`)은 어느 topic에도 속하지 않는다. topic 밖 페이지는 plugin `exclude`에 추가한다.
 - 사이드바 UI는 `src/components/layout/`의 `Sidebar`·`SiteTitle`·`SidebarToggle` override 세트다.
   실제 접힘 레이아웃은 `src/styles/custom.css`의 전역 규칙이다.
 - `pnpm-workspace.yaml`은 워크스페이스 목록이 아니라 esbuild·sharp의 빌드 허용 설정이다. 지우지 않는다.
 
-세부 작성 규칙과 MDX·Mermaid 함정은 이 파일에 복제하지 않고 `docs/content-authoring.md` 한 곳에서 관리한다.
+세부 작성 규칙과 MDX·D2 함정은 이 파일에 복제하지 않고 `docs/content-authoring.md` 한 곳에서 관리한다.

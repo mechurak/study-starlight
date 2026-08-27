@@ -21,7 +21,7 @@
   sections: 카테고리 하나 = 섹션 하나
     title  카테고리 이름 (h2)
     desc   카테고리 한 줄 설명
-    tone   mermaid classDef · DeckMap과 같은 여섯 팔레트 — 카테고리 식별색
+    tone   DeckMap과 같은 여섯 의미 팔레트(docs/content-authoring.md) — 카테고리 식별색
     decks  덱 카드 목록
       slug      덱 slug — 수정일을 계산할 콘텐츠 경로
       href      덱 index 링크 ('/cka/')
@@ -494,7 +494,7 @@ const tagIds = (deck: { tags: Tag[] }) => deck.tags.map((tag) => tag.id).join(' 
 </script>
 
 <style>
-  /* 의미 팔레트 — mermaid classDef · DeckMap과 같은 여섯 색 */
+  /* 의미 팔레트 — DeckMap과 같은 여섯 색 (docs/content-authoring.md "의미 팔레트" 절) */
   .catalog__section[data-tone='key']  { --dc-line: #2563eb; --dc-bg: #dbeafe; --dc-fg: #1e3a8a; }
   .catalog__section[data-tone='ok']   { --dc-line: #16a34a; --dc-bg: #dcfce7; --dc-fg: #14532d; }
   .catalog__section[data-tone='warn'] { --dc-line: #d97706; --dc-bg: #fef3c7; --dc-fg: #78350f; }
