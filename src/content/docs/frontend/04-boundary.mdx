@@ -228,9 +228,10 @@ export const getLocalDraft = () => localStorage.getItem('draft')
 ```
 
 :::caution[함정]
-`NEXT_PUBLIC_` 접두사가 붙은 환경변수만 브라우저로 간다.
-나머지는 서버 전용이지만, **실수로 클라이언트 컴포넌트에서 참조하면 조용히 `undefined`가 될 뿐**
-에러가 나지 않는다. `server-only`가 그 실수를 빌드 타임에 잡아준다.
+`process.env.NEXT_PUBLIC_*` 직접 참조는 `next build` 때 브라우저 bundle에 들어간다.
+나머지는 서버 전용이지만, **실수로 클라이언트 컴포넌트에서 참조해도 값이 전달되지 않을 뿐**
+에러가 나지 않는다. `server-only`가 그 실수를 빌드 타임에 잡아준다. 같은 image를 여러 환경에
+배포할 때 값이 고정되는 문제는 [런타임 설정 실전](/frontend/next-runtime-config/)에서 이어서 다룬다.
 :::
 
 ## 결정 트리와 흔한 실수

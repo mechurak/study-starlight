@@ -1,0 +1,398 @@
+---
+title: "Next.js 실전 — 빌드 타임과 런타임 설정"
+description: "동일한 Docker 이미지를 DEV와 PRD에 배포할 때 NEXT_PUBLIC 빌드 고정과 Kubernetes ConfigMap 런타임 주입을 분리하는 법"
+aliases: [NEXT_PUBLIC 런타임 환경 변수, Next.js Docker 환경 변수, ConfigMap counter_id]
+reviewedAt: 2026-08-29
+---
+
+import { FileTree, LinkCard, Steps, Tabs, TabItem } from '@astrojs/starlight/components';
+import TermIntro from '../../../components/docs/TermIntro.astro';
+import Thesis from '../../../components/docs/Thesis.astro';
+
+<Thesis>`NEXT_PUBLIC_`은 런타임 공개 설정이 아니라 빌드 결과에 박는 공개 상수다 — 한 이미지를 여러 환경에 배포하려면 환경별 값을 서버 런타임에서 읽어 브라우저에 명시적으로 전달한다</Thesis>
+
+<TermIntro
+  terms={[
+    ['빌드 타임 인라이닝', 'Build-time Inlining', '`next build`가 환경변수 참조를 실제 문자열로 바꾸어 클라이언트 bundle에 넣는 과정이다.'],
+    ['런타임 설정', 'Runtime Configuration', '이미지를 다시 만들지 않고 container가 시작되거나 요청을 받을 때 결정하는 설정이다.'],
+    ['논리 키', 'Logical Key', '`landing`처럼 코드가 안정적으로 참조하고, 환경별 실제 값과는 배포 설정에서 연결하는 이름이다.'],
+  ]}
+/>
+
+## 문제는 공개 여부보다 결정 시점이다
+
+한 Next.js 이미지를 온프렘 Kubernetes의 DEV와 PRD에 배포한다고 하자. Counter service는 하나지만
+같은 화면도 환경마다 발급된 `counter_id`가 다르다.
+
+| 화면 | DEV | PRD |
+|---|---|---|
+| 랜딩 | `dev-counter-1001` | `prd-counter-9001` |
+| 상품 목록 | `dev-counter-1002` | `prd-counter-9002` |
+
+두 ID는 브라우저가 Counter를 호출할 때 필요하므로 공개값이다. 그렇다고 `NEXT_PUBLIC_`에 넣으면
+런타임 설정이 되는 것은 아니다. Next.js는 `process.env.NEXT_PUBLIC_*` 직접 참조를
+[`next build` 때 클라이언트 JavaScript에 인라이닝한다](https://nextjs.org/docs/app/guides/environment-variables#bundling-environment-variables-for-the-browser).
+
+```ts
+// 소스
+const id = process.env.NEXT_PUBLIC_LANDING_COUNTER_ID
+
+// DEV 값으로 next build한 bundle의 의미
+const id = 'dev-counter-1001'
+```
+
+그 뒤 같은 Docker image를 PRD에 올리면서 환경변수를 `prd-counter-9001`로 바꿔도 이미 만들어진
+bundle은 변하지 않는다. **공개냐 비밀이냐**와 **빌드 때 정할지 실행할 때 정할지**는 서로 다른 축이다.
+
+| 값의 성격 | 읽는 곳 | 방식 |
+|---|---|---|
+| 비밀이며 서버에서만 필요 | 서버 | 일반 환경변수 + `server-only` |
+| 공개이며 빌드마다 달라도 됨 | 브라우저 | `NEXT_PUBLIC_*` |
+| 공개이며 같은 이미지에서 환경마다 다름 | 브라우저 | 일반 환경변수 → 런타임 설정 응답 |
+| 완전 정적 export에서 환경마다 다름 | 브라우저 | web server가 제공하는 별도 JSON |
+
+:::caution[우회가 아니다]
+`process.env[varName]`처럼 동적으로 조회하면 인라이닝을 피할 수는 있지만, 브라우저에 container의
+`process.env`가 생기는 것은 아니다. `next.config.js`의 `env`도 bundle에 들어가는 빌드 타임 값이다.
+런타임 설정은 서버나 정적 web server가 별도 응답으로 전달해야 한다.
+:::
+
+## 한 이미지와 두 설정
+
+코드에는 화면의 의미인 논리 키만 둔다. 환경별 실제 `counter_id`는 배포 설정이 소유한다.
+
+```d2 layout=elk pad=40 title="소스의 landing 논리 키가 한 Docker 이미지로 빌드된 뒤 DEV와 PRD ConfigMap의 서로 다른 counter ID에 연결되고, 두 브라우저가 공용 Counter service를 직접 호출하는 흐름"
+direction: down
+
+classes: {
+  ok: { style: { fill: "#dcfce7"; stroke: "#16a34a"; font-color: "#14532d" } }
+  warn: { style: { fill: "#fef3c7"; stroke: "#d97706"; font-color: "#78350f" } }
+  key: { style: { fill: "#dbeafe"; stroke: "#2563eb"; font-color: "#1e3a8a" } }
+  mute: { style: { fill: "#f1f5f9"; stroke: "#94a3b8"; font-color: "#334155" } }
+  zone: { style: { fill: "#ede9fe"; stroke: "#7c3aed"; font-color: "#4c1d95" } }
+}
+
+code: "소스 코드\ncounterKey: landing" { class: key }
+build: "next build\n클라이언트 bundle 생성" { class: warn }
+artifact: "동일한 Docker image" { class: key }
+devpod: "DEV Pod\nConfigMap: landing → dev-1001" { class: ok }
+prodpod: "PRD Pod\nConfigMap: landing → prd-9001" { class: ok }
+devbrowser: "DEV 브라우저\ncounter_id: dev-1001" { class: mute }
+prodbrowser: "PRD 브라우저\ncounter_id: prd-9001" { class: mute }
+counter: "공용 Counter service" { class: zone }
+
+code -> build -> artifact
+artifact -> devpod
+artifact -> prodpod
+devpod -> devbrowser: runtime config
+prodpod -> prodbrowser: runtime config
+devbrowser -> counter
+prodbrowser -> counter
+```
+
+이 분리는 URL을 키로 쓰는 것보다 안정적이다. `/products`가 `/catalog`로 바뀌거나 locale prefix가
+붙어도 화면 코드의 `counterKey="products"`는 유지할 수 있다. 실제 ID가 재발급되어도 application
+code와 image는 그대로 두고 배포 설정만 바꾼다.
+
+## 실제 ID는 Kubernetes 배포 설정에 둔다
+
+`counter_id`는 브라우저에 노출되는 값이므로 Secret이 아니라 **ConfigMap** 대상이다. 같은 이름의
+ConfigMap을 DEV와 PRD namespace에 각각 만들면 공통 Deployment가 환경별 값을 받는다.
+
+배포 파일을 저장소에서 관리한다면 다음처럼 코드와 환경별 값을 분리할 수 있다.
+
+<FileTree>
+
+- deploy/
+  - base/
+    - **deployment.yaml** 공통 image와 환경변수 참조
+  - overlays/
+    - dev/
+      - **counter-config.yaml** DEV `counter_id` 매핑
+    - prd/
+      - **counter-config.yaml** PRD `counter_id` 매핑
+
+</FileTree>
+
+Helm을 쓴다면 같은 역할을 `values-dev.yaml`과 `values-prd.yaml`이 맡으면 된다. ConfigMap 자체의
+생성법과 env·volume 주입 방식은 [Kubernetes 6장](/cka/06-config/#configmap)에서 더 깊게 다룬다.
+
+<Tabs>
+<TabItem label="DEV ConfigMap">
+
+```yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: frontend-runtime-config
+  namespace: dev
+data:
+  COUNTER_IDS_JSON: |
+    {
+      "landing": "dev-counter-1001",
+      "products": "dev-counter-1002"
+    }
+```
+
+</TabItem>
+<TabItem label="PRD ConfigMap">
+
+```yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: frontend-runtime-config
+  namespace: prd
+data:
+  COUNTER_IDS_JSON: |
+    {
+      "landing": "prd-counter-9001",
+      "products": "prd-counter-9002"
+    }
+```
+
+</TabItem>
+</Tabs>
+
+공통 Deployment는 ConfigMap key를 일반 환경변수로 주입한다.
+
+```yaml
+spec:
+  template:
+    spec:
+      containers:
+        - name: frontend
+          image: registry.example.com/frontend@sha256:<same-image-digest>
+          env:
+            - name: COUNTER_IDS_JSON
+              valueFrom:
+                configMapKeyRef:
+                  name: frontend-runtime-config
+                  key: COUNTER_IDS_JSON
+```
+
+[ConfigMap은 image에서 환경별 설정을 분리](https://kubernetes.io/docs/concepts/configuration/configmap/)하기 위한
+리소스다. Dockerfile에 `ARG`나 환경별 `ENV`를 선언할 필요가 없다. Dockerfile에는 image를 만드는
+절차만 두고, 어느 환경의 값인지는 Deployment가 container 시작 시 결정한다.
+
+:::caution[Dockerfile ENV를 바꿔도 늦다]
+Kubernetes의 `env`는 image의 `ENV` 기본값을 덮어쓸 수 있다. 그러나 `next build` 전에
+`NEXT_PUBLIC_*`로 인라이닝된 값까지 되돌리지는 못한다. 같은 image를 승격할 목적이라면
+환경별 ID를 Docker build argument로 넘기지 않는다.
+:::
+
+## Next.js 서버는 설정만 전달한다
+
+App Router의 Route Handler가 Pod의 일반 환경변수를 읽어 공개해도 되는 항목만 반환한다.
+[`connection()`](https://nextjs.org/docs/app/api-reference/functions/connection)은 이 handler가 build 때 정적 JSON으로 굳지 않고 요청 시 실행되어야 한다는 의도를
+명시한다. 최신 Next.js에서 [Route Handler는 기본적으로 캐시하지 않지만](https://nextjs.org/docs/app/getting-started/route-handlers#caching),
+중간 proxy와 브라우저까지 고려해 응답에도 `no-store`를 붙인다.
+
+```ts
+// app/api/runtime-config/route.ts
+import { connection } from 'next/server'
+
+function readCounterIds(): Record<string, string> {
+  const raw = process.env.COUNTER_IDS_JSON
+  if (!raw) throw new Error('COUNTER_IDS_JSON is not configured')
+
+  const value: unknown = JSON.parse(raw)
+  if (
+    typeof value !== 'object' ||
+    value === null ||
+    Array.isArray(value) ||
+    Object.values(value).some((id) => typeof id !== 'string')
+  ) {
+    throw new Error('COUNTER_IDS_JSON must be a string map')
+  }
+
+  return value as Record<string, string>
+}
+
+export async function GET() {
+  await connection()
+
+  try {
+    return Response.json(
+      { counterIds: readCounterIds() },
+      { headers: { 'Cache-Control': 'no-store' } },
+    )
+  } catch {
+    return Response.json(
+      { message: 'Runtime configuration is invalid' },
+      { status: 500 },
+    )
+  }
+}
+```
+
+이 endpoint는 Counter service를 호출하지 않는다. 브라우저가 사용할 ID 매핑만 돌려준다. 전체
+`process.env`를 반환하거나 prefix 규칙으로 자동 공개하지 말고, 위처럼 공개 가능한 필드만 allowlist한다.
+
+페이지 본문은 그대로 정적 렌더링할 수 있다. 별도 Route Handler를 브라우저에서 조회한다고 그 페이지의
+Server Component까지 동적 렌더링되는 것은 아니다.
+
+## 화면은 논리 키로 실제 ID를 찾는다
+
+각 화면은 배포 환경을 모르고 자기 논리 키만 `PageCounter`에 넘긴다.
+
+```tsx
+// app/page.tsx
+import { PageCounter } from '@/components/page-counter'
+
+export default function LandingPage() {
+  return (
+    <>
+      <PageCounter counterKey="landing" />
+      <main>{/* 정적 랜딩 콘텐츠 */}</main>
+    </>
+  )
+}
+```
+
+Client Component는 설정을 한 번 읽고 그 환경의 실제 ID로 공용 Counter를 직접 호출한다.
+
+```tsx
+// components/page-counter.tsx
+'use client'
+
+import { useEffect, useRef } from 'react'
+
+type RuntimeConfig = {
+  counterIds: Record<string, string>
+}
+
+let runtimeConfigPromise: Promise<RuntimeConfig> | undefined
+
+function getRuntimeConfig() {
+  runtimeConfigPromise ??= fetch('/api/runtime-config', {
+    cache: 'no-store',
+  }).then((response) => {
+    if (!response.ok) throw new Error('Runtime config request failed')
+    return response.json() as Promise<RuntimeConfig>
+  })
+
+  return runtimeConfigPromise
+}
+
+export function PageCounter({ counterKey }: { counterKey: string }) {
+  const sentKey = useRef<string | null>(null)
+
+  useEffect(() => {
+    if (sentKey.current === counterKey) return
+    sentKey.current = counterKey
+
+    void getRuntimeConfig()
+      .then(({ counterIds }) => {
+        const counterId = counterIds[counterKey]
+        if (!counterId) throw new Error(`Unknown counter key: ${counterKey}`)
+
+        // 실제 Counter service의 path와 method 계약에 맞춘다.
+        return fetch(`/counter/${encodeURIComponent(counterId)}`, {
+          cache: 'no-store',
+        }).then((response) => {
+          if (!response.ok) throw new Error('Counter request failed')
+        })
+      })
+      .catch((error) => {
+        sentKey.current = null
+        console.error(error)
+      })
+  }, [counterKey])
+
+  return null
+}
+```
+
+Counter가 이미 별도 origin으로 공개되어 있고 해당 frontend origin을 CORS로 허용한다면 마지막 URL만
+절대 주소로 바꾸면 된다. 같은 host의 `/counter`를 Ingress가 Counter service로 보내게 하면 요청은
+`브라우저 → Ingress → Counter Pod`로 가며 frontend Pod가 중계하지 않는다.
+
+:::caution[카운터의 정확성 경계]
+브라우저가 직접 호출할 수 있는 counter는 사용자가 재호출할 수도 있다. 개발 중 React effect의 추가 실행,
+network retry, 새로고침까지 정확히 한 번으로 묶어야 한다면 Counter service가 event ID를 받아 중복 제거해야
+한다. 화면 조회수는 보통 근사치로 쓰지만 결제·보안 판단의 근거로 사용하지 않는다.
+:::
+
+## Node server와 완전 정적 export는 갈린다
+
+지금까지 방식은 `next start`나 `output: 'standalone'`처럼 Pod 안에 Next.js runtime server가 있을 때
+사용한다. 한 image를 여러 환경에 승격하는 공식 경로도 [서버의 dynamic rendering에서 일반 환경변수를
+읽는 방식](https://nextjs.org/docs/app/guides/self-hosting#environment-variables)이다.
+
+`output: 'export'`는 다르다. build 결과가 HTML·JavaScript·CSS뿐이라 요청 시 `process.env`를 읽을
+Next.js server가 없다. GET Route Handler도 [build 때 정적 파일로 생성](https://nextjs.org/docs/app/guides/static-exports#route-handlers)되므로
+환경별 ID를 전달할 수 없다.
+
+<Tabs>
+<TabItem label="Next.js server">
+
+```text
+ConfigMap → Pod env → /api/runtime-config → 브라우저
+```
+
+페이지는 정적으로 렌더링해도 된다. 설정 endpoint만 request time에 실행한다.
+
+</TabItem>
+<TabItem label="Static export + Nginx">
+
+```text
+ConfigMap file → Nginx의 /runtime-config.json → 브라우저
+```
+
+ConfigMap의 JSON 파일을 `/usr/share/nginx/html/runtime-config.json` 같은 실제 static root에 mount하고,
+브라우저가 `/runtime-config.json`을 읽게 한다. 이 파일은 Next.js build 산출물이 아니라 container가
+시작될 때 web server에 붙는 배포 설정이다.
+
+</TabItem>
+</Tabs>
+
+둘을 섞지 않는다. `output: 'export'`인데 Route Handler에서 런타임 값을 읽으려 하거나, Next.js server가
+있는데 entrypoint shell script로 bundle 문자열을 치환하는 것은 실행 모델을 흐리게 만든다.
+
+## 배포와 검증 순서
+
+<Steps>
+
+1. **논리 키 목록을 코드 리뷰한다**
+
+   화면의 `counterKey`와 DEV·PRD ConfigMap의 key가 모두 일치해야 한다. ID 누락을 조용히 무시하지 않는다.
+
+2. **ConfigMap을 먼저 적용하고 새 Pod를 띄운다**
+
+   ConfigMap에서 가져온 환경변수는 실행 중인 process에 자동 반영되지 않는다. Kubernetes도
+   [새 값을 받으려면 Pod를 교체해야 한다](https://kubernetes.io/docs/tutorials/configuration/updating-configuration-via-a-configmap/#update-environment-variables-of-a-pod-via-a-configmap)고
+   명시한다. Helm checksum annotation이나 배포 pipeline의 rollout 단계로 이를 보장한다.
+
+3. **환경별 설정 응답을 확인한다**
+
+   DEV와 PRD에서 `/api/runtime-config`를 열어 같은 논리 키가 서로 다른 ID로 해석되는지 본다.
+   응답에 secret이나 관계없는 환경변수가 섞이지 않았는지도 함께 본다.
+
+4. **브라우저 Network에서 실제 호출 경로를 확인한다**
+
+   Counter 요청이 기대한 ID를 쓰는지, frontend Route Handler가 실제 Counter 요청을 중계하지 않는지 확인한다.
+
+5. **롤백도 image와 config의 조합으로 검증한다**
+
+   이전 image가 새 ConfigMap의 논리 키를 이해하는지 확인한다. 호환되지 않으면 image만 되돌려도 복구되지 않는다.
+
+</Steps>
+
+`NODE_ENV`로 DEV와 PRD를 구분하지 않는다. 두 배포 모두 최적화된 production server라면
+`NODE_ENV=production`이다. 환경의 차이는 namespace와 ConfigMap 같은 배포 설정으로 표현한다.
+
+## 런타임 설정 요약
+
+- `NEXT_PUBLIC_*`는 **public + build time**이고 public runtime 변수가 아니다
+- 같은 Docker image를 DEV와 PRD에 배포하면 일반 환경변수를 request time에 읽는다
+- 코드에는 `landing` 같은 논리 키, ConfigMap에는 환경별 실제 `counter_id`를 둔다
+- Next.js Route Handler는 설정만 전달하고 실제 Counter는 브라우저가 직접 호출할 수 있다
+- `output: 'export'`에는 runtime server가 없으므로 web server가 별도 JSON을 제공한다
+- ConfigMap을 env로 주입했다면 변경 뒤 반드시 새 Pod로 rollout한다
+
+<LinkCard
+  title="9. CSS의 문제"
+  description="Next.js 실행 환경을 지나 스타일 언어로 — Tailwind는 무엇을 끝냈는가."
+  href="/frontend/09-css-history/"
+/>

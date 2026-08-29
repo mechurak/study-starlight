@@ -428,6 +428,7 @@ export const deckDefinitions = [
 					'frontend/06-cache',
 					'frontend/07-mutation',
 					'frontend/08-performance',
+					'frontend/next-runtime-config',
 				],
 			],
 			[
