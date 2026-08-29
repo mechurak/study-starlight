@@ -392,6 +392,60 @@ kubectl create token dashboard-sa            # 수명 있는 토큰 발급 (Toke
 지금은 **`kubectl create token`으로 수명 있는 토큰을 발급**한다 — [cka 14장](/cka/14-rbac/).
 :::
 
+랩 후반부는 자동 마운트를 끄고 같은 토큰을 손으로 다시 주입한다 — *Modify the existing
+ServiceAccount dashboard-sa … to disable automatic mounting of API credentials. …
+Use a projected volume named token.* 1.22부터는 자동 마운트 자체가 내부적으로
+serviceAccountToken projected volume 방식(TokenRequest 기반 수명 있는 토큰)이라,
+자동으로 되던 걸 명시적으로 재구성해 보는 문제다.
+
+```bash
+# automountServiceAccountToken은 metadata 안이 아니라 오브젝트 최상위 필드다
+kubectl patch sa dashboard-sa -p '{"automountServiceAccountToken": false}'
+```
+
+Deployment 쪽은 projected volume이라 대응하는 임퍼러티브 명령이 없다. 문제가 매니페스트
+경로를 주는 게 신호다(*The Deployment manifest file can be found at:
+~/web-dashboard/deployment.yaml*) — live만 `kubectl edit`로 고치면 디스크의 파일이 낡은 채
+남아 다음 apply 때 수정이 되돌아가므로, **파일을 고쳐서 apply한다.** 도구 기준은 이렇다 —
+한 필드 값은 `set`/`patch`, 기존 필드 수정은 `edit`, 여러 줄 중첩 구조 추가에 파일까지
+주어졌으면 파일 수정 → `--dry-run=client` 검증 → `apply`.
+
+```yaml
+    spec:
+      serviceAccountName: dashboard-sa
+      volumes:
+      - name: token
+        projected:
+          sources:
+          - serviceAccountToken:
+              path: token          # 볼륨 안에 만들어질 파일 이름
+      containers:
+      - name: web-dashboard
+        volumeMounts:
+        - name: token
+          mountPath: /var/run/secrets/kubernetes.io/serviceaccount
+          readOnly: true
+```
+
+```bash
+kubectl apply --dry-run=client -f ~/web-dashboard/deployment.yaml   # 저장한 파일 사전 검증
+kubectl apply -f ~/web-dashboard/deployment.yaml
+kubectl rollout status deploy web-dashboard    # 채점 항목 "Deployment Ready"
+```
+
+:::caution[함정 — mountPath는 디렉터리까지만]
+목표 경로가 `/var/run/secrets/kubernetes.io/serviceaccount/token`이면 `mountPath`는
+디렉터리까지만 쓰고, 파일 이름 `token`은 projected source의 `path`가 맡는다.
+mountPath에 `/token`까지 붙이면 실제 경로가 `…/token/token`이 되어 채점에 걸린다.
+:::
+
+:::tip[필드명은 외우지 말고 explain으로 꺼낸다]
+`kubectl explain sa | grep -i mount`가 `automountServiceAccountToken`을 10초 안에 찾아준다.
+이름 자체도 영어 구를 camelCase로 이어 쓴 것뿐이다 — "automount (the) ServiceAccount token".
+같은 필드가 Pod spec에도 있고(`spec.automountServiceAccountToken`) **Pod 쪽이 SA 쪽보다
+우선**하므로, "특정 Pod만 토큰을 안 받게" 하는 문제면 Pod spec에 쓴다.
+:::
+
 ### 프라이빗 레지스트리 — Practice Test: Image Security
 
 원본 풀이: [24-Practice-Test-Image-Security.md](https://github.com/kodekloudhub/certified-kubernetes-administrator-course/blob/master/docs/07-Security/24-Practice-Test-Image-Security.md)
