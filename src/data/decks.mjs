@@ -529,6 +529,7 @@ export const deckDefinitions = [
 		tags: ['agent'],
 		groups: [
 			['프로젝트 지침', ['coding-agents/00-project-instructions']],
+			['작업 프로세스', ['coding-agents/01-development-process']],
 		],
 	},
 	{

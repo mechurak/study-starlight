@@ -1,0 +1,464 @@
+---
+title: "1. AI와 함께 개발하는 작업 프로세스"
+description: "PRD에는 현재 제품 요구, docs/batches에는 작업별 계획·상태·검증을 두고 Codex와 Claude Code를 마일스톤 단위로 운영하는 방법"
+aliases: [AI 개발 프로세스, agentic coding workflow, PRD, 제품 요구사항 문서, docs/batches, 로컬 작업 문서, 배치 작업]
+reviewedAt: 2026-08-30
+status: review
+---
+
+import { FileTree, LinkCard, Steps, TabItem, Tabs } from '@astrojs/starlight/components';
+import TermIntro from '../../../components/docs/TermIntro.astro';
+import Thesis from '../../../components/docs/Thesis.astro';
+
+<Thesis>PRD에는 현재 제품의 의도, `AGENTS.md`에는 반복 규칙, `docs/batches/`에는 작업별 계획·상태·증거를 두고 한 마일스톤씩 실행한다</Thesis>
+
+<TermIntro
+  terms={[
+    ['제품 요구사항 문서', 'Product Requirements Document (PRD)', '여러 배치를 거쳐도 유지되는 제품의 현재 목표·범위·사용자 동작·수용 조건을 담는 정본. 과거 작업 일지나 구현 체크리스트가 아니다.'],
+    ['배치', 'Batch', '함께 끝내야 의미가 있는 마일스톤 묶음. 작은 할 일 하나가 아니라 여러 세션에서도 같은 목표와 완료 조건을 유지해야 하는 작업 단위다.'],
+    ['수용 기준', 'Acceptance Criteria', '“코드를 작성했다”가 아니라 어떤 동작·테스트·측정 결과가 나오면 완료인지 판정하는 조건이다.'],
+    ['외부화된 상태', 'Externalized State', '목표·계획·현재 위치·결정 이유를 채팅 기억에만 두지 않고 저장소 파일에 기록한 상태다. 새 세션과 다른 도구도 같은 출발점을 얻는다.'],
+    ['승격', 'Promotion', '작업 중 확정한 제품 요구와 규약을 배치 기록에만 묻어 두지 않고 PRD·architecture·`AGENTS.md` 같은 영구 정본으로 옮기는 마감 단계다.'],
+  ]}
+/>
+
+이 장이 정하는 것은 “AI가 코드를 몇 퍼센트 쓰는가”가 아니라 **사람과 에이전트가 같은 목표를 보며
+어디에서 판단하고, 무엇으로 완료를 증명하고, 다음 세션에 무엇을 남기는가**다.
+
+OpenAI의 [Codex best practices](https://learn.chatgpt.com/guides/best-practices)는 좋은 작업 요청을
+목표·관련 맥락·제약·완료 조건으로 나누고, 어려운 일은 구현 전에 계획하며 마지막에는 테스트와 diff
+review까지 닫으라고 권한다. Anthropic의
+[Claude Code best practices](https://code.claude.com/docs/en/best-practices)는 검증 가능한 신호를 먼저
+주고 탐색 → 계획 → 구현을 분리하라고 설명한다. 두 제품이 `PRD`나 `docs/batches/`라는 이름을
+표준으로 정한 것은 아니다. 이 장은 공식 문서가 나누는 **지속할 목표·작업 계획·운영 규칙·검증 증거**를
+저장소의 문서 역할로 번역한다.
+
+```d2 layout=elk pad=40 title="현재 PRD와 backlog에서 로컬 배치 계약을 만들고 마일스톤 구현·검증 뒤 영구 정본을 갱신하는 흐름"
+direction: down
+
+classes: {
+  key: { style: { fill: "#dbeafe"; stroke: "#2563eb"; font-color: "#1e3a8a" } }
+  ok: { style: { fill: "#dcfce7"; stroke: "#16a34a"; font-color: "#14532d" } }
+  warn: { style: { fill: "#fef3c7"; stroke: "#d97706"; font-color: "#78350f" } }
+  mute: { style: { fill: "#f1f5f9"; stroke: "#94a3b8"; font-color: "#334155" } }
+  zone: { style: { fill: "#ede9fe"; stroke: "#7c3aed"; font-color: "#4c1d95" } }
+}
+
+candidate: "작업 후보\nbacklog 한 줄" { class: mute }
+prd: "현재 PRD\n제품 목표·요구" { class: zone }
+batch: "배치 계약\ndocs/batches/N-slug.md" { class: key }
+plan: "탐색·계획\n코드·문서·이력 확인" { class: zone }
+approve: "사람의 계획 승인\n의도·경계·위험" { class: warn }
+implement: "현재 마일스톤 구현\n작고 검토 가능한 diff" { class: key }
+verify: "검증\n테스트·빌드·화면" { class: warn }
+record: "상태·결정·증거 갱신\n같은 배치 문서" { class: ok }
+close: "영구 정본 갱신\nPRD·architecture·\nAGENTS.md" { class: ok }
+
+candidate -> batch
+prd -> batch: 현재 요구
+batch -> plan
+plan -> approve
+approve -> implement
+implement -> verify
+verify -> implement: 실패·수정 { style.stroke-dash: 3 }
+verify -> record: 통과
+record -> implement: 다음 마일스톤 { style.stroke-dash: 3 }
+record -> close: 전체 완료·승격
+```
+
+## 대화가 아니라 저장소가 기억한다
+
+Claude Code는 새 세션마다 빈 context window에서 시작하고, 긴 대화는 compact되며 불필요한 탐색 결과가
+쌓일수록 품질이 떨어질 수 있다
+([공식 memory 문서](https://code.claude.com/docs/en/memory),
+[context 관리 지침](https://code.claude.com/docs/en/best-practices#manage-context-aggressively)). Codex도 긴
+작업을 한 거대한 prompt로 버티기보다 저장소의 spec·plan·status Markdown을 반복해서 읽는
+**durable project memory**가 drift를 막았다고 설명한다
+([OpenAI 장시간 작업 사례](https://developers.openai.com/blog/run-long-horizon-tasks-with-codex)).
+
+따라서 같은 정보를 도구별 채팅에 복사하지 않고 세 층으로 나눈다.
+
+| 층 | 저장 위치 | 답하는 질문 |
+|---|---|---|
+| 공유 정본 | PRD + `AGENTS.md` + `docs/batches/` | 제품은 현재 **무엇이어야** 하고, 저장소에서는 **어떻게** 일하며, 이번 배치는 **어디까지** 하는가? |
+| 도구별 어댑터 | `CLAUDE.md`의 `@AGENTS.md`, 각 도구의 plan mode | 같은 계약을 이 도구에서 어떻게 읽고 계획 단계와 실행 단계를 나누는가? |
+| 강제 장치 | test·typecheck·lint·build·CI·hook | 결과가 실제로 맞고 금지된 경계를 넘지 않았음을 무엇이 판정하는가? |
+
+`docs/batches/`는 Codex나 Claude Code가 정한 공식 디렉토리 이름이 아니다. 두 제품이 공통으로 권하는
+**명확한 완료 조건, 저장소 안의 지속 가능한 맥락, 실행 가능한 검증**을 한 로컬 형식으로 묶은 이 덱의
+운영 패턴이다. PRD와 batch를 분리하는 것 역시 공식 파일명 규칙이 아니라, 모든 세션에 필요한 제품
+정본과 한 작업에서만 필요한 실행 상태가 서로 오염되지 않게 하는 이 덱의 권장 설계다.
+
+## 언제 배치 문서를 만드는가
+
+모든 수정에 문서를 하나씩 만들면 기록이 일이 된다. Claude Code 공식 가이드도 diff를 한 문장으로
+설명할 수 있는 작은 수정에는 plan의 overhead를 건너뛰라고 한다
+([Explore first, then plan, then code](https://code.claude.com/docs/en/best-practices#explore-first-then-plan-then-code)).
+
+다음 중 하나라도 해당하면 backlog 한 줄을 배치 문서로 승격한다.
+
+- 둘 이상의 독립적인 마일스톤이나 여러 작업 세션이 필요하다.
+- DB·API·UI처럼 경계를 가로질러 순서와 호환 조건을 보존해야 한다.
+- 가능한 설계가 여럿이고 선택 이유를 다음 작업에서도 알아야 한다.
+- 데이터 손실·보안·외부 쓰기처럼 구현 전에 사람이 확인할 gate가 있다.
+- “전체 테스트 통과”만으로는 부족해 별도의 수용 시나리오와 증거가 필요하다.
+
+반대로 typo, 명백한 한 줄 fix, 이미 정해진 반복 작업은 prompt에 목표와 완료 조건만 분명히 적고 바로
+처리한다. 반복 작업이 여러 번 나타난 뒤에는 batch가 아니라 script·skill·hook 후보인지 먼저 본다.
+
+배치를 만들기 전에 사용자 결과가 아직 정해지지 않았다면 구현 계획부터 쓰지 않고 PRD의 목표·범위부터
+정리한다. 한 배치 안에서 끝나는 작은 기능은 batch의 목표 절이 작은 spec 역할까지 맡아도 된다. 그러나
+여러 배치가 함께 지켜야 하거나 사용자에게 지속해서 약속할 동작은 PRD로 올린다.
+
+### GitHub 이슈 대신 로컬에 둘 때
+
+| 판단 축 | `docs/batches/` | GitHub 이슈·외부 tracker |
+|---|---|---|
+| 에이전트의 읽기·쓰기 | filesystem만으로 바로 읽고 diff로 갱신을 검토한다 | API·CLI·로그인과 별도 권한이 필요하다 |
+| 코드와 시점 맞추기 | spec·상태·코드를 같은 commit에 묶을 수 있다 | issue 본문과 code history가 따로 움직일 수 있다 |
+| 새 세션 진입 | 파일 검색과 git history만으로 현재 계약을 복구한다 | issue 번호나 외부 link를 먼저 알아야 한다 |
+| 사람 협업 | assignee·알림·discussion·board가 약하다 | 여러 사람·외부 기여자의 조율에 강하다 |
+| 잘 맞는 환경 | 1인 개발, repo와 강하게 결합된 작업 | 팀 backlog, 고객 제보, cross-repo 조율 |
+
+OpenAI의 반복 업무 사례도 목표·승인된 계획·명령·결과·결정을 에이전트가 계속 갱신하는 한 artifact에
+모아, 다음 실행이 앞선 실행의 학습을 재사용하게 한다
+([Automating repetitive work at OpenAI with Codex](https://developers.openai.com/blog/automating-repetitive-work-at-openai-with-codex)).
+Cursor 팀도 plan을 workspace의 Markdown으로 저장하면 중단된 작업과 미래 agent가 맥락을 이어받을 수
+있다고 설명한다
+([Best practices for coding with agents](https://cursor.com/blog/agent-best-practices#start-with-plans)).
+
+1인 저장소라면 이 이점이 issue의 협업 기능보다 클 수 있다. 다만 둘을 병행하며 같은 checklist와 결정을
+복사하지 않는다. 외부 조율 때문에 issue가 필요하다면 issue에는 상태와 batch link만 두거나, 반대로
+issue를 정본으로 정해 하나만 쓰는 편이 낫다.
+
+## 저장소 문서는 서로 다른 시간을 기억한다
+
+### `timeline`에서 배운 기록의 서열
+
+`timeline` 저장소는 과거 GitHub 이슈 번호를 이어 `docs/batches/11-story.md`부터 로컬 문서로 전환했다.
+현재 M1을 끝내고 M2를 진행하는 같은 파일 안에 계획, 완료 checkbox, `→ 결정`과 이유, 예상 함정,
+실제로 통과한 검증이 함께 있다. 중요한 점은 모든 내용을 그 파일에 영구 보관하는 것이 아니라
+**기록마다 돌아갈 정본을 정하는 것**이다.
+
+`timeline`의 현재 `docs/prd.md`는 PRD index와 backlog, 완료된 작업의 진행 메모까지 함께 담은 전환기
+구조다. batch를 로컬로 옮긴 다음 단계에서는 이 append-only 진행 이력을 PRD의 역할로 일반화하지
+않는다. PRD는 현재 제품을 설명하고, 과거 실행 과정은 완료된 batch와 Git이 기억하게 한다.
+
+| 기록 | 정본 | 수명주기 |
+|---|---|---|
+| 현재 제품 목표·범위·사용자 흐름·수용 조건 | `docs/prd.md` + `docs/prd/` | 과거 문장을 누적하지 않고 현재형으로 고친다. 이전 버전은 Git이 보존한다 |
+| 아직 묶이지 않은 작업 후보 | `docs/backlog.md` 또는 짧은 후보 절 | 배치로 승격하거나 필요가 사라지면 지운다 |
+| 목표·마일스톤·현재 상태·작업 중 결정 | `docs/batches/<N>-<slug>.md` | 완료 뒤에도 당시 실행 기록으로 남긴다 |
+| 기술 경계·renderer·schema 구현 규약 | architecture·spec·decision 문서 | batch에서 확정된 장기 규약만 승격한다 |
+| 저장소 전체 행동 규칙 | `AGENTS.md` | 반복해서 필요한 규칙만 유지한다. `CLAUDE.md`는 import adapter다 |
+| 변경의 정확한 snapshot | Git commit | 문서의 긴 판단 근거를 commit message에 다시 복제하지 않는다 |
+
+일반화하면 다음 정도의 구조면 충분하다.
+
+<FileTree>
+
+- my-project/
+  - **AGENTS.md** 저장소 지도, 작업·검증·권한 규칙
+  - **CLAUDE.md** `@AGENTS.md`
+  - docs/
+    - **prd.md** 현재 제품 요약과 세부 PRD 지도
+    - prd/
+      - overview.md 문제·사용자 결과·현재 범위
+      - requirements.md 사용자 흐름·제품 규칙·수용 조건
+    - backlog.md 아직 배치가 아닌 작업 후보 한 줄
+    - architecture/
+      - system.md 시스템의 영구 기술 경계
+    - decisions.md 제품·architecture 결정의 이유
+    - batches/
+      - **README.md** 파일명·상태·갱신·완료 수명주기
+      - **12-oauth.md** 현재 작업의 목표·마일스톤·검증·결정
+
+</FileTree>
+
+`README.md`가 공통 형식과 완료 절차를 한 번 정의하므로 각 batch는 자기 작업에만 집중한다. 반대로
+작업 문서마다 lifecycle 설명을 복사하면 첫 번째 drift가 작업 관리 문서에서 생긴다.
+
+### PRD는 현재 제품의 정본이다
+
+OpenAI의 장시간 Codex 사례는 하나의 거대한 prompt 대신 목표를 고정하는 `Prompt.md`, checkpoint를
+나누는 `Plan.md`, 실행 상태와 결정을 남기는 `Documentation.md`를 사용했다. Claude Code 공식 문서도
+범위 밖 항목과 관련 interface, end-to-end 검증까지 담은 self-contained `SPEC.md`를 만든 뒤 깨끗한 새
+session에서 실행하는 방식을 제안한다
+([OpenAI durable project memory](https://developers.openai.com/blog/run-long-horizon-tasks-with-codex#the-key-idea-durable-project-memory),
+[Claude Code의 self-contained spec](https://code.claude.com/docs/en/best-practices)). 이를 이 저장소의
+문서 체계로 옮기면 다음과 같다.
+
+| 공식 사례의 artifact | 맡는 내용 | 저장소에서 대응할 자리 |
+|---|---|---|
+| `Prompt.md`·`SPEC.md`의 지속할 목표 | 목표·비목표·사용자 결과·수용 조건 | PRD, 또는 한 배치에서 끝나는 작은 기능의 batch 목표 절 |
+| `Plan.md`·`Documentation.md` | milestone·검증·현재 상태·실행 중 결정 | `docs/batches/<N>-<slug>.md` |
+| `Implement.md`·`AGENTS.md`·`CLAUDE.md` | 모든 작업에서 반복할 실행·권한·검증 규칙 | `AGENTS.md`, 얇은 `CLAUDE.md` adapter |
+
+PRD에는 **무엇을 왜 만들어야 하는지**만 남긴다.
+
+| PRD에 둔다 | 다른 문서로 보낸다 |
+|---|---|
+| 해결할 문제와 사용자 결과 | 현재 milestone과 구현 순서 → batch |
+| 현재 범위와 비범위 | 완료 checkbox·명령·실행 결과 → batch |
+| 사용자 흐름과 제품 불변 조건 | 파일별 변경 계획·framework 선택 → batch 또는 architecture |
+| 제품 수준의 수용 시나리오 | SQL·RLS·index·migration 상세 → schema spec 또는 architecture |
+| 아직 결정되지 않은 제품 질문 | 과거 요구와 완료 작업 연대기 → 완료 batch와 Git |
+
+DB 문서도 이름보다 내용으로 나눈다. “Story는 Composition 소유자만 편집한다”처럼 사용자가 관찰하는
+데이터 관계와 권한은 PRD의 제품 규칙이 될 수 있다. 실제 table·trigger·RLS policy·index 설계는
+schema spec의 기술 정본이다.
+
+```md title="docs/prd/<topic>.md"
+# <제품 영역>
+
+상태: Active
+검토일: YYYY-MM-DD
+
+## 해결할 문제와 사용자 결과
+
+## 현재 범위와 비범위
+
+## 사용자 흐름
+
+## 제품 규칙과 불변 조건
+
+## 수용 시나리오
+
+## 결정 대기
+
+## 관련 문서
+```
+
+PRD를 갱신할 때는 변경 이력을 아래에 계속 붙이지 않고 문장을 현재형으로 바꾼다. “언제 왜 바뀌었나”는
+Git과 연결된 batch가 답한다. 진행 상황을 한눈에 볼 index가 필요하면 `docs/batches/README.md`에 진행 중인
+batch link만 짧게 두고, PRD를 project tracker로 만들지 않는다.
+
+## 배치 문서는 실행 가능한 계약이다
+
+배치 파일은 미래 구현을 예언하는 상세 설계서가 아니다. 코드 탐색 전에는 모르는 것을 억지로 채우지
+않고, **현재 확인된 목표와 경계, 다음에 판정할 checkpoint**를 기록한다. 시작 template은 이 정도면 된다.
+
+```md title="docs/batches/<N>-<slug>.md"
+# <N>. <배치 제목>
+
+상태: 계획
+
+<왜 지금 필요한지, 사용자가 얻을 결과, 관련 spec·요구사항 link>
+
+## 목표와 완료 조건
+
+- [ ] 사용자가 관찰할 수 있는 결과
+- [ ] 호환성·성능·보안 같은 핵심 제약
+- [ ] end-to-end 검증 시나리오와 기대 결과
+
+## 범위
+
+- 포함: 이번 batch가 바꾸는 경계
+- 제외: 다음 batch로 미루거나 의도적으로 유지할 것
+
+## 공통 계약
+
+- 모든 milestone에서 유지할 architecture·data·UX 규칙
+- 외부 쓰기·migration·dependency 추가처럼 사람 확인이 필요한 gate
+
+## M1. <작고 검증 가능한 결과>
+
+- [ ] 구현 항목
+- [ ] 구현 항목 → 결정: <완료 뒤 실제 선택과 이유>
+- 검증: `<focused-test>` · `<typecheck>` · <수동 시나리오>
+- ⚠️ 예상 함정: <위험과 확인할 증거>
+
+## M2. <다음 결과>
+
+- [ ] ...
+
+## 완료 기록
+
+- 최종 검증:
+- 영구 정본으로 승격한 내용:
+- 남은 follow-up:
+```
+
+좋은 완료 조건은 “component를 만든다”가 아니라 “로그아웃 상태 callback test가 먼저 실패하고 구현 뒤
+통과한다”, “390px과 1280px에서 reference screenshot과 핵심 배치가 일치한다”처럼 에이전트가 직접
+판정할 수 있다. Claude Code 문서는 test·build exit code·lint·screenshot 같은 pass/fail 신호가 있어야
+에이전트가 스스로 수정 loop를 닫는다고 설명한다
+([Give Claude a way to verify its work](https://code.claude.com/docs/en/best-practices#give-claude-a-way-to-verify-its-work)).
+
+OpenAI의 장시간 Codex 사례도 milestone마다 수용 기준과 검증 명령을 두고, 실패하면 다음 milestone로
+넘어가지 않는 stop-and-fix 규칙과 결정 메모를 유지했다
+([Plan.md 구성](https://developers.openai.com/blog/run-long-horizon-tasks-with-codex#the-key-idea-durable-project-memory)).
+배치 문서 하나가 작은 기능의 임시 spec·plan·status·audit log 역할을 모두 맡을 수 있지만, 여러 작업이
+공유하는 PRD와 영구 architecture 정본까지 대체하지는 않는다.
+
+## 한 배치를 여섯 단계로 운영한다
+
+<Steps>
+
+1. **후보를 배치로 승격한다.** backlog에서 목표 하나를 고르고 번호를 발급한다. 먼저 결과·비목표·완료
+   조건만 적으며, 아직 모르는 구현 세부는 빈칸이나 질문으로 남긴다.
+
+2. **수정 없이 탐색한다.** `AGENTS.md`, `docs/batches/README.md`, 관련 spec, 대상 code, test, git history를
+   읽는다. 에이전트에게 현재 동작, 재사용할 pattern, 영향 경계, 불확실한 가정을 근거와 함께 보고하게 한다.
+
+3. **계획을 사람이 승인한다.** agent가 milestone, 파일 경계, 위험, 검증을 제안하면 사람은 제품 의도와
+   비목표, 되돌리기 어려운 선택을 확인한다. 승인된 계획을 batch 파일에 반영한 뒤 구현 mode로 넘어간다.
+
+4. **현재 milestone만 구현한다.** 한 번에 batch 전체를 넓게 건드리지 않는다. 기존 pattern을 재사용하고
+   scope가 늘어나면 먼저 batch의 범위와 계획을 갱신해 다시 합의한다.
+
+5. **검증이 통과할 때까지 repair한다.** focused test를 빠른 feedback으로 먼저 돌리고, milestone 끝에는
+   typecheck·lint·build·browser 확인처럼 변경 위험에 맞는 gate를 실행한다. 실패 원인을 숨기거나 test를
+   약화해 통과시키지 않는다.
+
+6. **결과를 기록하고 다음 checkpoint로 간다.** 완료 checkbox, 실행한 검증과 결과, 실제 결정과 이유,
+   남은 위험을 같은 파일에 적는다. 다음 milestone이면 새 session도 이 파일과 현재 diff에서 시작하고,
+   전체 완료면 영구 정본 승격 단계로 간다.
+
+</Steps>
+
+이 흐름은 매 줄을 사람이 지시하는 micro-management가 아니다. OpenAI가 설명하는 Codex loop도 plan →
+edit → tool 실행 → 결과 관찰 → 실패 복구 → status 갱신의 반복이며, 사람은 milestone에서 방향을
+조정한다
+([long-horizon Codex loop](https://developers.openai.com/blog/run-long-horizon-tasks-with-codex#why-codex-can-stay-coherent-on-long-tasks)).
+
+## 프롬프트는 설명서가 아니라 파일을 가리킨다
+
+긴 batch 내용을 매 session prompt에 붙여 넣지 않는다. 저장소 경로와 현재 milestone, 권한 경계만 주고
+agent가 정본을 읽게 한다. 다음 세 prompt는 Codex와 Claude Code 양쪽에서 같은 의미로 쓸 수 있다.
+
+<Tabs>
+<TabItem label="탐색·계획">
+
+```text
+AGENTS.md, docs/batches/README.md, docs/batches/12-oauth.md를 읽어라.
+아직 파일을 수정하지 말고 관련 spec·code·test·git history를 조사하라.
+
+목표와 비목표를 다시 진술하고, 기존 pattern과 영향 경계, 불확실한 가정,
+사람이 결정해야 할 선택지를 근거와 함께 정리하라. 각 milestone을 독립적으로
+검증할 수 있게 나누고 정확한 validation command와 end-to-end 수용 시나리오를 제안하라.
+계획 승인 전에는 구현하지 마라.
+```
+
+Codex에서는 `/plan`, Claude Code에서는 plan mode로 이 단계를 분리한다. 도구 안의 임시 plan은 검토
+interface이고, 승인된 결과의 장기 정본은 batch 파일이다.
+
+</TabItem>
+<TabItem label="마일스톤 실행">
+
+```text
+승인된 계획을 docs/batches/12-oauth.md에 먼저 반영하고 M1만 구현하라.
+AGENTS.md의 권한 경계와 검증 규칙을 지켜라. focused check부터 실행하고,
+실패하면 원인을 고쳐 통과할 때까지 반복하라. M2에는 착수하지 마라.
+
+끝나면 M1 checkbox, 실제 validation 결과, 중요한 결정과 이유, 남은 위험을
+batch 문서에 갱신하고 git diff 전체를 요구사항과 회귀 위험 관점에서 review하라.
+```
+
+“구현하고 끝”이 아니라 verification과 문서 갱신까지 같은 요청의 완료 조건에 넣는다.
+
+</TabItem>
+<TabItem label="새 세션에서 재개">
+
+```text
+AGENTS.md, docs/batches/README.md, docs/batches/12-oauth.md를 읽고
+git status와 diff를 확인하라. 채팅 기억보다 현재 파일과 검증 결과를 정본으로 삼아라.
+
+완료된 milestone, 현재 진행 중인 항목, 아직 검증되지 않은 주장, 다음 행동을
+짧게 보고한 뒤 현재 milestone만 계속하라. scope나 권한이 달라지는 선택은 멈추고 물어라.
+```
+
+같은 batch라도 탐색 log로 context가 흐려졌거나 같은 오류를 두 번 넘게 반복하면, 배운 내용을 파일에
+반영하고 새 session에서 시작한다. Claude Code도 누적된 실패 context를 끌고 가기보다 더 정확한 prompt로
+새로 시작하라고 권한다
+([Course-correct early and often](https://code.claude.com/docs/en/best-practices#course-correct-early-and-often)).
+
+</TabItem>
+</Tabs>
+
+## 사람은 의도와 위험, 에이전트는 실행과 증거를 맡는다
+
+agent에게 자율성을 준다는 말은 제품 판단과 배포 책임까지 넘긴다는 뜻이 아니다. OpenAI의
+[AI-native engineering guide](https://learn.chatgpt.com/guides/build-ai-native-engineering-team)는 agent가 code-aware
+분석과 첫 구현·test·review를 맡더라도 prioritization, architecture tradeoff, 최종 품질과 배포 책임은
+사람에게 남는다고 구분한다.
+
+| 단계 | 에이전트에 위임 | 사람이 review | 사람이 최종 소유 |
+|---|---|---|---|
+| 탐색·계획 | 관련 code path, 기존 pattern, 선택지와 위험 조사 | 빠진 요구·잘못된 가정·milestone 크기 | 제품 목표·비목표·우선순위 |
+| 구현 | 반복 wiring, scoped refactor, test·문서 초안 | architecture 적합성, 보안·성능·migration 위험 | 새 abstraction과 장기 tradeoff |
+| 검증 | command 실행, 실패 repair, screenshot·log 수집 | 수용 기준이 실제 사용자 의도를 재는지 | 최종 승인과 ship 여부 |
+| 기록 | checkbox·결정·검증 증거 초안 | 이유가 사실과 diff에 맞는지 | 영구 정본 구조와 공개 문서 |
+
+다음은 batch에 **사람 확인 gate**를 명시한다.
+
+- 요구가 모호해 어느 선택도 “명백한 기본값”이 아닌 경우
+- public API·schema·data migration·security boundary를 바꾸는 경우
+- production·외부 서비스에 쓰거나 비용·삭제·배포가 발생하는 경우
+- 새 dependency나 cross-cutting abstraction으로 scope가 materially 넓어지는 경우
+- 검증이 불가능하거나 실패한 채 다음 milestone로 넘어가야 하는 경우
+
+반면 이미 승인된 scope 안의 파일 탐색, local edit, test 실행, 실패 수정은 매번 허락을 기다리지 않게
+한다. 긴 작업 mode도 기존 sandbox와 approval 경계를 넓히지 않는다는 것이 Codex의
+[공식 long-running work 지침](https://learn.chatgpt.com/docs/long-running-work)이다. 자율성은 권한을 없애는
+것이 아니라 **안전한 내부 loop와 결과를 바꾸는 gate를 분리하는 것**이다.
+
+검증 기록에는 성공 선언 대신 재현 가능한 증거를 남긴다.
+
+```md
+- M1 검증: `pnpm test -- auth` 18/18 통과 · `pnpm typecheck` 통과 ·
+  로그인 만료 → Google 재인증 → 원래 경로 복귀를 390px/1280px에서 확인.
+```
+
+전체 terminal log는 넣지 않는다. command·결과·판정에 영향을 준 관찰만 남기고, 실패한 접근도 다음
+session이 같은 길을 다시 밟을 가능성이 있을 때만 이유와 함께 기록한다.
+
+## 완료하면 작업 지식을 영구 지식으로 승격한다
+
+마지막 checkbox가 채워졌다고 바로 끝내지 않는다. batch가 구현 과정의 정본이었다면, 완료 시점에는
+그 안에서 다시 쓰일 지식만 영구 정본으로 옮겨야 한다.
+
+1. batch 전체 수용 시나리오와 repository 최종 check를 실행한다.
+2. 상태를 `완료 YYYY-MM-DD`로 바꾸고 최종 검증·미해결 follow-up을 적는다.
+3. 진행 중 batch index를 따로 유지한다면 해당 link를 완료 상태로 바꾸되, PRD에 작업 연대기를 붙이지 않는다.
+4. 사용자가 관찰할 제품 동작은 PRD를 현재형으로 고치고, 결정 이유가 중요하면 decision log에 남긴다.
+5. architecture·schema 불변 조건은 해당 기술 정본으로 승격한다.
+6. agent가 반복해서 틀린 **항상 적용되는 행동**만 `AGENTS.md`에 추가한다. 작성 구조는
+   [0장 — AGENTS.md와 CLAUDE.md 함께 설계하기](/coding-agents/00-project-instructions/)를 따른다.
+7. 완료된 batch는 삭제하지 않는다. 당시 선택과 검증을 찾는 history로 남긴다.
+
+Anthropic 내부 팀 사례에서는 여러 원문을 압축한 Markdown runbook을 다음 debugging의 context로 쓰고,
+design 단계부터 test와 주기적인 사람 확인을 결합했다
+([How Anthropic teams use Claude Code](https://claude.com/blog/how-anthropic-teams-use-claude-code)). 다만 모든
+작업 기록을 `AGENTS.md`나 PRD로 올리면 다시 context가 부풀어 오른다. **두 번 반복된 행동 실패는 지침
+후보, 확정된 사용자 동작은 PRD 후보, 장기 기술 경계는 architecture 후보, 이번 실행의 우회와 증거는
+batch에 남는다.**
+
+## 운영 체크리스트와 더 읽을 자료
+
+- [ ] 작은 일과 batch가 필요한 일을 구분했다.
+- [ ] PRD는 현재 제품의 목표·범위·사용자 동작만 설명하고 작업 연대기를 쌓지 않는다.
+- [ ] batch가 관련 PRD·spec을 가리키며 같은 요구를 길게 복제하지 않는다.
+- [ ] batch에 목표·비목표·완료 조건과 사람 확인 gate가 있다.
+- [ ] 탐색·계획 단계에서는 source code를 고치지 않았다.
+- [ ] 승인된 계획과 현재 상태가 채팅이 아니라 batch 파일에 있다.
+- [ ] 한 번에 현재 milestone만 구현하고 검증했다.
+- [ ] 실패한 check를 숨기거나 약화하지 않고 repair했다.
+- [ ] checkbox에는 command·결과·수동 확인 같은 증거가 따른다.
+- [ ] code와 batch 문서 갱신을 같은 commit에 묶을 준비가 됐다.
+- [ ] 확정된 제품 동작은 PRD, 기술 규약은 spec·architecture 정본으로 승격했다.
+- [ ] commit·push·deploy는 저장소의 권한 규칙과 사용자 요청을 따랐다.
+
+이 패턴의 직접 근거는 [Codex best practices](https://learn.chatgpt.com/guides/best-practices),
+[Claude Code best practices](https://code.claude.com/docs/en/best-practices),
+[OpenAI의 장시간 Codex 실험](https://developers.openai.com/blog/run-long-horizon-tasks-with-codex)이다.
+로컬 artifact가 반복 업무의 학습을 어떻게 축적하는지는
+[OpenAI의 Runme workflow 사례](https://developers.openai.com/blog/automating-repetitive-work-at-openai-with-codex),
+workspace plan이라는 유사 패턴은 [Cursor의 agent 운영 글](https://cursor.com/blog/agent-best-practices)에서
+더 볼 수 있다.
+
+<LinkCard
+  title="0. AGENTS.md와 CLAUDE.md 함께 설계하기"
+  description="배치 프로세스가 의존하는 공유 지침 정본, 얇은 adapter, 범위별 규칙 구조를 먼저 확인한다."
+  href="/coding-agents/00-project-instructions/"
+/>

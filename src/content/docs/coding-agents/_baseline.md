@@ -7,12 +7,18 @@
 
 ## 현재성 기준
 
-**2026년 8월 20일**에 다음 공식 문서를 확인했다.
+**2026년 8월 30일**에 다음 공식 문서와 사례를 확인했다.
 
 - OpenAI: <https://learn.chatgpt.com/docs/agent-configuration/agents-md>
   (구 주소 `developers.openai.com/codex/guides/agents-md`는 이곳으로 308 영구 리다이렉트된다)
+- OpenAI 작업 방식: <https://learn.chatgpt.com/guides/best-practices>,
+  <https://learn.chatgpt.com/docs/long-running-work>
 - Anthropic: <https://code.claude.com/docs/en/memory>
+- Anthropic 작업 방식: <https://code.claude.com/docs/en/best-practices>
 - Anthropic 기능 선택: <https://code.claude.com/docs/en/features-overview>
+- OpenAI 장시간 작업 사례: <https://developers.openai.com/blog/run-long-horizon-tasks-with-codex>,
+  <https://developers.openai.com/blog/automating-repetitive-work-at-openai-with-codex>
+- Anthropic 내부 활용 사례: <https://claude.com/blog/how-anthropic-teams-use-claude-code>
 
 제품의 탐색·로딩 동작은 바뀔 수 있다. 사실을 적을 때는 본문 주장 가까이에 공식 링크를 두고,
 이 덱의 권장 설계와 제품이 보장하는 동작을 구분한다. 공식 문서가 보장하지 않는 경계 사례는
@@ -26,10 +32,12 @@
 - 명령과 파일 예시는 복사해서 시작할 수 있을 정도로 구체적으로 쓰되, 특정 언어·프레임워크에 종속된 값은
   `<repo-command>` 같은 추상 표기보다 `pnpm test`처럼 알아보기 쉬운 예시를 쓰고 교체 지점을 설명한다.
 - 공유 행동 규칙의 정본은 `AGENTS.md`라는 이 덱의 권장안을 유지한다. 제품 공식 표준이라는 뜻으로 쓰지 않는다.
+- PRD는 현재 제품 요구, batch는 작업 과정과 증거, architecture·spec은 영구 기술 경계라는 역할 구분을
+  유지한다. 이 구분은 공식 파일명 표준이 아니라 공식 사례를 저장소에 적용한 이 덱의 권장안이다.
 
 ## 범위
 
-다룬다: 프로젝트 지침, 프롬프트와 컨텍스트 관리, 계획·구현·검증 요청, 병렬 작업, 실패 복구,
-도구별 기능을 함께 쓸 때의 이식 가능한 패턴.
+다룬다: 프로젝트 지침, PRD와 로컬 작업 문서의 수명주기, 프롬프트와 컨텍스트 관리, 계획·구현·검증 요청,
+병렬 작업, 실패 복구, 도구별 기능을 함께 쓸 때의 이식 가능한 패턴.
 
 다루지 않는다: 모델 API 개발, 범용 prompt engineering 이론, IDE 자체 사용법 전체, 각 제품의 전체 설정 레퍼런스.
