@@ -128,18 +128,29 @@ docs-as-code에서 SSG가 위키보다 나은 지점 — **깨짐이 배포 전�
 `starlight()` 안(3장)이다.
 
 ```js
+import path from 'node:path';
+import { prepareD2 } from './scripts/prepare-d2.mjs';
+
+const d2BinDirectory = await prepareD2(); // 공식 native D2 v0.8.2를 검증·캐시
+const currentPath = process.env.PATH?.split(path.delimiter).filter(Boolean) ?? [];
+process.env.PATH = [d2BinDirectory, ...currentPath.filter((entry) => entry !== d2BinDirectory)]
+  .join(path.delimiter);
+
 export default defineConfig({
   site: 'https://study.upggu.com',   // canonical · sitemap의 기준 주소 (8장)
   markdown: { processor: unified() }, // 이미지 확대 플러그인의 Astro 7 임시 호환 설정
   integrations: [
     astroD2({                       // ```d2를 빌드 시 SVG로 만드는 integration
       layout: 'elk',
-      experimental: { useD2js: true },
     }),
     starlight({ /* 사이트의 나머지 전부 */ }),
   ],
 });
 ```
+
+`prepareD2()`는 시스템 전역 설치 대신 실행 플랫폼의 공식 archive와 고정 SHA-256을 사용한다.
+검증된 바이너리는 `node_modules/.astro/d2/v0.8.2/`에 캐시하므로 Cloudflare Pages에서 build
+cache 기능을 켠 경우 다음 빌드에 보존할 수 있고, 캐시가 없어도 같은 설정 로드 과정에서 다시 준비된다.
 
 :::caution[함정]
 **`astroD2()`가 `starlight()`보다 먼저 와야 한다.** integration은 배열

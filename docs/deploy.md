@@ -39,11 +39,29 @@ Git 연결은 OAuth 승인이 필요해서 **대시보드에서만** 할 수 있
 
 `pnpm build`의 `prebuild`는 Cloudflare Pages가 넣은 `CF_PAGES=1`을 확인하고,
 얇은 Git checkout이면 `git fetch --unshallow` 후 Astro 빌드를 시작한다.
-대시보드의 Build command는 `pnpm build`로 그대로 둔다.
+대시보드의 Build command는 `pnpm build`로 그대로 둔다. D2 설치용 환경 변수나 별도 명령은 없다.
 
-D2 다이어그램은 `astro-d2`의 **D2.js/WASM 모드**로 빌드한다. 따라서 Cloudflare Pages 빌드
-이미지에 D2 CLI를 따로 설치할 필요가 없다. `experimental.useD2js`를 끄면 배포 환경에도
-D2 바이너리를 설치해야 하므로, config만 단독으로 바꾸지 않는다.
+## D2 native 바이너리는 어떻게 준비하나
+
+D2 다이어그램은 **native D2 `v0.8.2`**로 빌드한다. 시스템 전역 설치나 Cloudflare 대시보드
+설정에 기대지 않고, `astro.config.mjs`가 로드될 때 `scripts/prepare-d2.mjs`를 먼저 호출한다.
+그래서 `pnpm astro dev --background`·`pnpm build`·`pnpm check` 어느 진입점이든 같은 준비
+경로를 거친다.
+
+- 현재 플랫폼에 맞는 공식 standalone archive를 받는다. 지원 조합은 macOS arm64/x64와
+  Linux x86_64/arm64이며, Cloudflare Pages는 `linux-x64`를 쓴다.
+- 버전과 네 archive의 SHA-256은 스크립트에 고정돼 있다. 다운로드는 임시 디렉터리에서 하고,
+  체크섬 검증 → 압축 해제 → 실행 권한 설정 → `d2 --version`이 정확히 `v0.8.2`인지 확인한 뒤
+  검증된 디렉터리만 rename으로 캐시에 반영한다.
+- 캐시는 `node_modules/.astro/d2/v0.8.2/<platform-arch>/bin/d2`다. 설정을 읽을 때마다 캐시된
+  파일의 실행 권한과 버전을 다시 확인하고, 그 `bin`을 현재 프로세스의 `PATH` 앞에 붙인다.
+- Cloudflare Pages에서 build cache 기능이 켜져 있으면 Astro용
+  [`node_modules/.astro`를 보존한다](https://developers.cloudflare.com/pages/configuration/build-caching/).
+  캐시가 복원되면 다운로드를 건너뛰고, 없거나 검증에 실패하면 다시 설치하므로 이 대시보드
+  기능은 성능 최적화일 뿐 빌드 성공 조건이 아니다. cold build에는 GitHub release 다운로드가 필요하다.
+
+D2 버전을 올릴 때는 `D2_VERSION`만 바꾸지 말고 네 archive 이름·SHA-256, 이 문서, SVG 레이아웃
+회귀 검증을 한 세트로 갱신한다. 바이너리와 `public/d2/` 산출물은 Git에 넣지 않는다.
 
 ## 왜 빌드 전에 Git 이력을 받나
 

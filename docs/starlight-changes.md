@@ -10,7 +10,7 @@
 |---|---|---|
 | 덱 = topic 사이드바 | 단일 덱 manifest + `starlight-sidebar-topics` | `src/data/decks.mjs` · `astro.config.mjs` |
 | 테마 (Vitesse 계열) | `starlight-theme-rapide` 플러그인 | `astro.config.mjs` |
-| D2 펜스 렌더 (다이어그램) | `astro-d2` 통합 + D2.js (**starlight보다 먼저**) | `astro.config.mjs` |
+| D2 펜스 렌더 (다이어그램) | `astro-d2` 통합 + native D2 v0.8.2 (**starlight보다 먼저**) | `scripts/prepare-d2.mjs` · `astro.config.mjs` |
 | 이미지 클릭 확대 | `starlight-image-zoom` 플러그인 + 기존 override 합성 | `astro.config.mjs` · `MarkdownContent.astro` · `SourceFigure.astro` |
 | Markdown 프로세서 | 이미지 확대 호환을 위해 `unified()` 명시 | `astro.config.mjs` |
 | 검색 결과에 덱 이름 표시 | `MarkdownContent` 컴포넌트 override | `src/components/layout/MarkdownContent.astro` |
@@ -34,8 +34,13 @@
   2026-08 덱 단위 일괄 마이그레이션(이슈 #2)으로 전부 D2로 변환하고 통합을 제거했다.
   클라이언트 렌더라 문법 오류가 빌드를 통과하는 점, 테마 전환 때 SVG를 다시 그리는 점이
   검증 비용의 주범이었다.
-- D2 생성은 `experimental.useD2js: true`로 D2.js/WASM을 사용한다. Cloudflare Pages에 D2
-  바이너리를 설치할 필요가 없는 대신 `tala` 레이아웃은 쓸 수 없어서 기본을 `elk`로 고정했다.
+- D2 생성은 native D2 `v0.8.2`를 사용한다. `scripts/prepare-d2.mjs`가 macOS arm64/x64와
+  Linux x86_64/arm64의 공식 standalone archive 및 SHA-256을 코드에 고정하고,
+  `node_modules/.astro/d2/v0.8.2/` 아래 캐시를 준비한다. 검증된 `bin`을 `PATH` 앞에 붙인 뒤
+  `astroD2()`를 등록하므로 로컬·Cloudflare Pages 모두 시스템 전역 설치가 필요 없다.
+- archive는 임시 디렉터리에서 다운로드·checksum 검증·압축 해제하고, 실행 권한과
+  `d2 --version == v0.8.2`까지 확인한 디렉터리만 원자적으로 캐시에 반영한다. 캐시 hit에서도
+  실행 권한과 버전을 다시 확인한다. 기본 레이아웃은 `elk`다.
 - 생성된 `public/d2/`는 빌드 산출물이므로 `.gitignore`에서 제외한다.
 - `starlight-image-zoom`은 일반 Markdown/MDX 이미지와 D2 `<img>`를 자동으로 감싼다.
   `<SourceFigure>`는 원문 출처 링크와 이미지 확대 동작이 충돌하지 않도록 `<Zoom>`을 직접 쓴다.

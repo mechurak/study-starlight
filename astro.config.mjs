@@ -1,4 +1,5 @@
 // @ts-check
+import path from 'node:path';
 import { defineConfig } from 'astro/config';
 import { unified } from '@astrojs/markdown-remark';
 import starlight from '@astrojs/starlight';
@@ -6,7 +7,15 @@ import starlightSidebarTopics from 'starlight-sidebar-topics';
 import starlightThemeRapide from 'starlight-theme-rapide';
 import starlightImageZoom from 'starlight-image-zoom';
 import astroD2 from 'astro-d2';
+import { prepareD2 } from './scripts/prepare-d2.mjs';
 import { topics } from './src/data/decks.mjs';
+
+// dev/build/check 어느 진입점에서도 고정된 native D2를 먼저 준비한다.
+const d2BinDirectory = await prepareD2();
+const currentPath = process.env.PATH?.split(path.delimiter).filter(Boolean) ?? [];
+process.env.PATH = [d2BinDirectory, ...currentPath.filter((entry) => entry !== d2BinDirectory)].join(
+	path.delimiter,
+);
 
 export default defineConfig({
 	// 커스텀 도메인. canonical 링크와 sitemap이 전부 이 값으로 생성된다.
@@ -21,8 +30,6 @@ export default defineConfig({
 			layout: 'elk',
 			pad: 40,
 			theme: { default: '0', dark: '200' },
-			// Cloudflare Pages에 D2 바이너리를 설치하지 않고 WASM 기반 D2.js로 생성한다.
-			experimental: { useD2js: true },
 		}),
 		starlight({
 			title: 'Study Note',
