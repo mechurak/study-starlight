@@ -4,10 +4,12 @@ description: "PV/PVC 바인딩 조건, Pending의 두 가지 원인, WaitForFirs
 deckGroup: storage
 sidebar:
   order: 70
-legacyThesis: true
 ---
 
 import { LinkCard } from '@astrojs/starlight/components';
+import Thesis from '../../../components/docs/Thesis.astro';
+
+<Thesis>스토리지 실습은 공식 예제에서 PV·PVC 뼈대를 가져와 요구 필드만 남기고, 생성 뒤 바인딩 조건과 실제 마운트를 차례로 검증하는 문제다</Thesis>
 
 > 짝이 되는 개념 장: [cka 13. 스토리지](/cka/13-storage/)
 
@@ -20,49 +22,196 @@ StorageClass는 요청이 올 때 PV를 자동 생성하는 규칙이다. PVC가
 **클래스 · access mode · 용량 · 셀렉터**가 맞는지 `describe pvc`의 Events에서 확인한다.
 :::
 
-## PV와 PVC — Practice Test: Persistent Volume Claims
+## hostPath 로그 볼륨 — webapp
 
-원본 풀이: [10-Practice-Test-Persistent-Volume-Claims.md](https://github.com/kodekloudhub/certified-kubernetes-administrator-course/blob/master/docs/08-Storage/10-Practice-Test-Persistent-Volume-Claims.md)
+과제는 기존 `webapp` Pod의 로그를 **노드의 `/var/log/webapp` → 컨테이너의 `/log`**로
+연결하는 것이다. Pod 수준의 `spec.volumes`가 저장소를 정의하고, 대상 컨테이너의
+`volumeMounts`가 그 저장소를 어디에서 볼지 정한다. 두 블록의 `name: log-volume`이 연결 고리다 —
+공식 [Volumes](https://kubernetes.io/docs/concepts/storage/volumes/#hostpath) 예시도 같은 구조다.
 
-흐름: hostPath 볼륨 → PV(PersistentVolume) → PVC(PersistentVolumeClaim) → Pod 마운트.
-세 YAML의 뼈대는 공식 문서
-[Configure a Pod to Use a PersistentVolume for Storage](https://kubernetes.io/docs/tutorials/configuration/configure-persistent-volume-storage/)에
-한 페이지로 다 있다 — 시험 중 여기서 복사한다.
+기존 Pod을 바탕으로 작업한다면 먼저 전체 스펙을 뽑는다.
+
+```bash
+kubectl get pod webapp -o yaml > webapp.yaml
+```
+
+처음부터 최소 골격을 만들고 싶다면 다음 명령으로 API 서버에 아무것도 생성하지 않은 채 YAML만
+만든 뒤, 아래 완성본처럼 컨테이너 이름과 볼륨 두 블록을 고친다.
+
+```bash
+kubectl run webapp \
+  --image=kodekloud/event-simulator \
+  --env=LOG_HANDLERS=file \
+  --dry-run=client -o yaml > webapp.yaml
+```
+
+완성된 `webapp.yaml`은 다음 네 값을 한 번에 만족해야 한다.
 
 ```yaml
-# 1) Pod에 hostPath 볼륨
+apiVersion: v1
+kind: Pod
+metadata:
+  name: webapp
+spec:
+  containers:
+  - name: event-simulator
+    image: kodekloud/event-simulator
+    env:
+    - name: LOG_HANDLERS
+      value: file
+    volumeMounts:
+    - name: log-volume
+      mountPath: /log
   volumes:
   - name: log-volume
     hostPath:
       path: /var/log/webapp
+      type: Directory
 ```
 
+[`LOG_HANDLERS=file`](https://github.com/kodekloudhub/event-simulator/blob/master/event-simulator.py)은
+이 이미지가 로그를 `/log/app.log`에 쓰게 한다. 기존 Pod의 바꿀 수 없는 볼륨 스펙을 적용하려면
+지운 뒤 다시 만드는 force replace를 사용한다. 공식
+[`kubectl replace`](https://kubernetes.io/docs/reference/kubectl/generated/kubectl_replace/)에서
+`--force`도 **delete 후 create**로 정의한다.
+
+```bash
+kubectl replace -f webapp.yaml --force
+kubectl wait --for=condition=Ready pod/webapp --timeout=60s
+
+# 저장소와 마운트 경로가 올바르게 연결됐는지
+kubectl get pod webapp -o jsonpath='{.spec.volumes[?(@.name=="log-volume")].hostPath.path}{" -> "}{.spec.containers[0].volumeMounts[?(@.name=="log-volume")].mountPath}{"\n"}'
+
+# 파일 로그가 실제로 기록되는지
+kubectl exec webapp -- sh -c 'test -s /log/app.log && tail -n 3 /log/app.log'
+```
+
+:::caution[함정 — Directory는 경로를 만들지 않는다]
+`hostPath.type: Directory`는 **스케줄된 노드에 그 디렉터리가 이미 있어야** 한다. Pod이
+`ContainerCreating`에 머물면 `kubectl describe pod webapp`의 Events에서 `FailedMount`를 확인한다.
+`DirectoryOrCreate`는 경로를 만들지만, 문제에서 `Directory`를 요구했다면 임의로 바꾸지 않는다.
+또한 `LOG_HANDLERS=file`이면 표준 출력 로그가 없을 수 있으므로 `kubectl logs`만으로 실패라고
+판정하지 말고 `/log/app.log`를 확인한다.
+:::
+
+## PV와 PVC — Practice Test: Persistent Volume Claims
+
+원본 풀이: [10-Practice-Test-Persistent-Volume-Claims.md](https://github.com/kodekloudhub/certified-kubernetes-administrator-course/blob/master/docs/08-Storage/10-Practice-Test-Persistent-Volume-Claims.md)
+
+흐름: 바로 위의 Pod 직접 hostPath → PV(PersistentVolume) → PVC(PersistentVolumeClaim) → Pod 마운트.
+PV와 PVC에는 `kubectl create deployment` 같은 전용 명령형 생성기가 없다. 공식
+[`kubectl create`](https://kubernetes.io/docs/reference/kubectl/generated/kubectl_create/)도 파일이나
+표준 입력으로 매니페스트를 받으므로 YAML로 푸는 편이 빠르고 검증하기 쉽다.
+
+### 시험장에서 뼈대와 필드 찾기
+
+공식 문서 검색창에서 `configure persistent volume storage`를 찾으면
+[Configure a Pod to Use a PersistentVolume for Storage](https://kubernetes.io/docs/tutorials/configuration/configure-persistent-volume-storage/)의
+**Create a PersistentVolume → Create a PersistentVolumeClaim → Create a Pod** 순서에 세 YAML이 모두
+있다. 예제 전체를 그대로 남기지 말고 이름·용량·access mode·스토리지 구현처럼 **문제가 요구한
+필드만 대입**한다. 예제의 `storageClassName: manual`도 문제에서 클래스를 지정할 때만 남긴다.
+
+필드 철자가 기억나지 않으면 인터넷을 헤매기 전에 클러스터의 OpenAPI 스키마를 조회한다.
+
+```bash
+# 전체 필드에서 less의 /reclaim 검색으로 정확한 camelCase를 찾는다
+kubectl explain pv.spec --recursive | less
+kubectl explain pvc.spec --recursive | less
+
+# 찾은 필드의 설명·허용 값을 좁혀 본다
+kubectl explain pv.spec.persistentVolumeReclaimPolicy
+kubectl explain pvc.spec.resources.requests
+```
+
+PV에서는 긴 이름 `spec.persistentVolumeReclaimPolicy`, StorageClass에서는 짧은 이름
+`reclaimPolicy`를 쓴다. PV의 값은 `Retain`·`Delete`·deprecated된 `Recycle`이며, 정확한 enum과
+기본값은 공식 [PersistentVolume API](https://kubernetes.io/docs/reference/kubernetes-api/core/persistent-volume-v1/)에서도
+확인할 수 있다. 문제에서 `Retain`을 명시했다면 기본값에 기대지 말고 YAML에도 명시한다.
+
+### 1. PV 생성 — 관리자 쪽 저장 공간
+
+`pv-log`는 네임스페이스에 속하지 않는 클러스터 범위 리소스다. 따라서 `-n` 없이 만들고 조회한다.
+
 ```yaml
-# 2) PV
 apiVersion: v1
 kind: PersistentVolume
 metadata:
   name: pv-log
 spec:
-  accessModes: [ReadWriteMany]
   capacity:
     storage: 100Mi
+  accessModes:
+  - ReadWriteMany
+  persistentVolumeReclaimPolicy: Retain
   hostPath:
     path: /pv/log
 ```
 
+```bash
+kubectl create --dry-run=server -f pv-log.yaml
+kubectl create -f pv-log.yaml
+kubectl get pv pv-log
+```
+
+깨끗한 랩이라면 아직 claim이 없으므로 `Available`이 정상이다. 이미 조건이 맞는 PVC가 있으면 곧바로
+`Bound`가 될 수 있으므로 상태 이름 하나만 외우지 말고 `CLAIM` 열도 함께 본다.
+
+### 2. PVC 생성 — 앱의 요청
+
+PVC는 네임스페이스 범위 리소스다. 다음 첫 요청은 문제의 값 그대로 `50Mi`와 `ReadWriteOnce`를 쓴다.
+
 ```yaml
-# 3) PVC — 그리고 Pod에서 쓰기
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
   name: claim-log-1
 spec:
-  accessModes: [ReadWriteMany]
+  accessModes:
+  - ReadWriteOnce
   resources:
     requests:
       storage: 50Mi
 ```
+
+```bash
+kubectl create --dry-run=server -f claim-log-1.yaml
+kubectl create -f claim-log-1.yaml
+kubectl get pv,pvc
+kubectl describe pvc claim-log-1
+```
+
+공식 PVC 예제에서 `storageClassName: manual`을 복사해 왔다면 앞의 class 없는 `pv-log`와 묶이지
+않는다. 반대로 클러스터에 default StorageClass가 있으면 생략한 PVC에 클래스가 자동 지정될 수 있다.
+예상과 다르면 먼저 실제 저장값과 기본 클래스를 확인한다.
+
+```bash
+kubectl get pvc claim-log-1 -o jsonpath='{.spec.storageClassName}{"\n"}'
+kubectl get storageclass
+```
+
+명시적으로 class 없는 PV만 요청해야 하는 환경에서는 PVC에 `storageClassName: ""`를 둔다. 다만
+이 랩처럼 제공된 요구사항과 정답이 필드를 생략한다면 불필요한 값을 먼저 추가하지 않는다.
+
+:::caution[함정 1 — access mode는 크기 비교가 아니다]
+`pv-log`는 `ReadWriteMany`, `claim-log-1`은 `ReadWriteOnce`만 선언했으므로 용량이 맞아도
+**Pending**이다. `ReadWriteMany`가 `ReadWriteOnce`를 포함하는 상위 등급처럼 보이지만, 바인더는
+PVC가 요청한 mode 문자열이 PV의 `accessModes` 목록에 실제로 있는지 확인한다. 원인은
+`kubectl describe pvc claim-log-1`의 Events에서 좁힌다.
+:::
+
+### 3. mode를 맞춘 뒤 Pod에서 사용
+
+이 랩 흐름에서 claim을 실제로 묶으려면 `claim-log-1.yaml`의 mode를 `ReadWriteMany`로 고친 뒤
+Pending PVC를 다시 만든다.
+
+```bash
+kubectl delete pvc claim-log-1
+# claim-log-1.yaml: ReadWriteOnce → ReadWriteMany
+kubectl create -f claim-log-1.yaml
+kubectl get pv,pvc
+```
+
+바인딩 뒤 Pod에는 PVC 이름만 연결한다. Pod은 `hostPath` 같은 실제 구현을 알 필요가 없다.
 
 ```yaml
   volumes:
@@ -70,11 +219,6 @@ spec:
     persistentVolumeClaim:
       claimName: claim-log-1
 ```
-
-:::caution[함정 1 — accessModes가 다르면 안 묶인다]
-PV가 `ReadWriteMany`, PVC가 `ReadWriteOnce`면 용량이 맞아도 **Pending**이다.
-바인딩 조건은 accessModes·용량·storageClassName 세 가지 — [cka 13장](/cka/13-storage/).
-:::
 
 :::caution[함정 2 — 바인딩되면 용량은 PV 것]
 50Mi를 요청해도 100Mi PV에 묶이면 **PVC의 CAPACITY는 100Mi**다. PV는 쪼개지지 않는다.
@@ -201,8 +345,9 @@ kubectl create -f pvc.yaml -n <namespace>             # 초과 시 즉시 Forbid
 
 | 이 장의 섹션 | 검색어 | 공식 문서에서 가져올 것 |
 |---|---|---|
-| hostPath·PV·PVC·Pod | `Configure PersistentVolume Storage` | [Configure a Pod to Use a PersistentVolume for Storage](https://kubernetes.io/docs/tutorials/configuration/configure-persistent-volume-storage/) 한 페이지에서 PV, PVC, `persistentVolumeClaim` 볼륨의 세 YAML |
-| 바인딩·reclaim 진단 | `Persistent Volumes` | [Persistent Volumes](https://kubernetes.io/docs/concepts/storage/persistent-volumes/)에서 `accessModes`, `storageClassName`, `persistentVolumeReclaimPolicy`, claim 상태 의미 |
+| Pod hostPath | `Volumes hostPath` | [Volumes — hostPath](https://kubernetes.io/docs/concepts/storage/volumes/#hostpath)에서 `spec.volumes`와 `containers[].volumeMounts`, `type`의 의미 |
+| PV·PVC·Pod | `Configure PersistentVolume Storage` | [Configure a Pod to Use a PersistentVolume for Storage](https://kubernetes.io/docs/tutorials/configuration/configure-persistent-volume-storage/) 한 페이지에서 PV, PVC, `persistentVolumeClaim` 볼륨의 세 YAML |
+| 바인딩·reclaim 진단 | `Persistent Volumes` | [Persistent Volumes](https://kubernetes.io/docs/concepts/storage/persistent-volumes/)에서 바인딩 조건과 claim 상태를 보고, [PersistentVolume API](https://kubernetes.io/docs/reference/kubernetes-api/core/persistent-volume-v1/)에서 `persistentVolumeReclaimPolicy`의 정확한 enum 확인 |
 | StorageClass·동적 프로비저닝 | `Storage Classes` | [Storage Classes](https://kubernetes.io/docs/concepts/storage/storage-classes/)의 `storage.k8s.io/v1` 예시에서 `provisioner`, `reclaimPolicy`, `volumeBindingMode` 구조 |
 | 스토리지 quota | `Resource Quotas storage` | [Resource Quotas — Storage Resource Quota](https://kubernetes.io/docs/concepts/policy/resource-quotas/#storage-resource-quota)의 전체·클래스별 `spec.hard` 키 |
 
@@ -211,8 +356,12 @@ PV/PVC 문제에서는 문서 예시를 통째로 복사한 뒤 **스토리지 �
 
 ## 이 장에서 남길 것
 
+- Pod 볼륨은 **`spec.volumes` 정의 ↔ `containers[].volumeMounts` 사용**을 같은 `name`으로 연결
+- `hostPath.type: Directory`는 노드 경로를 만들지 않으며, 파일 로그는 마운트 안에서 직접 검증
+- PV/PVC YAML은 공식 문서의 `Configure Persistent Volume Storage`, 필드 철자는 `kubectl explain`
+- PV는 `persistentVolumeReclaimPolicy`, StorageClass는 `reclaimPolicy` — `Recycle`은 deprecated
 - PVC Pending의 원인은 둘 — **맞는 PV가 없다** vs **WaitForFirstConsumer 대기**
-- 바인딩 조건: accessModes · 용량 · storageClassName
+- 바인딩 조건: accessModes · 용량 · storageClassName — access mode는 상하 관계가 아닌 정확한 목록 값
 - `Bound`는 바인딩 성공일 뿐 — 소비 Pod의 **mount와 읽기·쓰기**까지 확인
 - 바인딩 후 용량은 PV 기준, PV는 Released여도 자동 재사용 안 됨
 - `no-provisioner` = 동적 프로비저닝 불가 = PV를 손으로 만들어야 한다
