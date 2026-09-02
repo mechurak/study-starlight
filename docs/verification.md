@@ -6,22 +6,31 @@
 pnpm check
 ```
 
-`check:content`가 manifest 등록과 중복(slug·topicOrder), `category`·`tag` 어휘,
-프론트매터, h4, 미지원 펜스 언어(promql·logql·traceql → `text`), 덱 index 컴포넌트,
-필수 `TermIntro`를 검사하고, 이어서 Astro 빌드와 Pagefind 인덱스 생성을 확인한다.
+`check:content`가 `_deck.mjs`와 MDX에서 파생한 slug·순서·그룹, `category`·`tag` 어휘,
+필수 baseline, 프론트매터, h4, 미지원 펜스 언어(promql·logql·traceql → `text`), 덱 index
+컴포넌트, `<Thesis>` 이관 표시, 필수 `<TermIntro>`, 검토 날짜 정합성을 검사한다. 이어서 Astro
+빌드와 Pagefind 인덱스를 만들고, `check:links`가 **렌더된 HTML의 내부 페이지·파일·anchor**를 검사한다.
+외부 URL의 생존 여부는 네트워크 상태와 rate limit 영향을 받으므로 기본 검사를 막지 않는다.
+
+덱별 검토 이력·검토 주기 초과·`legacyThesis` 잔량은 필요할 때 다음으로 본다.
+
+```bash
+pnpm report:content
+```
 
 ## 변경별 브라우저 검증
 
 | 변경 | 검증 |
 |---|---|
 | 문장·문단·링크 | `pnpm check` |
+| 새 페이지·덱 설정·순서 변경 | check + 해당 덱의 사이드바·DeckMap |
 | 표·컴포넌트 추가 | check + 모바일 넘침 |
 | D2 추가·수정 | check + SVG 로드·라이트/다크·확대·애니메이션 |
 | 테마·`custom.css`·config·override | 아래 항목 전수 |
 
 산출물을 브라우저에서 볼 때는 `pnpm preview`를 사용한다.
 
-D2 폭·배치를 조정하는 반복 작업에서는 매번 빌드하지 말고
+D2의 전체 작성 규칙은 [d2-authoring.md](d2-authoring.md)에 있다. 폭·배치를 조정하는 반복 작업에서는 매번 빌드하지 말고
 `node scripts/d2-measure.mjs [--png] <파일.mdx>`를 쓴다 — 빌드 산출물과 픽셀 단위로 같은
 크기를 캐시 준비 뒤 파일당 1~2초에 찍고, `--png`는 블록별 이미지를 `.d2-measure/`에 만들어 렌더 결과
 (라벨 겹침·컨테이너 관통처럼 폭 수치로 안 잡히는 결함)를 빌드·브라우저 없이 훑게 해 준다.

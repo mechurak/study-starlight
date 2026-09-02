@@ -1,7 +1,6 @@
 ---
 title: 개요
 description: Langfuse v4로 LLM 애플리케이션의 동작·비용·품질을 추적하고 prompt와 평가의 개선 루프를 운영한다
-aliases: [LLM Observability, LLMOps, LLM 평가, Prompt Management]
 reviewedAt: 2026-08-18
 status: review
 ---
@@ -75,27 +74,7 @@ legacy 경로를 제거하는 전환 기간이므로, 새 계측은 Python SDK v
 
 ## 구성
 
-<DeckMap
-  steps={[
-    { label: '0~1장', href: '/langfuse/00-position/', title: '자리와 데이터 모델', tone: 'key',
-      desc: '관측 플랫폼의 경계 · observation · trace · session · score',
-      note: '무엇을 어떤 단위로 남겨야 질문에 답할 수 있는가' },
-    { label: '2~3장', href: '/langfuse/02-instrumentation/', title: '관측 설계', tone: 'zone',
-      desc: 'OTel 기반 SDK · batch와 flush · agent/RAG trace 구조',
-      note: '실행을 잃지 않으면서 분석 가능한 이름과 문맥을 어떻게 남기는가' },
-    { label: '4~6장', href: '/langfuse/04-prompt-management/', title: '개선 루프', tone: 'ok',
-      desc: 'prompt version·label · score · online eval · dataset experiment',
-      note: 'production 실패를 재현 가능한 release gate로 어떻게 되돌리는가' },
-    { label: '7~9장', href: '/langfuse/07-k8s-architecture/', title: '온프렘 Kubernetes', tone: 'warn',
-      desc: 'Web·Worker · Postgres·ClickHouse·Redis·S3 · 배포·upgrade·retention',
-      note: '비동기 수집 경로를 여러 replica와 복구 가능한 저장소로 어떻게 운영하는가' },
-    { label: '10~12장', href: '/langfuse/10-security/', title: '운영', tone: 'bad',
-      desc: 'masking·key·SSO · queue·storage 관측 · 장애 진단',
-      note: '요청은 성공했는데 trace가 없을 때 어느 경계부터 가르는가' },
-    { label: '13~14장', href: '/langfuse/13-glossary/', title: '마무리', tone: 'mute',
-      desc: '용어 사전 · 전체 지도 · production 준비 체크리스트' },
-  ]}
-/>
+<DeckMap deck="langfuse" />
 
 ## 전체를 관통하는 세 문장
 

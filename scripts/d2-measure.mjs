@@ -19,7 +19,7 @@
 //   재배치했으면 --png로 눈으로 확인한다.
 //
 // 본문 폭은 632px이다. 632 초과는 그 비율만큼 축소 표시되고, 900 초과는 배치를 다시 잡는 편이
-// 낫다(docs/content-authoring.md의 D2 절). 출력의 배율은 632/폭이다.
+// 낫다(docs/d2-authoring.md). 출력의 배율은 632/폭이다.
 
 import fs from 'node:fs';
 import os from 'node:os';

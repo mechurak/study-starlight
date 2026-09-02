@@ -10,7 +10,9 @@
     "dev": "astro dev",
     "start": "astro dev",
     "check:content": "node scripts/check-content.mjs",
-    "check": "pnpm run check:content && astro build",
+    "check:links": "node scripts/check-links.mjs",
+    "report:content": "node scripts/report-content-health.mjs",
+    "check": "pnpm run check:content && astro build && pnpm run check:links",
     "prebuild": "node scripts/prepare-git-history.mjs",
     "build": "astro build",
     "preview": "astro preview",
@@ -26,6 +28,7 @@
     "starlight-image-zoom": "^0.15.0",
     "starlight-sidebar-topics": "^0.8.0",
     "starlight-sidebar-topics-dropdown": "^0.6.0",
-    "starlight-theme-rapide": "^0.5.2"
+    "starlight-theme-rapide": "^0.5.2",
+    "yaml": "^2.9.0"
   }
 }

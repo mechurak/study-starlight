@@ -8,6 +8,9 @@
   세로 스테퍼로 바꾸면 본문 글자 크기가 유지되고, 텍스트가 선택·검색되고,
   장 범위가 링크가 된다 (mermaid 노드는 클릭할 수 없었다).
 
+	deck: 현재 덱 slug. 각 덱의 `_deck.mjs` map을 읽어 그린다.
+	사이드바와 다른 덱은 덱 폴더만 고치면 되고, index에 steps를 복제하지 않는다.
+
   steps: 덱의 덩어리 하나 = 카드 하나
     label  범위 라벨 ("0~1장"). href가 있으면 링크가 된다
     title  덩어리 이름
@@ -15,10 +18,12 @@
     desc   그 덩어리가 다루는 것
     note   답하는 질문 / 층 / 도메인 — 덱마다 세 번째 열이 달랐던 그 값
     items  장을 하나씩 나열해야 하는 덱용 (shadcn) — [텍스트, href][]
-    tone   공통 의미 팔레트 — docs/content-authoring.md "의미 팔레트" 절
+    tone   공통 의미 팔레트 — docs/d2-authoring.md "의미 팔레트" 절
 
   desc · note는 평문이다. `코드`와 **굵게**만 아래에서 직접 처리한다.
 */
+import { getDeck } from '../../data/decks.mjs';
+
 type Tone = 'key' | 'ok' | 'warn' | 'bad' | 'mute' | 'zone';
 
 interface Step {
@@ -33,10 +38,13 @@ interface Step {
 }
 
 interface Props {
-  steps: Step[];
+  deck: string;
 }
 
-const { steps } = Astro.props;
+const { deck: deckSlug } = Astro.props;
+const deck = getDeck(deckSlug);
+if (!deck) throw new Error(`DeckMap: '${deckSlug}' 덱을 찾을 수 없습니다.`);
+const steps = deck.map as Step[];
 
 const escape = (s: string) =>
   s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
@@ -84,7 +92,7 @@ const format = (s: string) =>
     gap: 0;
   }
 
-  /* 의미 팔레트 — docs/content-authoring.md "의미 팔레트" 절과 같은 여섯 색 */
+  /* 의미 팔레트 — docs/d2-authoring.md "의미 팔레트" 절과 같은 여섯 색 */
   .deckmap__step[data-tone='key']  { --dm-line: #2563eb; --dm-bg: #dbeafe; --dm-fg: #1e3a8a; }
   .deckmap__step[data-tone='ok']   { --dm-line: #16a34a; --dm-bg: #dcfce7; --dm-fg: #14532d; }
   .deckmap__step[data-tone='warn'] { --dm-line: #d97706; --dm-bg: #fef3c7; --dm-fg: #78350f; }

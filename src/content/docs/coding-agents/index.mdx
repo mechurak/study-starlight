@@ -1,7 +1,6 @@
 ---
 title: 개요
 description: Claude Code와 Codex를 같은 저장소에서 운영하는 지침·PRD·로컬 작업 문서·컨텍스트·검증 패턴
-aliases: [코딩 에이전트, Coding Agents, AGENTS.md, CLAUDE.md]
 reviewedAt: 2026-08-30
 status: review
 ---
@@ -25,16 +24,7 @@ GitHub 이슈 대신 `docs/batches/`에 목표·계획·상태·검증을 남기
 
 ## 구성
 
-<DeckMap
-  steps={[
-    { label: '0장', href: '/coding-agents/00-project-instructions/', title: '프로젝트 지침', tone: 'key',
-      desc: '`AGENTS.md`를 공유 정본으로 두고 `CLAUDE.md`를 얇은 어댑터로 만드는 monorepo 구조',
-      note: '두 도구가 같은 규칙을 읽되, 서로 다른 하위 폴더 탐색 방식도 놓치지 않게 하려면' },
-    { label: '1장', href: '/coding-agents/01-development-process/', title: 'AI 개발 프로세스', tone: 'ok',
-      desc: 'PRD·`AGENTS.md`·`docs/batches/`의 역할을 나누고 마일스톤마다 구현·검증·기록을 닫는 흐름',
-      note: '현재 제품 정본을 흐리지 않고 긴 작업을 새 세션에서도 이어 가려면' },
-  ]}
-/>
+<DeckMap deck="coding-agents" />
 
 ## 이 덱의 기본 관점
 

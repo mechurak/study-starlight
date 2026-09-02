@@ -19,16 +19,7 @@ import DeckMap from '../../../components/docs/DeckMap.astro';
 
 ## 구성
 
-<DeckMap
-  steps={[
-    { label: '1장', href: '/lab-environment/01-kind/', title: 'kind 실습 환경', tone: 'key',
-      desc: 'Docker · Colima(macOS) · kubectl 자동완성 · kind 생성 · 중단 · 삭제',
-      note: '운영체제별 차이와 공통 kind 사용법을 한 흐름에서 어떻게 준비하나' },
-    { label: '2장', href: '/lab-environment/02-helm/', title: 'Helm CLI 준비', tone: 'warn',
-      desc: '운영체제별 공식 설치 페이지 · version · context 연결',
-      note: '여러 Kubernetes 실습이 공유하는 chart client를 어떻게 준비하나' },
-  ]}
-/>
+<DeckMap deck="lab-environment" />
 
 ## 다른 덱과의 경계
 

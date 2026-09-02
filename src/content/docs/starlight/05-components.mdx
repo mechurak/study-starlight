@@ -1,6 +1,9 @@
 ---
 title: "5. 내장 컴포넌트"
 description: "Steps·Tabs·Card·FileTree·Badge·aside·D2 — 내장 컴포넌트와 지시어와 다이어그램 펜스의 구분, 각각의 쓸 자리와 쓰지 말 자리, 실물 예시, 그리고 다이어그램을 D2로 통일한 이유"
+deckGroup: mdx
+sidebar:
+  order: 60
 ---
 
 import { Steps, Tabs, TabItem, Card, CardGrid, FileTree, Badge, LinkCard } from '@astrojs/starlight/components';
@@ -131,7 +134,8 @@ D2는 import하지 않는다. 언어 이름을 `d2`로 준 **코드 펜스**를 
 - **`<FileTree>`** — `- 경로/` 뒤에 설명을 이어 쓰면 회색 주석이 되고, 파일명을
   `**굵게**` 하면 강조된다. 중요한 파일을 눈에 띄게 하는 공식 수단
 - **`<Badge>` 를 제목에 달 때는 공백 없이 붙인다.** `### 집계 ClusterRole<Badge …/>` —
-  띄우면 앵커 slug 끝에 `-`가 붙어 **링크가 조용히 바뀐다.** 빌드는 통과한다.
+  띄우면 앵커 slug 끝에 `-`가 붙어 링크가 바뀐다. build만으로는 통과하지만,
+  그 anchor를 가리키는 내부 링크가 있으면 `pnpm check`의 링크 검사가 잡는다.
   간격은 `custom.css`의 `:is(h2, h3) > .sl-badge` 규칙이 알아서 준다
 - **`<LinkCard>` 는 장 끝 전용** — 이 덱의 모든 장이 다음 장 안내로 끝나는 그 자리다.
   이 페이지 맨 아래의 "6. 커스텀 컴포넌트" 카드가 그것이고, `<LinkButton>`은 덱 index에 하나 있다
@@ -237,7 +241,7 @@ svg -> browser: 표시·확대 {
 
 색의 의미는 사이트 전체가 여섯 개로 통일한다 — 다이어그램만이 아니라 `DeckMap`과 랜딩의
 카테고리 식별색도 같은 값을 쓴다. 정본 표는
-[docs/content-authoring.md의 "의미 팔레트" 절](https://github.com/mechurak/study-starlight/blob/main/docs/content-authoring.md)이다.
+[docs/d2-authoring.md의 "의미 팔레트" 절](https://github.com/mechurak/study-starlight/blob/main/docs/d2-authoring.md)이다.
 
 ```text
 ok   fill:#dcfce7  stroke:#16a34a  font-color:#14532d   /* 정상·성공 */

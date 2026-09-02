@@ -3,6 +3,10 @@ title: "7. RLS — Row Level Security"
 description: "가장 중요한 한 장 — 자동으로 붙는 WHERE 절, using과 with check, 정책 패턴 다섯, 성능 3종 세트"
 reviewedAt: 2026-08-12
 status: stable
+deckGroup: data-api
+sidebar:
+  order: 110
+legacyThesis: true
 ---
 
 import { Tabs, TabItem, Steps, LinkCard } from '@astrojs/starlight/components';
@@ -286,7 +290,7 @@ create policy "관리자 전체 접근"
 ```
 
 - 추가 조회 없음 → 가장 빠르다
-- [6장의 Custom Access Token Hook](/supabase/06-auth/#커스텀-클레임과-rbac)이 필요하다
+- [6A장의 Custom Access Token Hook](/supabase/06-auth-reference/#커스텀-클레임과-rbac)이 필요하다
 - **역할 변경이 토큰 갱신 후에 반영된다**
 
 </TabItem>

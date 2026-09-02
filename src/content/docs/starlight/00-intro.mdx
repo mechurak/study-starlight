@@ -1,6 +1,9 @@
 ---
 title: "0. 시작하기 전에"
 description: "이 덱의 대상과 범위, 왜 노션이 아니라 문서 사이트인가, 그리고 콘텐츠·구조·표현의 3층 멘탈 모델"
+deckGroup: intro
+sidebar:
+  order: 10
 ---
 
 import { Card, CardGrid, LinkCard } from '@astrojs/starlight/components';
@@ -14,7 +17,7 @@ import Thesis from '../../../components/docs/Thesis.astro';
     ['SSG', 'Static Site Generator', '정적 사이트 생성기. 빌드 시점에 모든 페이지를 HTML 파일로 미리 만들어 둔다. 요청마다 서버가 페이지를 조립하지 않으므로 **서버가 필요 없고, 싸고, 빠르다.** Starlight가 이 부류다.'],
     ['docs-as-code', '', '문서를 코드처럼 다루는 방식 — 마크다운 파일을 git으로 버전 관리하고, diff로 리뷰하고, 빌드해서 배포한다. 이 레포의 운영 방식 그 자체다.'],
     ['마크다운', 'Markdown', '평문에 가까운 경량 마크업. `#` 제목, `**굵게**` 같은 기호로 서식을 준다. 이 사이트의 모든 본문이 이것이다 — 정확히는 컴포넌트를 얹은 MDX(4장).'],
-    ['프론트매터', 'Frontmatter', '마크다운 파일 맨 위 `---` 사이의 메타데이터 블록. 본문이 아니라 **페이지의 속성**(제목·설명)이다. 이 값이 사이드바 라벨과 검색 결과에 쓰인다.'],
+    ['프론트매터', 'Frontmatter', '마크다운 파일 맨 위 `---` 사이의 메타데이터 블록. 본문이 아니라 **페이지의 속성**(제목·설명·소속·순서)이다. 이 값이 사이드바와 검색 결과에 쓰인다.'],
     ['Starlight', '', 'Astro 위에 만들어진 문서 사이트 프레임워크. 헤더·사이드바·검색·다크모드 같은 뼈대를 전부 주고, 우리는 마크다운 폴더만 채운다.'],
   ]}
 />
@@ -115,7 +118,7 @@ classes: {
 }
 
 content: "콘텐츠\nsrc/content/docs/\n마크다운 · MDX" { class: key }
-structure: "구조\nsrc/data/decks.mjs · astro.config.mjs\n덱 manifest · 사이트 설정" { class: mute }
+structure: "구조\n_deck.mjs · src/data/ · astro.config.mjs\n덱 metadata · 사이트 설정" { class: mute }
 presentation: "표현\nsrc/components/ · custom.css\n컴포넌트 · 스타일" { class: mute }
 check: "검사 · 빌드\npnpm check" { class: ok }
 dist: "dist/\n정적 HTML + 검색 인덱스" { class: ok }
@@ -147,7 +150,7 @@ check -> dist
 
 - 대상은 **이 사이트를 고치거나 비슷한 것을 만들려는 사람**, 예제는 이 레포 자체
 - 노션 대신 문서 사이트인 이유는 **본문을 파일로 소유**하기 위해서다 — git · 검색 · 에이전트 협업이 따라온다
-- 멘탈 모델은 3층 분리: **콘텐츠**(`src/content/docs/`) / **구조**(`src/data/decks.mjs` · `astro.config.mjs`) / **표현**(`src/components/`)
+- 멘탈 모델은 3층 분리: **콘텐츠**(`src/content/docs/`) / **구조**(덱별 `_deck.mjs` · `src/data/` · `astro.config.mjs`) / **표현**(`src/components/`)
 - 기준은 Starlight 0.41 · Astro 7 (2026-08) — 예제가 레포와 다르면 레포가 맞다
 
 <LinkCard

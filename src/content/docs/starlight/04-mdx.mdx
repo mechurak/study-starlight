@@ -1,6 +1,9 @@
 ---
 title: "4. MDX — 마크다운에 컴포넌트를"
 description: "MDX의 해부와 remark·rehype 변환 파이프라인, 마크다운과 다른 문법 함정 네 가지, 그리고 한글 문서에서 굵게가 깨지는 CommonMark 규칙"
+deckGroup: mdx
+sidebar:
+  order: 50
 ---
 
 import { LinkCard } from '@astrojs/starlight/components';
@@ -158,7 +161,7 @@ CommonMark의 강조 규칙에서 닫는 `**`는 **"단어의 끝" 위치여야*
 | `` **`get all`**이다 `` | `` `get all`이다 `` | 코드 서식이 이미 강조다 — `**`를 뺀다 |
 
 :::caution[함정]
-이 문제는 눈으로 훑어서 못 잡는다 — **산출물로 판정한다.** `pnpm build` 후:
+이 문제는 눈으로 훑어서 못 잡는다 — **산출물로 판정한다.** `pnpm check` 후:
 
 ```bash
 grep -rho '\*\*[^<*]\{0,45\}' dist --include=index.html | sort -u

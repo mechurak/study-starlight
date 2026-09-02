@@ -4,6 +4,9 @@ description: "Starlight로 학습 지식베이스를 설계할 때의 판단, �
 aliases: [개인 지식베이스, 학습 노트 구조, PKM]
 reviewedAt: 2026-08-25
 status: stable
+deckGroup: wrapup
+sidebar:
+  order: 100
 ---
 
 import { Steps, CardGrid, LinkCard } from '@astrojs/starlight/components';
@@ -16,7 +19,7 @@ import Thesis from '../../../components/docs/Thesis.astro';
 **콘텐츠 · 구조 · 표현은 다른 층이고, 층마다 판정자가 다르다.**
 
 - 콘텐츠(`src/content/docs/`)는 마크다운/MDX — 문법은 빌드가, 렌더는 브라우저가 판정한다
-- 구조(`src/data/decks.mjs` · `astro.config.mjs`)는 덱 manifest와 사이트 설정 — slug 어긋남은 `check:content`가 잡는다
+- 구조(덱별 `_deck.mjs` · MDX frontmatter · `src/data/` · `astro.config.mjs`)는 가까운 원본과 파생 설정 — 어긋남은 `check:content`가 잡는다
 - 표현(`src/components/` · `custom.css`)은 컴포넌트와 스타일 — 라이트/다크 두 모드가 판정한다
 
 무언가 이상할 때 "어느 층의 문제인가"부터 물으면, 뒤질 파일과 문서가 바로 좁혀진다.
@@ -28,19 +31,18 @@ import Thesis from '../../../components/docs/Thesis.astro';
 
 | 커졌을 때 보이는 통증 | 도입할 구조 원칙 | 이 레포의 구현 |
 |---|---|---|
-| 사이드바·랜딩·장 수가 서로 다르다 | 탐색 구조의 **단일 원본**을 둔다 | `src/data/decks.mjs`에서 topics와 랜딩 데이터를 파생 |
-| config가 수백 줄의 콘텐츠 목록이 된다 | 설정과 데이터를 분리한다 | `astro.config.mjs`는 조립만, 덱 정의는 manifest로 |
+| 사이드바·랜딩·장 수가 서로 다르다 | 같은 가까운 원본에서 모든 보기를 파생한다 | `_deck.mjs`와 MDX를 `load-decks.mjs`가 합성 |
+| 중앙 manifest가 수백 줄의 콘텐츠 목록이 된다 | 정보 소유권을 덱·페이지 가까이 옮긴다 | 덱 정보는 `_deck.mjs`, 그룹·순서는 각 MDX |
 | 컴포넌트를 어디서 고칠지 모르겠다 | 역할로 디렉터리를 나눈다 | `layout/` · `docs/` · `demos/` |
-| 예전 이름이나 약어로 검색하면 안 나온다 | 검색용 동의어를 본문 HTML에 남긴다 | 프론트매터 `aliases`를 페이지 앞에 렌더 |
-| 오래된 글인지 판단할 수 없다 | 수정일과 **내용 검토일**을 구분한다 | `reviewedAt` + `status` (`stable` · `review` · `stale`) |
-| 작업 규칙 파일이 길어 아무도 안 읽는다 | 루트 규칙은 **지도**, 세부는 목적별 문서로 둔다 | `AGENTS.md` → 작성·검증·배포 문서 |
-| 빌드는 되는데 페이지가 빠지거나 중복된다 | 프레임워크 밖의 프로젝트 불변식을 검사한다 | `check:content` 후 `astro build`를 `pnpm check`로 묶음 |
+| 예전 이름이나 약어로 검색하면 안 나온다 | 검색용 동의어를 본문 HTML에 남긴다 | 페이지 frontmatter·덱 `_deck.mjs`의 `aliases`를 렌더 |
+| 오래된 글인지 판단할 수 없다 | 수정일과 **내용 검토일**을 구분하고 미검토를 숨기지 않는다 | `reviewedAt` + `status` + `pnpm report:content` |
+| 작업 규칙 파일이 길어 아무도 안 읽는다 | 루트 규칙은 **지도**, 세부는 목적별 문서로 둔다 | `AGENTS.md` → 작성·D2·검증·배포 문서 |
+| 빌드는 되는데 페이지·anchor가 빠지거나 중복된다 | 프레임워크 밖의 프로젝트 불변식을 검사한다 | content → build → 렌더된 내부 링크를 `pnpm check`로 묶음 |
 | 로컬에서는 고쳤는데 다음 변경에서 다시 깨진다 | 같은 검사를 CI에서도 반복한다 | push·pull request마다 `pnpm check` |
 
-여기서 핵심은 manifest 자체가 아니라 **한 사실에 편집 지점을 하나만 두는 것**이다.
-덱의 순서를 manifest와 각 페이지 프론트매터 양쪽에 적거나, 작성 규칙을 `AGENTS.md`와
-별도 문서에 복제하면 어느 쪽이 맞는지 다시 사람이 판정해야 한다. 파생할 수 있는 값은
-파생하고, 파생할 수 없는 규칙은 한 문서만 원본으로 정한다.
+여기서 핵심은 특정 manifest가 아니라 **한 사실에 편집 지점을 하나만 두는 것**이다.
+전역 어휘는 `catalog.mjs`, 덱 정보는 그 덱의 `_deck.mjs`, 페이지 소속·순서는 그 MDX가 소유한다.
+같은 목록을 사이드바와 랜딩에 다시 적지 않고 파생하며, 파생할 수 없는 규칙만 한 문서를 원본으로 둔다.
 
 ### 페이지는 검색 결과 한 건의 크기로
 
@@ -58,7 +60,7 @@ import Thesis from '../../../components/docs/Thesis.astro';
 
 1. Starlight 기본 라우팅·사이드바·검색으로 글부터 쓴다
 2. 서로 무관한 주제가 늘어날 때 topic으로 사이드바를 나눈다
-3. 같은 덱 목록을 두 군데 이상 편집하게 될 때 manifest를 만든다
+3. 같은 목록을 두 군데 이상 편집하게 될 때 가까운 원본 하나를 정하고 나머지를 파생한다
 4. 실제 검색 실패가 쌓일 때 `aliases`, 현재성 판단이 어려울 때 `reviewedAt`·`status`를 넣는다
 5. 같은 표현을 세 번째 복붙할 때 문서 컴포넌트로 뽑는다
 6. 사람이 반복해서 놓치는 불변식만 검사 스크립트와 CI로 고정한다
@@ -75,7 +77,7 @@ import Thesis from '../../../components/docs/Thesis.astro';
 |---|---|
 | [1. 지형](/starlight/01-landscape/) | 선택의 축은 "본문이 어디에 사는가" — Starlight는 **파일 소유 + 내장 기본값**의 답 |
 | [2. Astro](/starlight/02-astro/) | 기본값이 zero-JS — 컴포넌트는 빌드 시점 템플릿, JS는 섬만 |
-| [3. 구조](/starlight/03-starlight/) | 파일 경로 = slug = URL, 덱 구조의 원본은 manifest 한 곳 |
+| [3. 구조](/starlight/03-starlight/) | 파일 경로 = slug = URL, 덱과 페이지가 자기 정보를 소유하고 loader가 탐색 구조를 파생 |
 | [4. MDX](/starlight/04-mdx/) | 문서인 척하는 소스 코드 — 중괄호 · 들여쓰기 · 닫는 `**`가 지뢰 |
 | [5. 내장 컴포넌트](/starlight/05-components/) | 절차는 Steps, 갈래는 Tabs, 분류는 Card — 다이어그램 기본값은 D2, 색 여섯 개의 약속 |
 | [6. 커스텀](/starlight/06-custom/) | 사다리 아래 칸부터 — 만들면 머리 주석에 "왜"를 남긴다 |
@@ -88,24 +90,23 @@ import Thesis from '../../../components/docs/Thesis.astro';
 
 <Steps>
 
-1. `src/content/docs/<덱이름>/` 을 만들고 `index.mdx`(개요)와 본문 페이지를 넣는다
+1. `src/content/docs/<덱이름>/`을 만들고 `_deck.mjs`를 둔다
 
-   장 파일명은 `00-intro.mdx` 부터 번호로. 처음부터 전부 `.mdx`로 만든다.
-   덱 index의 "구성" 절은 다이어그램이 아니라 `<DeckMap>`으로.
+   가까운 성격의 덱 설정을 복사해 `navOrder` · `catalogOrder` · metadata · `category` · `tags` ·
+   `termIntro` · `groups` · `map`을 정한다. 이 파일이 있으면 loader가 덱을 자동 발견한다.
 
-2. `src/data/decks.mjs`에 덱을 등록한다
+2. 같은 폴더에 `_baseline.md`와 `index.mdx`를 만든다
 
-   `label` · `link` · `icon` · `items`(그룹 라벨 + slug 문자열). 등록하지 않으면
-   `Failed to find the topic` 으로 빌드가 실패한다 — 잊어도 잡힌다.
+   baseline에는 기준 버전 · 서술 규칙 · 범위 경계를 둔다. index에는 `<LinkButton>` 하나와
+   `<DeckMap deck="<덱이름>" />` 하나를 둔다. map 단계는 `_deck.mjs`만 고친다.
 
-   같은 데이터로 사이드바와 랜딩 카드가 만들어지고, 장 수는 slug 개수에서 계산된다.
+3. 본문 페이지를 넣는다
 
-3. 덱 고유의 규칙이 있으면 `_baseline.md`를 덱 폴더에 만든다
+   장 파일명은 `00-intro.mdx`부터 번호로 두고 처음부터 `.mdx`로 만든다. 각 페이지에
+   `deckGroup`과 겹치지 않는 `sidebar.order`를 적으면 사이드바와 장 수에 자동 반영된다.
+   새 장은 `<Thesis>`를 두고, 개념 학습 덱이면 규칙에 맞춰 `<TermIntro>`도 둔다.
 
-   기준 버전 고정, 서술 규칙, "왜 이렇게 쓰였는가" — AGENTS.md가 아니라 여기에.
-   `_` 파일이라 빌드에는 안 잡힌다.
-
-4. `pnpm check`로 판정하고, 장의 리듬(Thesis → TermIntro → h2 5~9개 → 요약 → LinkCard)을 유지한다
+4. `pnpm check`로 설정·본문·빌드·내부 링크를 판정하고, 실제 사이드바와 DeckMap을 확인한다
 
 </Steps>
 
@@ -116,8 +117,9 @@ import Thesis from '../../../components/docs/Thesis.astro';
 | 하려는 것 | 명령 |
 |---|---|
 | dev 서버 (백그라운드) | `pnpm astro dev --background` → `pnpm astro dev stop` / `status` / `logs` |
-| 전 페이지 판정 | `pnpm build` |
-| 배포와 같은 물건 확인 | `npx serve dist -l 4323` |
+| 전 페이지 판정 | `pnpm check` |
+| 덱별 검토·Thesis 이관 현황 | `pnpm report:content` |
+| 배포와 같은 산출물 확인 | `pnpm preview` |
 | 깨진 굵게 찾기 | `grep -rho '\*\*[^<*]\{0,45\}' dist --include=index.html \| sort -u` |
 | 제목 고치기 전 앵커 참조 확인 | `grep -rn '#앵커-slug' src/content/docs/` |
 | 배포 | `main` 푸시 (요청받았을 때만) — 브랜치 푸시는 preview |
@@ -133,7 +135,7 @@ import Thesis from '../../../components/docs/Thesis.astro';
 | D2를 눌러도 확대되지 않음 | `inline: true`로 SVG를 HTML에 직접 넣음 | 5 |
 | 화면에 `**` 가 그대로 보임 | 닫는 `**` 앞 문장부호 + 뒤 조사 | 4 |
 | 컴포넌트 안 내용이 코드 블록으로 | JSX 자식 마크다운 들여쓰기 | 4 |
-| 절 링크가 조용히 죽음 | 제목 수정으로 앵커 slug 변경 | 7 |
+| 외부 참고 링크가 조용히 죽음 | 상대 사이트의 이전·삭제 — 기본 내부 링크 검사 범위 밖 | 7 |
 | 제목 옆 Badge 후 링크 변경 | `<Badge>` 앞에 공백 — slug 끝에 `-` | 5 |
 | 검색에 새 글이 안 나옴 (배포) | 인덱스는 빌드 산출물 — 배포가 안 된 것 | 8 |
 | 하위 경로 배포에서 본문 링크만 깨짐 | 본문 절대 경로 링크에 base 미적용 | 8 |

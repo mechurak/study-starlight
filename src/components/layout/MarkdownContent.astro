@@ -6,7 +6,7 @@ import { deckDefinitions } from '../../data/decks.mjs';
 // 헤더 검색(Pagefind) 결과에 "덱: <이름>"을 표시하기 위한 커스텀 meta.
 // meta는 <main data-pagefind-body> 안에 있어야 수집되는데, 본문 안쪽의
 // 첫 공통 진입점이 이 컴포넌트라 여기서 심는다. 라벨은 topics 플러그인의
-// 라우트 데이터에서 오므로 src/data/decks.mjs의 topic label과 항상 일치한다.
+// 라우트 데이터에서 오므로 파생된 deck topic label과 항상 일치한다.
 // 랜딩처럼 topic 밖 페이지는 isCurrent가 없어 meta 없이 렌더된다.
 // 결과 카드에서의 표시 위치·모양은 src/styles/custom.css 참고.
 // 이 override가 있으면 starlight-image-zoom이 자체 MarkdownContent override를 설치하지 않으므로
@@ -16,11 +16,20 @@ const { entry } = Astro.locals.starlightRoute;
 const data = entry.data as typeof entry.data & {
 	aliases?: string[];
 	reviewedAt?: Date;
-	status?: 'stable' | 'review' | 'stale';
+	status?: 'unreviewed' | 'stable' | 'review' | 'stale';
 };
 const deck = deckDefinitions.find((candidate) => candidate.slug === entry.id);
-const aliases = data.aliases ?? deck?.aliases ?? [];
-const statusLabel = data.status === 'review' ? '검토 필요' : data.status === 'stale' ? '오래된 내용' : undefined;
+const aliases = [...new Set([...(deck?.aliases ?? []), ...(data.aliases ?? [])])];
+// 랜딩처럼 topic 밖에 있는 표지는 콘텐츠 현재성 대상이 아니다.
+const status = topic ? (data.status ?? (data.reviewedAt ? 'stable' : 'unreviewed')) : undefined;
+const statusLabel =
+	status === 'unreviewed'
+		? '검토 이력 없음'
+		: status === 'review'
+			? '검토 필요'
+			: status === 'stale'
+				? '오래된 내용'
+				: undefined;
 const reviewedAt = data.reviewedAt?.toLocaleDateString('ko-KR', {
 	year: 'numeric',
 	month: '2-digit',
@@ -35,7 +44,7 @@ const reviewedAt = data.reviewedAt?.toLocaleDateString('ko-KR', {
 		<p class="content-meta">
 			{aliases.length > 0 && <span>다른 이름: {aliases.join(' · ')}</span>}
 			{reviewedAt && <span>내용 검토: {reviewedAt}</span>}
-			{statusLabel && <span class:list={['content-status', `content-status--${data.status}`]}>{statusLabel}</span>}
+			{statusLabel && <span class:list={['content-status', `content-status--${status}`]}>{statusLabel}</span>}
 		</p>
 	)
 }
@@ -57,6 +66,10 @@ const reviewedAt = data.reviewedAt?.toLocaleDateString('ko-KR', {
 
 	.content-status--review {
 		color: var(--sl-color-orange-high, #d97706);
+	}
+
+	.content-status--unreviewed {
+		color: var(--sl-color-gray-3);
 	}
 
 	.content-status--stale {

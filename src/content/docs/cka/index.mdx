@@ -18,26 +18,7 @@ kubectl은 써봤지만 "안에서 무슨 일이 벌어지는지"가 흐릿한 �
 배점 순서와 학습 순서는 다르다. 트러블슈팅(30%)이 마지막에 있는 이유는,
 앞의 전부를 알아야 진단이 되기 때문이다.
 
-<DeckMap
-  steps={[
-    { label: '0~1장', href: '/cka/00-intro/', title: '시험 소개', tone: 'mute',
-      desc: '이 덱을 읽는 법 · 시험 자체의 해부 (환경 · 채점 · 시간 배분)' },
-    { label: '2~3장', href: '/cka/02-architecture/', title: '기초', tone: 'key',
-      desc: '클러스터 아키텍처 · kubectl' },
-    { label: '4~8장', href: '/cka/04-pods/', title: 'Workloads and Scheduling', badge: '15%', tone: 'warn',
-      desc: 'Pod · 워크로드 · 설정 · 스케줄링 · 오토스케일링' },
-    { label: '9~12장', href: '/cka/09-services/', title: 'Services and Networking', badge: '20%', tone: 'warn',
-      desc: 'Service · DNS · Ingress/Gateway · NetworkPolicy' },
-    { label: '13장', href: '/cka/13-storage/', title: 'Storage', badge: '10%', tone: 'mute',
-      desc: 'PV · PVC · StorageClass · 볼륨' },
-    { label: '14~17장', href: '/cka/14-rbac/', title: 'Cluster Architecture', badge: '25%', tone: 'bad',
-      desc: 'RBAC · 클러스터 라이프사이클 · Helm/Kustomize · 확장' },
-    { label: '18장', href: '/cka/18-troubleshooting/', title: 'Troubleshooting', badge: '30%', tone: 'bad',
-      desc: '증상에서 원인으로 — 앞의 전부가 여기서 쓰인다' },
-    { label: '19~20장', href: '/cka/19-exam-strategy/', title: '시험 대비', tone: 'mute',
-      desc: '시험 전략 · 치트시트 · 마무리' },
-  ]}
-/>
+<DeckMap deck="cka" />
 
 ## 전체를 관통하는 한 문장
 
