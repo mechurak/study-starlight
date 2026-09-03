@@ -18,8 +18,10 @@ PVC가 Pending인 이유가 랩마다 다르고, 그 차이가 곧 출제 포인
 
 :::tip[실습 전 확인]
 PV(PersistentVolume)는 관리자가 준비한 저장 공간, PVC(PersistentVolumeClaim)는 앱의 요청,
-StorageClass는 요청이 올 때 PV를 자동 생성하는 규칙이다. PVC가 `Pending`이면
-**클래스 · access mode · 용량 · 셀렉터**가 맞는지 `describe pvc`의 Events에서 확인한다.
+StorageClass는 PVC가 사용할 **프로비저닝 방식과 바인딩 정책**을 묶은 규칙이다. 동적
+프로비저너가 있으면 PV를 만들 수 있지만 `kubernetes.io/no-provisioner`는 만들지 않는다.
+PVC가 `Pending`이면 **클래스 · access mode · 용량 · 셀렉터**가 맞는지 `describe pvc`의
+Events에서 확인한다.
 :::
 
 ## hostPath 로그 볼륨 — webapp
@@ -192,6 +194,14 @@ kubectl get storageclass
 명시적으로 class 없는 PV만 요청해야 하는 환경에서는 PVC에 `storageClassName: ""`를 둔다. 다만
 이 랩처럼 제공된 요구사항과 정답이 필드를 생략한다면 불필요한 값을 먼저 추가하지 않는다.
 
+:::tip[`volumeName`을 생략하라는 문제]
+`spec.volumeName`은 특정 PV에 미리 바인딩할 때 쓰는 필드다. 공식
+[Persistent Volumes — Volume Name](https://v1-35.docs.kubernetes.io/docs/concepts/storage/persistent-volumes/#volume-name)처럼
+이를 생략하면 컨트롤 플레인이 class·access mode·용량에 맞는 PV를 고르거나 동적 프로비저닝을
+요청한다. `Do not use the volumeName field`가 있으면 작성하는 PVC YAML에서 필드 자체를 빼고,
+`Pending`을 없애려고 조회한 PV 이름을 임의로 넣지 않는다.
+:::
+
 :::caution[함정 1 — access mode는 크기 비교가 아니다]
 `pv-log`는 `ReadWriteMany`, `claim-log-1`은 `ReadWriteOnce`만 선언했으므로 용량이 맞아도
 **Pending**이다. `ReadWriteMany`가 `ReadWriteOnce`를 포함하는 상위 등급처럼 보이지만, 바인더는
@@ -232,11 +242,96 @@ Pod을 지우면 그제야 삭제되고, PV는 reclaim 정책이 `Retain`이면 
 
 원본 풀이: [13-Practice-Test-Storage-Class.md](https://github.com/kodekloudhub/certified-kubernetes-administrator-course/blob/master/docs/08-Storage/13-Practice-Test-Storage-Class.md)
 
-| 과제 | 명령 |
+이 랩은 **기존 StorageClass를 요청하는 PVC → 그 PVC를 소비하는 Pod → 새 StorageClass** 순서다.
+리소스 이름이 비슷해도 `local-path`가 어떤 프로비저너를 쓰는지는 이름만 보고 단정하지 않고 실제
+오브젝트를 조회한다.
+
+```bash
+kubectl get storageclass
+kubectl get storageclass local-path -o yaml
+kubectl get pv
+```
+
+### 1. 기존 클래스 요청 — local-pvc
+
+PVC에는 전용 명령형 생성기가 없으므로 요구한 네 값을 YAML에 직접 옮긴다. 특정 PV를 지목하는
+`volumeName`은 넣지 않는다.
+
+```yaml
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: local-pvc
+spec:
+  storageClassName: local-path
+  accessModes:
+  - ReadWriteOnce
+  resources:
+    requests:
+      storage: 500Mi
+```
+
+```bash
+kubectl create -f local-pvc.yaml
+kubectl get pvc local-pvc
+kubectl describe pvc local-pvc
+```
+
+여기서 `Pending`을 곧바로 실패로 판정하지 않는다. 먼저 `local-path`의 `volumeBindingMode`와 PVC
+Events를 확인한다. `WaitForFirstConsumer`라면 이 PVC를 쓰는 Pod이 아직 없어서 기다리는 중이다.
+
+### 2. 소비 Pod 생성 — nginx
+
+`kubectl run`에는 PVC와 마운트 경로를 받는 전용 플래그가 없다. 공식
+[`kubectl run`](https://v1-35.docs.kubernetes.io/docs/reference/kubectl/generated/kubectl_run/)의
+`--dry-run=client -o yaml`로 이름과 이미지를 먼저 만든 뒤 `volumeMounts`와 `volumes`를 추가한다.
+`--overrides`에 JSON을 전부 넣을 수도 있지만 시험장에서는 YAML을 고치는 편이 읽고 검증하기 쉽다.
+
+```bash
+kubectl run nginx --image=nginx:alpine --dry-run=client -o yaml > nginx.yaml
+```
+
+```yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: nginx
+spec:
+  containers:
+  - name: nginx
+    image: nginx:alpine
+    volumeMounts:
+    - name: local-persistent-storage
+      mountPath: /var/www/html
+  volumes:
+  - name: local-persistent-storage
+    persistentVolumeClaim:
+      claimName: local-pvc
+```
+
+`volumeMounts[].name`과 `volumes[].name`은 Pod 안의 연결 고리라 서로 같아야 한다. 실제 PVC를
+고르는 값은 별도의 `persistentVolumeClaim.claimName: local-pvc`다. 뼈대가 만든 라벨이나
+`restartPolicy`는 문제에서 다른 값을 요구하지 않는 한 그대로 둬도 된다.
+
+```bash
+kubectl create -f nginx.yaml
+kubectl wait --for=condition=Ready pod/nginx --timeout=60s
+kubectl get pvc local-pvc
+kubectl describe pod nginx
+```
+
+Pod 생성 뒤 `local-pvc`가 `Bound`, Pod이 `Running`인지 함께 본다. `WaitForFirstConsumer`였다면
+이때 스케줄러가 소비 노드를 고르면서 바인딩이 진행된다.
+
+### 3. 로컬 PV용 클래스 생성 — delayed-volume-sc
+
+공식 [Storage Classes — Local](https://v1-35.docs.kubernetes.io/docs/concepts/storage/storage-classes/#local)의
+예제가 이 문제의 뼈대다. 이름만 문제의 값으로 바꾼다.
+
+| 필드 | 여기서의 의미 |
 |---|---|
-| StorageClass 조회 | `k get sc` — PROVISIONER·VOLUMEBINDINGMODE 열 |
-| 동적 프로비저닝 여부 | provisioner가 `kubernetes.io/no-provisioner`면 **안 된다** (로컬 볼륨) |
-| PVC에 클래스 지정 | `spec.storageClassName: local-storage` |
+| `provisioner: kubernetes.io/no-provisioner` | 컨트롤러가 PV를 자동 생성하지 않음 — 조건에 맞는 local PV를 관리자가 미리 준비 |
+| `volumeBindingMode: WaitForFirstConsumer` | 소비 Pod의 스케줄 조건을 알 때까지 준비된 PV의 선택·바인딩을 미룸 |
 
 ```yaml
 apiVersion: storage.k8s.io/v1
@@ -251,7 +346,9 @@ volumeBindingMode: WaitForFirstConsumer
 `volumeBindingMode: WaitForFirstConsumer`인 클래스의 PVC는 **그 PVC를 쓰는 Pod이
 스케줄될 때까지 Pending이 정상**이다. "왜 Pending인가"에 대한 답이
 7장 첫 랩(accessModes 불일치)과 다르다는 것 — 이 대비가 두 랩의 출제 의도다.
-Pod을 만들면 그때 바인딩된다.
+다만 `no-provisioner`는 PV를 만들지 않으므로 Pod을 만든 뒤에도 조건에 맞는 PV가 없으면 계속
+Pending이다. 또한 Pod의 `spec.nodeName`은 스케줄러를 우회하므로 이 모드와 함께 쓰지 않는다.
+노드를 제한해야 하면 `nodeSelector`나 affinity를 쓴다.
 :::
 
 ## 정적·동적 프로비저닝 완료 판정
@@ -348,7 +445,7 @@ kubectl create -f pvc.yaml -n <namespace>             # 초과 시 즉시 Forbid
 | Pod hostPath | `Volumes hostPath` | [Volumes — hostPath](https://kubernetes.io/docs/concepts/storage/volumes/#hostpath)에서 `spec.volumes`와 `containers[].volumeMounts`, `type`의 의미 |
 | PV·PVC·Pod | `Configure PersistentVolume Storage` | [Configure a Pod to Use a PersistentVolume for Storage](https://kubernetes.io/docs/tutorials/configuration/configure-persistent-volume-storage/) 한 페이지에서 PV, PVC, `persistentVolumeClaim` 볼륨의 세 YAML |
 | 바인딩·reclaim 진단 | `Persistent Volumes` | [Persistent Volumes](https://kubernetes.io/docs/concepts/storage/persistent-volumes/)에서 바인딩 조건과 claim 상태를 보고, [PersistentVolume API](https://kubernetes.io/docs/reference/kubernetes-api/core/persistent-volume-v1/)에서 `persistentVolumeReclaimPolicy`의 정확한 enum 확인 |
-| StorageClass·동적 프로비저닝 | `Storage Classes` | [Storage Classes](https://kubernetes.io/docs/concepts/storage/storage-classes/)의 `storage.k8s.io/v1` 예시에서 `provisioner`, `reclaimPolicy`, `volumeBindingMode` 구조 |
+| StorageClass·동적 프로비저닝 | `Storage Classes` | [Storage Classes](https://v1-35.docs.kubernetes.io/docs/concepts/storage/storage-classes/)에서 필드 구조를, [Local](https://v1-35.docs.kubernetes.io/docs/concepts/storage/storage-classes/#local)에서 `no-provisioner`와 `WaitForFirstConsumer` 조합을 확인 |
 | 스토리지 quota | `Resource Quotas storage` | [Resource Quotas — Storage Resource Quota](https://kubernetes.io/docs/concepts/policy/resource-quotas/#storage-resource-quota)의 전체·클래스별 `spec.hard` 키 |
 
 PV/PVC 문제에서는 문서 예시를 통째로 복사한 뒤 **스토리지 구현 필드만** 문제에 맞게 바꾼다.
@@ -359,12 +456,15 @@ PV/PVC 문제에서는 문서 예시를 통째로 복사한 뒤 **스토리지 �
 - Pod 볼륨은 **`spec.volumes` 정의 ↔ `containers[].volumeMounts` 사용**을 같은 `name`으로 연결
 - `hostPath.type: Directory`는 노드 경로를 만들지 않으며, 파일 로그는 마운트 안에서 직접 검증
 - PV/PVC YAML은 공식 문서의 `Configure Persistent Volume Storage`, 필드 철자는 `kubectl explain`
+- `volumeName`을 생략하면 특정 PV를 선점하지 않고 바인더의 선택·프로비저닝에 맡긴다
 - PV는 `persistentVolumeReclaimPolicy`, StorageClass는 `reclaimPolicy` — `Recycle`은 deprecated
 - PVC Pending의 원인은 둘 — **맞는 PV가 없다** vs **WaitForFirstConsumer 대기**
 - 바인딩 조건: accessModes · 용량 · storageClassName — access mode는 상하 관계가 아닌 정확한 목록 값
+- PVC를 쓰는 Pod은 `kubectl run`으로 뼈대를 만들고 `volumeMounts` ↔ `volumes`를 같은 이름으로 연결
 - `Bound`는 바인딩 성공일 뿐 — 소비 Pod의 **mount와 읽기·쓰기**까지 확인
 - 바인딩 후 용량은 PV 기준, PV는 Released여도 자동 재사용 안 됨
 - `no-provisioner` = 동적 프로비저닝 불가 = PV를 손으로 만들어야 한다
+- `WaitForFirstConsumer` = Pod 스케줄 때까지 바인딩 지연 — PV 생성 기능은 아니다
 - 동적 Pending은 **StorageClass → provisioner 컨트롤러 → PVC Events → Pod mount** 순서로 좁힌다
 - 스토리지 quota는 **PVC 요청 용량·개수**를 세며 실제 파일 사용량은 세지 않는다
 
