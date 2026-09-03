@@ -4,6 +4,7 @@ description: "ip · ss · netplan · resolvectl — 지금 이 서버의 주소�
 deckGroup: network
 sidebar:
   order: 80
+reviewedAt: 2026-09-03
 legacyThesis: true
 ---
 
@@ -14,92 +15,290 @@ import TermIntro from '../../../components/docs/TermIntro.astro';
 
 <TermIntro
   terms={[
-    ['iproute2', '', '지금 리눅스의 표준 네트워크 도구 모음. `ip` · `ss` · `bridge`가 여기 들어 있다. 옛 `net-tools`(`ifconfig`·`netstat`·`route`)를 대체했고 **Ubuntu에는 기본 설치조차 안 된다.**'],
-    ['netplan', '', 'Ubuntu의 네트워크 설정 **추상화 층**. YAML 한 벌을 쓰면 뒤에서 systemd-networkd(서버) 또는 NetworkManager(데스크톱)용 설정으로 번역해 준다.'],
-    ['systemd-resolved', '', 'DNS 질의를 대신 처리하고 캐시하는 로컬 서비스. `/etc/resolv.conf`가 **`127.0.0.53`** 을 가리키는 이유가 이것이다 — 진짜 DNS 서버 주소는 `resolvectl status`에 있다.'],
-    ['MTU', 'Maximum Transmission Unit', '한 패킷에 실을 수 있는 최대 크기(보통 1500바이트). VPN·터널이 끼면 줄어드는데, 맞지 않으면 **작은 요청은 되고 큰 응답만 멈추는** 기묘한 증상이 난다.'],
-    ['LISTEN / ESTAB', '', '소켓의 상태. `LISTEN`은 **접속을 기다리는 서버 쪽 포트**, `ESTAB`(established)은 실제로 연결된 세션이다. `ss`의 출력에서 이 둘만 구분해도 절반은 읽힌다.'],
+    ['네트워크 인터페이스', 'network interface', '운영체제가 패킷을 내보내고 받는 출입구. 물리 NIC뿐 아니라 `lo`·브리지·가상 Ethernet·VPN 터널도 각각 인터페이스로 보인다. IP 주소는 서버 전체가 아니라 **인터페이스에 붙는다.**'],
+    ['링크', 'link', '인터페이스 바로 아래의 연결 상태. 유선 NIC라면 케이블·스위치 포트와 신호가 살아 있는지를 뜻한다. 링크가 살아야 그 위에 IP 주소와 라우팅을 올릴 수 있다.'],
+    ['CIDR prefix', 'Classless Inter-Domain Routing prefix', '`10.20.30.41/24`의 `/24`. 주소 중 앞의 몇 비트가 네트워크 부분인지 표시하며, 같은 링크에서 직접 만날 주소 범위를 판단하는 기준이다.'],
+    ['라우팅 테이블', 'routing table', '목적지별로 어느 인터페이스와 다음 라우터를 쓸지 적어 둔 커널의 길찾기 표. 어느 구체적인 경로에도 맞지 않을 때 쓰는 마지막 길이 **default route**다.'],
+    ['소켓 · bind', 'socket · bind', '소켓은 프로세스가 네트워크 통신에 쓰는 끝점이고, bind는 그 소켓이 받을 로컬 IP와 포트를 정하는 일이다. 프로세스가 실행 중이어도 포트에 bind하지 않으면 네트워크 요청을 받을 수 없다.'],
   ]}
 />
 
+네트워크 상태는 한 덩어리가 아니다. 아래 항목은 서로 다른 질문에 답한다.
+
+| 확인할 층 | 묻는 질문 | 대표 명령 |
+|---|---|---|
+| 링크 | 인터페이스와 그 아래 연결이 살아 있나 | `ip link` · `ethtool` |
+| 주소 | 이 인터페이스가 어떤 IP를 가졌나 | `ip address` |
+| 경로 | 목적지까지 어느 인터페이스·게이트웨이를 쓰나 | `ip route` |
+| 소켓 | 어느 프로세스가 어떤 포트를 열었나 | `ss` |
+| 이름 해석 | 이름을 어느 DNS 서버에서 IP로 바꾸나 | `resolvectl` · `getent` |
+
+링크가 `UP`이어도 주소가 없을 수 있고, 주소가 있어도 default route가 없을 수 있다. 포트가
+`LISTEN`이어도 loopback에만 bind했거나 방화벽이 막으면 다른 서버에서는 닿지 않는다. 그래서 각 층을
+따로 읽어야 한다.
+
 ## 주소와 링크 — `ip`
 
+`ip`는 최신 Linux의 표준 도구 모음인 `iproute2`의 명령이다. Ubuntu 24.04의
+[`ip(8)` manual](https://manpages.ubuntu.com/manpages/noble/man8/ip.8.html)에 나온 문법은
+**전역 옵션 → 볼 객체 → 동작 → 대상** 순서다.
+
+```text
+ip [OPTIONS] OBJECT { COMMAND | help }
+```
+
 ```bash
-ip -br a            # 요약: 인터페이스 · 상태 · IP  ← 가장 먼저 치는 명령
-ip -br link         # 링크 상태와 MAC만
-ip a show enp1s0    # 한 인터페이스 상세
-ip -s link show enp1s0   # 송수신 통계와 에러·드롭 카운터  ← 중요
-ip r                # 라우팅 테이블
-ip r get 8.8.8.8    # "이 목적지로는 어느 인터페이스/게이트웨이로 나가나"  ← 매우 유용
-ip neigh            # ARP 테이블 (같은 랜에서 누가 보이나)
+ip -br address show             # -br = brief(요약), address = 인터페이스에 붙은 IP 주소
+ip -4 -br address show          # -4 = IPv4만 표시. -6이면 IPv6만 표시
+ip -br link show                # link = 주소 아래의 인터페이스·MAC·연결 상태
+ip address show dev enp1s0      # dev = device. enp1s0 하나만 상세 표시
+ip -s link show dev enp1s0      # -s = statistics. 송수신 바이트·에러·드롭까지 표시
+ip route show                   # route = 커널 라우팅 테이블
+ip route get 8.8.8.8            # get = 이 목적지에 커널이 고를 경로를 계산. 패킷을 보내지는 않음
+ip neigh show                   # neigh = neighbour. 같은 링크의 IP↔MAC 대응(IPv4의 ARP 포함)
 ```
 
-`-br`(brief)를 붙이면 사람이 읽을 수 있는 표가 된다.
+:::tip[`ip a`의 `a`는 옵션이 아니다]
+하이픈이 붙은 `-br`·`-4`·`-s`는 **옵션**이고, `a`·`r`은 객체 이름의 **축약형**이다.
+
+- `ip a` = `ip address show`
+- `ip r` = `ip route show`
+- `ip -br a` = `ip -brief address show`
+
+대화형 터미널에서는 짧게 쳐도 되지만 문서나 스크립트에서는 `address`·`route`처럼 풀어 쓰면
+처음 보는 사람도 뜻을 읽을 수 있다. 같은 글자라도 명령마다 뜻이 다르다. 예를 들어 `ip a`의
+`a`는 address지만, 뒤에서 볼 `ss -a`의 `-a`는 all이다.
+:::
+
+### `ip -br address` 출력 읽기
+
+`-br`(brief)는 여러 줄짜리 상세 출력을 인터페이스 하나당 한 줄로 줄인다.
 
 ```
-$ ip -br a
+$ ip -br address show
 lo               UNKNOWN        127.0.0.1/8 ::1/128
 enp1s0           UP             10.20.30.41/24 fe80::5054:ff:fe12:3456/64
 docker0          DOWN           172.17.0.1/16
 ```
 
-| 상태 | 뜻 |
-|---|---|
-| `UP` | 정상 |
-| `DOWN` | 인터페이스가 꺼져 있거나 **케이블이 안 꽂혀 있다** |
-| `UNKNOWN` | `lo`의 정상 상태다 — 문제가 아니다 |
-| 주소가 `169.254.x.x` | **DHCP를 못 받았다**(link-local 자동 할당). 아주 강한 신호다 |
-| 주소가 아예 없다 | 정적 설정 누락 또는 DHCP 실패 |
+| 열 | 예 | 읽는 법 |
+|---|---|---|
+| 인터페이스 | `lo` | loopback. 이 서버가 자기 자신을 부르는 가상 인터페이스 |
+| 인터페이스 | `enp1s0` | 예측 가능한 이름을 쓰는 Ethernet 인터페이스. 물리 NIC나 VM의 가상 NIC일 수 있음 |
+| 동작 상태 | `UP` | 링크 수준에서 사용할 수 있다는 뜻. IP·라우팅·DNS·외부 연결까지 정상이라는 뜻은 아님 |
+| 동작 상태 | `DOWN` | 관리자가 내렸거나 아래쪽 연결 신호가 없음. `ip link`와 `ethtool`로 둘을 구분 |
+| 동작 상태 | `UNKNOWN` | 드라이버가 동작 상태를 확정해 주지 않음. `lo`와 일부 가상 인터페이스에서는 정상 |
+| 주소 | `10.20.30.41/24` | IPv4 주소와 prefix 길이 |
+| 주소 | `fe80::…/64` | IPv6 link-local 주소. IPv6가 켜진 인터페이스에 보이는 것이 보통 정상 |
+
+인터페이스가 여러 개이거나 한 인터페이스에 IPv4·IPv6 주소가 함께 있는 것은 정상이다. 중요한 것은
+“내가 확인하려는 트래픽이 어느 인터페이스와 주소를 쓰는가”다.
+
+상태를 더 자세히 보면 다음처럼 나온다.
+
+```text
+$ ip link show dev enp1s0
+2: enp1s0: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 state UP mode DEFAULT
+    link/ether 52:54:00:12:34:56 brd ff:ff:ff:ff:ff:ff
+```
+
+- `UP` flag — 관리자가 인터페이스를 켜 둔 상태다. `ip link set ... up`의 결과
+- `LOWER_UP` — NIC 아래쪽에서 carrier가 잡혔다. 유선이라면 보통 케이블과 스위치 포트의 신호가 있다는 뜻
+- `NO-CARRIER` — 관리상 `UP`이지만 아래쪽 신호가 없다. 케이블·스위치·VM NIC 연결을 확인
+- `link/ether` — 이 인터페이스의 MAC(Media Access Control) 주소
+- `mtu 1500` — 한 번에 실을 수 있는 IP 패킷의 최대 크기. 터널·VPN 구간과 맞지 않으면 작은 요청만 되고
+  큰 전송이 멈출 수 있다
+
+### 주소와 `/24` 읽기
+
+`10.20.30.41/24`에서 `10.20.30.41`은 인터페이스의 주소이고 `/24`는 앞 24비트가 네트워크 부분이라는
+뜻이다. IPv4 점 표기로 바꾸면 netmask `255.255.255.0`이며, 이 예에서는 `10.20.30.0/24`가
+직접 연결된 네트워크다. 커널은 prefix를 보고 목적지가 같은 링크에 있는지, 라우터로 보내야 하는지
+판단한다.
+
+:::caution[`169.254.x.x`는 왜 이상 신호인가]
+[`169.254.0.0/16`](https://www.rfc-editor.org/rfc/rfc3927.html)은 **IPv4 link-local** 전용 범위다.
+다른 주소 설정 방법을 쓸 수 없을 때 호스트가 스스로 주소를 골라 같은 물리·논리 링크 안에서만
+통신하게 만든다. 라우터는 이 주소의 패킷을 다른 네트워크로 전달하지 않는다.
+
+따라서 사내망의 routable 주소를 DHCP나 정적 설정으로 받아야 하는 주 NIC에 **이 주소만** 있다면,
+서버는 IPv4로 같은 링크 밖에 나갈 주소를 얻지 못한 상태다. DHCP 응답을 못 받은 경우가 흔하지만 정적 주소 누락,
+네트워크 관리 서비스 설정, 의도한 격리 링크일 수도 있으므로 주소 하나만으로 원인을 확정하지 않는다.
 
 ```bash
-ip r
-# default via 10.20.30.1 dev enp1s0 proto static     ← 기본 게이트웨이. 없으면 외부로 못 나간다
+ip -4 -br address show                # 어떤 인터페이스가 169.254/16을 가졌나
+ip route show                         # 정상 주소의 직접 경로와 default route가 있는가
+networkctl status enp1s0              # systemd-networkd가 본 링크·주소·게이트웨이 상태
+journalctl -u systemd-networkd -b     # -u = unit, -b = 이번 부팅의 DHCP·주소 설정 로그
+```
+
+인터페이스 주소가 `169.254.x.x`인 것과 라우팅 테이블에 `169.254.0.0/16` 경로가 있는 것은 다른
+관찰이다. 또한 `fe80::/10`은 IPv6의 link-local 범위라서 IPv6 인터페이스에 보이는 것 자체는 이상이 아니다.
+:::
+
+### 라우팅 테이블 읽기
+
+```bash
+ip route show
+# default via 10.20.30.1 dev enp1s0 proto static     ← 구체적인 경로가 없을 때 쓸 gateway
 # 10.20.30.0/24 dev enp1s0 proto kernel scope link src 10.20.30.41
 ```
 
+| 토큰 | 뜻 |
+|---|---|
+| `default` | 더 구체적인 경로에 맞지 않는 모든 목적지. IPv4로는 `0.0.0.0/0`과 같은 뜻 |
+| `via 10.20.30.1` | 다음 홉(next hop), 즉 이 서버 대신 다음 네트워크로 패킷을 넘길 게이트웨이 |
+| `dev enp1s0` | 패킷을 내보낼 인터페이스 |
+| `proto static` | 관리자가 정적으로 넣은 경로. DHCP면 `dhcp`, 주소를 붙이며 커널이 만든 경로면 `kernel` |
+| `scope link` | 게이트웨이를 거치지 않고 같은 링크에서 직접 닿는 목적지 |
+| `src 10.20.30.41` | 이 경로로 보낼 때 우선 선택할 출발지 주소 |
+
+default route가 없어도 같은 subnet과 별도 경로가 있는 목적지에는 갈 수 있다. 다만 그 어느 경로에도
+맞지 않는 주소에는 갈 길이 없다. 실제 목적지 하나에 대해 커널의 선택을 묻는 명령이 더 정확하다.
+
+```text
+$ ip route get 8.8.8.8
+8.8.8.8 via 10.20.30.1 dev enp1s0 src 10.20.30.41 uid 1000
+    cache
+```
+
+`ip route get`은 연결 시험이 아니다. 패킷을 보내지 않고 **현재 규칙이라면** 어느 gateway·인터페이스·
+출발지 주소를 고를지만 계산한다. 실제 도달 여부는 다음 장에서 `ping`·`nc`·`curl`로 확인한다.
+
+### 같은 링크의 이웃 — `ip neigh`
+
+```text
+$ ip neigh show dev enp1s0
+10.20.30.1 lladdr 00:11:22:33:44:55 REACHABLE
+10.20.30.52 lladdr 52:54:00:aa:bb:cc STALE
+10.20.30.99 FAILED
+```
+
+커널은 같은 링크의 상대에게 Ethernet frame을 보내려면 IP뿐 아니라 MAC 주소도 알아야 한다.
+`ip neigh`는 IPv4의 ARP(Address Resolution Protocol)와 IPv6의 NDP(Neighbor Discovery Protocol)가
+알아낸 이 대응을 보여 준다.
+
+- `REACHABLE` — 최근에 도달 가능함을 확인했다
+- `STALE` — 한동안 확인하지 않았다는 뜻일 뿐 실패가 아니다. 다음 통신 때 다시 검증한다
+- `FAILED` — 주소 확인 요청에 응답하지 않았다. 같은 subnet의 gateway가 이 상태면 링크·VLAN·상대 장비를 의심한다
+
 ## 열린 포트와 연결 — `ss`
 
+`ss`는 socket statistics의 약자다. 앞의 `ip`가 인터페이스와 길을 보여 준다면, `ss`는
+**어느 프로세스가 어느 로컬 IP·포트에서 기다리고 있는지**, 그리고 지금 누구와 연결돼 있는지를
+보여 준다.
+
 ```bash
-sudo ss -tulpn          # 듣고 있는 TCP/UDP 포트 + 프로세스  ← 이 장에서 제일 많이 쓴다
-ss -tn state established              # 지금 맺어진 TCP 연결
-ss -tn state established '( dport = :443 )'   # 443으로 나가는 연결만
-ss -s                                 # 소켓 요약 통계
-sudo ss -tp state established '( sport = :22 )'   # 지금 SSH로 붙어 있는 사람들
+# -t = TCP, -u = UDP, -l = listening만, -p = process, -n = numeric
+sudo ss -tulpn                         # 듣고 있는 TCP/UDP 포트와 소유 프로세스
+
+ss -tn state established              # -t = TCP, -n = 숫자 표시. 연결이 맺어진 소켓만
+ss -tn state established '( dport = :443 )'  # dport = 상대(destination) 포트가 443인 연결
+sudo ss -tp state established '( sport = :22 )'  # sport = 로컬(source) 포트가 22인 SSH 연결
+sudo ss -lntp '( sport = :10259 )'     # 로컬 10259/TCP를 듣는 프로세스만
+
+ss -s                                 # -s = summary. 프로토콜·상태별 소켓 수 요약
 ```
 
-옵션 글자의 뜻 — `t`(TCP) `u`(UDP) `l`(LISTEN만) `p`(프로세스, root 필요)
-`n`(이름 해석 안 함 — 빠르다) `a`(전부).
+여러 짧은 옵션은 `-t -u -l -p -n`처럼 따로 쓰거나 `-tulpn`처럼 한 묶음으로 쓸 수 있다.
 
-```
+| 옵션·필터 | 뜻 | 왜 쓰나 |
+|---|---|---|
+| `-t` | TCP socket만 | HTTP·SSH·데이터베이스처럼 연결을 맺는 프로토콜 확인 |
+| `-u` | UDP socket만 | DNS·NTP처럼 연결을 맺지 않는 프로토콜 확인 |
+| `-l` | `LISTEN` 또는 UDP의 `UNCONN`처럼 요청을 기다리는 socket만 | 서버가 포트를 실제로 열었는지 확인 |
+| `-a` | listening과 연결된 socket을 모두 표시 | `netstat -a`와 같은 넓은 조회. 출력이 많음 |
+| `-n` | 서비스명·호스트명으로 바꾸지 않고 IP와 포트를 숫자로 표시 | DNS 지연을 피하고 `443` 같은 실제 값을 그대로 확인 |
+| `-p` | socket을 소유한 process·PID 표시 | 다른 사용자의 process까지 보려면 보통 `sudo` 필요 |
+| `-s` | 개별 socket 대신 summary 표시 | 전체 연결 수나 `TIME-WAIT` 증가를 빠르게 확인 |
+| `state established` | TCP 상태가 `ESTAB`인 항목만 | 실제로 맺어진 연결만 좁혀 보기 |
+| `sport` / `dport` | 이 서버의 로컬(source) 포트 / 상대(destination) 포트 | 서버로 들어온 연결과 밖으로 나간 연결을 구분 |
+
+filter 식의 괄호를 작은따옴표로 감싸는 이유는 shell이 `(`·`)`를 자기 문법으로 해석하지 못하게
+하기 위해서다. `ss`가 식 전체를 그대로 받아 처리한다.
+
+옛 교재·실습의 `netstat`을 만나면 다음처럼 읽어 바꾼다. Ubuntu 24.04의
+[`ss(8)` 설명](https://manpages.ubuntu.com/manpages/noble/man8/ss.8.html)도 `netstat`과 비슷한 정보를
+보여 주면서 TCP와 상태 정보를 더 많이 제공하는 도구라고 정의한다.
+
+| 확인 목적 | 옛 `netstat` | 지금의 `ss` |
+|---|---|---|
+| 리스닝 TCP/UDP 포트와 프로세스 | `netstat -tulpn` | `sudo ss -tulpn` |
+| 모든 TCP 소켓과 프로세스 | `netstat -antp` | `sudo ss -antp` |
+
+`netstat -nplt`는 `-n -p -l -t`를 붙인 것과 같고 옵션 순서에는 의미가 없다. 위 조합에서
+`n`·`t`·`u`·`l`·`p`·`a`의 뜻은 `ss`와 거의 같지만, 두 명령의 모든 옵션이 일대일로 호환되지는 않는다.
+
+Ubuntu 24.04의 [`ubuntu-minimal` 패키지](https://packages.ubuntu.com/noble/ubuntu-minimal)는
+`iproute2`에 의존하며, 그 패키지에 `ip`와 `ss`가 함께 들어 있다. 반면 `netstat`은 별도
+[`net-tools` 패키지](https://packages.ubuntu.com/noble/net-tools)가 제공하므로, 명령이 없으면 새 진단에는
+`ss`를 쓰고 구형 절차를 그대로 재현해야 할 때만 `net-tools`를 설치한다.
+
+```text
 $ sudo ss -tulpn
-Netid State  Local Address:Port   Peer Address:Port  Process
-tcp   LISTEN 0.0.0.0:22           0.0.0.0:*          users:(("sshd",pid=1103,fd=3))
-tcp   LISTEN 127.0.0.1:5432       0.0.0.0:*          users:(("postgres",pid=1521,fd=5))
+Netid State  Recv-Q Send-Q Local Address:Port Peer Address:Port Process
+tcp   LISTEN 0      4096   0.0.0.0:22         0.0.0.0:*        users:(("sshd",pid=1103,fd=3))
+tcp   LISTEN 0      244    127.0.0.1:5432     0.0.0.0:*        users:(("postgres",pid=1521,fd=5))
 ```
+
+| 열 | 뜻 |
+|---|---|
+| `Netid` | `tcp`·`udp`처럼 socket이 쓰는 프로토콜 |
+| `State` | `LISTEN`은 새 연결 대기, `ESTAB`은 연결 성립, UDP의 `UNCONN`은 특정 상대와 연결하지 않은 상태 |
+| `Recv-Q` / `Send-Q` | 대기 중인 데이터·연결 queue. 의미는 상태마다 다르며 계속 쌓이는지가 장애 단서 |
+| `Local Address:Port` | 이 서버가 bind한 IP와 포트. 서버 접근 문제에서는 가장 먼저 볼 열 |
+| `Peer Address:Port` | 연결된 상대의 IP와 포트. `LISTEN`은 아직 특정 상대가 없어 `*` |
+| `Process` | process 이름, PID, file descriptor. `-p`를 줬을 때 표시 |
+
+bind 주소는 “어느 인터페이스로 들어오는 요청을 받을 것인가”를 정한다.
+
+| bind 주소 | 받을 수 있는 범위 |
+|---|---|
+| `127.0.0.1:5432` | IPv4 loopback만. 이 서버 안의 process만 접속 가능 |
+| `0.0.0.0:22` | 이 서버가 가진 **모든 IPv4 주소**. `0.0.0.0` 자체로 접속하는 것은 아님 |
+| `10.20.30.41:8443` | 그 특정 IPv4 주소로 들어온 요청만 |
+| `[::]:443` | 이 서버가 가진 모든 IPv6 주소. IPv4도 함께 받는지는 socket·커널 설정에 따라 다름 |
 
 :::caution[함정 — `127.0.0.1:포트` vs `0.0.0.0:포트`]
 로컬에서는 되는데 **다른 서버에서 접속이 안 된다**면 방화벽보다 이걸 먼저 본다.
 `127.0.0.1`에 바인딩된 서비스는 **외부에서 절대 닿을 수 없다** — 그 서비스의 설정에서
-bind 주소를 `0.0.0.0`(또는 특정 IP)으로 바꿔야 한다. 방화벽을 아무리 열어도 소용없다.
+bind 주소를 `0.0.0.0`(또는 특정 IP)으로 바꿔야 한다. 반대로 `0.0.0.0`이라고 해서 외부 접근이
+보장되는 것은 아니다. 그다음에는 host 방화벽과 상위 network 경로를 확인한다.
 :::
 
 ## 설정 — netplan
 
+`ip address`와 `ip route`가 보여 주는 것은 **지금 커널에 적용된 상태**다. `ip`로 주소나 경로를
+직접 추가할 수도 있지만 그 변경은 보통 재부팅하면 사라진다. Ubuntu에서 재부팅 뒤에도 유지할
+원하는 상태는 netplan YAML에 적는다.
+
+netplan은 설정을 직접 수행하는 network daemon이 아니다. YAML을 읽어 Ubuntu Server에서는
+주로 `systemd-networkd`, Desktop에서는 주로 NetworkManager가 이해하는 설정으로 변환하고 적용한다.
+
 <FileTree>
 
-- /etc/netplan/
-  - 50-cloud-init.yaml 클라우드/설치 관리자가 만든 것
-  - 99-custom.yaml **직접 쓸 파일 — 숫자가 클수록 나중에 적용된다**
-- /run/systemd/network/ netplan이 번역해 낸 실제 설정 (직접 고치지 않는다)
+- /etc/netplan/ **재부팅 뒤에도 유지할 YAML**
+  - 50-cloud-init.yaml cloud-init이나 설치 관리자가 만든 설정
+  - 99-custom.yaml 직접 추가한 설정 — 파일명 정렬상 뒤라 앞 파일을 보완·재정의
+- /run/systemd/network/ netplan이 networkd용으로 생성한 임시 설정 — 직접 고치지 않음
 
 </FileTree>
 
+Netplan은 여러 YAML을 파일명 사전순으로 합친다. 뒤 파일이 앞 파일의 같은 scalar 값을 덮을 수 있지만,
+list는 합쳐지는 등 자료형별 규칙이 있으므로 “99 파일이 앞 파일 전체를 대체한다”는 뜻은 아니다.
+[Netplan 설정 구조](https://netplan.readthedocs.io/en/stable/structure-id/)에서 병합 규칙을 확인할 수 있다.
+
 ```bash
-netplan status --all        # 현재 적용 상태 요약 (24.04에서 잘 다듬어졌다)
-netplan get                 # 지금 설정을 YAML로 덤프
-sudo netplan try            # 적용 후 120초 안에 확인 못 하면 자동 롤백  ← 원격이면 필수
-sudo netplan apply          # 즉시 적용 (롤백 없음)
+netplan status --all                 # status = 적용 상태, --all = 모든 interface 표시
+netplan get                          # 여러 파일을 합친 netplan 설정을 YAML로 출력
+sudo netplan try --timeout 120       # try = 임시 적용, --timeout = 확인을 기다릴 초. 미확인 시 롤백
+sudo netplan apply                   # apply = 디스크의 설정을 즉시 적용. 자동 롤백 없음
 ```
+
+`status`·`get`은 읽기 명령이지만 `try`·`apply`는 실제 network 상태를 바꾼다. 원격 SSH에서 주소·
+gateway를 바꾸다가 연결이 끊기면 확인할 수 없으므로,
+[공식 적용 절차](https://netplan.readthedocs.io/en/stable/netplan-tutorial/#applying-new-netplan-configuration)처럼
+`netplan try`의 제한 시간 안에 새 연결을 확인한 뒤 확정한다.
 
 ```yaml
 # /etc/netplan/99-custom.yaml
@@ -118,61 +317,117 @@ network:
         search: [corp.local]
 ```
 
+| 필드 | 뜻 |
+|---|---|
+| `version: 2` | netplan YAML schema 버전. Ubuntu 24.04에서도 `2` |
+| `renderer: networkd` | 생성한 설정을 실제로 실행할 backend로 systemd-networkd를 선택 |
+| `ethernets.enp1s0` | Ethernet interface `enp1s0`의 설정 시작 |
+| `dhcp4: false` | DHCPv4로 주소·gateway·DNS를 자동으로 받지 않음 |
+| `addresses` | 이 interface에 붙일 정적 주소. 주소만이 아니라 `/24` 같은 prefix도 필수 |
+| `routes[].to: default` | 더 구체적인 route가 없는 모든 IPv4 목적지 |
+| `routes[].via` | default route의 다음 gateway |
+| `nameservers.addresses` | 질의를 보낼 upstream DNS server 주소 |
+| `nameservers.search` | `db01`처럼 점 없는 이름에 차례로 붙여 볼 검색 domain |
+
 :::caution[함정 셋]
 - **원격 서버에서는 `apply`가 아니라 `try`** 를 쓴다. 설정이 틀리면 접속이 끊기고
-  콘솔 없이는 복구할 수 없다
-- netplan YAML은 **들여쓰기와 파일 권한**에 민감하다 — `sudo chmod 600 /etc/netplan/*.yaml`
-  (600이 아니면 경고가 뜬다)
-- 옛 문법 `gateway4:`는 **폐기됐다.** 위처럼 `routes: - to: default`로 쓴다
+  console 없이는 복구할 수 없다. timeout rollback 뒤에는 실제 상태가 돌아왔는지도 확인한다
+- netplan YAML은 **들여쓰기와 파일 권한**에 민감하다. 공식 권장 권한은 root만 읽고 쓸 수 있는
+  `600`이다 — `sudo chmod 600 /etc/netplan/*.yaml`
+- 옛 문법 `gateway4:`는 **deprecated** 상태다. 위처럼 `routes: - to: default`로 쓴다
 :::
 
 ## DNS — systemd-resolved
 
+애플리케이션은 보통 DNS server에 곧바로 묻지 않는다. Ubuntu 24.04 Server의 일반적인 경로는
+다음과 같다.
+
+```text
+애플리케이션 → glibc의 이름 해석(NSS) → systemd-resolved → interface별 upstream DNS
+                                            ↑
+                                  127.0.0.53:53 local stub
+```
+
+systemd-resolved는 이름 해석 요청을 받고 cache하며, DHCP·netplan 등에서 얻은 interface별 DNS와
+검색 domain을 보고 어느 server에 물을지 고른다. VPN과 사내망이 함께 있으면 질의할 domain에 따라
+다른 interface의 DNS를 고르는 split DNS도 여기서 처리한다.
+
+`127.0.0.53`은 외부 DNS 주소가 아니다. `127.0.0.0/8`에 속한 loopback 주소라 이 서버 안에서
+systemd-resolved가 기다리는 local stub이다. 공식
+[`systemd-resolved(8)` 설명](https://manpages.ubuntu.com/manpages/noble/man8/systemd-resolved.service.8.html)도
+이 주소의 TCP·UDP 53번 port를 local DNS stub으로 정의한다.
+
 ```bash
-resolvectl status                 # 링크별 DNS 서버 · 검색 도메인 · DNSSEC  ← 진짜 설정은 여기
-resolvectl query intranet.corp.local
-resolvectl statistics             # 캐시 적중률
-sudo resolvectl flush-caches      # 캐시 비우기 (DNS를 방금 바꿨을 때)
+resolvectl status                    # global·interface별 DNS server, search domain, protocol 상태
+resolvectl status enp1s0             # enp1s0에 연결된 DNS 설정만
+resolvectl query intranet.corp.local # query = resolved가 실제 경로를 골라 이름을 해석
+resolvectl statistics                # cache·DNSSEC 검증 등 resolver 통계
+sudo resolvectl flush-caches         # flush-caches = local DNS cache 삭제. 상태를 바꾸므로 sudo
 ```
 
 ```bash
-cat /etc/resolv.conf
-# nameserver 127.0.0.53      ← 스텁 리졸버. 이게 정상이다
-cat /run/systemd/resolve/resolv.conf   # 실제 업스트림 DNS 목록
+readlink -f /etc/resolv.conf                   # -f = symbolic link를 끝까지 따라 실제 파일 표시
+cat /etc/resolv.conf                           # 애플리케이션이 보는 resolver 진입점
+# nameserver 127.0.0.53                        # local stub이므로 정상
+cat /run/systemd/resolve/resolv.conf           # resolved가 알고 있는 upstream DNS 목록
 ```
 
 :::caution[함정 — `/etc/resolv.conf`를 직접 고치지 않는다]
-그 파일은 `systemd-resolved`가 만드는 **심볼릭 링크이자 자동 생성물**이라
-직접 고쳐도 재부팅이나 네트워크 변경 때 덮어써진다. DNS를 바꾸려면
-**netplan의 `nameservers`** 를 고치고 `netplan apply` 한다.
-그리고 `nameserver 127.0.0.53`은 고장이 아니라 **정상 상태다** — 진짜 서버는
-`resolvectl status`에서 확인한다.
+일반적인 Ubuntu Server에서 이 파일은 systemd-resolved가 관리하는 파일을 가리키는 symbolic link다.
+직접 고쳐도 reboot·DHCP 갱신·network 변경 때 덮어써진다. netplan이 interface를 관리한다면 영구 DNS는
+netplan의 `nameservers`를 고치고 `netplan try`로 적용한다. 임시로 `sudo resolvectl dns <interface> <주소>`를
+준 경우에는 interface가 사라지면 설정도 사라진다.
+
+`nameserver 127.0.0.53`은 고장이 아니라 **local 중계 지점**이다. 실제 upstream과 어느 interface를
+통해 쓰는지는 `resolvectl status`에서 확인한다.
 :::
 
 ### 이름 해석의 순서
 
-DNS만 보는 것이 아니다. `/etc/nsswitch.conf`의 `hosts:` 줄이 순서를 정한다 —
-보통 `files`(`/etc/hosts`) → `resolve`/`dns`.
+Linux에서 “이름을 IP로 바꾼다”는 것은 DNS만 뜻하지 않는다. glibc의 NSS(Name Service Switch)가
+`/etc/nsswitch.conf`의 `hosts:` 줄을 읽어 `/etc/hosts`, systemd-resolved, DNS 같은 source를 어떤
+순서로 확인할지 정한다.
 
 ```bash
-getent hosts intranet.corp.local   # /etc/hosts까지 포함한 "실제 해석 결과"  ← dig보다 정확
-dig +short intranet.corp.local     # DNS에만 직접 물어본다 (dnsutils 패키지)
-dig @10.20.0.53 intranet.corp.local   # 특정 서버에 물어본다
+grep '^hosts:' /etc/nsswitch.conf       # hosts database의 source와 조회 순서
+getent hosts intranet.corp.local        # getent = NSS 전체 경로로 hosts 항목 조회
+resolvectl query intranet.corp.local    # resolved의 cache·interface별 DNS 정책을 포함해 조회
+dig +short intranet.corp.local          # +short = 답만 간단히. NSS를 건너뛰고 DNS protocol로 조회
+dig @10.20.0.53 intranet.corp.local     # @주소 = 이 DNS server를 직접 지정
 ```
 
-`getent hosts`와 `dig`의 결과가 다르면 **`/etc/hosts`에 항목이 있다는 뜻**이다 —
-"내 노트북에선 되는데 서버에선 안 돼요"의 흔한 정체다.
+`getent`는 애플리케이션의 일반적인 이름 해석에 가장 가깝고, `dig`는 DNS 자체를 분리해서 시험하는
+도구다. `dig`도 `/etc/resolv.conf`가 `127.0.0.53`을 가리키면 local stub에는 물을 수 있지만,
+`/etc/hosts`와 다른 NSS source는 보지 않는다.
+
+두 결과가 다르면 `/etc/hosts`가 흔한 원인이지만 유일한 원인은 아니다. NSS module 순서, search domain,
+resolved cache, split DNS, LLMNR·mDNS도 후보이므로 `hosts:` 줄과 `resolvectl status`를 함께 본다.
 
 ## 인터페이스 하드웨어 — `ethtool`
 
+`ip link`는 kernel이 공통 형식으로 정리한 상태를 보여 주고, `ethtool`은 주로 유선 Ethernet NIC의
+driver·PHY(물리 신호 계층)에 더 가까운 정보를 묻는다. 가상 interface는 speed나 cable 상태를
+제공하지 않을 수 있다.
+
 ```bash
-sudo ethtool enp1s0 | grep -E "Speed|Duplex|Link detected"
-sudo ethtool -S enp1s0 | grep -i -E "error|drop|crc"   # NIC 카운터
-ip -s link show enp1s0                                  # 커널이 센 에러/드롭
+sudo ethtool enp1s0                  # 옵션 없이 device만 주면 speed·duplex·link 상태 조회
+sudo ethtool -i enp1s0               # -i = driver 정보: driver·firmware·bus 주소
+sudo ethtool -S enp1s0               # -S = NIC driver가 제공하는 상세 statistics
+ip -s link show dev enp1s0           # ip의 -s = kernel 공통 RX/TX statistics
+
+# grep -E = 확장 정규식 사용, | = 여러 pattern 중 하나
+sudo ethtool enp1s0 | grep -E 'Speed|Duplex|Link detected'
+# grep -i = 대소문자 무시, -E = error 또는 drop 또는 crc 검색
+sudo ethtool -S enp1s0 | grep -i -E 'error|drop|crc'
 ```
 
-`Link detected: no`면 **케이블 또는 스위치 포트 문제**다. 그 위의 어떤 설정도 볼 필요가 없다.
-`errors`/`dropped`가 계속 증가하면 케이블 불량·MTU 불일치·스위치 문제를 의심한다.
+물리 NIC에서 `Link detected: no`면 IP 설정보다 먼저 케이블, switch port, NIC 상태를 확인한다.
+VM에서는 hypervisor가 virtual NIC를 분리했을 수도 있다. counter가 한 번이라도 0이 아니라고 곧바로
+장애는 아니다. 두 번 조회했을 때 `errors`·`dropped`·`crc`가 **계속 증가하는지**가 중요하다.
+
+- `crc` 증가 — cable·connector·switch port 같은 물리 전송 문제 가능성
+- `dropped` 증가 — queue 부족, driver, traffic 폭주, 정책에 의한 drop 등 후보가 넓음
+- 작은 요청은 되는데 큰 전송만 멈춤 — interface와 tunnel 경로의 MTU 불일치 후보
 
 ## 도구가 없다면
 
@@ -180,44 +435,62 @@ ip -s link show enp1s0                                  # 커널이 센 에러/�
 <TabItem label="최소 진단 세트">
 
 ```bash
-sudo apt install -y traceroute mtr-tiny dnsutils lsof net-tools tcpdump curl netcat-openbsd
+sudo apt install -y traceroute mtr-tiny dnsutils lsof tcpdump curl netcat-openbsd ethtool
+# -y = 설치 확인 질문에 자동 yes. 구형 netstat을 꼭 재현해야 할 때만 아래 package 추가
+sudo apt install -y net-tools
 ```
 
-`traceroute`·`mtr`·`dig`·`netstat`·`lsof`는 **Ubuntu 서버 기본 설치에 없다.**
-장애가 난 뒤에 (프록시 때문에 apt도 안 되는 상황에서) 깔려고 하면 늦는다 —
-서버를 받으면 미리 깔아 둔다.
+package 이름과 실행 명령이 항상 같지는 않다. `mtr-tiny`가 `mtr`, `dnsutils`가 `dig`,
+`netcat-openbsd`가 `nc`, `net-tools`가 `netstat`·`ifconfig`를 제공한다. `net-tools`는 구형 절차
+호환용이고 새 진단은 기본 `ip`·`ss`를 쓴다.
+
+이 도구들은 최소 설치에 없을 수 있다. 장애가 난 뒤에는 DNS·proxy·network 문제 때문에 `apt` 자체가
+안 될 수 있으므로, 운영 환경 정책이 허용한다면 server image를 만들 때 필요한 진단 도구를 준비한다.
 
 </TabItem>
 <TabItem label="아무것도 못 깔 때">
 
 ```bash
-cat /proc/net/dev              # 인터페이스 통계
-cat /proc/net/tcp              # 소켓 (16진수라 읽기 힘들다)
-cat /etc/resolv.conf
+cat /proc/net/dev              # kernel의 interface별 RX/TX byte·packet·error·drop counter
+cat /proc/net/tcp              # 현재 network namespace의 TCP socket. 주소·상태가 16진수라 읽기 어려움
+cat /etc/resolv.conf           # 애플리케이션이 보는 DNS 진입점
 # TCP 연결 확인 — bash 내장 기능이라 nc 없이도 된다
 timeout 3 bash -c '</dev/tcp/10.20.30.50/443' && echo OPEN || echo CLOSED
+# timeout 3 = 3초 뒤 중단, bash -c = 뒤 문자열을 새 Bash에서 실행
+# /dev/tcp/host/port = 실제 file이 아니라 Bash가 TCP connect로 해석하는 특수 문법
 ```
 
-마지막 줄은 **도구 없는 서버에서 포트 열림을 확인하는 유일한 방법**으로 종종 쓰인다.
+마지막 줄은 `nc`·`curl`이 없을 때 쓸 수 있는 TCP 연결 확인 fallback이다. 접속 성공 여부만 보여 주며
+TLS·HTTP 응답이 정상인지는 증명하지 않는다. 또한 `/proc`와 `/dev/tcp`가 보여 주는 상태는 현재 process의
+network namespace 기준이므로 container 안과 host의 결과가 다를 수 있다.
 
 </TabItem>
 </Tabs>
 
 :::tip[핵심]
-`ip -br a` → `ip r` → `sudo ss -tulpn` → `resolvectl status`.
-이 넷이 "이 서버의 네트워크 현재 상태" 전부다. 여기서 이상한 값
-(`169.254.x.x`, default 경로 없음, `127.0.0.1` 바인딩)을 찾으면 진단은 거기서 끝난다.
+`ip -br address` → `ip route get <목적지>` → `sudo ss -tulpn` → `resolvectl status` 순서로 본다.
+
+1. 쓸 주소가 있는가
+2. 그 목적지에 kernel이 고른 길이 있는가
+3. 필요한 local service가 어느 주소·port에서 기다리는가
+4. 이름 해석은 어느 interface의 DNS를 쓰는가
+
+`169.254/16`, default route 없음, `127.0.0.1` bind는 무조건 오류 코드가 아니라 **기대하던 구성과
+다르다는 단서**다. 관찰한 값을 정상 설계와 비교한 뒤 다음 장의 층별 연결 시험으로 넘어간다.
 :::
 
 ## 7장 요약
 
-- `ifconfig`·`netstat`은 없다 — **`ip -br a` · `ss -tulpn`** 이 지금의 표준이다
-- 주소가 `169.254.x.x`면 **DHCP 실패**, `ip r`에 default가 없으면 외부로 못 나간다
-- `127.0.0.1` 바인딩은 방화벽과 무관하게 **외부에서 못 닿는다**
+- `ip a`의 `a`는 옵션이 아니라 address의 축약형이다 — 풀면 `ip address show`
+- 링크·주소·경로는 별개다. `UP`은 아래 연결 상태일 뿐 인터넷 정상 판정이 아니다
+- `169.254/16`은 같은 링크 밖으로 routing하지 않는 IPv4 link-local 범위다. 주 NIC가 이 주소만
+  가졌다면 DHCP·정적 설정을 확인하되 원인을 단정하지 않는다
+- `ss -tulpn`은 protocol·listening·process·numeric 옵션을 묶은 현재 표준이다. `netstat`은 구형 호환용
+- `127.0.0.1` bind는 이 server 안에서만, `0.0.0.0` bind는 모든 local IPv4 interface에서 받는다
 - 네트워크 설정은 netplan YAML. **원격에서는 `apply`가 아니라 `try`**
-- `/etc/resolv.conf`의 `127.0.0.53`은 정상 — 진짜 DNS는 `resolvectl status`
-- 실제 이름 해석 결과는 `dig`가 아니라 **`getent hosts`** 가 정확하다
-- 진단 도구는 기본 설치에 없다 — **장애 나기 전에** 깔아 둔다
+- `/etc/resolv.conf`의 `127.0.0.53`은 local DNS stub이다. upstream은 `resolvectl status`에서 본다
+- 애플리케이션의 NSS 경로는 `getent`, DNS protocol만 분리한 시험은 `dig`로 확인한다
+- error·drop counter는 한 번의 값보다 **시간에 따라 계속 증가하는지**가 중요하다
 
 <LinkCard
   title="8. 네트워크가 안 될 때 — 어디까지 되나"

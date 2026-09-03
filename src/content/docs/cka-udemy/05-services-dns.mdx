@@ -46,6 +46,8 @@ service-definition-1.yaml file.* — 는 정의 파일의 빈칸(셀렉터·포�
 원본 풀이: [09-Practice-Test-Explore-Env.md](https://github.com/kodekloudhub/certified-kubernetes-administrator-course/blob/master/docs/09-Networking/09-Practice-Test-Explore-Env.md)
 
 노드의 네트워크 인터페이스를 읽는 연습 — 시험보다 [18장 트러블슈팅](/cka/18-troubleshooting/)의 재료다.
+이 랩은 원문대로 `netstat`을 쓰지만, 현재 Ubuntu에서는 같은 확인을 `ss`로 한다.
+두 도구의 일반적인 읽기법은 [server 7장](/server/07-network/)에 있다.
 
 ```bash
 # "What is the Internal IP address of the controlplane node in this cluster?"
@@ -61,10 +63,20 @@ netstat -nplt | grep kube-scheduler       # n(숫자 주소) p(프로세스명) 
 netstat -anp | grep etcd                  # a = 리스닝뿐 아니라 맺힌 연결까지 전부 — 클라이언트 2379, 피어 2380
 ```
 
-- 인터페이스 이름 규칙: `eth*`는 물리, `lo`는 루프백, `veth*`는 Pod 쪽 가상 인터페이스다.
-  `cni0` 같은 브리지는 보통 **CNI(Container Network Interface) 플러그인**이 만든다.
+이 실습에서 필요한 현대 명령 대응은 두 개다. `p`로 다른 프로세스 정보를 보려면 보통 root 권한이
+필요하므로 `sudo`를 붙였다.
+
+| 확인 목적 | 랩의 `netstat` | 현재의 `ss` |
+|---|---|---|
+| 리스닝 TCP 포트와 프로세스 | `netstat -nplt` | `sudo ss -lntp` |
+| 리스닝·연결된 TCP 소켓과 프로세스 | `netstat -anp` | `sudo ss -antp` |
+
+- 인터페이스 이름만으로 물리·가상 여부나 만든 주체를 단정하지 않는다. `lo`는 루프백이고,
+  `veth*`는 가상 Ethernet pair의 한쪽이다. Kubernetes에서는 호스트 쪽이 `veth*`, Pod 안쪽이
+  `eth0`로 보이는 경우가 흔하다. `cni0` 같은 브리지는 보통
+  **CNI(Container Network Interface) 플러그인**이 만든다.
   원본 문제는 containerd가 만든 브리지라고 표현하지만, 런타임 이름만 보고 답하지 말고
-  `ip link`에서 실제 인터페이스를 확인한다
+  `ip -d link`에서 인터페이스 종류를 확인한다
   — *We use Containerd as our container runtime. What is the interface/bridge created by
   Containerd on this host?*
 - etcd의 두 포트 중 연결이 많은 쪽은 **2379**(API 서버가 붙는 클라이언트 포트),
@@ -205,7 +217,7 @@ Service YAML은 `kubectl expose ... --dry-run=client -o yaml`로 뼈대를 얻�
 
 - 조회형 문제는 명령보다 **열 이름**(TYPE·Endpoints·INTERNAL-IP·CLUSTER-IP)을 기억한다
 - 세 IP 대역(노드/Pod/Service)은 각각 다른 명령으로 찾는다 — 컨트롤 플레인 Pod은 호스트 IP라 제외
-- 듣는 포트는 `netstat -nplt | grep <프로세스>`
+- 듣는 포트는 랩에서 `netstat -nplt`, 현재 환경에서는 `sudo ss -lntp`로 찾는다
 - DNS 문제의 절반은 `<service>.<namespace>` 형식으로 끝난다
 - 증명 순서는 **EndpointSlice → Pod IP → ClusterIP → FQDN → 외부 NodePort**다
 
