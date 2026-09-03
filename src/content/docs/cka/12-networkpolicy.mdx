@@ -52,25 +52,29 @@ NetworkPolicy는 이 기본값을 **선택적으로 좁히는** 도구다.
 
 쿠버네티스는 위의 네트워크 모델을 **요구사항으로 정의만 하고 직접 구현하지 않는다.**
 구현이 없으면 Pod은 IP조차 받지 못한다. 그 구현을 맡아 "평평한 네트워크"를 실제로 만드는 주체가
-CNI(Container Network Interface — kubelet이 Pod 네트워크를 만들 때 호출하는 표준 인터페이스)다.
+CNI(Container Network Interface — 컨테이너 런타임이 Pod 네트워크를 만들 때 호출하는 표준 인터페이스)다.
 
-```d2 pad=40 title="kubelet 이 Pod 생성 때 CNI 플러그인의 ADD 를 호출해 IP 할당 · veth 연결 · 라우팅을 맡기고 실패하면 ContainerCreating 에서 멈추는 순서"
+```d2 pad=40 title="kubelet 의 샌드박스 생성 요청을 받은 컨테이너 런타임이 CNI 플러그인의 ADD 를 호출해 IP 할당 · veth 연결 · 라우팅을 맡기고 실패하면 ContainerCreating 에서 멈추는 순서"
 shape: sequence_diagram
 
 kl: kubelet
+rt: 컨테이너 런타임
 cni: CNI 플러그인
-pod: Pod 네트워크 네임스페이스
+pod: Pod 네트워크\n네임스페이스
 
-kl -> cni: Pod 생성 — ADD 호출
-cni.n1: "설정 /etc/cni/net.d/\n바이너리 /opt/cni/bin/"
-cni -> pod: IP 할당 · veth 인터페이스 연결 · 라우팅
-cni -> kl: 결과 반환 { style.stroke-dash: 3 }
-kl.n1: 실패하면 Pod 은 ContainerCreating 에서 멈춘다
+kl -> rt: 샌드박스 생성\nCRI
+rt -> cni: ADD 호출
+rt.n1: "설정 /etc/cni/net.d/\n바이너리 /opt/cni/bin/\n둘 다 런타임이 읽는다"
+cni -> pod: IP 할당 ·\nveth 인터페이스 연결 ·\n라우팅
+cni -> rt: 결과 반환 { style.stroke-dash: 3 }
+rt -> kl: 결과 반환 { style.stroke-dash: 3 }
+kl.n1: 실패하면 Pod 은\nContainerCreating\n에서 멈춘다
 ```
 
-- kubelet은 Pod을 만들 때 **CNI 플러그인을 호출**해 IP를 할당하고
-  veth(virtual ethernet — Pod과 노드를 잇는 한 쌍의 가상 케이블) 인터페이스를 붙인다
-- 설정은 **`/etc/cni/net.d/`** 에 있고, 바이너리는 `/opt/cni/bin/` 에 있다
+- kubelet이 Pod 샌드박스를 요청하면 **컨테이너 런타임이 CNI 플러그인을 호출**해 IP를 할당하고
+  veth(virtual ethernet — Pod과 노드를 잇는 한 쌍의 가상 케이블) 인터페이스를 붙인다.
+  v1.24부터 CNI 관리는 kubelet이 아니라 런타임의 몫이다
+- 설정은 **`/etc/cni/net.d/`** 에 있고, 바이너리는 `/opt/cni/bin/` 에 있다 — 이 경로를 읽는 쪽도 런타임이다
 - CNI가 없거나 고장나면 Pod은 **`ContainerCreating`** 에서 멈춘다
 
 | CNI | 특징 | NetworkPolicy |

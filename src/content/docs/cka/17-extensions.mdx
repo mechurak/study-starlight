@@ -71,6 +71,18 @@ Docker 전용 코드(dockershim)를 그렇게 품고 있다가 부담이 커져 
 - 소켓 경로: `unix:///run/containerd/containerd.sock`
 - **Docker는 v1.24에서 제거**되었다 (dockershim 삭제). 지금은 containerd가 표준
 
+이 소켓 경로는 kubelet 설정 파일의 `containerRuntimeEndpoint` 필드에 있다. 노드에서 값을 확인하는
+자리가 여기다 — 옛 자료가 가리키는 `--container-runtime` 플래그는 v1.27에서 제거됐다.
+
+```bash
+grep containerRuntimeEndpoint /var/lib/kubelet/config.yaml   # 이 노드에 설정된 CRI 소켓
+kubectl get nodes -o wide                                    # CONTAINER-RUNTIME 열로도 확인
+```
+
+같은 뜻의 [`--container-runtime-endpoint` 플래그](https://kubernetes.io/docs/reference/command-line-tools-reference/kubelet/)는
+설정 파일보다 우선하지만 공식 문서가 deprecated로 표시했다. 설정 파일을 먼저 보고, 값이 다르면
+`/var/lib/kubelet/kubeadm-flags.env`에서 플래그 재정의를 찾는다.
+
 ```bash
 # crictl 설정
 sudo crictl config --set runtime-endpoint=unix:///run/containerd/containerd.sock
@@ -94,10 +106,13 @@ sudo crictl rmi --prune              # 안 쓰는 이미지 정리
 Pod마다 IP를 주고 노드 사이를 잇는 방법은 환경마다 다르다 — 온프렘·클라우드·
 베어메탈이 전부 다른 답을 쓴다. 그래서 코어는 "인터페이스를 만들고 IP를 붙여라"는
 호출 규약만 정하고, 방법은 플러그인에 맡긴다.
-kubelet이 Pod 샌드박스(Pod의 컨테이너들이 공유할 네트워크 네임스페이스 껍데기)를
-만들 때 **CNI 플러그인을 실행**한다.
+kubelet은 CRI로 런타임에게 Pod 샌드박스(Pod의 컨테이너들이 공유할 네트워크 네임스페이스 껍데기)를
+만들라고 시킬 뿐이고, **CNI 플러그인을 실제로 실행하는 쪽은 컨테이너 런타임**이다.
+v1.24에서 kubelet의 `cni-bin-dir`·`network-plugin` 플래그가 제거되면서 CNI 관리는
+[kubelet의 일이 아니게 됐다](https://kubernetes.io/docs/concepts/extend-kubernetes/compute-storage-net/network-plugins/).
+그래서 CNI 설정과 바이너리 경로를 아는 주체도 런타임이다.
 
-```d2 layout=elk pad=40 title="kubelet 의 ADD 호출로 시작해 인터페이스 생성 · IP 할당 · 라우팅 3단계를 거쳐 Pod 통신이 가능해지는 CNI 흐름과, CNI 가 고장나면 ContainerCreating 에서 멈추는 실패 경로"
+```d2 layout=elk pad=40 title="kubelet 의 샌드박스 생성 요청을 받은 컨테이너 런타임이 CNI 플러그인을 ADD 호출해 인터페이스 생성 · IP 할당 · 라우팅 3단계를 거치는 흐름과, CNI 가 고장나면 ContainerCreating 에서 멈추는 실패 경로"
 direction: down
 
 classes: {
@@ -108,6 +123,7 @@ classes: {
 }
 
 kl: kubelet { class: mute }
+rt: 컨테이너 런타임\ncontainerd { class: mute }
 cni: CNI 플러그인 { class: key }
 conf: /etc/cni/net.d/\nJSON 설정 ·\n사전순 첫 번째를 쓴다 { class: mute }
 bin: /opt/cni/bin/\n바이너리 { class: mute }
@@ -117,9 +133,10 @@ s3: ③ 라우팅 설정 { class: mute }
 ok: Pod 이 통신 가능 ✅ { class: ok }
 fail: CNI 가 없거나 고장 { class: bad }
 
-kl -> cni: ADD 호출
-conf -> cni: { style.stroke-dash: 3 }
-bin -> cni: { style.stroke-dash: 3 }
+kl -> rt: 샌드박스 생성 (CRI)
+rt -> cni: ADD 호출
+conf -> rt: { style.stroke-dash: 3 }
+bin -> rt: { style.stroke-dash: 3 }
 cni -> s1
 s1 -> s2
 s2 -> s3
