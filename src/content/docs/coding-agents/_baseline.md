@@ -7,18 +7,28 @@
 
 ## 현재성 기준
 
-**2026년 8월 30일**에 다음 공식 문서와 사례를 확인했다.
+**2026년 9월 4일**에 다음 공식 문서와 사례를 확인했다.
 
-- OpenAI: <https://learn.chatgpt.com/docs/agent-configuration/agents-md>
-  (구 주소 `developers.openai.com/codex/guides/agents-md`는 이곳으로 308 영구 리다이렉트된다)
+- OpenAI 지침 파일: <https://learn.chatgpt.com/docs/agent-configuration/agents-md>
+  (구 주소 `developers.openai.com/codex/guides/agents-md`는 이곳으로 영구 리다이렉트된다)
 - OpenAI 작업 방식: <https://learn.chatgpt.com/guides/best-practices>,
-  <https://learn.chatgpt.com/docs/long-running-work>
-- Anthropic: <https://code.claude.com/docs/en/memory>
+  <https://learn.chatgpt.com/docs/long-running-work> (ChatGPT·Codex 공용 goals 문서 — 인용할 때 주어를 Codex로 좁히지 않는다)
+- OpenAI 실행 계획: <https://developers.openai.com/cookbook/articles/codex_exec_plans>
+  (`PLANS.md`·ExecPlan. best-practices가 직접 링크하는, `docs/batches/`의 가장 가까운 공식 대응물)
+- Anthropic 지침 파일: <https://code.claude.com/docs/en/memory>
 - Anthropic 작업 방식: <https://code.claude.com/docs/en/best-practices>
 - Anthropic 기능 선택: <https://code.claude.com/docs/en/features-overview>
+- Anthropic monorepo 설정: <https://code.claude.com/docs/en/large-codebases>
+- Anthropic compaction 뒤 남는 것: <https://code.claude.com/docs/en/context-window#what-survives-compaction>
+- Anthropic 완료 조건 loop: <https://code.claude.com/docs/en/goal>
 - OpenAI 장시간 작업 사례: <https://developers.openai.com/blog/run-long-horizon-tasks-with-codex>,
   <https://developers.openai.com/blog/automating-repetitive-work-at-openai-with-codex>
 - Anthropic 내부 활용 사례: <https://claude.com/blog/how-anthropic-teams-use-claude-code>
+- AGENTS.md 스펙 사이트: <https://agents.md/> — "가장 가까운 파일을 자동으로 읽는다"는 문구는 스펙의
+  일반론이고, Codex가 실제로 어디까지 읽는지는 OpenAI 공식 문서를 따른다
+- OpenAI harness engineering: <https://openai.com/index/harness-engineering/> — 2026-09-04 재확인 때
+  봇 차단(403)으로 원문을 다시 읽지 못했다. 2차 자료와 일치하는 요지("짧은 지도 + 구조화된 `docs/`")만
+  인용하고 세부 구조를 새로 단정하지 않는다
 
 제품의 탐색·로딩 동작은 바뀔 수 있다. 사실을 적을 때는 본문 주장 가까이에 공식 링크를 두고,
 이 덱의 권장 설계와 제품이 보장하는 동작을 구분한다. 공식 문서가 보장하지 않는 경계 사례는
@@ -34,6 +44,11 @@
 - 공유 행동 규칙의 정본은 `AGENTS.md`라는 이 덱의 권장안을 유지한다. 제품 공식 표준이라는 뜻으로 쓰지 않는다.
 - PRD는 현재 제품 요구, batch는 작업 과정과 증거, architecture·spec은 영구 기술 경계라는 역할 구분을
   유지한다. 이 구분은 공식 파일명 표준이 아니라 공식 사례를 저장소에 적용한 이 덱의 권장안이다.
+- `docs/batches/`를 설명할 때는 OpenAI ExecPlan(`PLANS.md`)이 가장 가까운 공식 대응물임을 밝히고,
+  **자기완결 vs 링크**, **연속 실행 vs milestone gate** 두 축의 차이를 이 덱의 선택으로 서술한다.
+  1장에서 한 번 설명하고 다른 장에서 반복하지 않는다.
+- `timeline` 저장소를 사례로 들 때는 그 저장소의 현재 구조와 맞춘다. 덱에서 권장하는 구조가 사례와
+  달라지면 어느 쪽이 먼저 바뀌었는지 밝힌다.
 
 ## 범위
 
