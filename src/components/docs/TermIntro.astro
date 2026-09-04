@@ -1,15 +1,18 @@
 ---
 /*
-  장 첫머리의 "처음 나오는 말" 상자.
+  장 첫머리의 "처음 나오는 말" 접이식 상자.
   이 덱의 약속 — 새 용어는 반드시 풀 이름과 "왜 필요한지"를 먼저 준다.
+  핵심 본문보다 먼저 시선을 끌지 않도록 기본은 접혀 있다.
 
   terms: [용어, 풀 이름(없으면 ''), 한 줄 설명][]
+  open: 처음부터 펼칠 때만 true (기본 false)
 */
 interface Props {
   title?: string;
   terms: [string, string, string][];
+  open?: boolean;
 }
-const { title = '이 장에서 처음 나오는 말', terms } = Astro.props;
+const { title = '이 장에서 처음 나오는 말', terms, open = false } = Astro.props;
 
 // 설명은 평문이라 마크다운이 안 먹는다. `코드`와 **굵게**만 직접 처리한다.
 const escape = (s: string) =>
@@ -21,41 +24,80 @@ const format = (s: string) =>
     .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
 ---
 
-<div class="terms">
-  <div class="terms__title">{title}</div>
-  <dl>
-    {terms.map(([word, full, desc]) => (
-      <div class="terms__row">
-        <dt>
-          <code>{word}</code>
-          {full && <span class="terms__full">{full}</span>}
-        </dt>
-        <dd set:html={format(desc)} />
-      </div>
-    ))}
-  </dl>
-</div>
+<details class="terms" open={open}>
+  <summary class="terms__summary">
+    <span class="terms__title">{title}</span>
+    <span class="terms__count" data-pagefind-ignore>{terms.length}개</span>
+  </summary>
+  <div class="terms__body">
+    <dl>
+      {terms.map(([word, full, desc]) => (
+        <div class="terms__row">
+          <dt>
+            <code>{word}</code>
+            {full && <span class="terms__full">{full}</span>}
+          </dt>
+          <dd set:html={format(desc)} />
+        </div>
+      ))}
+    </dl>
+  </div>
+</details>
 
 <style>
   .terms {
-    margin: 1.2rem 0 1.6rem;
-    border: 1px solid var(--sl-color-gray-5, #d4d4d8);
-    border-left: 3px solid var(--sl-color-accent, #4f46e5);
+    --sl-details-border-color: var(--sl-color-gray-6, #e4e4e7);
+    --sl-details-border-color--hover: var(--sl-color-gray-5, #d4d4d8);
+    margin: 1rem 0 1.5rem;
+    border: 1px solid var(--sl-details-border-color);
     border-radius: 0.4rem;
-    padding: 0.85rem 1rem 0.95rem;
-    background: var(--sl-color-gray-7, #f4f4f5);
+    padding: 0;
+    background: transparent;
   }
-  :global([data-theme='dark']) .terms {
-    background: var(--sl-color-gray-6, #27272a);
-    border-color: var(--sl-color-gray-5, #3f3f46);
+
+  .terms__summary {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    margin: 0;
+    padding: 0.55rem 0.75rem;
+    color: var(--sl-color-gray-3);
+    font-size: 0.8rem;
+    font-weight: 500;
+    line-height: 1.4;
   }
+  .terms__summary:hover {
+    color: var(--sl-color-gray-2);
+  }
+  .terms__summary:focus-visible {
+    outline: 2px solid var(--sl-color-accent);
+    outline-offset: 2px;
+    border-radius: 0.35rem;
+  }
+  .terms__summary::before {
+    --sl-details-marker-size: 1rem;
+    flex: none;
+    margin-inline: -0.1rem 0.05rem;
+    opacity: 0.65;
+  }
+  .terms[open] > .terms__summary {
+    margin-bottom: 0;
+    border-bottom: 1px solid var(--sl-details-border-color);
+  }
+
   .terms__title {
+    min-width: 0;
+  }
+  .terms__count {
+    margin-inline-start: auto;
+    color: var(--sl-color-gray-4);
     font-size: 0.7rem;
-    font-weight: 700;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    opacity: 0.6;
-    margin-bottom: 0.6rem;
+    font-weight: 400;
+    white-space: nowrap;
+  }
+  .terms__body {
+    padding: 0.8rem 1rem 0.95rem;
+    background: var(--sl-color-gray-7, #f4f4f5);
   }
   dl {
     margin: 0;
