@@ -14,7 +14,7 @@
 - OpenAI 작업 방식: <https://learn.chatgpt.com/guides/best-practices>,
   <https://learn.chatgpt.com/docs/long-running-work> (ChatGPT·Codex 공용 goals 문서 — 인용할 때 주어를 Codex로 좁히지 않는다)
 - OpenAI 실행 계획: <https://developers.openai.com/cookbook/articles/codex_exec_plans>
-  (`PLANS.md`·ExecPlan. best-practices가 직접 링크하는, `docs/batches/`의 가장 가까운 공식 대응물)
+  (`PLANS.md`·ExecPlan. best-practices가 직접 링크하는, `docs/plans/`의 가장 가까운 공식 대응물)
 - Anthropic 지침 파일: <https://code.claude.com/docs/en/memory>
 - Anthropic 작업 방식: <https://code.claude.com/docs/en/best-practices>
 - Anthropic 기능 선택: <https://code.claude.com/docs/en/features-overview>
@@ -42,11 +42,13 @@
 - 명령과 파일 예시는 복사해서 시작할 수 있을 정도로 구체적으로 쓰되, 특정 언어·프레임워크에 종속된 값은
   `<repo-command>` 같은 추상 표기보다 `pnpm test`처럼 알아보기 쉬운 예시를 쓰고 교체 지점을 설명한다.
 - 공유 행동 규칙의 정본은 `AGENTS.md`라는 이 덱의 권장안을 유지한다. 제품 공식 표준이라는 뜻으로 쓰지 않는다.
-- PRD는 현재 제품 요구, batch는 작업 과정과 증거, architecture·spec은 영구 기술 경계라는 역할 구분을
+- PRD는 현재 제품 요구, 작업 계획(`docs/plans/`)은 작업 과정과 증거, architecture·spec은 영구 기술 경계라는 역할 구분을
   유지한다. 이 구분은 공식 파일명 표준이 아니라 공식 사례를 저장소에 적용한 이 덱의 권장안이다.
-- `docs/batches/`를 설명할 때는 OpenAI ExecPlan(`PLANS.md`)이 가장 가까운 공식 대응물임을 밝히고,
+- `docs/plans/`를 설명할 때는 OpenAI ExecPlan(`PLANS.md`)이 가장 가까운 공식 대응물임을 밝히고,
   **자기완결 vs 링크**, **연속 실행 vs milestone gate** 두 축의 차이를 이 덱의 선택으로 서술한다.
   1장에서 한 번 설명하고 다른 장에서 반복하지 않는다.
+- 작업 단위는 "작업 계획(plan)", 파일은 "계획 문서"라고 부른다. 도구의 plan mode가 만드는 임시 plan과
+  구분해서 쓴다. "배치"는 `timeline`의 옛 이름이라 사례 설명에서만 쓴다.
 - `timeline` 저장소를 사례로 들 때는 그 저장소의 현재 구조와 맞춘다. 덱에서 권장하는 구조가 사례와
   달라지면 어느 쪽이 먼저 바뀌었는지 밝힌다.
 

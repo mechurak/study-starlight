@@ -41,7 +41,7 @@ export default {
 			"href": "/coding-agents/01-development-process/",
 			"title": "AI 개발 프로세스",
 			"tone": "ok",
-			"desc": "PRD·`AGENTS.md`·`docs/batches/`의 역할을 나누고 마일스톤마다 구현·검증·기록을 닫는 흐름",
+			"desc": "PRD·`AGENTS.md`·`docs/plans/`의 역할을 나누고 마일스톤마다 구현·검증·기록을 닫는 흐름",
 			"note": "현재 제품 정본을 흐리지 않고 긴 작업을 새 세션에서도 이어 가려면"
 		}
 	]
