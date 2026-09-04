@@ -1,0 +1,175 @@
+---
+title: "6. search_runs로 조건 걸기"
+description: 필터 문법의 다섯 필드와 연산자, UI에서 손으로 하던 판단을 스크립트로 굳히는 법
+reviewedAt: 2026-09-05
+deckGroup: compare
+sidebar:
+  order: 70
+---
+
+import { LinkCard } from '@astrojs/starlight/components';
+import SourceFigure from '../../../components/docs/SourceFigure.astro';
+import TermIntro from '../../../components/docs/TermIntro.astro';
+import Thesis from '../../../components/docs/Thesis.astro';
+
+<Thesis>검색이 되는 순간 MLflow는 기록 도구에서 **판단 도구**가 된다 — 다만 param은 문자열이라 부등호가 안 먹는다</Thesis>
+
+<TermIntro
+  terms={[
+    ['filter string', '', 'SQL의 WHERE절을 닮은 조건 문자열. `metrics.sharpe_net > 0.8` 같은 형태다.'],
+    ['필드 접두어', '', '무엇을 거를지 가리키는 앞부분. `metrics.`·`params.`·`tags.`·`attributes.`·`datasets.` 다섯이다.'],
+    ['order_by', '', '정렬 기준 목록. `["metrics.sharpe_net DESC"]`처럼 문자열로 준다.'],
+  ]}
+/>
+
+## 조건 하나의 구조
+
+필터는 **필드 · 연산자 · 값** 세 조각이다.
+
+<SourceFigure
+  src="/images/mlflow/search-syntax.png"
+  alt="검색 조건이 필드, 비교 연산자, 값 세 부분으로 나뉘는 구조를 표시한 그림"
+  width={439}
+  height={142}
+  caption="왼쪽이 무엇을 볼지(필드), 가운데가 어떻게 비교할지, 오른쪽이 비교 대상이다. 값은 따옴표로 감싸고 metric만 예외적으로 숫자를 그대로 쓴다."
+  sourceHref="https://mlflow.org/docs/latest/ml/search/search-runs/"
+  sourceLabel="MLflow 공식 문서 — Search Runs"
+/>
+
+필드는 다섯 종류다.
+
+| 접두어 | 무엇을 거르나 | 값의 종류 |
+|---|---|---|
+| `metrics.` | 실행 결과 수치 | **실수** — 부등호가 그대로 먹는다 |
+| `params.` | 실행 조건 | 문자열 — 등가·`LIKE`만 |
+| `tags.` | 분류·메모 | 문자열 |
+| `attributes.` | run 자체의 속성 (`run_name`·`status`·`run_id`·시각) | 문자열 |
+| `datasets.` | 연결된 데이터셋 (`name`·`digest`·`context`) | 문자열 |
+
+연산자는 값의 종류를 따른다.
+
+- 숫자: `=` `!=` `>` `>=` `<` `<=`
+- 문자열: `=` `!=` `LIKE`(대소문자 구분) `ILIKE`(구분 안 함)
+- 없음 확인: `IS NULL` · `IS NOT NULL` — tag와 param에만 쓴다
+- 목록: `IN` — `datasets`와 `attributes.run_id`에만 쓴다
+
+:::caution[함정 — OR가 없다]
+조건을 잇는 논리 연산자는 **`AND` 하나뿐이다.** "Sharpe가 높거나 MDD가 얕은 런"은 한 번의 질의로 못 만든다.
+넓게 가져와 pandas에서 거르거나, 질의를 두 번 던지고 합친다.
+:::
+
+## 실제로 쓰는 형태
+
+`mlflow.search_runs()`는 기본으로 **pandas DataFrame**을 돌려준다. sshim-trader의 실제 DB에 던져 보면
+열이 `run_id`·`experiment_id`·`status`·`artifact_uri`·`start_time`·`end_time` 다음에
+`metrics.*`·`params.*`·`tags.*`가 이어진다.
+
+```python
+import mlflow
+
+mlflow.set_tracking_uri("sqlite:///artifacts/mlflow.db")
+
+df = mlflow.search_runs(
+    experiment_names=["research/tune_o2n"],
+    filter_string="tags.phase = 'tune' and metrics.sharpe_net > 0.5",
+    order_by=["metrics.sharpe_net DESC"],
+    max_results=20,
+)
+df[["tags.mlflow.runName", "metrics.sharpe_net", "params.lgbm.num_leaves"]]
+```
+
+`experiment_names`를 쓰면 experiment id를 몰라도 된다. 여러 experiment를 한 번에 보려면 목록으로 주고,
+전체를 훑을 때는 `search_all_experiments=True`를 쓴다.
+
+## sshim-trader에서 바로 쓸 질의들
+
+```python
+# 1) 최종 검증 런만 — 튜닝 trial을 걷어낸다
+"tags.phase = 'final'"
+
+# 2) 채택 후보 — holdout에서도 버틴 것
+"metrics.holdout_sharpe_net > 0.8 and metrics.holdout_mdd > -0.25"
+
+# 3) 특정 재학습 주기만 — param은 문자열이라 등가 비교
+"params.step_days = '120'"
+
+# 4) 같은 데이터셋으로 돌린 것만
+"params.dataset = 'chart-nxt_day_202608'"
+
+# 5) 특정 study의 trial 전체
+"tags.study = 'nxt_daily_o2n' and tags.phase = 'tune'"
+
+# 6) 아직 판단을 안 붙인 런 — 3장에서 만든 decision tag가 없는 것
+"tags.decision IS NULL"
+
+# 7) 이름 규칙으로 거르기
+"attributes.run_name LIKE 'nxt_daily_o2n_final_%'"
+```
+
+`metrics.holdout_mdd > -0.25`가 부등호 방향이 뒤집힌 것처럼 보이는데 맞다. MDD는 음수이므로
+"덜 깊은 낙폭"이 더 큰 값이다. **metric의 부호 규약을 아는 사람만 쓸 수 있는 조건**이라,
+이런 질의는 스크립트에 주석과 함께 굳혀 두는 편이 낫다.
+
+## UI에서 하던 판단을 스크립트로
+
+[5장](/mlflow/05-ui/)의 "튜닝 결과 읽는 순서"를 그대로 코드로 옮기면 매번 같은 기준으로 볼 수 있다.
+
+```python
+import mlflow
+
+mlflow.set_tracking_uri("sqlite:///artifacts/mlflow.db")
+
+final = mlflow.search_runs(
+    experiment_names=["research/tune_o2n"],
+    filter_string="tags.phase = 'final'",
+)
+cols = ["tags.variant", "metrics.sharpe_net", "metrics.holdout_sharpe_net", "metrics.holdout_mdd"]
+table = final[cols].set_index("tags.variant")
+
+# 튜닝 구간에서만 좋아지고 holdout에서 무너졌는지 한 줄로 확인한다
+table["overfit_gap"] = table["metrics.sharpe_net"] - table["metrics.holdout_sharpe_net"]
+print(table.round(3))
+```
+
+`overfit_gap`은 MLflow가 주는 값이 아니라 여기서 만든 파생값이다. 이렇게 **검색 결과를 DataFrame으로 받아
+내가 아는 판단 규칙을 얹는 것**이 이 도구의 실제 사용 방식이다.
+
+여기서 한 걸음 더 나가면 [4장](/mlflow/04-artifacts/)의 artifact 회수와 이어진다.
+
+```python
+top3 = mlflow.search_runs(
+    experiment_names=["research/nxt_daily_o2n"],
+    order_by=["metrics.sharpe_net DESC"],
+    max_results=3,
+)
+for run_id in top3["run_id"]:
+    path = mlflow.artifacts.download_artifacts(run_id=run_id, artifact_path="daily_net_returns.csv")
+    ...  # 세 런의 일별 수익을 한 그래프에 겹친다
+```
+
+## 런이 아주 많아지면
+
+`search_runs`는 결과를 한 번에 메모리로 올린다. 기본 `max_results`가 100000이라 지금 규모에서는
+신경 쓸 일이 없지만, trial을 수천 개씩 돌리기 시작하면 `MlflowClient.search_runs`의 페이지 단위 호출로 바꾼다.
+
+```python
+from mlflow import MlflowClient
+
+client = MlflowClient("sqlite:///artifacts/mlflow.db")
+page = client.search_runs(experiment_ids=["2"], max_results=500)
+while True:
+    for run in page:
+        ...
+    if page.token is None:      # 마지막 페이지 — token 확인 없이 돌리면 첫 페이지로 되돌아가 무한 루프다
+        break
+    page = client.search_runs(experiment_ids=["2"], max_results=500, page_token=page.token)
+```
+
+모델을 기록하기 시작하면 짝이 되는 API가 하나 더 생긴다. `mlflow.search_logged_models()`는
+run이 아니라 **모델**을 조건으로 찾고, 역시 DataFrame을 돌려준다. [8장](/mlflow/08-models/)에서 쓴다.
+
+<LinkCard
+  title="7. Optuna trial을 parent/child로 묶기"
+  description="지금의 평평한 30행이 왜 지저분해지는지, 부모 run 하나로 묶으면 무엇이 달라지는지."
+  href="/mlflow/07-nested-runs/"
+/>

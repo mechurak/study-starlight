@@ -1,0 +1,186 @@
+---
+title: "1. experiment · run과 그 안의 네 가지"
+description: log_run()의 인자가 대응하는 MLflow 데이터 모델과, run 하나를 어느 크기로 자를지의 기준
+reviewedAt: 2026-09-05
+deckGroup: position
+sidebar:
+  order: 20
+---
+
+import { LinkCard } from '@astrojs/starlight/components';
+import SourceFigure from '../../../components/docs/SourceFigure.astro';
+import TermIntro from '../../../components/docs/TermIntro.astro';
+import Thesis from '../../../components/docs/Thesis.astro';
+
+<Thesis>experiment는 "같은 질문을 반복해서 묻는 자리"이고 run은 "그 질문에 대한 답 하나"다 — 이 크기를 잘못 잡으면 뒤의 모든 비교가 어긋난다</Thesis>
+
+<TermIntro
+  terms={[
+    ['experiment', '', '같은 목적의 run을 담는 이름 있는 묶음. run은 반드시 하나의 experiment에 속한다.'],
+    ['run', '', '실행 하나. `run_id`라는 32자 hex 식별자를 가지며 param·metric·tag·artifact가 여기에 붙는다.'],
+    ['run_name', '', '사람이 읽는 이름. 실제로는 `mlflow.runName`이라는 tag로 저장되어 나중에 바꿀 수 있다.'],
+    ['lifecycle stage', '', 'run이 `active`인지 `deleted`인지. UI의 삭제는 `deleted` 표시일 뿐 실제 삭제가 아니다.'],
+    ['LoggedModel', '', 'MLflow 3에서 1급 개체가 된 "기록된 모델". run에 딸린 파일이 아니라 자체 id와 metric을 가진다.'],
+  ]}
+/>
+
+## 전체 그림
+
+MLflow의 저장 단위는 세 층이다. **experiment가 run을 담고, run이 param·metric·tag·artifact를 담는다.**
+tag는 experiment에도 run에도 붙을 수 있다.
+
+<SourceFigure
+  src="/images/mlflow/tag-exp-run-relationship.svg"
+  alt="experiment 하나가 여러 run을 담고, tag가 experiment 수준과 run 수준 양쪽에 붙는 계층 관계"
+  width={1062}
+  height={801}
+  caption="지금은 바깥 상자(experiment)가 안쪽 상자(run)를 담는 관계와, tag가 두 수준 모두에 붙는다는 점만 본다. 아래쪽 metadata 목록은 다음 절에서 항목별로 나눈다."
+  sourceHref="https://mlflow.org/docs/latest/ml/traditional-ml/tutorials/hyperparameter-tuning/part1-child-runs/"
+  sourceLabel="MLflow 공식 문서 — Parent and Child Runs"
+/>
+
+sshim-trader에는 지금 experiment가 넷 있다. `Default`는 MLflow가 자동으로 만든 것이고 나머지 셋이 실제 사용처다.
+
+| experiment | 만드는 곳 | 한 run이 뜻하는 것 |
+|---|---|---|
+| `research/nxt_daily_o2n` | `scripts/research_nxt_daily.py` | walk-forward 연구 실행 1회 |
+| `research/tune_o2n` | `scripts/research_tune.py` | Optuna trial 1개 또는 최종 검증 1개 |
+| `backtest` | `sshim_trader/backtest/__main__.py` | 백테스트 config 1개의 실행 |
+
+:::caution[함정]
+experiment 이름의 `/`는 **폴더가 아니다.** OSS MLflow UI는 `research/tune_o2n`을 그냥 한 덩어리 문자열로
+보여 준다. 트리로 접히지 않으니 접두어 규칙(`research/`)은 사람이 읽는 정렬 힌트로만 쓰고,
+실제 그룹핑이 필요하면 tag를 쓴다.
+:::
+
+## log_run()의 인자와 데이터 모델의 대응
+
+`sshim_trader/utils/tracking.py`의 시그니처를 그대로 놓고 보면 MLflow 데이터 모델과 1:1로 붙는다.
+
+```python
+def log_run(
+    experiment: str,                              # experiment 이름
+    params: dict[str, Any],                       # → mlflow.log_params()
+    metrics: dict[str, Any],                      # → mlflow.log_metrics()
+    artifact_paths: Sequence[Path | str] = (),    # → mlflow.log_artifact(s)()
+    run_name: str | None = None,                  # → mlflow.runName tag
+    tags: dict[str, str] | None = None,           # → run tag
+) -> str | None:                                  # run_id
+```
+
+| MLflow 개체 | 저장 형태 | 나중에 바꿀 수 있나 | 무엇에 쓰나 |
+|---|---|---|---|
+| param | 문자열 (최대 6000자) | 아니오 — 같은 key 재기록은 오류 | 조건 확인, 그룹 비교 |
+| metric | 실수 + `step` + `timestamp` | 예 — 같은 key를 여러 step으로 쌓음 | 수치 조건 검색, 정렬, 차트 |
+| tag | 문자열 (최대 8000자) | 예 | 분류, 거르기, 메모 |
+| artifact | 파일 | 덧붙이기만 | 리포트·예측·모델처럼 값이 아닌 것 |
+
+key 길이 제한은 셋 다 250자다. `lgbm.min_child_samples`처럼 평탄화한 이름은 여유롭게 들어간다.
+
+:::tip[param과 metric을 가르는 한 문장]
+**실행을 시작하기 전에 값이 정해져 있으면 param, 실행이 끝나야 알 수 있으면 metric이다.**
+`round_trip_cost_bp=28.0`은 내가 정한 비용 가정이니 param이고, `mean_net_bp`는 결과이니 metric이다.
+숫자라는 이유로 param에 넣으면 문자열 비교만 되어 `> 0.8` 같은 조건을 못 쓴다.
+:::
+
+## run 하나를 어느 크기로 자를 것인가
+
+이게 이 장에서 가장 중요한 결정이다. 기준은 "**내가 통째로 채택하거나 기각할 대상**"이다.
+
+```d2 layout=elk pad=40 title="walk-forward 연구 한 번은 fold를 여러 번 돌아도 채택 단위가 하나이므로 run 하나가 되는 구조"
+direction: down
+
+classes: {
+  key: {
+    style: {
+      fill: "#dbeafe"
+      stroke: "#2563eb"
+      font-color: "#1e3a8a"
+    }
+  }
+  mid: {
+    style: {
+      fill: "#f1f5f9"
+      stroke: "#94a3b8"
+      font-color: "#334155"
+    }
+  }
+  fine: {
+    style: {
+      fill: "#dcfce7"
+      stroke: "#16a34a"
+      font-color: "#14532d"
+    }
+  }
+}
+
+cmd: "명령 1회\nresearch_nxt_daily --target o2n" { class: key }
+
+folds: fold 반복 {
+  class: mid
+  grid-rows: 3
+  f1: "2023 구간 학습 → 예측" { class: mid }
+  f2: "2024 구간 학습 → 예측" { class: mid }
+  f3: "2025 구간 학습 → 예측" { class: mid }
+}
+
+agg: "예측을 모아 한 번 평가\nsharpe_net · mdd · hit_rate" { class: mid }
+run: "MLflow run 1개\n채택·기각의 단위" { class: fine }
+
+cmd -> folds
+folds -> agg
+agg -> run
+```
+
+- **walk-forward 연구 1회 = run 1개.** 안에서 fold가 스무 번 돌아도 내가 보는 건 합쳐진 지표 하나다.
+  fold마다 run을 만들면 experiment가 의미 없는 행으로 가득 찬다.
+- **Optuna trial 1개 = run 1개.** trial 30개는 후보 30개이므로 run도 30개다. 다만 이렇게 하면 한 study가
+  30행을 만들어 experiment가 금세 지저분해지는데, 이 문제는 [7장의 parent/child run](/mlflow/07-nested-runs/)에서 푼다.
+- **백테스트 config 1개 = run 1개.** `configs/*.yaml` 하나가 조건 한 벌이므로 자연스럽게 맞는다.
+
+fold별 숫자를 꼭 보고 싶다면 run을 늘리는 대신 **같은 metric을 `step`으로 쌓는다.** `log_metric("fold_sharpe", v, step=i)`처럼
+쓰면 run 하나 안에서 fold 진행에 따른 곡선이 된다. 이건 [3장](/mlflow/03-logging-api/)에서 다룬다.
+
+## run에 자동으로 붙는 것
+
+`mlflow.start_run()`은 내가 준 것 외에도 몇 가지를 알아서 채운다. sshim-trader의 `artifacts/mlflow.db`에
+실제로 들어 있는 tag가 그 증거다.
+
+| 자동 tag | 값의 예 | 언제 붙나 |
+|---|---|---|
+| `mlflow.runName` | `nxt_daily_o2n_20260830_120331` | `run_name`을 줬거나 MLflow가 임의 이름을 지을 때 |
+| `mlflow.user` | 실행한 OS 사용자 | 항상 |
+| `mlflow.source.name` | `scripts/research_tune.py` | 스크립트로 실행할 때 |
+| `mlflow.source.type` | `LOCAL` | 항상 |
+| `mlflow.source.git.commit` | 커밋 해시 | **git 작업 트리 안에서 실행할 때** |
+| `mlflow.source.git.branch` · `repoURL` | `main` · 원격 주소 | 위와 같음 |
+| `mlflow.parentRunId` | 부모 run_id | `nested=True`로 만든 자식 run일 때 |
+
+`mlflow.source.git.commit`이 공짜로 붙는다는 사실이 중요하다. **"이 결과가 어떤 코드에서 나왔나"라는
+질문이 이미 답해져 있다.** 다만 uncommitted 변경까지는 알려주지 않는다 — 자세한 건
+[10장](/mlflow/10-reproducibility/)에서 다룬다.
+
+run에는 상태도 함께 저장된다. `status`는 `RUNNING` → `FINISHED`/`FAILED`/`KILLED`로 바뀌고,
+`lifecycle_stage`는 `active` 또는 `deleted`다. **UI에서 run을 지워도 `deleted` 표시만 될 뿐 파일과 행은 남는다.**
+진짜로 지우려면 [11장](/mlflow/11-operations/)의 `mlflow gc`가 필요하다.
+
+## MLflow 3에서 하나 늘어난 층
+
+MLflow 2까지는 모델이 run에 딸린 artifact 폴더였다. MLflow 3부터는 **LoggedModel**이 자체 id를 가진 개체가
+되어, run과 나란히 서고 자기 metric을 가진다.
+
+```text
+MLflow 2:  experiment → run → artifacts/model/         (모델은 파일)
+MLflow 3:  experiment → run ─┬─ params · metrics · tags
+                             └─ LoggedModel (model_id) ─ 자체 metric · tag
+```
+
+지금 sshim-trader는 모델을 전혀 기록하지 않으므로 이 층이 비어 있다. 하지만 walk-forward의 마지막 fold
+모델을 실거래에 실으려는 순간 필요해지고, 그때 `models:/<model_id>` 같은 URI가 등장한다.
+[8장](/mlflow/08-models/)에서 다룬다.
+
+<LinkCard
+  title="2. tracking URI와 두 개의 저장소"
+  description="sqlite 파일 하나와 artifacts/mlruns 폴더가 각각 무엇을 담는지, 실행 디렉터리가 왜 결과를 바꾸는지 본다."
+  href="/mlflow/02-storage/"
+/>

@@ -1,0 +1,144 @@
+---
+title: "13. 마무리 — 지금 레포에 적용할 순서"
+description: 이 덱에서 나온 개선 항목을 비용과 효과 순으로 줄 세우고, 전체 지도를 한 장으로 묶는다
+reviewedAt: 2026-09-05
+deckGroup: wrapup
+sidebar:
+  order: 140
+---
+
+import { LinkCard } from '@astrojs/starlight/components';
+import Thesis from '../../../components/docs/Thesis.astro';
+
+<Thesis>지금 sshim-trader에 필요한 건 MLflow를 더 쓰는 게 아니라 **이미 쓰고 있는 것의 구멍 네 개를 막는 것**이다</Thesis>
+
+## 전체 지도
+
+```d2 layout=elk pad=40 title="연구 실행이 남기는 네 가지 기록과 그것이 비교·검색을 거쳐 모델 승격과 실거래로 이어지는 덱 전체 지도"
+direction: down
+
+classes: {
+  key: {
+    style: {
+      fill: "#dbeafe"
+      stroke: "#2563eb"
+      font-color: "#1e3a8a"
+    }
+  }
+  zone: {
+    style: {
+      fill: "#ede9fe"
+      stroke: "#7c3aed"
+      font-color: "#4c1d95"
+    }
+  }
+  fine: {
+    style: {
+      fill: "#dcfce7"
+      stroke: "#16a34a"
+      font-color: "#14532d"
+    }
+  }
+  mid: {
+    style: {
+      fill: "#f1f5f9"
+      stroke: "#94a3b8"
+      font-color: "#334155"
+    }
+  }
+}
+
+exec: "실행\nwalk-forward · 튜닝 · 백테스트" { class: key }
+
+rec: "run 하나에 남는 것" {
+  class: mid
+  grid-rows: 2
+  p: "param\n실행 전에 정한 조건" { class: mid }
+  m: "metric\n실행이 만든 수치" { class: mid }
+  t: "tag\n분류 · 사후 판단" { class: mid }
+  a: "artifact\n리포트 · 예측" { class: mid }
+}
+
+look: "비교\nUI · 차트 · 평행 좌표" { class: zone }
+find: "검색\nsearch_runs 조건" { class: zone }
+model: "모델 기록\nlog_model · signature" { class: fine }
+reg: "승격\nRegistry alias @champion" { class: fine }
+live: "실거래\n내보낸 모델 파일" { class: fine }
+
+exec -> rec: "log_run()" {
+  style.animated: true
+}
+rec -> look
+rec -> find
+look -> model: 조건 채택
+find -> model: 조건 채택
+model -> reg
+reg -> live: 파일로 내보내기
+find -> exec: 다음 실행 조건
+```
+
+## 지금 잘하고 있는 것
+
+바꾸지 말아야 할 결정들이다. 개선을 얹을 때 이걸 깨지 않는지 먼저 본다.
+
+- **기록 실패가 연구를 멈추지 않는다.** `log_run()`이 예외를 삼키고 `None`을 돌려준다.
+- **비유한값을 거른다.** NaN·inf가 그대로 들어가면 차트와 정렬이 망가진다([3장](/mlflow/03-logging-api/)).
+- **중첩 dict를 평탄화한다.** `lgbm.learning_rate`가 검색·정렬 가능한 열이 된다.
+- **run 이름이 산출물 폴더 이름과 같다.** UI와 디스크를 눈으로 잇는다.
+- **튜닝 trial에 artifact를 붙이지 않는다.** 디스크가 안 는다([11장](/mlflow/11-operations/)).
+- **MLflow가 dev dependency다.** 매매 봇이 MLflow에 의존하지 않는다.
+
+## 구멍 네 개 — 비용 대비 효과 순
+
+| 순위 | 무엇 | 왜 지금 | 비용 |
+|---|---|---|---|
+| 1 | `log_artifacts`에 `artifact_path=path.name` 주기 | 지금은 폴더 두 개를 넘기는 순간 같은 이름 파일이 조용히 덮인다 | 한 줄 |
+| 2 | `git_dirty` tag와 seed param 추가 | 커밋 해시가 있어도 미커밋 상태면 재현이 안 된다. 랜덤 베이스라인 seed가 z 값을 좌우한다 | 몇 줄 |
+| 3 | Optuna trial을 parent/child로 묶기 | 튜닝 세션 단위가 기록에 없고 `best_value`가 콘솔에서 사라진다 | `log_run`에 인자 하나 + 호출부 |
+| 4 | 채택 조건의 모델 하나를 `log_model`로 남기기 | 지금은 좋다고 판단해도 그 모델이 어디에도 없다 | signature 추론 + 한 번의 학습 |
+
+1과 2는 **오늘 고칠 수 있고 되돌릴 필요가 없는 것**이다. 3은 튜닝을 다시 돌릴 때 같이 하면 되고,
+4는 전략을 실거래에 올리기로 결정한 시점에 필요해진다.
+
+## 하지 않기로 한 것
+
+기능이 있다고 다 쓰지 않는다. 이 덱에서 명시적으로 제외한 것들이다.
+
+| 안 하는 것 | 이유 |
+|---|---|
+| `mlflow.lightgbm.autolog()` | walk-forward는 run 하나에서 여러 번 학습한다. param 충돌과 모델 20개, 기록 오버헤드만 남는다([8장](/mlflow/08-models/)) |
+| fold마다 run 만들기 | 채택 단위가 아니다. 필요하면 `step`으로 곡선을 남긴다 |
+| 학습할 때마다 자동 등록 | Registry가 후보 목록이 되면 "등록됨"이 의미를 잃는다([9장](/mlflow/09-registry/)) |
+| 실거래에서 `models:/…@champion` 직접 로드 | 매매 봇이 MLflow와 sqlite에 의존하게 된다. 파일로 내보내는 쪽을 택했다 |
+| `optuna-integration`의 `MLflowCallback` | 목적값 하나만 기록한다. 나머지 지표는 어차피 직접 넣어야 한다([7장](/mlflow/07-nested-runs/)) |
+| tracking server 띄우기 | 1인·단일 기기에서는 얻는 게 없다. 두 번째 기기가 생기면 그때 한다([11장](/mlflow/11-operations/)) |
+| `predictions.parquet` 무조건 올리기 | 런당 11MB다. 원본이 이미 폴더에 있고 `out_dir` tag가 가리킨다 |
+
+## 습관 세 가지
+
+도구 설정보다 이쪽이 오래 간다.
+
+**하나. 레포 루트에서만 실행한다.** tracking URI가 상대 경로라, 다른 곳에서 돌리면 빈 DB를 새로 만들고
+조용히 성공한다. 오류가 안 나기 때문에 며칠 뒤에 발견한다.
+
+**둘. 판단을 tag로 되돌려 적는다.** `decision=rejected`, `reason=holdout에서 무너짐`을 붙여 두면
+반년 뒤 같은 방향을 다시 시도할 때 검색으로 걸린다. metric은 무슨 일이 있었는지 말해 주지만
+**왜 그렇게 결정했는지는 내가 적어야만 남는다.**
+
+**셋. `mlflow.db`를 가끔 복사한다.** artifact 폴더와 달리 이 파일에는 원본이 없다. 사라지면
+"어떤 조건으로 무엇이 나왔는지"가 통째로 사라진다.
+
+## 참고 자료
+
+- [MLflow Tracking](https://mlflow.org/docs/latest/ml/tracking/) — 저장소 구성 세 가지와 로깅 API의 정본
+- [Search Runs](https://mlflow.org/docs/latest/ml/search/search-runs/) — 필터 문법의 필드·연산자 전체 목록
+- [Parent and Child Runs](https://mlflow.org/docs/latest/ml/traditional-ml/tutorials/hyperparameter-tuning/part1-child-runs/) — 튜닝 결과를 중첩 run으로 정리하는 근거와 예제
+- [Model Registry](https://mlflow.org/docs/latest/ml/model-registry/) — alias·version·tag의 의미와 stage에서 옮겨 가는 이유
+- [Backend Stores](https://mlflow.org/docs/latest/self-hosting/architecture/backend-store/) — file store가 유지보수 모드인 이유와 DB backend가 필요한 기능
+- [Dataset Tracking](https://mlflow.org/docs/latest/ml/dataset/) — digest 계산과 `log_input`의 context 규약
+
+<LinkCard
+  title="개요로 돌아가기"
+  description="덱 전체 구성과 각 장이 답하는 질문을 다시 본다."
+  href="/mlflow/"
+/>

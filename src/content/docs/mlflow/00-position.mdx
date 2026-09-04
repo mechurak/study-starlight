@@ -1,0 +1,186 @@
+---
+title: "0. MLflow의 자리"
+description: 폴더 산출물이 막히는 지점과 MLflow가 대신 맡는 일, 그리고 맡지 않는 일
+reviewedAt: 2026-09-05
+deckGroup: position
+sidebar:
+  order: 10
+---
+
+import { Card, CardGrid, LinkCard } from '@astrojs/starlight/components';
+import TermIntro from '../../../components/docs/TermIntro.astro';
+import Thesis from '../../../components/docs/Thesis.astro';
+
+<Thesis>MLflow는 실행을 대신 해 주지 않는다 — 이미 하고 있는 실행에 **나중에 다시 찾을 수 있는 이름표**를 붙인다</Thesis>
+
+<TermIntro
+  terms={[
+    ['experiment tracking', '실험 추적', '학습·평가 실행 한 번의 조건과 결과를 구조화해 저장하고 나중에 비교하는 일이다.'],
+    ['run', '', 'MLflow가 기록하는 실행 하나. 조건·결과·산출물이 한 묶음으로 붙는다.'],
+    ['walk-forward', '', '과거 구간으로 학습해 다음 구간을 예측하는 것을 앞으로 밀며 반복하는 검증 방식이다. sshim-trader 연구의 기본 검증 틀이다.'],
+    ['holdout', '', '파라미터 선택에 쓰지 않고 떼어 둔 최근 구간. 튜닝이 과적합인지 판정하는 자리다.'],
+  ]}
+/>
+
+## 지금 sshim-trader가 남기는 것
+
+연구·백테스트 스크립트는 이미 성실하게 파일을 남긴다. 실행마다 타임스탬프가 붙은 폴더가 생기고 그 안에
+예측·요약·리포트가 들어간다.
+
+```text
+artifacts/
+├── research/
+│   ├── features_nxt_day_202608.parquet          # 피처 캐시
+│   └── nxt_daily_o2n_20260830_120331/
+│       ├── predictions.parquet
+│       ├── summary.csv
+│       ├── daily_net_returns.csv
+│       └── report.html
+├── backtest/
+│   └── 20260830_120951_backtest/
+│       └── summary.json · trades.csv · equity.csv · report.html
+└── optuna.db                                    # trial별 파라미터와 목적값
+```
+
+이 구조는 **산출물 보관**에는 충분하다. 막히는 건 그다음이다.
+
+| 하고 싶은 일 | 폴더만 있을 때 |
+|---|---|
+| 지난달 돌린 것 중 holdout Sharpe가 가장 높았던 조건 찾기 | 폴더를 하나씩 열어 `summary.csv`를 읽어야 한다 |
+| `step_days`를 60에서 120으로 바꾼 효과만 보기 | 어느 폴더가 어떤 `step_days`였는지 폴더 이름에 없다 |
+| 튜닝 trial 30개의 파라미터-성능 관계 보기 | `optuna.db`에는 목적값 하나뿐, 나머지 지표는 사라진다 |
+| 이 결과가 어떤 코드 버전에서 나왔는지 확인 | 커밋 해시가 어디에도 없다 |
+| 백테스트와 walk-forward 결과를 같은 표에서 비교 | 파일 형식(`summary.json` · `summary.csv`)부터 다르다 |
+
+공통점은 하나다. **파일은 "그때 무엇이 나왔는가"를 남기지만 "그때 무엇을 정했는가"를 남기지 않는다.**
+조건이 코드 안 기본값과 CLI 인자에 흩어져 있으니, 폴더를 아무리 잘 정리해도 조건별 비교가 안 된다.
+
+## MLflow가 대신 맡는 자리
+
+MLflow Tracking은 실행 하나를 run으로 잘라 네 가지를 함께 저장한다. 셋은 구조화된 값이고 하나는 파일이다.
+
+<CardGrid>
+
+<Card title="param — 실행 전에 정한 값" icon="setting">
+`train_days=750`, `step_days=60`, `lgbm.learning_rate=0.05`처럼 **내가 고른** 조건. 문자열로 저장되고 한 번 쓰면 바꿀 수 없다.
+</Card>
+
+<Card title="metric — 실행이 만든 수치" icon="analytics">
+`sharpe_net`, `holdout_mdd`, `hit_rate`처럼 **실행 결과로 나온** 숫자. 나중에 조건 검색의 좌변이 된다.
+</Card>
+
+<Card title="tag — 분류·메모" icon="pencil">
+`phase=tune`, `study=nxt_daily_o2n`처럼 런을 묶고 거르는 문자열. 나중에 추가·수정할 수 있다.
+</Card>
+
+<Card title="artifact — 산출물 파일" icon="document">
+`report.html`, `predictions.parquet`처럼 값으로 못 담는 것. 원본은 여전히 `artifacts/` 폴더에 있고 사본이 run에 붙는다.
+</Card>
+
+</CardGrid>
+
+이렇게 저장하면 아까의 질문이 전부 조건식이 된다.
+
+```python
+import mlflow
+
+best = mlflow.search_runs(
+    experiment_names=["research/tune_o2n"],
+    filter_string="params.step_days = '120' and metrics.holdout_sharpe_net > 0.8",
+    order_by=["metrics.holdout_sharpe_net DESC"],
+)
+```
+
+## 무엇을 맡지 않는가
+
+MLflow를 "MLOps 전체"로 이해하면 이 레포에서 쓸 자리를 잘못 잡는다. 지금 sshim-trader가 이미
+다른 도구로 잘 하고 있는 일이 있고, MLflow는 거기 끼어들지 않는다.
+
+```d2 layout=elk pad=40 title="데이터 수집부터 실거래까지의 흐름에서 Optuna·연구 코드·MLflow가 각각 맡는 구간의 경계"
+direction: down
+
+classes: {
+  key: {
+    style: {
+      fill: "#dbeafe"
+      stroke: "#2563eb"
+      font-color: "#1e3a8a"
+    }
+  }
+  mid: {
+    style: {
+      fill: "#f1f5f9"
+      stroke: "#94a3b8"
+      font-color: "#334155"
+    }
+  }
+  zone: {
+    style: {
+      fill: "#ede9fe"
+      stroke: "#7c3aed"
+      font-color: "#4c1d95"
+    }
+  }
+  fine: {
+    style: {
+      fill: "#dcfce7"
+      stroke: "#16a34a"
+      font-color: "#14532d"
+    }
+  }
+}
+
+collect: "Kiwoom 수집\nscripts/chart_nxt_daily" { class: mid }
+feat: "피처 생성\nresearch/features.py" { class: mid }
+search: "탐색 전략\nOptuna TPE · optuna.db" { class: zone }
+wf: "walk-forward 학습·평가\nresearch/walkforward.py" { class: mid }
+track: "MLflow\nrun 기록 · 비교 · 검색" { class: key }
+decide: "조건 채택" { class: fine }
+live: "실거래 앱\npython -m sshim_trader" { class: fine }
+
+collect -> feat
+feat -> wf
+search -> wf: 다음 파라미터 제안
+wf -> search: 목적값 반환
+wf -> track: "결과 기록" {
+  style.animated: true
+}
+track -> decide
+decide -> live: 확정된 전략만
+```
+
+- **탐색은 Optuna가 한다.** 다음 파라미터를 무엇으로 할지는 TPE sampler가 정하고 `artifacts/optuna.db`가
+  study 상태를 이어 간다. MLflow는 그 trial의 결과를 받아 적을 뿐 탐색에 개입하지 않는다.
+- **평가 지표의 정의는 연구 코드가 한다.** `sharpe_net`을 어떻게 계산하는지는
+  `sshim_trader/research/evaluate.py`가 정한다. MLflow는 숫자를 검증하지 않는다.
+- **실행 스케줄링·재시도는 없다.** 언제 돌릴지는 내가 명령을 치는 시점이다.
+- **실거래 런타임에는 들어가지 않는다.** `mlflow`는 `pyproject.toml`의 dev group에 있다. 매매 봇은
+  MLflow 없이 동작해야 한다.
+
+:::tip[이 덱을 읽는 기준]
+"MLflow가 이걸 할 수 있는가"가 아니라 "**이 레포에서 이게 없으면 무엇을 못 찾는가**"로 기능을 고른다.
+MLflow 3에는 GenAI trace·prompt registry·LLM judge까지 들어 있지만, 시스템 트레이딩 연구에는 쓰지 않는다.
+:::
+
+## 부가 기능이라는 결정
+
+`sshim_trader/utils/tracking.py`의 `log_run()`은 전체를 `try`로 감싸고 실패하면 경고만 남긴다.
+
+```python
+    except Exception:
+        logger.warning("MLflow 기록 실패 (런 산출물 자체는 무관)", exc_info=True)
+        return None
+```
+
+이 선택은 지켜야 할 계약이다. **파일 산출물이 원본이고 MLflow는 그 위의 색인 계층**이므로,
+트래킹이 깨져도 연구는 계속돼야 한다. 이 덱에서 무엇을 추가로 기록할지 고를 때도 같은 기준을 쓴다 —
+MLflow에만 존재하는 정보가 늘수록 이 계약이 약해진다.
+
+거꾸로 말하면 지금 `log_run()`이 놓치는 것도 분명하다. `mlflow.db`가 지워지면 **어떤 파라미터로 무엇이
+나왔는지**는 완전히 사라진다. 파라미터를 파일에도 남기는 문제는 [10장](/mlflow/10-reproducibility/)에서 다룬다.
+
+<LinkCard
+  title="1. experiment · run · 그 안의 네 가지"
+  description="log_run()의 인자가 MLflow 데이터 모델의 어디에 대응하는지, run 하나를 어느 크기로 잡을지 정한다."
+  href="/mlflow/01-data-model/"
+/>

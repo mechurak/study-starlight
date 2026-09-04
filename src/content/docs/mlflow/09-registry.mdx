@@ -1,0 +1,208 @@
+---
+title: "9. Model Registry — 이름으로 모델 집어 오기"
+description: registered model과 version, alias로 실거래가 코드 수정 없이 champion 모델을 받아 가게 만든다
+reviewedAt: 2026-09-05
+deckGroup: model
+sidebar:
+  order: 100
+---
+
+import { LinkCard, Steps } from '@astrojs/starlight/components';
+import SourceFigure from '../../../components/docs/SourceFigure.astro';
+import TermIntro from '../../../components/docs/TermIntro.astro';
+import Thesis from '../../../components/docs/Thesis.astro';
+
+<Thesis>alias는 "지금 쓰는 모델"이라는 **움직이는 이름표**다 — 소비자 코드는 버전을 모르고 이름만 안다</Thesis>
+
+<TermIntro
+  terms={[
+    ['registered model', '등록 모델', '이름이 붙은 모델 묶음. 그 아래에 버전들이 쌓인다.'],
+    ['model version', '모델 버전', '등록할 때마다 1씩 늘어나는 번호. 내용은 바뀌지 않는다.'],
+    ['alias', '별칭', '특정 버전을 가리키는 이름표. `@champion`처럼 쓰고 다른 버전으로 옮길 수 있다.'],
+    ['stage', '단계', '`Staging`·`Production` 같은 예전 방식의 고정 단계. alias로 대체됐다.'],
+  ]}
+/>
+
+## run_id를 코드에 박으면 생기는 일
+
+[8장](/mlflow/08-models/)에서 모델을 기록하고 나면 `models:/m-a1b2c3…` 같은 URI가 생긴다. 실거래 코드가
+이걸 직접 들고 있으면 문제가 세 가지다.
+
+- 모델을 새로 학습할 때마다 **코드를 고쳐 배포**해야 한다.
+- 그 32자 문자열이 어떤 조건의 모델인지 코드만 봐서는 모른다.
+- 되돌리려면 예전 문자열을 어딘가에서 찾아와야 한다.
+
+Model Registry는 이 사이에 한 겹을 넣는다. **모델에 이름을 주고, 그 이름 아래 버전을 쌓고,
+"지금 쓰는 것"을 별칭으로 가리킨다.**
+
+```d2 layout=elk pad=40 title="연구가 만든 모델이 등록 모델의 버전으로 쌓이고 champion 별칭이 그중 하나를 가리키며 소비자는 별칭만 참조하는 구조"
+direction: down
+
+classes: {
+  key: {
+    style: {
+      fill: "#dbeafe"
+      stroke: "#2563eb"
+      font-color: "#1e3a8a"
+    }
+  }
+  mid: {
+    style: {
+      fill: "#f1f5f9"
+      stroke: "#94a3b8"
+      font-color: "#334155"
+    }
+  }
+  fine: {
+    style: {
+      fill: "#dcfce7"
+      stroke: "#16a34a"
+      font-color: "#14532d"
+    }
+  }
+  warnbox: {
+    style: {
+      fill: "#fef3c7"
+      stroke: "#d97706"
+      font-color: "#78350f"
+    }
+  }
+}
+
+run: "연구 run\nlog_model(\nname=\"lgbm_o2n\")" { class: key }
+
+reg: "등록 모델 nxt_daily_o2n" {
+  class: mid
+  grid-rows: 3
+  v1: "version 1\n2026-06" { class: mid }
+  v2: "version 2\n2026-08" { class: mid }
+  v3: "version 3\n2026-09" { class: fine }
+}
+
+alias: "@champion" { class: warnbox }
+consumer: "소비자\nmodels:/nxt_daily_o2n\n@champion" { class: fine }
+
+run -> reg.v3: 새 버전으로 추가
+alias -> reg.v3: "지금 이걸 가리킨다" {
+  style.stroke-dash: 3
+}
+consumer -> alias: 이름만 안다
+```
+
+## 등록하는 두 가지 방법
+
+sqlite도 database backend이므로 지금 구성 그대로 Registry를 쓸 수 있다. file store였다면 못 썼을 기능이다.
+
+<Steps>
+
+1. 기록과 동시에 등록한다. 가장 짧다.
+
+   ```python
+   mlflow.lightgbm.log_model(
+       model,
+       name="lgbm_o2n",
+       signature=signature,
+       registered_model_name="nxt_daily_o2n",   # 없으면 만들고, 있으면 버전을 하나 늘린다
+   )
+   ```
+
+2. 이미 기록된 모델을 나중에 등록한다. **연구 런을 한참 쌓아 두고 그중 하나를 고르는** 흐름에 맞다.
+
+   ```python
+   import mlflow
+
+   mv = mlflow.register_model(model_uri=f"models:/{model_id}", name="nxt_daily_o2n")
+   print(mv.version)   # 3
+   ```
+
+3. UI에서 버튼으로도 된다. 모델 화면의 등록 버튼을 누르면 새 이름을 만들지, 기존 이름에 버전을 더할지 묻는다.
+
+</Steps>
+
+<SourceFigure
+  src="/images/mlflow/registry-register.png"
+  alt="기록된 모델 화면에서 Model Registry에 등록하는 버튼과 등록 대상 선택 화면"
+  width={2711}
+  height={1599}
+  caption="오른쪽 위 등록 버튼이 이 화면의 요점이다. 누르면 새 이름을 만들지 기존 등록 모델에 버전을 추가할지 고르는 대화상자가 뜬다."
+  sourceHref="https://mlflow.org/docs/latest/ml/model-registry/"
+  sourceLabel="MLflow 공식 문서 — Model Registry"
+/>
+
+**두 번째 방식을 권한다.** 연구 run은 대부분 기각된다. 학습할 때마다 자동 등록하면 Registry가
+후보 목록이 되어 버리고, "등록됐다"는 사실이 아무 의미가 없어진다. 등록은 **판단이 끝난 뒤의 행위**여야 한다.
+
+## alias로 "지금 쓰는 것"을 가리킨다
+
+버전 번호는 늘기만 하고 바뀌지 않는다. 움직이는 건 alias다.
+
+```python
+from mlflow import MlflowClient
+
+client = MlflowClient("sqlite:///artifacts/mlflow.db")
+
+# 검증을 통과한 버전을 champion으로 승격
+client.set_registered_model_alias("nxt_daily_o2n", "champion", version="3")
+
+# 비교용으로 돌려 볼 후보
+client.set_registered_model_alias("nxt_daily_o2n", "challenger", version="4")
+
+# 판단 근거를 버전에 붙여 둔다
+client.set_model_version_tag("nxt_daily_o2n", version="3", key="holdout_sharpe", value="0.91")
+client.set_model_version_tag("nxt_daily_o2n", version="3", key="dataset", value="chart-nxt_day_202608")
+```
+
+소비자는 버전을 모른다.
+
+```python
+model = mlflow.pyfunc.load_model("models:/nxt_daily_o2n@champion")
+```
+
+되돌리기도 한 줄이다 — `set_registered_model_alias(..., version="2")`로 이름표만 옮기면 된다.
+**모델 파일은 그대로 있고 가리키는 곳만 바뀐다.**
+
+:::tip[stage 대신 alias]
+`Staging`·`Production` 같은 stage는 예전 방식이다. `transition_model_version_stage`가 아직 있지만
+새 설계의 출발점으로 쓰지 않는다. alias는 이름을 내가 정할 수 있고(`champion`·`challenger`·`o2c_champion`),
+한 모델에 여러 개를 동시에 걸 수 있다.
+:::
+
+## 실거래가 이걸 쓰려면 무엇이 필요한가
+
+여기서 정직하게 짚을 게 있다. **지금 `mlflow`는 dev dependency다.** `python -m sshim_trader`는
+MLflow를 import하지 않고, 그게 [0장](/mlflow/00-position/)에서 확인한 경계다. Registry를 실거래에
+쓰려면 이 경계를 어떻게든 건드려야 한다.
+
+| 방식 | 하는 일 | 대가 |
+|---|---|---|
+| A. 실거래에서 직접 로드 | 실거래가 `mlflow`를 런타임 의존성으로 갖고 `models:/…@champion`을 읽는다 | 매매 봇이 MLflow와 sqlite 파일에 의존하게 된다. MLflow가 깨지면 매매가 멈춘다 |
+| B. 연구 쪽에서 내보내기 | 승격 시 champion 모델을 `artifacts/live/model.pkl` 같은 고정 경로로 복사한다 | 실거래는 파일 하나만 안다. 대신 복사 단계를 사람이나 스크립트가 챙겨야 한다 |
+
+**B를 권한다.** [0장](/mlflow/00-position/)의 "MLflow는 부가 기능" 계약이 실거래에서 특히 중요하기
+때문이다. Registry는 *어느 모델이 champion인가*를 결정하고 기록하는 자리로 쓰고, 실행 시점에
+매매 봇이 참조하는 건 내보낸 파일로 둔다.
+
+```python
+# 승격 스크립트: alias가 가리키는 버전을 실거래가 읽는 경로로 내보낸다
+mv = client.get_model_version_by_alias("nxt_daily_o2n", "champion")
+local = mlflow.artifacts.download_artifacts(mv.source, dst_path="artifacts/live")
+print(f"champion = version {mv.version} → {local}")
+```
+
+이러면 **판단의 이력은 Registry에, 실행의 의존성은 파일 하나에** 남는다. 나중에 A로 옮기고 싶어져도
+`get_model_version_by_alias` 한 줄을 실거래 쪽으로 옮기면 되니 되돌릴 수 없는 선택이 아니다.
+
+## 지금 당장 할 일은 아니다
+
+전략이 아직 채택 전이라면 Registry는 비어 있는 게 정상이다. 이 장은 **[8장](/mlflow/08-models/)의
+모델 기록을 시작하는 순간 함께 정해야 할 이름 규칙**을 미리 정리해 둔 것이다. 실제로 필요한 건 셋뿐이다.
+
+- 등록 모델 이름은 target별로 하나 — `nxt_daily_o2n`, `nxt_daily_o2c`
+- alias는 `champion` 하나로 시작하고, 비교 실험을 시작할 때 `challenger`를 더한다
+- 버전마다 `holdout_sharpe`·`dataset`·`git_commit` tag를 붙여 근거를 남긴다
+
+<LinkCard
+  title="10. 6개월 뒤 이 런을 다시 만들 수 있는가"
+  description="git commit과 dirty 작업 트리, dataset digest, seed — 재현을 막는 것들을 하나씩 막는다."
+  href="/mlflow/10-reproducibility/"
+/>

@@ -1,0 +1,109 @@
+---
+title: 개요
+description: sshim-trader의 연구·백테스트 실행을 MLflow run으로 기록하고, 어떤 조건이 왜 나았는지 검색·비교로 되찾는다
+reviewedAt: 2026-09-05
+---
+
+import { LinkCard, LinkButton } from '@astrojs/starlight/components';
+import DeckMap from '../../../components/docs/DeckMap.astro';
+
+> MLflow는 실험 결과를 예쁘게 보여 주는 대시보드가 아니다 — **"이 조건이 정말 나았나"를 나중에 다시 물을 수 있게 만드는 저장소**다
+
+백테스트를 한 번 돌리면 `artifacts/backtest/20260830_120951_backtest/` 같은 폴더가 하나 생긴다. 안에는
+`summary.json`, `trades.csv`, `report.html`이 들어 있다. 한두 번은 이걸로 충분하다. 그런데 파라미터를 바꿔
+서른 번을 돌리고 나면 문제가 생긴다 — **어떤 폴더가 어떤 조건이었는지, 왜 그 조건을 골랐는지가 폴더 이름에
+남아 있지 않다.** 튜닝 trial 30개를 돌리면 그 폴더조차 남지 않는다.
+
+MLflow는 실행 하나를 **run**으로 잘라, 실행 전에 정한 값(param)·실행 결과 수치(metric)·분류표(tag)·
+산출물 파일(artifact)을 한 저장소에 함께 넣는다. 그러면 "왕복 비용 28bp에서 holdout Sharpe가 0.8을 넘은 런"
+같은 질문을 파일을 뒤지지 않고 조건식으로 물을 수 있다.
+
+```d2 layout=elk pad=40 title="연구 스크립트가 실행한 결과가 run으로 기록되고 UI와 검색을 거쳐 다음 실행 조건으로 돌아오는 순환"
+direction: down
+
+classes: {
+  key: {
+    style: {
+      fill: "#dbeafe"
+      stroke: "#2563eb"
+      font-color: "#1e3a8a"
+    }
+  }
+  zone: {
+    style: {
+      fill: "#ede9fe"
+      stroke: "#7c3aed"
+      font-color: "#4c1d95"
+    }
+  }
+  fine: {
+    style: {
+      fill: "#dcfce7"
+      stroke: "#16a34a"
+      font-color: "#14532d"
+    }
+  }
+  mid: {
+    style: {
+      fill: "#f1f5f9"
+      stroke: "#94a3b8"
+      font-color: "#334155"
+    }
+  }
+}
+
+script: "연구 · 백테스트 스크립트\nwalk-forward · Optuna · 백테스트" { class: key }
+files: "파일 산출물\npredictions.parquet · report.html" { class: mid }
+store: "MLflow tracking store\nsqlite + artifacts/mlruns" { class: key }
+ui: "mlflow ui\n런 비교 · chart" { class: zone }
+query: "search_runs\n조건으로 좁히기" { class: zone }
+pick: "다음 조건 결정\n채택 · 기각" { class: fine }
+
+script -> files: 원본 그대로 저장
+script -> store: "param · metric · tag" {
+  style.animated: true
+}
+files -> store: artifact로 첨부
+store -> ui
+store -> query
+ui -> pick
+query -> pick
+pick -> script: 다음 실행
+```
+
+**2026년 9월 5일 기준**이고 `../sshim-trader`에 설치된 **MLflow 3.15.2**에서 확인했다. backend store는
+로컬 sqlite, artifact store는 로컬 디렉터리이며 tracking server는 띄우지 않는다.
+
+<LinkButton href="/mlflow/00-position/" icon="right-arrow">첫 장부터 읽기</LinkButton>
+
+## 구성
+
+<DeckMap deck="mlflow" />
+
+## 전체를 관통하는 세 문장
+
+**run은 "한 번의 의사결정 단위"다.** walk-forward가 안에서 fold를 20번 돌아도 그건 run 하나다. 내가 채택하거나
+기각할 대상이 하나면 run도 하나다. 반대로 Optuna trial 30개는 결정 후보 30개이므로 run 30개가 맞고,
+이때는 부모 run 하나로 묶는다.
+
+**param과 metric의 경계가 나중의 검색 가능성을 결정한다.** 실행 전에 정한 값은 param, 실행이 만든 수치는
+metric이다. param은 문자열로 저장되어 immutable이고, metric만 `metrics.sharpe_net > 0.8` 같은 수치 조건의
+좌변이 된다. 이 경계를 대충 잡으면 런이 쌓인 뒤에 되돌릴 수 없다.
+
+**파일이 원본이고 MLflow는 색인이다.** sshim-trader의 `log_run()`은 기록에 실패해도 예외를 올리지 않고
+`None`을 리턴한다. 이 결정이 옳다 — 트래킹이 깨져도 연구 산출물은 남아야 한다. 그래서 MLflow에 무엇을
+넣을지는 "여기 없으면 못 찾는가"로 고른다.
+
+## 다른 덱과의 경계
+
+- 전략 자체(피처·라벨·평가 지표의 타당성)는 [강화학습 덱](/rl/)과 sshim-trader 레포 문서가 맡는다.
+- LLM 애플리케이션의 trace·prompt·평가는 [Langfuse 덱](/langfuse/)이 맡는다. MLflow 3에도 GenAI 기능이
+  있지만 이 덱은 다루지 않는다.
+- 관리형 MLflow와 Unity Catalog는 [Databricks 덱](/databricks/)의 영역이다.
+- 나중에 팀 서버로 옮길 때의 Kubernetes·object storage·SSO는 [온프렘 Kubernetes 덱](/onprem/)을 따른다.
+
+<LinkCard
+  title="0. MLflow의 자리"
+  description="폴더로 남기던 산출물이 어디서 막히는지, 그 자리에 MLflow가 무엇을 대신 맡는지 먼저 긋는다."
+  href="/mlflow/00-position/"
+/>

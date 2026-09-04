@@ -1,0 +1,142 @@
+---
+title: "5. UI에서 런을 비교하는 법"
+description: run 목록의 열 고르기, 차트 보기와 평행 좌표, 런 상세 화면을 실제 튜닝 결과 읽기에 붙인다
+reviewedAt: 2026-09-05
+deckGroup: compare
+sidebar:
+  order: 60
+---
+
+import { LinkCard, Steps } from '@astrojs/starlight/components';
+import SourceFigure from '../../../components/docs/SourceFigure.astro';
+import TermIntro from '../../../components/docs/TermIntro.astro';
+import Thesis from '../../../components/docs/Thesis.astro';
+
+<Thesis>UI는 "무엇을 물어야 할지 아직 모를 때" 쓰는 도구다 — 질문이 분명해지면 [6장의 검색](/mlflow/06-search/)으로 넘어간다</Thesis>
+
+<TermIntro
+  terms={[
+    ['run 목록', 'table view', 'experiment 안의 런을 행으로 늘어놓은 표. 어떤 param·metric을 열로 볼지 고를 수 있다.'],
+    ['차트 보기', 'chart view', '여러 런의 metric을 한 화면에 그리는 모드. 막대·산점도·평행 좌표 등을 고른다.'],
+    ['평행 좌표', 'parallel coordinates', '파라미터 여러 개와 결과를 세로축으로 늘어놓고 런 하나를 꺾은선으로 그리는 그림. 어떤 값 구간이 좋은 결과로 이어지는지 본다.'],
+  ]}
+/>
+
+## 먼저 어디를 보게 되는가
+
+`uv run mlflow-ui`로 열면 왼쪽에 experiment 목록, 가운데에 그 experiment의 run 목록이 나온다.
+sshim-trader라면 `research/nxt_daily_o2n`, `research/tune_o2n`, `backtest` 셋이 보인다.
+
+<SourceFigure
+  src="/images/mlflow/quickstart-ui-run-list.png"
+  alt="experiment 하나의 run들이 이름·생성 시각·데이터셋·주요 metric 열로 나열된 목록 화면"
+  width={2454}
+  height={575}
+  caption="한 행이 run 하나다. 오른쪽으로 갈수록 metric과 param 열이 이어지고, 어떤 열을 보여줄지는 열 선택 메뉴에서 켜고 끈다."
+  sourceHref="https://mlflow.org/docs/latest/ml/tracking/quickstart/"
+  sourceLabel="MLflow 공식 문서 — Tracking Quickstart"
+/>
+
+기본 상태로는 쓸모가 적다. **처음 할 일은 열을 고르는 것**이다. run 목록의 열 설정에서 지금 판단에 필요한
+metric과 param만 켠다. 예를 들어 `research/tune_o2n`이라면 이렇게 좁힌다.
+
+| 켤 열 | 왜 |
+|---|---|
+| `metrics.holdout_sharpe_net` | 채택 판단의 기준 |
+| `metrics.sharpe_net` | 튜닝 구간 성능 — holdout과의 차이가 과적합 신호 |
+| `metrics.z_vs_random` | 랜덤 대비 몇 σ인지 |
+| `params.lgbm.learning_rate` · `num_leaves` | 실제로 흔든 축 |
+| `tags.phase` | `tune`과 `final`을 구분 |
+
+`params.train_days`처럼 모든 런에서 같은 값인 열은 끈다. **모든 행이 같은 값인 열은 정보가 0**이고
+가로 스크롤만 늘린다.
+
+## 차트 보기 — 30개 trial을 한눈에
+
+목록의 차트 아이콘을 누르면 같은 런들이 그림이 된다. 여기서 세 가지가 실제로 쓸모 있다.
+
+<SourceFigure
+  src="/images/mlflow/ui-compare-metrics.png"
+  alt="여러 런의 파라미터와 결과 metric을 한 화면에서 비교하는 차트 보기 화면"
+  width={1264}
+  height={718}
+  caption="같은 experiment의 런들이 하나의 좌표계에 얹힌다. 튜닝 trial처럼 런이 수십 개일 때, 목록의 숫자를 읽는 것보다 이 화면이 훨씬 빠르다."
+  sourceHref="https://mlflow.org/docs/latest/ml/getting-started/hyperparameter-tuning/"
+  sourceLabel="MLflow 공식 문서 — Hyperparameter Tuning"
+/>
+
+- **막대 그래프** — 런별 `holdout_sharpe_net`을 세워 놓고 상위 몇 개를 눈으로 집는다.
+- **산점도** — x축 `params.lgbm.num_leaves`, y축 `metrics.sharpe_net`으로 두면 그 파라미터가 성능과
+  관계가 있는지 없는지가 바로 보인다. 구름처럼 흩어져 있으면 그 축은 흔들 가치가 없다는 뜻이다.
+- **평행 좌표** — 파라미터 여러 개와 결과를 세로축으로 늘어놓고 런을 선으로 잇는다. 좋은 결과로 가는
+  선들이 특정 구간을 통과하면 다음 탐색 범위를 그쪽으로 좁힐 근거가 된다.
+
+:::tip[튜닝 결과를 읽는 순서]
+`research/tune_o2n`을 열면 이 순서가 빠르다. **(1) `phase=final` 두 런의 holdout 열을 먼저 본다 →
+(2) `default`보다 `best`가 holdout에서도 나은지 확인한다 → (3) 그다음에야 trial 30개의 평행 좌표를 본다.**
+`research_tune.py`의 docstring도 "판단은 holdout 컬럼으로 할 것"이라고 못 박아 뒀다. 튜닝 구간 Sharpe만
+높은 trial은 과적합의 증거이지 성과가 아니다.
+:::
+
+## 런을 골라 나란히 비교
+
+목록에서 체크박스로 둘 이상을 고르고 비교를 누르면 param 차이만 강조된 표가 나온다.
+`final_default`와 `final_best`처럼 **한 축만 다른 두 런**을 볼 때 특히 좋다 —
+같은 값은 회색으로 가라앉고 다른 값만 남는다.
+
+백테스트 experiment에서는 config 파일이 다른 런끼리 비교하면 YAML의 어느 키가 달랐는지가 바로 보인다.
+`log_run(params={"config_file": ..., **raw_config})`가 config 전체를 param으로 펴 두었기 때문에 가능한 일이다.
+
+## 런 상세 화면
+
+행 이름을 누르면 그 런 하나의 화면이 열린다.
+
+<SourceFigure
+  src="/images/mlflow/quickstart-our-run.png"
+  alt="run 하나의 상세 화면에서 파라미터·metric·tag와 붙어 있는 artifact 목록을 보여주는 모습"
+  width={1549}
+  height={901}
+  caption="위쪽에 run_id·상태·소요 시간, 가운데에 param과 metric, 아래 탭에 artifact가 있다. artifact 탭에서 report.html을 누르면 화면 안에서 바로 열린다."
+  sourceHref="https://mlflow.org/docs/latest/ml/tracking/quickstart/"
+  sourceLabel="MLflow 공식 문서 — Tracking Quickstart"
+/>
+
+여기서 확인할 것은 넷이다.
+
+<Steps>
+
+1. **param 전체** — 목록에서 끈 열까지 다 보인다. "이 런이 정확히 어떤 조건이었나"의 정본이다.
+
+2. **metric 곡선** — `step`으로 쌓은 metric이 있으면 여기서 선 그래프가 된다.
+
+3. **tag** — `mlflow.source.git.commit`을 확인한다. 이 결과를 낸 코드 버전이다.
+
+4. **artifact** — `report.html`을 열고, 필요하면 `out_dir` tag의 경로로 원본 폴더를 찾아간다.
+
+</Steps>
+
+MLflow 3에는 모델 탭이 따로 있다. 지금 sshim-trader는 모델을 기록하지 않으므로 비어 있다 —
+[8장](/mlflow/08-models/)에서 여기를 채운다.
+
+<SourceFigure
+  src="/images/mlflow/tracking-models-ui.png"
+  alt="experiment 화면의 모델 탭에서 기록된 모델들이 자체 행으로 나열된 모습"
+  width={3834}
+  height={1926}
+  caption="MLflow 3에서 모델은 run에 딸린 파일이 아니라 자체 행을 가진다. 지금 이 탭이 비어 있다는 사실이 8장의 출발점이다."
+  sourceHref="https://mlflow.org/docs/latest/ml/tracking/"
+  sourceLabel="MLflow 공식 문서 — MLflow Tracking"
+/>
+
+## UI의 한계
+
+UI는 "훑기"에 강하고 "재현"에 약하다. 열을 켜고 정렬한 상태는 내 브라우저에만 있고, 같은 판단을
+다음 달에 반복하려면 다시 손으로 조립해야 한다. 그리고 런이 수백 개가 되면 스크롤이 답이 아니게 된다.
+
+그래서 **한 번 하고 마는 탐색은 UI, 반복하는 판단은 코드**로 가른다. 다음 장의 `search_runs`가 그 자리다.
+
+<LinkCard
+  title="6. search_runs로 조건 걸기"
+  description="필터 문법의 다섯 필드와 연산자, 그리고 UI에서 손으로 하던 판단을 스크립트로 굳히는 법."
+  href="/mlflow/06-search/"
+/>
