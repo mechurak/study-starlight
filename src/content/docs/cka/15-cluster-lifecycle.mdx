@@ -252,18 +252,24 @@ kubectl describe node controlplane | grep -A5 Conditions
 ```
 
 ```bash
-# 예: Calico
-kubectl apply -f https://raw.githubusercontent.com/projectcalico/calico/v3.28.0/manifests/calico.yaml
+# 예: Calico — 현행 공식 문서의 표준은 Tigera Operator 방식이다
+kubectl create -f https://raw.githubusercontent.com/projectcalico/calico/v3.31.6/manifests/operator-crds.yaml
+kubectl create -f https://raw.githubusercontent.com/projectcalico/calico/v3.31.6/manifests/tigera-operator.yaml
+curl -O https://raw.githubusercontent.com/projectcalico/calico/v3.31.6/manifests/custom-resources.yaml
+# custom-resources.yaml의 ipPools[].cidr를 --pod-network-cidr와 맞춘 뒤
+kubectl create -f custom-resources.yaml
 
 # 잠시 후
-kubectl get nodes            # Ready
-kubectl get pods -n kube-system
+kubectl get nodes                    # Ready
+kubectl get pods -n calico-system    # 오퍼레이터 방식은 kube-system이 아니라 여기 뜬다
 ```
 
 :::caution[함정]
-`--pod-network-cidr`과 **CNI 매니페스트의 CIDR(Classless Inter-Domain Routing — IP 대역 표기법)이 일치**해야 한다.
-Calico 기본은 `192.168.0.0/16`, Flannel은 `10.244.0.0/16`이다.
+`--pod-network-cidr`과 **CNI 쪽에 설정하는 CIDR(Classless Inter-Domain Routing — IP 대역 표기법)이 일치**해야 한다.
+Calico는 `Installation` 리소스의 `ipPools[].cidr`(기본 `192.168.0.0/16`), Flannel은 `10.244.0.0/16`이다.
 안 맞으면 Pod은 뜨는데 **통신이 안 된다** — 진단하기 까다로운 유형이다.
+큰 manifest를 `apply`가 아니라 `create`로 넣는 이유와 랩 풀이는
+[cka-udemy 5장의 Calico 설치 절](/cka-udemy/05-services-dns/#calico-설치--lab-install-calico-cni-2025-신규)에 있다.
 :::
 
 ### 워커 노드 조인

@@ -106,7 +106,7 @@ export default {
 			"label": "5장",
 			"title": "Service와 DNS",
 			"href": "/cka-udemy/05-services-dns/",
-			"desc": "EndpointSlice · Service · CoreDNS · 내부에서 외부까지 계층별 검증",
+			"desc": "EndpointSlice · Service · CoreDNS · Calico CNI 설치 · 계층별 검증",
 			"items": [
 				[
 					"cka 9장",

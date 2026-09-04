@@ -1,6 +1,6 @@
 ---
 title: 개요
-description: KodeKloud 실습 풀이 46개를 뼈대로, 여러 실습에서 확인한 실패 진단·완료 검증·복구 패턴을 CKA 장 순서로 모은 연습 덱
+description: KodeKloud 실습 풀이 47개를 뼈대로, 여러 실습에서 확인한 실패 진단·완료 검증·복구 패턴을 CKA 장 순서로 모은 연습 덱
 ---
 
 import { LinkButton, LinkCard } from '@astrojs/starlight/components';
@@ -10,8 +10,8 @@ import DeckMap from '../../../components/docs/DeckMap.astro';
 
 유데미 CKA 강의의 참고 레포 [`certified-kubernetes-administrator-course`](https://github.com/kodekloudhub/certified-kubernetes-administrator-course)에 요약된
 **KodeKloud 실습(Practice Test) 풀이 44개**를, [cka 덱](/cka/)의 장 순서로 재편성했다.
-레포에 풀이가 없는 **2025년 신규 랩 2개**(admission 컨트롤러)는
-[KodeKloud 노트 사이트](https://notes.kodekloud.com/docs/Certified-Kubernetes-Administrator-CKA/)를 소스로 보강했다.
+레포에 풀이가 없는 **2025년 신규 랩 3개**(admission 컨트롤러 2개, Calico CNI 설치)는
+[KodeKloud 노트 사이트](https://notes.kodekloud.com/docs/Certified-Kubernetes-Administrator-CKA/)와 랩 원문을 소스로 보강했다.
 개념 설명은 cka 덱이 맡고, 이 덱은 "**이런 문제가 나오면 이렇게 푼다**"만 맡는다.
 
 여기에 다른 실습을 수행하며 얻은 **완료 판정·실패 분기·복구 후 재검증 패턴**도 덧붙인다.
@@ -52,7 +52,7 @@ import DeckMap from '../../../components/docs/DeckMap.astro';
 | Worker Node Failure | 원본이 빈 껍데기 — 진단 순서는 [cka 18장](/cka/18-troubleshooting/)에 있다 |
 | CNI weave | Weave는 단종됐고 현 시험 환경에 없다. 다만 런타임 엔드포인트·CNI 디렉터리를 확인하는 두 문항은 [5장](/cka-udemy/05-services-dns/)에 살려 뒀다 |
 | Networking weave | 위와 같다 |
-| Deploy Network Solution | 풀이가 "weave를 설치하라" 한 줄이다 |
+| Deploy Network Solution | 풀이가 "weave를 설치하라" 한 줄이다. 현행 과정의 대체 랩(Install Calico CNI)은 [5장](/cka-udemy/05-services-dns/)에 있다 |
 | Multiple Schedulers | 현 커리큘럼(v1.35)에 없는 항목이다 |
 
 :::tip[시험 직전에는]
