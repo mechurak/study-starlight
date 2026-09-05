@@ -213,6 +213,9 @@ kubectl get ingressclass
 
 ### Ingress TLS
 
+시험 중 복사 원본은 공식 [Ingress 문서의 TLS 절](https://kubernetes.io/docs/concepts/services-networking/ingress/#tls)이다 —
+라우팅 규칙을 가져온 그 페이지에서 스크롤만 내리면 `spec.tls` 예시가 있다.
+
 ```bash
 kubectl create secret tls web-tls --cert=./tls.crt --key=./tls.key
 ```
