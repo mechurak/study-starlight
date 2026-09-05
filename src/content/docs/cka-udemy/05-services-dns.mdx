@@ -211,7 +211,7 @@ last-applied-configuration 어노테이션이 크기 제한(262144바이트)을 
 ```bash
 kubectl get cm kubeadm-config -n kube-system -o yaml | grep -i podSubnet         # 정본 — init 때 받은 값
 grep cluster-cidr /etc/kubernetes/manifests/kube-controller-manager.yaml         # 대역을 실제로 나눠주는 주체
-kubectl get nodes -o custom-columns=NAME:.metadata.name,PODCIDR:.spec.podCIDR    # 노드별 할당 결과
+kubectl describe node controlplane | grep -i podcidr                             # 노드별 할당 결과
 ```
 
 노드의 `podCIDR`는 전체 대역이 아니라 **노드별로 잘라 받은 조각**(보통 `/24`)이다 —
@@ -241,12 +241,30 @@ kubectl get nodes                                       # NotReady였다면 Read
 
 | 대역 | 랩 보기에서 빠르게 추론 | 설정 원본 확인 |
 |---|---|---|
-| 노드 — *What network range are the nodes in the cluster part of?* | `k get nodes -o wide` → INTERNAL-IP | 노드에서 `ip -brief address`, `ip route`로 주소의 prefix 확인 |
-| Pod — *What is the range of IP addresses configured for PODs on this cluster?* | `k get pods -A -o wide` — 호스트 네트워크 Pod 제외 | `k get nodes -o custom-columns=NAME:.metadata.name,PODCIDR:.spec.podCIDR` 또는 CNI 설정 |
-| Service — *What is the IP Range configured for the services within the cluster?* | `k get svc -A` → CLUSTER-IP | `k get servicecidr` 또는 kube-apiserver의 `--service-cluster-ip-range` |
+| 노드 — *What network range are the nodes in the cluster part of?* | `k get nodes -o wide` → INTERNAL-IP | 노드에서 `ip a`로 그 주소의 prefix 확인 |
+| Pod — *What is the range of IP addresses configured for PODs on this cluster?* | `k get pods -A -o wide` — 호스트 네트워크 Pod 제외 | controller-manager 매니페스트의 `--cluster-cidr` |
+| Service — *What is the IP Range configured for the services within the cluster?* | `k get svc -A` → CLUSTER-IP | apiserver 매니페스트의 `--service-cluster-ip-range` |
 
-현재 Kubernetes의 `ServiceCIDR` 확인 방법은
-[Extend Service IP Ranges](https://kubernetes.io/docs/tasks/network/extend-service-ip-ranges/)에 있다.
+:::tip[시험 — grep 한 번으로 Pod·Service 대역을 같이 뽑는다]
+kubeadm 클러스터에서는 controller-manager 매니페스트에 두 플래그가 다 있다.
+
+```bash
+grep -E 'cluster-cidr|cluster-ip-range' /etc/kubernetes/manifests/kube-controller-manager.yaml
+```
+
+단, Service 대역의 정본은 ClusterIP를 실제로 할당하는 **kube-apiserver** 쪽
+`--service-cluster-ip-range`다. controller-manager의 같은 플래그는 노드 CIDR을 나눌 때
+Service 대역과 겹치지 않게 하려는 참고값이라, 서술형으로 "어느 설정이냐"를 물으면
+apiserver라고 답한다.
+:::
+
+controller-manager에 `--cluster-cidr`가 없는 클러스터(`init` 때 `--pod-network-cidr` 생략)면
+CNI가 자체 IPAM으로 대역을 관리한다 — 위 [Calico 설치 절](#calico-설치--lab-install-calico-cni-2025-신규)처럼
+CNI 설정(`kubectl get installation default -o yaml | grep cidr`)이나 CNI Pod 로그의
+default IPv4 pool에서 확인한다.
+
+Service 대역은 SSH 없이 `k get servicecidr`로도 보인다(1.33부터 stable인 `ServiceCIDR` API).
+자세한 건 [Extend Service IP Ranges](https://kubernetes.io/docs/tasks/network/extend-service-ip-ranges/)에 있다.
 
 kube-proxy 관련 —
 
@@ -254,10 +272,22 @@ kube-proxy 관련 —
 # "How many kube-proxy pods are deployed in this cluster?"
 kubectl get pods -n kube-system | grep kube-proxy   # 노드 수만큼 있다
 # "What type of proxy is the kube-proxy configured to use?"
-kubectl logs -n kube-system <kube-proxy-pod>        # 프록시 모드(iptables 등)가 로그에 찍힌다
+kubectl logs -n kube-system <kube-proxy-pod>        # 기동 로그에 "Using iptables Proxier" 같은 줄
 # "How does this Kubernetes cluster ensure that a kube-proxy pod runs on all nodes in the cluster?"
 kubectl get ds -n kube-system                       # 모든 노드에 하나씩 = DaemonSet
 ```
+
+:::tip[왜 프록시 모드만 설정이 아니라 로그를 보는가]
+kube-proxy 설정은 `kube-system`의 `kube-proxy` ConfigMap에 있지만, `mode:` 필드는 보통
+**빈 값**이다. 빈 값이면 kube-proxy가 기동할 때 스스로 기본값(iptables)을 고르므로, 실제로
+무엇을 쓰는지의 정본은 그 결정이 찍힌 **기동 로그**다. 앞의 CIDR 문제들과 구분하는 기준 —
+
+- 플래그로 **반드시 명시되는 값**(Pod·Service CIDR) → 매니페스트 grep
+- 설정이 비어 있으면 **런타임에 결정되는 값**(프록시 모드) → 로그
+
+실전 순서는 `k describe cm kube-proxy -n kube-system | grep mode`를 먼저 쳐보고,
+빈 값이면 로그로 간다. mode에 값이 박혀 있는 클러스터라면 ConfigMap만으로 끝난다.
+:::
 
 ## CoreDNS — Practice Test: CoreDNS in Kubernetes
 

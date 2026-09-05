@@ -145,6 +145,8 @@ fail -> cni: ContainerCreating 에서 멈춘다\n노드는 NotReady ❌ { style.
 ```
 
 ② 의 IP 할당은 IPAM(IP Address Management — 주소 할당 관리) 플러그인의 몫이다.
+이렇게 깔린 Pod 네트워크 위에서 Service의 가상 IP가 어떻게 Pod IP로 번역되는지는
+[9장의 분업 절](/cka/09-services/#dnat-다음은-배달--kube-proxy와-cni의-분업)에서 본다.
 
 **모든 CNI가 지켜야 하는 규칙**
 

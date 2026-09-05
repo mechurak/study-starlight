@@ -63,6 +63,38 @@ sudo ipvsadm -Ln                      # ipvs 모드일 때
 규칙은 TCP/UDP 포트에 대해서만 있다. 확인은 `curl`이나 `wget`으로 해야 한다.
 :::
 
+### DNAT 다음은 배달 — kube-proxy와 CNI의 분업
+
+위 시퀀스는 목적지 주소가 바뀌는 데까지만 보여 준다. DNAT은 패킷의 목적지를 Pod IP로
+바꿔치기할 뿐, **바뀐 주소까지 실어 나르지는 않는다.** 그 배달은
+CNI(Container Network Interface) 플러그인 — Calico·Cilium·Flannel — 이 미리 깔아 둔
+Pod 네트워크의 몫이다. Service 하나가 동작하려면 서로 다른 두 층이 맞물려야 한다.
+
+| 층 | 대역 | 실현하는 주체 | 하는 일 |
+|---|---|---|---|
+| Service 층 | Service CIDR — apiserver의 `--service-cluster-ip-range` | kube-proxy가 커널 규칙으로 | 가상 IP를 Pod IP로 번역(DNAT) |
+| Pod 층 | Pod CIDR — controller-manager의 `--cluster-cidr` 또는 CNI 자체 IPAM | CNI 플러그인이 인터페이스·라우팅으로 | Pod IP 할당과 노드 사이 배달 |
+
+패킷 하나의 여정으로 보면 —
+
+1. 클라이언트 Pod가 `10.96.0.10:80`(ClusterIP)으로 보낸다. Service CIDR의 가상 주소다
+2. 그 노드의 커널이 kube-proxy가 심어 둔 규칙으로 목적지를 `10.244.1.5:8080`으로 바꾼다.
+   **Service 층의 일은 여기서 끝난다**
+3. 바뀐 Pod IP까지는 CNI가 깔아 둔 라우팅·터널이 나른다. 백엔드 Pod가 다른 노드에 있어도
+   Pod 네트워크가 이어 준다
+
+두 대역이 **겹치면 안 되는** 이유가 여기 있다 — 커널 입장에서 "번역해야 할 가상 주소"와
+"그대로 배달할 진짜 주소"가 대역으로 구분되어야 하기 때문이다. CNI가 IP를 어떻게 주고
+누가 실행하는지는 [17장 CNI 절](/cka/17-extensions/#cni--pod-네트워크)에서 본다.
+Cilium처럼 kube-proxy의 역할까지 eBPF로 흡수해 kube-proxy 없이 도는 CNI도 있지만,
+시험 환경은 표준 구성(kube-proxy DaemonSet + CNI)이다.
+
+:::caution[함정 — Pod IP 직접 통신이 안 되면 Service 층이 아니다]
+아래 진단 트리의 첫 질문("Pod IP로 직접 되는가")이 이 분업을 가른다. 같은 노드에서는
+되는데 **다른 노드에서만 안 되면** 앱도 kube-proxy도 아니라 **Pod 네트워크(CNI) 층**의
+고장이다. kube-proxy를 아무리 들여다봐도 답이 안 나온다.
+:::
+
 ## Service 타입 네 가지
 
 <CardGrid>
@@ -752,6 +784,7 @@ q4 -> fine: 전부 된다
 ## 9장 요약
 
 - Service는 프로세스가 아니라 **커널에 심긴 규칙**이다. **ping은 안 된다**
+- kube-proxy는 **번역**(가상 IP → Pod IP), CNI는 **배달**(그 Pod IP까지) — Service는 두 층의 분업이다
 - 타입은 **포함 관계**: LoadBalancer ⊃ NodePort ⊃ ClusterIP
 - **`port` / `targetPort` / `nodePort` 세 포트를 구분**하라. targetPort 누락이 단골 실수
 - **`kubectl get endpoints`가 진단의 1번**이다. 비었으면 라벨 또는 Ready 문제
