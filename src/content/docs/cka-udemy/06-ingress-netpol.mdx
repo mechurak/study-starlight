@@ -221,11 +221,62 @@ curl -fsS -H 'Host: <rule-host>' http://<entry-address>:<port>/<path>
 컨트롤러 Service의 외부 주소·NodePort와 방화벽을 본다. Ingress만 생성하고 컨트롤러가 없으면
 실제 데이터 플레인이 없으므로 이 검증의 2단계를 통과할 수 없다.
 
-## Gateway API — API 설치와 구현체를 분리해 진단하기
+## Gateway API — 만들기와 진단
 
 Gateway API는 Ingress보다 오브젝트가 많지만, 층은 더 명확하다. **CRD는 API 서버가 리소스를
 저장하게 하고, Gateway 컨트롤러는 그 선언을 실제 프록시 설정으로 만든다.** CRD만 설치해
 `kubectl get gateway`가 동작하는 상태는 트래픽 준비 완료가 아니다.
+
+### Gateway 만들기 — 명령형이 없으니 스키마와 가이드에서 뽑는다
+
+최신 랩의 작성 유형이다 — 지정된 ns에 GatewayClass·listener·allowedRoutes를 갖춘 Gateway를
+만들라는 식. Ingress와 갈리는 지점부터: **`kubectl create`의 서브커맨드에 `gateway`는 없다.**
+Gateway는 CRD로 들어오는 리소스라 명령형 생성이 없고, YAML이 유일한 경로다. 출처는 세 곳이다.
+
+```bash
+# 1순위 — CRD는 스키마가 함께 설치되므로 explain이 그대로 동작한다
+kubectl explain gateway.spec.listeners --recursive
+kubectl explain gateway.spec.listeners.allowedRoutes.namespaces.from   # All | Same | Selector
+```
+
+- 샘플 YAML은 Gateway API 공식 가이드의 [Deploying a simple Gateway](https://gateway-api.sigs.k8s.io/guides/getting-started/simple-gateway/)다 —
+  `gatewayClassName`, listener의 name/protocol/port, `allowedRoutes`까지 이 유형과 같은 모양이라
+  이름·ns·클래스와 `from: Same → All`만 바꾸면 되고, Gateway에 붙는 HTTPRoute 예시도 같은 페이지에 있다.
+  (사이트 개편으로 경로가 바뀐 적이 있으니 URL 대신 **Guides → Getting started** 위치로 기억한다.)
+- 클러스터에 이미 Gateway가 있으면 `-o yaml`로 복사한다 — annotation 때와 같은 전략이다.
+
+틀리기 쉬운 곳은 `allowedRoutes.namespaces.from`의 세 단계 중첩이다. 철자와 깊이는 explain으로
+확인하고, 만든 뒤에는 아래 진단 사슬의 2단계(`describe gateway` → Accepted·Programmed)로 판정한다.
+CRD면 explain이 동작하는 이유는 [cka 17장](/cka/17-extensions/#crd를-만들면-무슨-일이-생기나)에 있다.
+
+### HTTPRoute의 parentRefs — 세 값을 클러스터에서 캐낸다
+
+Gateway 다음 문제는 그 Gateway에 HTTPRoute를 붙이는 것이다. Route 자체는 **백엔드 Service와
+같은 네임스페이스**에 만들고(`backendRefs`는 기본적으로 같은 ns만 참조한다 — "Ingress는 앱과
+같은 ns"와 동일한 원칙), `parentRefs`에 채울 세 값은 전부 클러스터에서 캐낸다.
+
+```bash
+kubectl get gateway -A                       # parentRefs의 name과 namespace
+kubectl get gateway nginx-gateway -n nginx-gateway \
+  -o jsonpath='{.spec.listeners[*].name}'    # sectionName에 넣을 listener 이름
+```
+
+`sectionName`은 특정 listener에만 붙일 때 쓴다 — listener가 하나면 생략해도 붙지만, 문제가
+listener 이름을 지정하면 명시한다. 그리고 이 Route가 실제로 붙을 수 있는지는 Route가 아니라
+**Gateway의 `allowedRoutes`가 쥐고 있다** — 다른 ns에서 붙으려면 앞 절에서 만든 `from: All`이
+전제다.
+
+`rules` 쪽은 출처를 주의한다 — **simple-gateway 페이지의 HTTPRoute 예시에는 `matches`가 없다**
+(경로 지정 없이 모든 트래픽을 매치하는 최소 예시다). `PathPrefix`를 명시하는 문제는
+[HTTP routing 가이드](https://gateway-api.sigs.k8s.io/guides/user-guides/http-routing/)의 matches
+블록을 복사하거나, `kubectl explain httproute.spec.rules.matches.path`로 철자와 허용값
+(Exact | PathPrefix | RegularExpression)을 확인한다.
+
+YAML 형태는 [cka 11장 HTTPRoute](/cka/11-ingress-gateway/#httproute)에 있고, 만든 뒤에는
+진단 사슬 3단계(`describe httproute` → `Accepted`·`ResolvedRefs`)로 판정한다 — `Accepted=False`면
+parentRefs와 allowedRoutes, `ResolvedRefs=False`면 backendRefs의 Service 이름·포트를 본다.
+
+### 배포를 진단하기 — API 설치와 구현체를 분리한다
 
 ```bash
 # 1. API 종류와 구현체가 각각 존재하는가
@@ -396,6 +447,8 @@ kubectl describe networkpolicy internal-policy -n default
 | Ingress TLS | `Ingress` | 같은 페이지의 [TLS 절](https://kubernetes.io/docs/concepts/services-networking/ingress/#tls) — 별도 검색 없이 스크롤만 하면 `spec.tls`(hosts + secretName) 예시가 있다 |
 | Ingress 컨트롤러 | `Ingress Controllers` | [Ingress Controllers](https://kubernetes.io/docs/concepts/services-networking/ingress-controllers/)에서 **지원되는 구현체를 고른 뒤 그 구현체 문서**로 이동. Kubernetes 공통 컨트롤러 Deployment YAML은 없으므로 문제에서 준 매니페스트가 우선 |
 | Gateway API | `Gateway API` | [Gateway API](https://kubernetes.io/docs/concepts/services-networking/gateway/)에서 `GatewayClass` → `Gateway` → `HTTPRoute` 역할과 API 설치 필요 여부 확인 |
+| Gateway 작성 | `Gateway API` | 샘플 YAML은 [Deploying a simple Gateway](https://gateway-api.sigs.k8s.io/guides/getting-started/simple-gateway/) — 허용 도메인인지 응시 전에 확인하고, 아니면 클러스터 안의 `kubectl explain gateway.spec --recursive`로 대체 |
+| HTTPRoute 작성 | `Gateway API` | `matches`(PathPrefix) 예시는 [HTTP routing 가이드](https://gateway-api.sigs.k8s.io/guides/user-guides/http-routing/) — simple-gateway 예시에는 matches가 없다. 대체는 `kubectl explain httproute.spec.rules.matches.path` |
 | NetworkPolicy | `Network Policies` | [Network Policies](https://kubernetes.io/docs/concepts/services-networking/network-policies/)의 전체 ingress/egress 예시를 복사한 뒤 `podSelector`, `namespaceSelector`, `ports`를 문제에 맞게 줄이기 |
 
 :::caution[구현체 전용 필드는 공식 Kubernetes 문서에 없다]
@@ -416,6 +469,10 @@ Ingress API 필드가 아니라 구현체 설정이다. Kubernetes 문서에서 
   `kubernetes.io/tls` 타입이고, 판정은 컨트롤러 진입점의 443이다
 - Ingress의 마지막 판정은 컨트롤러 진입점에 **Host 헤더·경로를 넣은 외부 요청**이다
 - Gateway API는 **CRD와 컨트롤러**가 모두 필요하고, 조건을 Class → Gateway → Route 순서로 읽는다
+- Gateway는 `create` 서브커맨드가 없다 — YAML은 `kubectl explain`, simple-gateway 가이드,
+  기존 리소스 복사에서 가져온다
+- HTTPRoute는 백엔드와 같은 ns에 만들고, `parentRefs`의 이름·ns·`sectionName`은
+  `get gateway`에서 캐낸다 — 붙을 권한은 Gateway의 `allowedRoutes`가 쥔다
 - 남이 만든 매니페스트 디버깅: ns → 들여쓰기 → 이름 오타 → 키 대소문자 순으로 훑는다
 - NetworkPolicy는 PolicyTypes에 적은 방향만 잠긴다 — 선택 안 된 Pod은 전부 허용
 - `ingress`의 `- {}`는 모두 허용, 빈 목록은 모두 차단이며 Egress를 잠그면 DNS UDP/TCP 53도 따로 연다
