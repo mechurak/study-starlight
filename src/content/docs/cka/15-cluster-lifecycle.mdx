@@ -291,6 +291,10 @@ sudo kubeadm join 192.168.1.10:6443 \
   --discovery-token-ca-cert-hash sha256:1234...
 ```
 
+토큰은 파일이 아니다 — admin.conf 같은 kubeconfig는 노드의 **파일**이지만, 부트스트랩 토큰은
+**클러스터 안** kube-system 네임스페이스의 Secret으로 저장된다. 그래서 컨트롤 플레인에서
+`kubeadm token list`로 조회되고, kubeconfig를 복사하는 일과는 아무 관련이 없다.
+
 토큰은 **24시간 뒤 만료**된다. 잃어버렸다면 —
 
 ```bash
