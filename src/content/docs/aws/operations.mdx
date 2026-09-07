@@ -1,0 +1,157 @@
+---
+title: "8. 배포와 관측 — 변경에서 장애 원인까지"
+description: CloudFormation·CDK·SAM과 CI/CD의 관계, CloudWatch 지표·로그와 X-Ray 추적, CloudTrail 감사 기록으로 운영 흐름을 연결한다
+deckGroup: operations
+sidebar:
+  order: 80
+aliases: [DevOps, IaC, CloudFormation, CDK, SAM, CI/CD, CloudWatch, X-Ray, OpenTelemetry]
+reviewedAt: 2026-09-07
+---
+
+import { Steps, LinkCard } from '@astrojs/starlight/components';
+import Thesis from '../../../components/docs/Thesis.astro';
+import TermIntro from '../../../components/docs/TermIntro.astro';
+
+<Thesis>운영은 변경을 재현 가능한 단위로 배포하고, 실패한 요청을 지표·로그·추적으로 좁혀 다시 고치는 순환이다.</Thesis>
+
+<TermIntro terms={[
+  ['IaC', 'Infrastructure as Code', '인프라의 원하는 구성을 코드나 템플릿으로 정의하는 방식.'],
+  ['CI/CD', 'Continuous Integration / Continuous Delivery or Deployment', '변경을 통합·검증하고 배포 가능한 상태 또는 실제 배포로 연결하는 과정.'],
+  ['관측 가능성', 'Observability', '지표·로그·추적 등 외부 신호로 시스템 내부 상태를 이해할 수 있는 성질.'],
+]} />
+
+사진 업로드가 어제는 됐는데 오늘 실패한다면 “무엇을 바꿨는지”와 “어디서 실패했는지”가 모두 필요하다.
+앞 장까지 구성한 함수·API·DB·역할을 재현할 수 있어야 변경을 비교하고 복구할 수 있다.
+이 장은 **코드 변경 → 배포 → 요청 관측 → 원인 수정**의 연결을 다룬다.
+
+## DevOps를 도구 목록보다 작업의 순환으로 보기
+
+DevOps는 개발·운영이 변경과 결과를 함께 책임지는 문화·방법이다. 특정 AWS 서비스를 쓴다고 완성되는
+기능이 아니다. 작은 앱에서도 같은 흐름을 적용할 수 있다.
+
+```d2 layout=elk pad=40 title="코드 변경을 검증·배포하고 지표·로그·추적으로 결과를 확인해 다음 수정으로 이어가는 운영 흐름"
+direction: down
+classes: {
+  key: { style: { fill: "#dbeafe"; stroke: "#2563eb"; font-color: "#1e3a8a" } }
+  ok: { style: { fill: "#dcfce7"; stroke: "#16a34a"; font-color: "#14532d" } }
+  warn: { style: { fill: "#fef3c7"; stroke: "#d97706"; font-color: "#78350f" } }
+}
+source: "코드·인프라 정의 변경" { class: key }
+build: "빌드·검증 / 배포 산출물" { class: key }
+deploy: "변경 검토·배포 / 실행 환경" { class: ok }
+observe: "지표·로그·추적 / 원인과 영향" { class: warn }
+source -> build: "CI"
+build -> deploy: "CD"
+deploy -> observe: "운영 결과" { style.animated: true }
+observe -> source: "다음 수정" { style.stroke-dash: 3 }
+```
+
+그림에서 중요한 연결은 마지막 신호가 다음 수정의 근거가 된다는 점이다.
+배포 성공 표시와 사용자의 업로드 성공률은 다른 지표다.
+
+## CloudFormation·CDK·SAM은 어떤 관계인가?
+
+| 도구·단위 | 작성하거나 관리하는 것 | 관계 |
+|---|---|---|
+| CloudFormation template | YAML·JSON 리소스 정의 | 어떤 자원을 구성할지 기술 |
+| CloudFormation stack | 템플릿으로 관리하는 리소스 묶음 | 생성·변경·삭제 상태를 한 단위로 추적 |
+| CDK (Cloud Development Kit) | TypeScript·Python 등으로 인프라 정의 | CloudFormation 템플릿으로 합성(synthesize) |
+| SAM (Serverless Application Model) | 함수·API 등 서버리스 정의와 CLI 작업 | CloudFormation을 확장해 서버리스 구성을 간결하게 표현 |
+
+CloudFormation을 쓸 때 실제 상태를 확인할 자리는 **stack의 Events·Resources·Outputs**다.
+CDK나 SAM을 사용해도 생성된 AWS 리소스의 권한·네트워크·비용을 이해해야 한다.
+([CloudFormation stack](https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/stacks.html),
+[CDK](https://docs.aws.amazon.com/cdk/v2/guide/home.html),
+[SAM](https://docs.aws.amazon.com/serverless-application-model/latest/developerguide/what-is-sam.html))
+
+### SAM 작업 흐름 읽기
+
+`sam init`은 프로젝트 시작, `sam build`는 코드와 의존성 준비, `sam deploy`는 AWS로 배포하는 단계다.
+이는 **명령의 역할을 읽는 예시**이며 이 덱에서 실제 배포를 수행하는 절차는 아니다.
+설치·튜토리얼은 [공식 SAM 시작 가이드](https://docs.aws.amazon.com/serverless-application-model/latest/developerguide/serverless-getting-started.html)를 따른다.
+
+배포 전에 대상 계정·리전, 생성할 역할과 자원, 예상 비용을 보고 변경 내용을 검토한다.
+삭제할 때도 stack에 속한 자원이 모두 사라진다고 가정하지 않는다. 보존 정책으로 남긴 데이터와
+별도 생성된 자원은 [비용 장](/aws/billing/#멈춰도-남는-비용) 기준으로 확인한다.
+
+## CI/CD에서 산출물과 배포 대상을 구분하기
+
+CI(Continuous Integration)는 변경을 자주 통합하며 빌드·검증한다. Continuous Delivery는 배포 가능한
+상태를 유지하고 필요하면 승인 후 배포한다. Continuous Deployment는 검증을 통과한 변경을 자동 배포한다.
+
+| 단계 | 대표 도구 예시 | 남겨야 할 연결 |
+|---|---|---|
+| Source | GitHub 등 소스 저장소 | 어떤 commit인가? |
+| Build·Test | CodeBuild 등 빌드 실행기 | 어떤 산출물·검증 결과인가? |
+| Deploy | CloudFormation·CodeDeploy 등 | 어느 계정·환경에 어떤 버전을 반영했나? |
+| Orchestration | CodePipeline | 어떤 순서·조건·승인으로 단계를 연결했나? |
+
+CodePipeline은 단계를 연결하고, CodeBuild는 빌드 작업을 실행한다. CodeDeploy가 모든 배포의 필수
+경유지는 아니다. 배포 대상에 맞는 action을 고른다.
+([CodePipeline 개념](https://docs.aws.amazon.com/codepipeline/latest/userguide/concepts.html))
+
+실패 시에는 직전 버전으로 돌아갈 수 있는지, 데이터 변경이 되돌리기와 호환되는지 확인한다.
+코드 버전만 되돌려도 이미 지운 데이터가 복원되는 것은 아니다.
+
+## 지표·로그·추적을 다른 질문에 쓰기
+
+| 신호 | 답할 질문 | AWS에서 볼 곳 |
+|---|---|---|
+| Metric | 실패가 얼마나 늘었고 언제부터인가? | CloudWatch metrics·alarms |
+| Log | 이 실행에서 어떤 입력·분기·오류가 있었나? | CloudWatch Logs |
+| Trace | 한 요청이 어느 서비스에서 시간을 썼나? | X-Ray 등 추적 조회 |
+| Audit event | 누가 설정을 바꿨나? | CloudTrail |
+
+### Metric: 시간에 따른 값을 같은 기준으로 비교
+
+Namespace는 `AWS/Lambda` 같은 지표 묶음이고, metric name은 `Errors` 같은 측정 항목이다.
+Dimension은 `FunctionName`처럼 대상을 구별하는 속성이다. 기간(period)과 통계(sum·average 등)를
+맞춰야 같은 값끼리 비교한다.
+([CloudWatch 지표 개념](https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/cloudwatch_concepts.html))
+
+서비스가 기본 제공하는 지표와 앱이 보내는 사용자 지정 지표는 구분한다. 그래프가 비었다면
+장애 없음으로 단정하기 전에 리전·dimension·기간과 수집 설정을 확인한다.
+
+### Log: group 안의 stream에서 사건 읽기
+
+Log event는 timestamp와 메시지, log stream은 같은 소스의 이벤트 흐름,
+log group은 stream들을 묶어 보존·접근 설정 등을 적용하는 단위다.
+“인스턴스 하나당 group 하나” 같은 고정 대응은 아니다.
+([CloudWatch Logs 개념](https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/CloudWatchLogsConcepts.html))
+
+요청 ID와 `photoId` 같은 업무 식별자를 남기면 재시도와 원래 요청을 연결할 수 있다.
+토큰·비밀 키·사진 본문까지 로그에 남기지 말고 필요한 맥락만 기록한다. 보존 기간과 수집 비용도 정한다.
+
+### Trace: 요청이 지나는 구간의 시간을 읽기
+
+Trace는 서비스 사이를 지나는 요청을 구간별로 연결한다. 전체가 느릴 때 API 처리인지, 함수 실행인지,
+DB 호출인지 좁히는 데 쓴다. 추적이 연결되려면 계측과 context 전달이 필요하며, 샘플링 때문에 모든
+요청이 추적에 있는 것은 아니다.
+
+X-Ray는 추적을 저장·조회하는 서비스로 읽되, 새 코드의 계측에는 OpenTelemetry 방향을 따른다.
+AWS는 **X-Ray SDK와 daemon을 2026-02-25부터 maintenance mode**로 전환했고 OpenTelemetry로의
+이관을 안내한다. 이를 X-Ray 서비스 자체의 종료로 읽지 않는다.
+([X-Ray 계측 이관 안내](https://docs.aws.amazon.com/xray/latest/devguide/xray-sdk-migration.html))
+
+### Audit: 앱 오류와 설정 변경 이력을 나누기
+
+CloudTrail은 AWS API 활동을 조사하는 곳이다. “사진 변환 함수에서 예외가 났다”는 앱 로그와,
+“누군가 함수 설정을 바꿨다”는 관리 이벤트는 다르다. 기본 Event history의 범위와 보존 조건은
+[IAM의 감사 로그 절](/aws/iam/#last-accessed와-감사-로그)을 확인한다.
+
+## 사진 처리 실패를 좁히는 순서
+
+<Steps>
+
+1. **영향 확인**: CloudWatch에서 실패 수·처리 지연이 늘어난 시각과 배포 시각을 맞춘다.
+2. **실행 확인**: 함수 로그에서 해당 요청 ID·사진 ID를 찾는다. 로그가 없다면 호출 여부와 로그 기록 권한을 본다.
+3. **구간 확인**: trace가 있으면 느리거나 실패한 외부 호출을 찾는다. 큐 기반 작업은 대기 시간·재시도도 따로 본다.
+4. **변경 확인**: 배포 산출물과 stack Events, CloudTrail의 설정 변경 기록을 비교한다.
+5. **복구 확인**: 수정 또는 되돌리기 후 새 요청 성공과 실패 작업 재처리를 모두 확인한다.
+
+</Steps>
+
+이 흐름을 따라갈 수 있으면 서비스 이름을 외우는 단계를 넘어선다. 어떤 신원이 어느 경로로 어떤
+자원을 호출했고, 어떤 결과를 남겼는지 설명할 수 있어야 한다.
+
+<LinkCard title="AWS 개요 — 필요할 때 찾아보기" description="권한·비용·네트워크·앱 운영 중 지금 막힌 질문으로 돌아간다." href="/aws/" />

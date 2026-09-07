@@ -18,11 +18,42 @@
 - 단가는 리전·단위·조건 없이 일반화하지 않는다. 현재 금액이 필요하면 공식 요금표에 연결한다.
 - 바뀔 수 있는 동작에는 본문 가까이 공식 근거를 단다. reviewedAt은 실제 확인한 날짜만 쓴다.
 - 각 학습 본문은 Thesis와 TermIntro로 열고, index는 DeckMap을 사용한다.
+- 공통 예시는 사진 업로드·목록 조회·썸네일 처리 앱이다. 서비스 이름보다 실행·저장·호출·권한의 경계를 먼저 그린다.
+- 관리형·서버리스를 무관리·무비용으로 표현하지 않는다. EC2도 AWS가 기반 인프라를 관리한다.
+- 서비스와 리소스의 범위, S3 저장 클래스별 AZ 범위, RDS Multi-AZ 배포 유형을 구분한다.
+- Lambda 동기·비동기·이벤트 소스 매핑의 재시도를 구분한다. 비동기 함수 오류의 기본 두 번 재시도를 전체에 적용하지 않는다.
+- Cognito 앱 사용자·운영자 IAM 신원, JWT·임시 AWS 자격증명, 함수 호출 권한·실행 역할을 구분한다.
 
 ## 범위
 
-- 현재 범위는 IAM, 비용 확인·알림·리소스 정리, VPC 네트워크 기초와 연결 진단이다.
+- 현재 범위는 AWS 구조·관리 책임, IAM, 비용 확인·알림·리소스 정리, VPC 기초·연결 진단,
+  컴퓨팅·저장소·DB 기초, Lambda·API·메시징 연결, Cognito, IaC·CI/CD·관측의 운영 흐름이다.
 - VPC의 기본 예시는 상용 리전의 IPv4 네트워크다. NAT 배치는 zonal public NAT 기준임을
   명시하고 Regional NAT·IPv6의 차이를 별도로 설명한다.
 - 실제 계정 생성·권한 변경·리소스 삭제는 독자가 자기 계정에서 판단해 수행하는 절차다.
 - 조직 전체 거버넌스, 다중 VPC·하이브리드 네트워크 상세 설계, Terraform 입문, 자격증 대비는 현재 범위 밖이다.
+- 전체 앱의 배포 실습, EKS 클러스터 운영 상세, DynamoDB 단일 테이블 고급 설계는 범위 밖이다.
+
+## 강의 자료 반영 이력
+
+2026-02-24 강의 정리 자료 `Samsung_20260224.pdf`(로컬 원본: 저장소 밖
+`../Samsung_20260224.pdf`, 총 19쪽)를 2026-09-07에 읽고 반영했다. 쪽수는 PDF 페이지 기준이다.
+손글씨 원문은 이미지로도 확인했다. 원본 PDF·페이지 캡처는 사이트에 포함하지 않고 설명과 D2를 새로 작성했다.
+
+| 자료 쪽 | 반영 위치 | 살린 설명 |
+|---|---|---|
+| 1–4 | `foundations.mdx`, `compute.mdx` | 서버 → API 서비스, 서비스/리소스, 리전/AZ/엣지, 관리 책임 비교 |
+| 5–6 | `iam.mdx`, `serverless.mdx` | 정책의 필드, 역할·STS, EC2 instance profile과 Lambda 실행 역할 |
+| 7–8 | `storage.mdx` | EBS/S3 접근 방식, 객체 구성, DynamoDB 키·Query·인덱스·용량 |
+| 9–13 | `compute.mdx`, `serverless.mdx` | VM/컨테이너/함수, 동기·이벤트 연결, Lambda 호출 세 갈래, API 요청·응답 경계 |
+| 14–15 | `cognito.mdx` | User Pool/Identity Pool, 로그인 토큰과 AWS 임시 자격증명 |
+| 16–18 | `operations.mdx` | 템플릿 → stack → 자원, CI/CD, 지표·로그·추적 |
+| 19 | 반영할 본문 없음 | 실질적인 학습 내용이 없는 마지막 쪽 |
+
+기존 IAM·비용·VPC의 운영 절차와 URL은 유지했다. 강의에 없는 비용·VPC 상세를 강의에서 온 것으로
+표시하지 않는다. 자료의 서비스 나열은 앱 예시와 진단 질문으로 연결하고, AppSync·Kinesis 등의
+단순 언급과 용량 산식 전체는 독립 장으로 확장하지 않았다.
+
+공식 문서로 보정한 주요 지점은 S3 단일 AZ 클래스 예외, RDS Multi-AZ instance/cluster 구분,
+DynamoDB의 강한 읽기·GSI 제약, 서버리스의 복수 과금 축, Lambda 소스별 재시도,
+API Gateway REST/HTTP·proxy 구분, Cognito 향상된 인증 흐름, X-Ray SDK/daemon의 maintenance mode다.

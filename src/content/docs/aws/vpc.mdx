@@ -36,6 +36,9 @@ EC2를 만들었는데 접속되지 않거나, 서버는 살아 있는데 외부
 추후 별도 장으로 확장할 주제다. [IAM](/aws/iam/)은 AWS API 작업 권한을, VPC는 네트워크 통신을
 다룬다. 관리자가 EC2를 생성할 수 있다고 그 서버의 TCP 포트에도 연결되는 것은 아니다.
 
+리전·AZ와 자원의 위치부터 정리하고 싶다면 [큰 그림의 배치 구조](/aws/foundations/#리전az엣지는-서로-다른-자리다)를
+먼저 본다. 사진 앱에서도 EC2·EBS를 배치하는 경계와 S3 API에 접근하는 경로를 구분한다.
+
 ## VPC·서브넷·주소 범위
 
 ### 리전과 AZ의 경계
@@ -328,3 +331,5 @@ aws ec2 describe-security-groups --profile tf-study --region ap-northeast-2 \
 - [ ] 실습 후 NAT·Endpoint·Elastic IP와 로그 보존을 점검한다.
 
 <LinkCard title="2. 비용 확인과 과금 방지" description="NAT·Endpoint·공인 IPv4 비용을 추적하고 남은 자원을 정리한다." href="/aws/billing/" />
+
+<LinkCard title="4. 컴퓨팅 — EC2·컨테이너·Lambda" description="네트워크 위에서 앱을 실행할 단위와 관리 책임을 고른다." href="/aws/compute/" />

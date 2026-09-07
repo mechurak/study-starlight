@@ -1,0 +1,157 @@
+---
+title: "5. 저장소와 DB — EBS·S3·DynamoDB"
+description: 블록·객체·항목의 접근 방식, S3 key와 저장 범위, 관계형 DB와 DynamoDB의 키·조회·일관성·용량을 구분한다
+deckGroup: application
+sidebar:
+  order: 50
+aliases: [S3, EBS, DynamoDB, RDS, 오브젝트 스토리지, GSI, LSI, RCU, WCU]
+reviewedAt: 2026-09-07
+---
+
+import { LinkCard } from '@astrojs/starlight/components';
+import Thesis from '../../../components/docs/Thesis.astro';
+import TermIntro from '../../../components/docs/TermIntro.astro';
+
+<Thesis>저장소는 데이터 모양과 읽는 방법으로 고르며, 디스크·객체·DB 항목의 경계와 복제 범위를 따로 확인한다.</Thesis>
+
+<TermIntro terms={[
+  ['EBS', 'Elastic Block Store', 'EC2에 연결해 디스크처럼 사용하는 블록 스토리지.'],
+  ['S3', 'Simple Storage Service', '버킷 안에 key로 구분한 객체를 저장하고 API로 읽는 서비스.'],
+  ['DynamoDB', 'Amazon DynamoDB', '키를 중심으로 항목을 저장하고 조회하는 관리형 NoSQL 데이터베이스.'],
+]} />
+
+사진 앱에는 OS가 사용할 디스크, 사진 원본, “사용자별 최근 사진” 목록이 필요하다.
+모두 저장이지만 접근 방법은 다르다. [컴퓨팅 장](/aws/compute/)에서 실행 위치를 골랐다면
+여기서는 **서버를 교체해도 남아야 할 데이터와 그 조회 방법**을 정한다.
+
+| 데이터 | 필요한 접근 | 이 예시에서 맡길 곳 |
+|---|---|---|
+| EC2의 OS·앱 파일 | 파일시스템을 통한 디스크 읽기·쓰기 | EBS |
+| 사진 원본·썸네일 | key로 객체 업로드·다운로드 | S3 |
+| 사용자별 사진 목록 | 사용자 ID와 시간으로 조회 | DynamoDB 또는 관계형 DB |
+
+## EBS와 S3는 접근 방식이 다르다
+
+```d2 layout=elk pad=40 title="EC2는 같은 AZ의 EBS를 디스크로 연결하고 S3 버킷의 객체에는 API로 접근한다"
+direction: down
+classes: {
+  key: { style: { fill: "#dbeafe"; stroke: "#2563eb"; font-color: "#1e3a8a" } }
+  zone: { style: { fill: "#ede9fe"; stroke: "#7c3aed"; font-color: "#4c1d95" } }
+  ok: { style: { fill: "#dcfce7"; stroke: "#16a34a"; font-color: "#14532d" } }
+}
+azone: "같은 AZ" {
+  class: zone
+  disk: "EBS / 블록 볼륨" { shape: cylinder; class: key }
+  app: "EC2 / 앱" { class: key }
+}
+bucket: "S3 버킷 / 객체\n서브넷 안에 연결하는 디스크가 아님" { shape: cylinder; class: ok }
+azone.disk -- azone.app: "디스크 연결" {
+  style: { stroke: "#2563eb"; font-color: "#334155" }
+}
+azone.app -> bucket: "서비스 API로 읽기·쓰기" { style.animated: true }
+```
+
+EBS 볼륨은 **같은 AZ의 EC2**에 연결한다. 볼륨의 블록 위에 파일시스템을 만들면 앱이 파일을 읽고 쓸 수 있다.
+EBS는 AZ 안에서 데이터를 복제하지만 그 볼륨이 자동으로 다른 AZ의 디스크가 되는 것은 아니다.
+([EBS 볼륨](https://docs.aws.amazon.com/ebs/latest/userguide/ebs-volumes.html))
+
+S3는 객체 API로 접근한다. 위 화살표는 논리적인 호출이며 인터넷 공개를 의미하지 않는다.
+[VPC Endpoint](/aws/vpc/#aws-서비스-연결-endpoint와-dns)를 사용하는 경로도 있다.
+접속 경로와 S3 읽기·쓰기 권한은 따로 맞춰야 한다.
+
+## S3 객체를 key·본문·메타데이터로 읽기
+
+일반적인 S3 버킷의 객체는 다음처럼 이해하면 된다.
+
+| 구성 | 사진 예시 | 의미 |
+|---|---|---|
+| Bucket | `study-photos-example` | 객체를 담는 경계 |
+| Key | `users/u123/photos/p456.jpg` | 버킷 안의 객체 이름 |
+| Data | JPEG 파일 바이트 | 저장하는 본문 |
+| Metadata | `Content-Type: image/jpeg` | 객체를 설명하는 속성 |
+
+Key의 `/`는 폴더처럼 보여 주기 위한 prefix 구분에 쓸 수 있다. 일반적인 S3 객체 모델은
+파일시스템의 디렉터리 트리와 같지 않다. 객체의 메타데이터도 별도 DB의 검색 인덱스와는 다르다.
+([S3 개념](https://docs.aws.amazon.com/AmazonS3/latest/userguide/Welcome.html),
+[객체 메타데이터](https://docs.aws.amazon.com/AmazonS3/latest/userguide/UsingMetadata.html))
+
+### 복제 범위는 storage class를 보고 판단한다
+
+S3 Standard는 최소 3개 AZ에 데이터를 저장한다. 하지만 **모든 S3 저장 클래스가 다중 AZ는 아니다**.
+S3 One Zone-IA와 S3 Express One Zone은 단일 AZ를 사용한다. 여기서 Standard의 배치 특성을
+S3 전체의 고정 규칙으로 확대하지 않는다.
+([저장 클래스 비교](https://docs.aws.amazon.com/AmazonS3/latest/userguide/storage-class-intro.html))
+
+오래된 사진을 지우거나 보관 클래스로 옮길 때는 접근 빈도·복구 지연·최소 보관 기간을 함께 본다.
+복제는 사용자 삭제를 되돌리는 장치가 아니므로 versioning·백업·보존 정책도 별도로 정한다.
+
+## 관계형 DB와 DynamoDB는 질문하는 방식이 다르다
+
+관계형 DB는 테이블 관계와 SQL 질의를 중심으로 모델링한다. DynamoDB는 **어떤 key로 어떤 항목을
+읽을지**를 먼저 정한다. “SQL은 일관성, NoSQL은 성능”만으로 나누면 모델과 읽기 보장 조건을 놓친다.
+
+사진 원본은 S3에 두고, DynamoDB 항목에는 소유자·업로드 시각·S3 key를 저장하는 예시를 보자.
+
+| Partition key | Sort key | s3Key | status |
+|---|---|---|---|
+| `USER#u123` | `PHOTO#2026-09-07T09:00:00Z#p456` | `users/u123/photos/p456.jpg` | `READY` |
+| `USER#u123` | `PHOTO#2026-09-07T10:00:00Z#p457` | `users/u123/photos/p457.jpg` | `PROCESSING` |
+
+Partition key는 데이터를 나누는 기준이고, sort key는 같은 partition key 안에서 항목을 구별하고
+정렬·범위 조회하는 기준이다. 복합 기본 키는 이 둘의 조합으로 항목을 식별한다.
+항목(item)은 속성(attribute)의 모음이며 항목 크기 한도는 **400KB**다.
+([DynamoDB 구성 요소](https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/HowItWorks.CoreComponents.html))
+
+이 모델은 “사용자 u123의 최근 사진”에 맞춘 예시다. “모든 사용자의 처리 중인 사진”이라는 다른 질문이
+생기면 별도의 키·인덱스 설계를 검토한다. 큰 사진 바이트를 항목에 함께 넣지 않은 이유도 여기에 있다.
+
+## Query·Scan·보조 인덱스의 차이
+
+**Query**는 partition key 값을 지정하고 선택적으로 sort key 조건을 적용한다. **Scan**은 테이블이나
+인덱스의 항목을 읽어 훑는다. 필터가 있다고 읽기 자체가 그 결과만큼으로 줄지는 않는다.
+한 번의 응답으로 전체 결과가 끝났다고 가정하지 말고 페이지네이션도 처리한다.
+([Query](https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/Query.html),
+[Scan](https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/Scan.html))
+
+| 인덱스 | 기본 테이블과의 키 관계 | 만들 때 기억할 점 |
+|---|---|---|
+| GSI (Global Secondary Index) | 다른 partition key·sort key 가능 | 다른 조회 경로, eventual consistency |
+| LSI (Local Secondary Index) | 같은 partition key, 다른 sort key | 테이블 생성 때 정의하며 strong read 선택 가능 |
+
+인덱스의 projection은 어떤 속성을 인덱스에 포함할지 정한다. 인덱스는 조회를 돕지만 저장 공간과
+쓰기 작업에도 영향을 준다. “검색이 필요하니 전부 복사” 전에 실제 반환할 속성을 고른다.
+([보조 인덱스](https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/SecondaryIndexes.html))
+
+PartiQL로 SQL과 비슷한 문법을 사용할 수 있어도 키·인덱스·읽기 비용의 모델이 관계형 DB로 바뀌지는 않는다.
+
+## 일관성과 처리 용량을 따로 선택하기
+
+### 방금 쓴 값을 바로 읽어야 할까?
+
+Eventually consistent read는 최근 쓰기가 즉시 반영되지 않을 수 있다. Strongly consistent read는
+이전에 성공한 쓰기를 반영한다. DynamoDB의 테이블·LSI는 strong read를 선택할 수 있지만,
+**GSI 읽기는 eventual consistency**다. 따라서 “쓰기 성공 직후 GSI에서 안 보임”은 즉시 데이터
+유실로 단정할 상황이 아니다.
+([읽기 일관성](https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/HowItWorks.ReadConsistency.html))
+
+### 요청마다 낼까, 처리 용량을 잡아둘까?
+
+On-demand는 요청량에 따라 읽기·쓰기를 과금하고, provisioned는 초당 처리 용량을 설정한다.
+Provisioned에는 Auto Scaling을 구성할 수 있다. 어느 모드든 키 분포·제한·throttling을 살펴야 한다.
+([처리 용량 모드](https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/capacity-mode.html))
+
+RCU(Read Capacity Unit)·WCU(Write Capacity Unit)는 provisioned 처리 용량,
+RRU(Read Request Unit)·WRU(Write Request Unit)는 on-demand 요청 단위를 읽을 때 만나는 말이다.
+항목 크기·읽기 일관성·트랜잭션 여부에 따라 소모 단위가 달라지므로 요청 건수를 그대로 비용으로 읽지 않는다.
+실제 단위 계산은 [읽기·쓰기 작업의 용량 소비](https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/read-write-operations.html)에서 확인한다.
+
+## 저장 후 문제가 생기면 이 순서로 확인한다
+
+1. **대상**: 계정·리전·버킷/key 또는 테이블/기본 키가 맞는가?
+2. **경로·권한**: timeout인지 `AccessDenied`인지 구분하고 네트워크와 IAM을 확인한다.
+3. **읽기 모델**: GSI 반영 지연, 잘못된 key 조건, 누락된 다음 페이지가 아닌가?
+4. **보존·비용**: 서버를 지운 뒤 EBS·스냅샷·S3 버전·DB 백업이 남았는가?
+
+자원 정리의 구체적인 확인 목록은 [멈춰도 남는 비용](/aws/billing/#멈춰도-남는-비용)으로 이어진다.
+
+<LinkCard title="6. 서버리스와 연결 — 요청·이벤트·메시지" description="저장된 사진을 처리할 때 누가 호출하고 실패를 다시 시도하는지 구분한다." href="/aws/serverless/" />

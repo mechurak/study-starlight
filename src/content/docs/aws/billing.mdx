@@ -35,6 +35,10 @@ import TermIntro from '../../../components/docs/TermIntro.astro';
 이 장은 개인 단일 계정을 기준으로 설정과 일상 점검, 예상 밖 비용 대응을 다룬다.
 로그인 방식이 아직 정리되지 않았다면 [IAM 장](/aws/iam/)부터 본다.
 
+[큰 그림](/aws/foundations/)의 “쓴 만큼 낸다”를 운영에 적용할 때는 **무엇을 얼마나 썼는지**부터 나눈다.
+사진 앱이라면 함수 실행이 끝나도 사진 저장 공간과 로그는 남는다. 요청 수·실행 시간·저장량·전송량은
+서로 다른 비용 축이므로, 서버리스 사용 여부만으로 비용이 멎었는지 판단하지 않는다.
+
 ## Billing 접근 설정
 
 ### 화면 접근 설정과 IAM 권한은 별개
@@ -223,11 +227,18 @@ Credit 필터를 해제한다.
 | Interface VPC Endpoint | AZ별 배치 시간과 데이터 처리 비용 | VPC → Endpoints. 서비스 접근 의존성을 확인한 뒤 삭제 |
 | 공인 IPv4·Elastic IP | 사용 중인 AWS 제공 공인 IPv4와 유휴 주소 모두 과금 대상 | EC2 → Elastic IPs에서 미사용 주소 Release. 일반 공인 IP도 점검 |
 | Load Balancer·RDS | EC2 인스턴스와 수명이 별개 | 해당 서비스 콘솔에서 남은 자원·백업 확인 |
+| S3 객체·이전 버전 | 앱을 지워도 저장된 데이터는 남음 | 버킷의 버전·보관 정책을 확인하고 필요한 데이터만 유지 |
+| DynamoDB 테이블·백업 | 함수와 데이터 자원의 수명이 별개 | 테이블 용량 모드·인덱스·백업을 함께 확인 |
+| CloudWatch Logs | 함수 삭제와 로그 group 삭제는 별개 | Log groups에서 필요한 보존 기간·잔여 group 확인 |
 
 EBS의 용량·성능 비용은 [EBS 요금표](https://aws.amazon.com/ebs/pricing/), NAT Gateway와 공인 IPv4는
 [VPC 요금표](https://aws.amazon.com/vpc/pricing/), Interface Endpoint는
 [PrivateLink 요금표](https://aws.amazon.com/privatelink/pricing/)에서 사용 리전과 단위를 맞춰 본다.
 Gateway Endpoint와 Interface Endpoint의 과금 구조도 구분한다.
+
+앱 서비스의 잔여 비용은 [S3](https://aws.amazon.com/s3/pricing/),
+[DynamoDB](https://aws.amazon.com/dynamodb/pricing/),
+[CloudWatch](https://aws.amazon.com/cloudwatch/pricing/) 요금표에서 저장·요청·용량·로그 항목을 나눠 본다.
 
 2026-09-07 기준 AWS 제공 공인 IPv4의 기본 요금은 주소당 **0.005 USD/시간**이다.
 하나를 30일 내내 보유하면 `0.005 × 24 × 30 = 3.60 USD`이며 무료 혜택·크레딧·세금은 별도다.

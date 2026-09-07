@@ -1,0 +1,112 @@
+---
+title: "7. Cognito — 앱 로그인과 AWS 자격증명"
+description: Cognito User Pool의 로그인 토큰과 Identity Pool의 임시 AWS 자격증명, API 인증과 사용자별 데이터 권한을 구분한다
+deckGroup: application
+sidebar:
+  order: 70
+aliases: [Cognito, User Pool, Identity Pool, JWT, STS, 앱 인증]
+reviewedAt: 2026-09-07
+---
+
+import { LinkCard } from '@astrojs/starlight/components';
+import Thesis from '../../../components/docs/Thesis.astro';
+import TermIntro from '../../../components/docs/TermIntro.astro';
+
+<Thesis>User Pool은 앱 사용자의 로그인 토큰을 발급하고, Identity Pool은 필요한 경우 그 신원을 AWS 임시 권한으로 연결한다.</Thesis>
+
+<TermIntro terms={[
+  ['User Pool', 'Amazon Cognito user pool', '앱 사용자를 인증하고 로그인 토큰을 발급하는 사용자 디렉터리.'],
+  ['Identity Pool', 'Amazon Cognito identity pool', '외부 또는 User Pool 신원을 IAM 역할의 임시 AWS 자격증명으로 연결하는 기능.'],
+  ['JWT', 'JSON Web Token', '서명으로 검증할 수 있는 클레임을 담은 토큰 형식.'],
+]} />
+
+[IAM 장](/aws/iam/)은 AWS를 운영하는 사람과 워크로드의 신원을 다뤘다. 사진 앱에 가입한 사용자는
+운영자와 다르다. 앱 회원마다 IAM 사용자를 만들기보다 앱 로그인을 구성하고, 사용자가 접근할 데이터
+범위를 정해야 한다. 이 장은 **로그인에 성공한 뒤 어떤 토큰을 어디에 보내는가**를 설명한다.
+
+## 먼저 앱 API만 호출할지 AWS API도 직접 호출할지 정하기
+
+| 요구 | 기본 흐름 | 확인할 권한 |
+|---|---|---|
+| 로그인하고 사진 목록 API 호출 | User Pool → 토큰 → 앱 API | 토큰 검증과 앱의 데이터 접근 제어 |
+| 앱에서 AWS SDK로 S3에 직접 접근 | 신원 제공자 → Identity Pool → 임시 자격증명 → S3 | IAM 역할과 사용자별 자원 범위 |
+
+두 pool은 항상 세트로 필요한 것이 아니다. User Pool만으로 앱 로그인을 구성할 수 있고,
+Identity Pool은 지원하는 다른 신원 제공자와 연결할 수도 있다.
+([Cognito의 두 구성 요소](https://docs.aws.amazon.com/cognito/latest/developerguide/what-is-amazon-cognito.html))
+
+## User Pool 토큰의 용도를 구분하기
+
+로그인 후 받은 토큰은 역할이 다르다.
+
+| 토큰 | 용도 | 확인할 점 |
+|---|---|---|
+| ID token | 인증된 사용자의 식별·속성 전달 | 앱이 누구인지 이해할 정보 |
+| Access token | 허용 범위(scope)에 따른 API 접근 | API가 기대하는 토큰 종류와 scope |
+| Refresh token | 새 ID·access token 발급 | 만료·폐기·보관 조건 |
+
+User Pool의 ID·access token은 JWT다. Refresh token까지 같은 JWT로 가정하지 않는다.
+토큰을 디코드해 문자열을 읽은 것과 서명·발급자·만료·대상·token use를 검증한 것은 다르다.
+([User Pool 토큰](https://docs.aws.amazon.com/cognito/latest/developerguide/amazon-cognito-user-pools-using-tokens-with-identity-providers.html),
+[JWT 검증](https://docs.aws.amazon.com/cognito/latest/developerguide/amazon-cognito-user-pools-using-tokens-verifying-a-jwt.html))
+
+## 앱 API를 호출하는 흐름
+
+```d2 layout=elk pad=40 title="클라이언트가 User Pool에서 로그인 토큰을 받고 API Gateway의 검증을 거쳐 Lambda를 호출한다"
+direction: down
+classes: {
+  key: { style: { fill: "#dbeafe"; stroke: "#2563eb"; font-color: "#1e3a8a" } }
+  ok: { style: { fill: "#dcfce7"; stroke: "#16a34a"; font-color: "#14532d" } }
+}
+pool: "Cognito User Pool" { class: key }
+client: "클라이언트 / 로그인 완료" { class: key }
+gateway: "API Gateway / 토큰 검증" { class: ok }
+fn: "Lambda / 사용자별 데이터 권한 확인" { class: ok }
+pool -> client: "로그인 후 토큰 발급"
+client -> gateway: "API 요청 / 토큰 첨부" { style.animated: true }
+gateway -> fn: "검증된 사용자 정보와 요청" { style.animated: true }
+```
+
+API Gateway **HTTP API**에서는 JWT authorizer로 Cognito 토큰을 검증할 수 있다.
+API 접근에는 access token과 필요한 scope를 사용하도록 경로를 구성한다. REST API의 Cognito
+authorizer와 설정 방식이 다르므로 자신이 만든 API 유형부터 확인한다.
+([HTTP API JWT authorizer](https://docs.aws.amazon.com/apigateway/latest/developerguide/http-api-jwt-authorizer.html))
+
+이 흐름에서 브라우저는 Lambda 실행 역할의 AWS 키를 받지 않는다. Lambda가 자기 실행 역할로 DB를
+조회한다. 앱은 검증된 사용자 식별자를 기준으로 소유자를 확인해야 한다. 요청 본문의 `userId`만
+믿으면 로그인한 사용자가 다른 사람의 사진을 지정할 수 있다.
+
+## Identity Pool로 AWS API에 직접 접근하는 흐름
+
+AWS SDK를 쓰는 클라이언트가 S3에 직접 접근해야 한다면 다음 경로를 구성할 수 있다.
+
+1. User Pool 등 지원하는 신원 제공자에서 인증한다. User Pool 연결 예시에서는 ID token을 사용한다.
+2. 클라이언트가 Identity Pool에 신원 정보를 전달한다. `GetId`로 identity ID를 얻는다.
+3. `GetCredentialsForIdentity`를 요청한다. 향상된 인증 흐름에서 **Cognito가 STS와 연계해**
+   매핑된 IAM 역할의 임시 자격증명을 반환한다.
+4. SDK가 임시 자격증명으로 AWS API 요청에 서명한다. 허용 범위는 역할과 자원 정책 등으로 평가된다.
+
+향상된 흐름에서는 클라이언트가 STS를 직접 호출하는 단계를 따로 넣지 않는다. 기본(classic) 흐름은
+절차가 다르다.
+([Identity Pool 인증 흐름](https://docs.aws.amazon.com/cognito/latest/developerguide/authentication-flow.html))
+
+임시 자격증명은 **Access key ID·Secret access key·Session token**의 세 값과 만료 정보를 포함한다.
+Identity ID나 JWT 자체가 AWS access key는 아니다. Secret access key는 요청 서명에 사용하며,
+API 서버에 비밀번호처럼 본문으로 보내는 값이 아니다.
+([임시 자격증명 사용](https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_temp_use-resources.html))
+
+## 로그인 성공과 사진 접근 허용은 별도로 검증한다
+
+| 증상 | 먼저 확인할 경계 |
+|---|---|
+| 로그인 자체가 실패 | User Pool·app client·인증 흐름 |
+| API가 토큰을 거부 | 발급자·대상·만료·token use·scope |
+| Identity Pool의 자격증명 교환 실패 | 연결한 provider·전달 토큰·역할 매핑·역할 신뢰 정책 |
+| S3가 `AccessDenied` 반환 | 현재 역할·버킷/key 범위·자원 정책 |
+| 다른 사용자의 사진까지 읽힘 | 앱의 소유자 검사 또는 IAM 자원 범위 |
+
+로그인했다는 이유로 버킷 전체를 허용하지 않는다. 직접 접근이라면 사용자별 prefix 같은 자원 경계를
+정책에 연결한다. API 경유라면 앱의 데이터 접근 검사를 확인한다.
+토큰·임시 자격증명은 로그와 오류 화면에 남기지 않는다.
+
+<LinkCard title="8. 배포와 관측 — 변경에서 장애 원인까지" description="앱과 권한 구성을 재현하고 지표·로그·추적으로 요청을 따라간다." href="/aws/operations/" />

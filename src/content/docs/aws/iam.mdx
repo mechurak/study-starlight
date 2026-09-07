@@ -29,6 +29,10 @@ root·IAM 사용자·역할은 그 계정에 접근하는 신원이다.
 
 ## 사용자·그룹·역할의 차이
 
+사진 앱을 예로 들면 운영자는 앱 자원을 만들고, 앱 코드는 사진 저장소를 읽으며, 회원은 앱에 로그인한다.
+세 주체의 권한은 같지 않다. 여기서는 운영자와 앱의 AWS 신원을 다루고,
+회원 로그인은 [Cognito 장](/aws/cognito/)에서 연결한다.
+
 | 구성 요소 | 하는 일 | 운영할 때 기억할 점 |
 |---|---|---|
 | IAM User | 계정 안에 이름을 가진 신원 | 콘솔 비밀번호와 액세스 키는 별개로 생성·관리한다 |
@@ -41,6 +45,51 @@ root·IAM 사용자·역할은 그 계정에 접근하는 신원이다.
 맡은 뒤 무엇을 할 수 있는지 정한다. AWS는 사람에게는 연동 로그인과 임시 자격증명을,
 EC2·Lambda 같은 워크로드에는 IAM 역할을 권장한다.
 ([IAM 보안 모범 사례](https://docs.aws.amazon.com/IAM/latest/UserGuide/best-practices.html))
+
+### 정책을 요청의 문장으로 읽기
+
+정책은 “**어떤 주체가 어떤 작업을 어떤 자원에 어떤 조건으로 할 수 있는가**”를 표현한다.
+다음은 사진 처리 역할에 연결할 수 있는 신원 기반 권한 정책의 설명용 예시다.
+버킷 이름은 예시이며 실제 적용 전 자기 자원과 필요한 동작에 맞춘다.
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": "s3:GetObject",
+      "Resource": "arn:aws:s3:::study-photos-example/users/*"
+    }
+  ]
+}
+```
+
+`Effect`는 허용·거부, `Action`은 API 작업, `Resource`는 대상이다. `Condition`은 필요한 조건을
+더한다. 이 예시는 `users/` 아래 객체 읽기이며 버킷 목록 조회나 업로드까지 허용하지 않는다.
+실제 허용 여부에는 자원 정책과 명시적 거부 등도 영향을 준다.
+([정책 요소](https://docs.aws.amazon.com/IAM/latest/UserGuide/reference_policies_elements.html))
+
+신원 기반 정책은 연결된 신원이 주체이므로 `Principal`을 적지 않는다. 버킷 정책이나 역할 신뢰 정책처럼
+자원 기반 정책에서는 `Principal`로 허용할 주체를 지정한다. 역할의 신뢰 정책과 위 권한 정책을 섞지 않는다.
+
+### 앱이 쓰는 역할과 임시 자격증명
+
+EC2의 앱이 S3를 읽도록 만들 때 개발자의 장기 키를 서버에 복사하기보다 **instance profile**로 역할을
+연결한다. Instance profile은 EC2에 IAM 역할을 전달하는 그릇이며 역할 하나를 담는다.
+콘솔에서는 함께 생성돼 이름이 같아 보일 수 있지만 별개의 객체다.
+([Instance profile](https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles_use_switch-role-ec2_instance-profiles.html))
+
+앱의 AWS SDK는 지원되는 기본 자격증명 경로를 통해 역할의 임시 자격증명을 가져와 사용한다.
+환경 변수 등에 별도 키를 넣어 두면 의도한 역할 대신 그 키를 사용할 수 있으므로 설정을 함께 확인한다.
+([EC2에서 역할 사용](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/iam-roles-for-amazon-ec2.html))
+
+STS(Security Token Service)가 발급하는 임시 자격증명은 **Access key ID·Secret access key·Session token**과
+만료 정보를 가진다. 역할 자체가 고정된 access key인 것은 아니다. Lambda는 instance profile 대신
+함수의 [execution role](/aws/serverless/#lambda의-들어오는-권한과-나가는-권한)을 설정한다.
+
+서버가 역할을 맡을 수 있는지, 그 역할로 S3 객체를 읽을 수 있는지, S3까지 통신할 수 있는지는
+각각 **신뢰·권한·네트워크**의 질문이다.
 
 ## root 사용자 보호
 
