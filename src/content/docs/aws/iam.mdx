@@ -1,0 +1,245 @@
+---
+title: "1. IAM — 신원과 권한"
+description: root 보호, IAM 사용자·그룹·역할, Identity Center, CLI 인증과 권한 진단을 정리한다
+deckGroup: account
+sidebar:
+  order: 10
+aliases: [AWS IAM, 루트 계정, MFA, 액세스 키, AWS SSO]
+reviewedAt: 2026-09-07
+---
+
+import { Steps, LinkCard } from '@astrojs/starlight/components';
+import Thesis from '../../../components/docs/Thesis.astro';
+import TermIntro from '../../../components/docs/TermIntro.astro';
+
+<Thesis>root를 보호하고 일상 작업용 신원을 분리한 뒤, 현재 자격증명과 실제 권한을 따로 확인한다.</Thesis>
+
+<TermIntro terms={[
+  ['IAM', 'Identity and Access Management', 'AWS에서 누가 어떤 자원에 어떤 작업을 할 수 있는지 관리하는 서비스.'],
+  ['root 사용자', '', 'AWS 계정 생성 시 만들어지는 최상위 신원. 일상 작업과 분리해 보호한다.'],
+  ['MFA', 'Multi-factor authentication', '비밀번호 외에 보안 키나 인증 앱 등 추가 요소로 로그인 주체를 확인한다.'],
+]} />
+
+로그인이 됐다고 모든 작업이 가능한 것은 아니다. **인증**은 요청자가 누구인지 확인하는 단계이고,
+**권한 평가**는 그 요청을 허용할지 결정하는 단계다. AWS 계정은 자원과 청구의 경계이고,
+root·IAM 사용자·역할은 그 계정에 접근하는 신원이다.
+
+이 장은 계정 초기 설정부터 CLI 사용, `AccessDenied` 진단까지 다룬다.
+비용 화면 접근은 [다음 장](/aws/billing/)에서 이어진다.
+
+## 사용자·그룹·역할의 차이
+
+| 구성 요소 | 하는 일 | 운영할 때 기억할 점 |
+|---|---|---|
+| IAM User | 계정 안에 이름을 가진 신원 | 콘솔 비밀번호와 액세스 키는 별개로 생성·관리한다 |
+| User group | 여러 IAM 사용자에게 정책을 묶어 적용 | 그룹으로 로그인하지 않으며 역할을 그룹에 넣지 않는다 |
+| IAM Role | 신뢰한 주체가 맡아 쓰는 권한 | AssumeRole로 임시 자격증명을 받아 사용한다 |
+| Policy | 허용·거부할 작업과 자원, 조건을 기술 | 신원에 붙는 정책과 자원에 붙는 정책이 있다 |
+| IAM Identity Center | 사람의 계정·애플리케이션 접근을 중앙 관리 | AWS 계정 접근 시 역할과 임시 자격증명을 사용한다 |
+
+역할의 **신뢰 정책**(trust policy)은 누가 그 역할을 맡을 수 있는지 정하고, **권한 정책**은 역할을
+맡은 뒤 무엇을 할 수 있는지 정한다. AWS는 사람에게는 연동 로그인과 임시 자격증명을,
+EC2·Lambda 같은 워크로드에는 IAM 역할을 권장한다.
+([IAM 보안 모범 사례](https://docs.aws.amazon.com/IAM/latest/UserGuide/best-practices.html))
+
+## root 사용자 보호
+
+### 먼저 해둘 설정
+
+<Steps>
+
+1. root로 로그인해 계정 메뉴 → **Security credentials** → **Multi-factor authentication**에서
+   MFA 등록 상태를 확인한다. 인증 앱이나 보안 키를 등록하고 실제 로그인을 확인한다.
+2. 같은 화면의 **Access keys**를 확인한다. root 액세스 키는 만들지 않고, 기존 키가 있다면
+   사용처를 역할·임시 자격증명으로 옮겨 제거한다.
+3. root 이메일·복구용 전화번호가 유효한지 확인하고, 비밀번호와 MFA 복구 수단을 관리한다.
+4. 아래의 일상 작업용 신원으로 로그인이 되는 것을 확인한 뒤 root에서 로그아웃한다.
+
+</Steps>
+
+AWS는 root MFA를 요구하지만 등록 상태와 복구 수단은 직접 확인해야 한다. root 자격증명을
+공유하지 않고 필요한 작업에만 사용하는 것이 기본이다.
+([root 보호 지침](https://docs.aws.amazon.com/IAM/latest/UserGuide/root-user-best-practices.html))
+
+### root가 필요한 작업
+
+단독 계정의 root 이메일·비밀번호 변경, 계정 폐쇄, Billing의 **Activate IAM Access** 설정 등이
+대표적이다. 결제 관련 작업 전체나 지원 플랜 변경 전체를 root 전용으로 외우지 않는다.
+작업별 최신 조건은 [root 전용 작업 목록](https://docs.aws.amazon.com/IAM/latest/UserGuide/id_root-user.html#root-user-tasks)에서 확인한다.
+
+### CLI에서 자격증명 보고서 확인
+
+root 키를 CLI에 넣어 검사하지 않는다. 보고서 조회 권한이 있는 관리 신원에서 다음을 실행한다.
+
+```bash
+aws iam generate-credential-report --profile tf-study
+# State가 COMPLETE가 된 뒤 다운로드한다. STARTED/INPROGRESS면 생성 명령으로 상태를 다시 확인한다.
+aws iam get-credential-report --profile tf-study --query Content --output text \
+  | base64 --decode | head -n 2
+```
+
+CSV의 헤더와 `<root_account>` 행에서 `mfa_active`, `access_key_1_active`, `access_key_2_active`를
+확인한다. 액세스 키 열의 `true`는 활성 키가 있다는 뜻이다. `false`만으로 비활성 키까지 없다고
+단정하지 말고, 삭제 여부는 root의 Security credentials 화면에서 확인한다.
+macOS에서 디코드 옵션이 지원되지 않으면 `base64 -D`를 쓴다.
+
+보고서 생성·다운로드에는 `iam:GenerateCredentialReport`와 `iam:GetCredentialReport`가 필요하다.
+보고서는 최대 4시간 동안 재사용되므로 변경 직후 결과가 남아 있을 수 있다.
+([자격증명 보고서](https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_getting-report.html))
+
+## 일상 작업용 로그인 구성
+
+### 우선 검토: IAM Identity Center
+
+혼자 쓰더라도 임시 자격증명의 이점은 있다. Identity Center를 팀에서만 쓰는 도구로 보거나
+단독 사용에는 무조건 과하다고 판단할 필요는 없다. 다만 **AWS 계정 접근을 관리하려면
+Organizations와 연결된 organization instance**를 사용한다. account instance는 애플리케이션
+접근용이므로 같은 기능으로 생각하지 않는다.
+([인스턴스 유형](https://docs.aws.amazon.com/singlesignon/latest/userguide/identity-center-instances.html))
+
+<Steps>
+
+1. [시작 가이드](https://docs.aws.amazon.com/singlesignon/latest/userguide/getting-started.html)에 따라
+   사전 조건을 확인하고 Identity Center를 활성화한다. 그 전에 아래의 조직 전환 조건을 확인한다.
+2. 사용자·그룹과 MFA를 구성하고, **permission set**으로 AWS 계정에서 사용할 권한 묶음을 정의한다.
+3. 대상 AWS 계정에 사용자·그룹과 permission set을 할당한다.
+4. AWS access portal에서 계정과 권한을 선택해 콘솔에 들어간다. 포털 주소를 저장한다.
+
+</Steps>
+
+:::caution[신규 학습 계정에서 Organizations를 켜기 전에]
+AWS Free Tier FAQ에 따르면 Organizations 생성·가입 시 Free Tier 크레딧이 즉시 만료되고,
+Free plan은 Paid plan으로 전환된다. 임시 인증을 도입하려다가 학습용 크레딧을 잃지 않도록
+현재 플랜과 이 조건부터 확인한다.
+([Free Tier FAQ](https://docs.aws.amazon.com/awsaccountbilling/latest/aboutv2/free-tier-FAQ.html))
+:::
+
+### 선택 가능한 학습 경로: IAM User와 관리자 그룹
+
+Organizations 도입 없이 단독 계정을 시작한다면 아래처럼 구성할 수 있다.
+`AdministratorAccess`는 거의 모든 자원을 관리하는 **넓은 권한**이므로, 학습 초기 관리용으로
+선택하더라도 자동화·일상 작업에는 필요한 권한만 가진 역할을 따로 두는 방향으로 발전시킨다.
+
+<Steps>
+
+1. **IAM → User groups → Create group**에서 `Administrators` 그룹을 만들고 AWS 관리형 정책
+   `AdministratorAccess`를 연결한다.
+2. **Users → Create user**에서 예를 들어 `study-admin`을 만든다. **Provide user access to the
+   AWS Management Console**을 선택하고, IAM 사용자 생성 경로에서 비밀번호를 설정한다.
+3. `Administrators` 그룹에 추가하고 Sign-in URL과 초기 비밀번호를 안전하게 저장한다.
+   URL은 `https://<account-id>.signin.aws.amazon.com/console` 형식이며 계정 별칭도 쓸 수 있다.
+4. 새 사용자로 로그인해 **Security credentials → MFA**를 등록하고 재로그인으로 확인한다.
+
+</Steps>
+
+콘솔 비밀번호를 만들었다고 CLI용 키까지 만들어지는 것은 아니다.
+[IAM 사용자 생성 절차](https://docs.aws.amazon.com/IAM/latest/UserGuide/id_users_create.html)와
+[최소 권한 원칙](https://docs.aws.amazon.com/IAM/latest/UserGuide/best-practices.html)을 함께 본다.
+
+## CLI·Terraform 인증
+
+### Identity Center 프로파일
+
+AWS CLI v2가 설치되어 있고 위의 계정 할당이 끝났다면 SSO(Single Sign-On) 프로파일을 만든다.
+`tf-study`는 로컬 프로파일 이름이다.
+
+```bash
+aws configure sso --profile tf-study
+aws sso login --profile tf-study
+aws sts get-caller-identity --profile tf-study
+```
+
+마지막 출력의 `Account`와 `Arn`이 의도한 계정·역할인지 확인한다. 세션이 만료되면 다시 로그인한다.
+([CLI SSO 설정](https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-sso.html))
+
+Terraform도 실행 전에 사용할 프로파일을 명시하고, provider에서 다른 인증을 지정했는지 확인한다.
+
+```bash
+AWS_PROFILE=tf-study aws sts get-caller-identity
+AWS_PROFILE=tf-study terraform plan
+```
+
+프로파일은 자격증명을 고르는 로컬 이름일 뿐 권한을 제한하지 않는다. `default` 의존을 줄이고,
+대상 계정과 리전은 별도로 확인한다.
+
+### 장기 액세스 키가 꼭 필요한 경우
+
+임시 인증을 쓸 수 없는 도구에 한해 필요한 권한만 가진 IAM 사용자를 만들고 **Security credentials
+→ Create access key**에서 키를 발급한다. CLI 용도 선택은 안내용이며 키의 권한을 제한하지 않는다.
+`aws configure --profile tf-study`로 입력하면 로컬 `~/.aws/credentials`에 저장된다.
+([액세스 키 관리](https://docs.aws.amazon.com/IAM/latest/UserGuide/securing_access-keys.html))
+
+키는 코드·Terraform 변수 파일·스크린샷·Git에 넣지 않는다. 노출되면 해당 키를 비활성화하고
+사용 이력을 조사한 뒤 교체·삭제한다. 콘솔 MFA를 등록했어도 **장기 키의 API 요청에 MFA가 자동으로
+붙지는 않는다**. MFA 조건이 필요하면 MFA를 거친 임시 세션과 정책 조건을 사용한다.
+
+## 내 권한 확인과 AccessDenied 진단
+
+### 현재 신원과 연결된 정책
+
+`aws sts get-caller-identity`는 [현재 호출 신원](https://docs.aws.amazon.com/cli/latest/reference/sts/get-caller-identity.html)을
+확인하는 명령이지 모든 권한을 나열하는 명령은 아니다. ARN(Amazon Resource Name)이 `user/…`인지
+`assumed-role/…`인지 보고 조회 대상을 정한다.
+
+```bash
+# 아래는 IAM 사용자 study-admin을 조사하는 예시다. 조회 명령에도 IAM 권한이 필요하다.
+aws iam list-attached-user-policies --user-name study-admin --profile tf-study
+aws iam list-user-policies --user-name study-admin --profile tf-study
+aws iam list-groups-for-user --user-name study-admin --profile tf-study
+aws iam list-attached-group-policies --group-name Administrators --profile tf-study
+aws iam list-group-policies --group-name Administrators --profile tf-study
+```
+
+`list-attached-*`는 관리형 정책 연결, `list-*-policies`는 인라인 정책 이름을 보여준다.
+역할 세션이면 IAM → **Roles → 해당 역할 → Permissions**를 확인하고, Identity Center로 만든
+역할의 권한은 원본 permission set도 확인한다.
+
+### 허용 정책이 있는데 거부될 때
+
+우선 오류의 작업명·대상 자원·계정·리전을 맞춘다. 신원 정책만이 아니라 자원 정책, 조건,
+permissions boundary(권한 상한), 역할 세션 정책, 조직의 SCP(Service Control Policy) 같은
+제약도 영향을 준다. 명시적 `Deny`가 있으면 다른 정책의 `Allow`로 덮을 수 없다.
+([정책과 권한](https://docs.aws.amazon.com/IAM/latest/UserGuide/access_policies.html))
+
+특정 작업은 정책 시뮬레이터로 좁혀 볼 수 있다. 아래 계정 ID는 자기 계정으로 바꾼다.
+
+```bash
+aws iam simulate-principal-policy --profile tf-study \
+  --policy-source-arn arn:aws:iam::123456789012:user/study-admin \
+  --action-names ec2:DescribeInstances
+```
+
+실제 자원·조건을 넣지 않은 시뮬레이션 결과는 실제 요청과 다를 수 있다.
+`assumed-role` 세션 ARN을 그대로 넣지 않고 IAM 사용자·역할 ARN을 사용한다.
+([시뮬레이터의 범위와 한계](https://docs.aws.amazon.com/IAM/latest/UserGuide/access_policies_testing-policies.html))
+
+### Last accessed와 감사 로그
+
+콘솔 **IAM → Users 또는 Roles → 대상 → Last accessed**에서 최근 서비스 접근을 본다.
+CLI에서는 작업을 생성한 뒤 반환된 `JobId`로 결과를 조회한다.
+
+```bash
+aws iam generate-service-last-accessed-details --profile tf-study \
+  --arn arn:aws:iam::123456789012:user/study-admin
+aws iam get-service-last-accessed-details --profile tf-study --job-id <JobId>
+```
+
+`JobStatus`가 `COMPLETED`인지 확인한다. Last accessed에는 실패한 접근 시도도 포함되므로
+성공 기록이나 현재 권한의 증명으로 읽지 않는다.
+([Last accessed 정보](https://docs.aws.amazon.com/IAM/latest/UserGuide/access_policies_last-accessed.html))
+
+누가 무엇을 바꿨는지는 CloudTrail로 확인한다. 기본 **Event history**는 리전별 최근 90일의
+관리 이벤트를 별도 trail 생성 없이 제공한다. 장기 보존·데이터 이벤트가 필요하면 trail과 저장소
+등을 별도로 구성하고 비용도 확인한다.
+([CloudTrail Event history](https://docs.aws.amazon.com/awscloudtrail/latest/userguide/view-cloudtrail-events.html))
+
+## 운영 체크리스트
+
+- [ ] root MFA·복구 수단을 확인하고 root 액세스 키를 제거했다.
+- [ ] 일상 작업용 신원으로 로그인하며 MFA를 사용한다.
+- [ ] CLI에서 의도한 계정·역할·프로파일을 확인한다.
+- [ ] 관리자 권한과 자동화 권한을 구분하고 불필요한 권한·키를 정기적으로 줄인다.
+- [ ] CloudTrail에서 작업 기록을 찾을 수 있고 필요한 보존 범위를 정했다.
+- [ ] Billing 접근과 예산 알림을 설정했다.
+
+<LinkCard title="2. 비용 확인과 과금 방지" description="Billing 접근부터 사용량·크레딧 조회, 예산 알림과 남은 리소스 정리까지." href="/aws/billing/" />

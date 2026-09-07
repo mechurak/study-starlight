@@ -1,0 +1,281 @@
+---
+title: "2. 비용 확인과 과금 방지"
+description: Billing 접근, Budgets 알림, Free Tier·크레딧 확인, Cost Explorer 분석과 리소스 정리
+deckGroup: account
+sidebar:
+  order: 20
+aliases: [AWS Billing, AWS 비용, 과금, Cost Explorer, EC2-Other, 프리 티어]
+reviewedAt: 2026-09-07
+---
+
+import { Steps, LinkCard } from '@astrojs/starlight/components';
+import Thesis from '../../../components/docs/Thesis.astro';
+import TermIntro from '../../../components/docs/TermIntro.astro';
+
+<Thesis>사용량·크레딧·청구액을 나눠 보고, 예산 알림과 리소스 정리를 함께 운영한다.</Thesis>
+
+<TermIntro terms={[
+  ['Billing', '', 'AWS 청구·결제 정보를 확인하고 관리하는 영역.'],
+  ['Cost Explorer', '', '비용과 사용량을 날짜·서비스·리전별로 나눠 원인을 찾는 도구.'],
+  ['Budgets', '', '설정한 비용·사용량 임계치에 도달하거나 초과가 예상되면 알림을 보내는 도구.'],
+  ['Free Tier', '', '계정 플랜과 서비스 조건에 따라 제공되는 무료 사용 한도·체험·크레딧.'],
+]} />
+
+학습 계정에서 먼저 필요한 것은 **비용이 늘었음을 알아차리고 그 원인을 찾는 경로**다.
+청구액이 0이어도 자원이 돌아가거나 크레딧이 소모될 수 있다. 다음처럼 질문별로 화면을 나누면
+"어디서 확인해야 하지?"가 줄어든다.
+
+| 확인할 질문 | 먼저 볼 화면 | 함께 볼 조건 |
+|---|---|---|
+| 이번 달 청구 예상액·확정 청구서는? | Bills | 당월 추정인지 마감된 청구인지, 세금·크레딧 |
+| 어떤 서비스와 리전에서 늘었나? | Cost Explorer | 기간·지표·필터·Charge type |
+| 무료 사용 한도와 크레딧은 얼마나 남았나? | Free Tier · Credits | 계정 플랜·만료일·갱신 시점 |
+| 정한 금액을 넘기기 전에 알 수 있나? | Budgets | actual·forecasted, 데이터 갱신 지연 |
+
+이 장은 개인 단일 계정을 기준으로 설정과 일상 점검, 예상 밖 비용 대응을 다룬다.
+로그인 방식이 아직 정리되지 않았다면 [IAM 장](/aws/iam/)부터 본다.
+
+## Billing 접근 설정
+
+### 화면 접근 설정과 IAM 권한은 별개
+
+IAM 사용자·역할이 Billing의 주요 페이지를 열려면 **계정의 Activate IAM Access 설정**과
+**해당 신원의 IAM 권한**이 모두 필요하다. 전자는 root가 변경한다.
+([Billing 접근 제어](https://docs.aws.amazon.com/awsaccountbilling/latest/aboutv2/control-access-billing.html))
+
+<Steps>
+
+1. root로 로그인해 계정 메뉴 → **Account**를 연다.
+2. **IAM user and role access to Billing information → Edit**에서 **Activate IAM Access**를
+   선택하고 저장한다.
+3. 비용을 볼 사용자·역할의 정책을 확인한다. 조회만 필요하면 Billing 조회 권한을,
+   Budgets 생성까지 필요하면 그 작업 권한도 부여한다.
+4. root에서 로그아웃하고 일상 신원으로 **Bills·Cost Explorer·Budgets**를 각각 열어 본다.
+
+</Steps>
+
+:::tip[AdministratorAccess에 Billing 정책을 또 붙여야 할까?]
+`AdministratorAccess`는 이미 모든 작업·자원에 대한 `Allow`를 포함한다. 별도 거부나 상한이 없다면
+Billing 정책을 중복 첨부할 필요는 없지만, Activate IAM Access 설정은 여전히 필요하다.
+([정책 원문](https://docs.aws.amazon.com/aws-managed-policy/latest/reference/AdministratorAccess.html))
+:::
+
+조직 계정은 계정별 활성화 상태와 관리 계정의 비용 조회 설정도 확인한다.
+이 스위치는 Billing 관련 **SDK/API 접근 자체를 제어하지는 않는다**. API 오류는 IAM 권한을
+별도로 진단한다. 최소 권한 구성은 [Billing 관리형 정책](https://docs.aws.amazon.com/awsaccountbilling/latest/aboutv2/security-iam-awsmanpol.html)을 참고한다.
+
+## Budgets로 비용 알림 만들기
+
+### 월 예산 생성
+
+빠른 시작은 **Budgets → Create budget → Use a template → Monthly cost budget**이다.
+임계치를 직접 정하려면 **Customize** (advanced)를 선택한다.
+([예산 생성 가이드](https://docs.aws.amazon.com/cost-management/latest/userguide/budgets-create.html))
+
+<Steps>
+
+1. **Cost budget**을 선택하고 이름을 `monthly-study-budget`처럼 정한다.
+2. 기간은 **Monthly**, 반복은 **Recurring**으로 설정한다.
+3. 예산을 감당 가능한 금액으로 입력한다. 아래 예시는 **월 10 USD**이며 AWS 권장 금액이나
+   무료 한도가 아니라 학습용 설정 예다.
+4. 처음에는 서비스·리전을 좁히지 않고 계정 전체를 대상으로 한다.
+5. 크레딧·환불 포함 여부를 확인한다. **크레딧에 가려진 자원 비용**을 먼저 감지하려면
+   크레딧 제외 예산을 사용하고, 청구에 가까운 값을 보려면 크레딧 포함 예산을 따로 구분한다.
+6. 아래 알림을 설정하고 각 알림의 이메일 주소를 확인한 뒤 생성한다.
+
+</Steps>
+
+| 알림 유형 | 임계치 예시 | 월 10 USD 예산에서의 의미 |
+|---|---|---|
+| Actual | 50% | 집계된 비용이 5 USD에 도달하면 중간 점검 |
+| Actual | 80% | 집계된 비용이 8 USD에 도달하면 조기 대응 |
+| Actual | 100% | 예산 소진 확인 |
+| Forecasted | 100% | 월말 예상 비용이 10 USD에 도달할 것으로 예측될 때 확인 |
+
+### 예측과 알림의 한계
+
+신규 계정에서 forecasted 알림만 믿지 않는다. AWS는 예산 예측에 약 **5주 사용 이력**을 요구한다.
+또한 actual 알림은 예산 기간 중 해당 임계치에 처음 도달할 때 보내므로 매일 반복되는 경보로
+생각하지 않는다. 크레딧 포함 여부와 갱신 주기도 [Budgets 동작 지침](https://docs.aws.amazon.com/cost-management/latest/userguide/budgets-best-practices.html)에서 확인할 수 있다.
+
+:::caution[예산은 지출 상한이 아니다]
+Budgets는 집계된 청구 데이터를 사용하므로 알림이 실시간이 아니다. 이메일 알림만 설정한 예산은
+리소스를 자동으로 멈추지 않는다. Actions를 구성해도 대상·권한·실행 지연이 있어 계정 전체에 대한
+확실한 지출 차단기로 사용할 수 없다.
+:::
+
+### Budgets 자체 요금
+
+2026-09-07 확인 기준, 비용·사용량 **모니터링과 알림은 무료**다. Actions를 붙인 예산은
+첫 2개 무료, 이후 예산당 하루 0.10 USD이며 **Budget Reports** 이메일 보고서는 발송당
+0.01 USD다. 기본 경보 메일과 유료 보고서를 구분한다.
+([Budgets 요금표](https://aws.amazon.com/aws-cost-management/aws-budgets/pricing/))
+
+## Free Tier와 크레딧
+
+### 계정 생성일과 현재 플랜부터 확인
+
+| 계정 조건 | 확인할 기준 |
+|---|---|
+| 2025-07-15 이전 생성 | 기존 Free Tier의 서비스별 무료 조건·기간. 12개월 혜택은 가입일 기준이며 영구 무료가 아니다 |
+| 2025-07-15 이후 생성, Free plan | 크레딧 잔액과 플랜 남은 기간. 최대 6개월 또는 크레딧 소진 중 먼저 도달하는 때까지 |
+| 2025-07-15 이후 생성, Paid plan | 무료 한도·유효한 크레딧 적용 후 발생할 유료 사용 비용 |
+
+신규 계정은 최초 100 USD와 활동으로 추가 획득 가능한 최대 100 USD 크레딧 체계로 시작한다.
+Free plan 종료와 크레딧 만료는 별개이며, 유료 전환 후에도 남은 크레딧은 만료 전까지 적격 비용에
+적용될 수 있다. Free plan은 사용할 서비스에 제한이 있고, Organizations 가입 등은 유료 전환을
+유발할 수 있으므로 작업 전에 확인한다. 특히 **Organizations 생성·가입이나 Control Tower 구성은
+Free Tier 크레딧의 즉시 만료와 추가 크레딧 획득 자격 상실**도 일으킨다. 일반적인 수동 Paid 전환과
+구분한다.
+([Free Tier 조건](https://docs.aws.amazon.com/awsaccountbilling/latest/aboutv2/free-tier.html),
+[신규 체계 안내](https://aws.amazon.com/blogs/aws/aws-free-tier-update-new-customers-can-get-started-and-explore-aws-with-up-to-200-in-credits/),
+[플랜 전환 FAQ](https://docs.aws.amazon.com/awsaccountbilling/latest/aboutv2/free-tier-FAQ.html))
+
+### 무료 한도 대비 사용량
+
+**Billing → Free Tier**에서 현재 적용되는 서비스별 사용량과 한도를 확인한다. 계정 플랜·무료
+제공 기간에 따라 보이는 항목이 다르다. Free plan의 남은 기간·크레딧은 콘솔 홈의 관련 위젯도 본다.
+
+사용량 기반 Free Tier 알림은 해당 한도의 **85% 초과 시** 이메일로 알려준다.
+**Billing preferences → Alert preferences → Edit → Receive AWS Free Tier alerts**에서 설정과
+수신 주소를 확인한다. 개인 계정은 기본 활성화되지만 Organizations 관리 계정은 직접 켜야 한다.
+신규 계정의 **크레딧 잔액·플랜 종료 알림**과는 다른 알림이다.
+([Free Tier 사용량 추적](https://docs.aws.amazon.com/awsaccountbilling/latest/aboutv2/tracking-free-tier-usage.html))
+
+`Zero spend budget` 템플릿도 비용 발생 감지에 쓸 수 있다. 이것을 "무료 한도를 넘기 직전
+반드시 도착하는 알림"으로 해석하지 않는다. 무료 사용량, 비용 집계, 크레딧 적용은 서로 다른 기준이다.
+
+### 크레딧 잔액과 적용 이력
+
+**Billing → Credits**에서 크레딧을 선택해 상세를 연다.
+
+| 필드·화면 | 읽는 방법 |
+|---|---|
+| Amount remaining | 마지막 청구 주기 기준 잔액. 당월 소모가 즉시 모두 반영된 값은 아니다 |
+| Estimated amount remaining | 당월 추정 잔액. 공식 문서상 매일 갱신 |
+| Expiration date · Applicable products | 만료일과 적용 가능한 서비스 |
+| Application history | 해당 크레딧이 적용된 계정·서비스·제품·금액 |
+| Bills → Savings | 당월 추정 크레딧 정보를 함께 확인하는 경로 |
+
+이제 Credits 상세에도 **Application history**가 있으므로 "어디에 썼는지는 Credits에서 볼 수 없다"고
+단정하지 않는다. 화면의 기준 시점과 추정 여부를 같이 읽는다.
+([크레딧 조회·적용 가이드](https://docs.aws.amazon.com/awsaccountbilling/latest/aboutv2/useconsolidatedbilling-credits.html))
+
+## Cost Explorer로 원인 찾기
+
+### 활성화와 기본 조회
+
+Billing and Cost Management 콘솔에서 **Cost Explorer**를 처음 열어 활성화한다. 당월 데이터는
+약 24시간 후 조회할 수 있고, 과거 데이터는 더 걸릴 수 있다. 이후에도 실시간 계측 화면은 아니다.
+Budgets 생성 과정에서 이미 활성화됐을 수도 있다.
+([활성화 가이드](https://docs.aws.amazon.com/cost-management/latest/userguide/ce-enable.html))
+
+<Steps>
+
+1. 날짜를 **이번 달**, 집계 단위를 **Daily**, 지표를 **Unblended cost**로 맞춘다.
+2. **Group by → Service**로 어느 서비스에서 비용이 늘었는지 확인한다.
+3. 해당 서비스를 필터로 고정하고 **Group by → Region**으로 리전을 좁힌다.
+4. **Group by → Usage type**으로 시간·저장량·전송량 등 과금 항목을 찾는다.
+5. 해당 서비스 콘솔에서 같은 계정·리전을 선택해 실제 리소스를 확인한다.
+
+</Steps>
+
+콘솔의 기본 비용 분석은 무료지만 API 조회와 일부 세부 데이터 기능은 과금 대상이다.
+CLI로 반복 조회하는 자동화를 만들기 전 [Cost Explorer 요금표](https://aws.amazon.com/aws-cost-management/aws-cost-explorer/pricing/)를 확인한다.
+
+### 크레딧 적용 전후를 나눠 보기
+
+`Charge type`은 사용료·크레딧·세금·환불 같은 청구 항목의 종류다. **Filters → Charge type → Credit**으로
+크레딧 항목을 선택하고 **Group by → Service**로 적용된 서비스를 본다. 전체 화면으로 돌아갈 때는
+Credit 필터를 해제한다.
+([Cost Explorer 필터](https://docs.aws.amazon.com/cost-management/latest/userguide/ce-filtering.html))
+
+예를 들어 사용료 8 USD와 크레딧 -8 USD만 있는 기간은 합계가 0 USD다. 다른 청구 유형이 있으면
+세금·수수료·환불 등도 합산해야 한다. 저장한 보고서와 필터에 따라 크레딧 포함 여부가 달라질 수
+있으므로 **기본 화면은 언제나 실청구액**이라고 가정하지 않는다. 최종 청구는 Bills와 맞춰 본다.
+
+### 비용 0과 사용량 0은 다르다
+
+사용량이 궁금하면 특정 **Usage type** 또는 같은 단위의 Usage type group으로 좁힌 후 **Usage**
+지표를 본다. 시간과 GB처럼 다른 단위를 합친 총량은 의미가 없다. 이 화면은 무료 한도 기준선까지
+보여주는 용도가 아니므로 한도 대비 비율은 Free Tier에서 확인한다.
+([사용량 유형 필터](https://docs.aws.amazon.com/cost-management/latest/userguide/ce-filtering.html))
+
+## 멈춰도 남는 비용
+
+### EC2-Other는 리소스 이름이 아니다
+
+`EC2 - Other`는 EBS·NAT Gateway 등 EC2 주변 비용을 조사할 때 자주 보는 서비스 묶음이다.
+필터를 그 항목으로 고정하고 **Usage type**을 보면 `EBS:SnapshotUsage`, `EBS:VolumeUsage.gp3`,
+`NatGateway-Hours` 같은 항목으로 나뉜다. 리전 접두어가 붙을 수 있다.
+
+모든 네트워크 비용이 이 묶음에 들어가지는 않는다. **공인 IPv4·VPC Endpoint는 Amazon VPC 등
+다른 서비스 분류에서도 확인**한다. EC2-Other만 보고 비용 조사를 끝내지 않는다.
+([EC2-Other 비용 분석](https://aws.amazon.com/blogs/aws-cloud-financial-management/tips-and-tricks-for-exploring-your-data-in-aws-cost-explorer-part-2/))
+
+### 남기기 쉬운 리소스와 정리 기준
+
+| 대상 | 비용이 계속 생기는 이유 | 확인·정리 경로 |
+|---|---|---|
+| EBS 볼륨 | 인스턴스를 stop해도 저장 공간은 유지됨 | EC2 → Volumes. `Available`은 미연결 상태이지 불필요하다는 뜻은 아니므로 데이터 확인 후 삭제 |
+| EBS 스냅샷·AMI | 인스턴스와 별도로 백업이 남음 | AMIs와 Snapshots를 함께 확인. 필요 없는 이미지와 백업만 제거 |
+| NAT Gateway | 배치 시간과 처리 데이터에 비용 발생 | VPC → NAT gateways. 사용 경로 확인 후 삭제하고 남은 Elastic IP도 확인 |
+| Interface VPC Endpoint | AZ별 배치 시간과 데이터 처리 비용 | VPC → Endpoints. 서비스 접근 의존성을 확인한 뒤 삭제 |
+| 공인 IPv4·Elastic IP | 사용 중인 AWS 제공 공인 IPv4와 유휴 주소 모두 과금 대상 | EC2 → Elastic IPs에서 미사용 주소 Release. 일반 공인 IP도 점검 |
+| Load Balancer·RDS | EC2 인스턴스와 수명이 별개 | 해당 서비스 콘솔에서 남은 자원·백업 확인 |
+
+EBS의 용량·성능 비용은 [EBS 요금표](https://aws.amazon.com/ebs/pricing/), NAT Gateway와 공인 IPv4는
+[VPC 요금표](https://aws.amazon.com/vpc/pricing/), Interface Endpoint는
+[PrivateLink 요금표](https://aws.amazon.com/privatelink/pricing/)에서 사용 리전과 단위를 맞춰 본다.
+Gateway Endpoint와 Interface Endpoint의 과금 구조도 구분한다.
+
+2026-09-07 기준 AWS 제공 공인 IPv4의 기본 요금은 주소당 **0.005 USD/시간**이다.
+하나를 30일 내내 보유하면 `0.005 × 24 × 30 = 3.60 USD`이며 무료 혜택·크레딧·세금은 별도다.
+"연결된 Elastic IP는 무료"라는 과거 규칙을 적용하지 않는다.
+([공인 IPv4 요금](https://aws.amazon.com/vpc/pricing/))
+
+### 종료·삭제할 때의 함정
+
+EC2를 **terminate**해도 모든 볼륨이 없어지는 것은 아니다. 연결별 `DeleteOnTermination`이
+`true`인 EBS만 자동 삭제된다. 추가 볼륨·스냅샷은 별도로 남을 수 있다.
+([종료 후 EBS 보존 설정](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/preserving-volumes-on-termination.html))
+
+AMI deregister 시 현재 콘솔에서는 **Delete associated snapshots**를 선택해 연결된 스냅샷을
+함께 지울 수 있다. 기본적으로 항상 지워지는 것은 아니며, 다른 AMI에서도 사용하는 스냅샷은
+옵션을 선택해도 남는다. 처리 결과와 Snapshots 목록을 확인한다.
+([AMI 등록 해제와 스냅샷 삭제](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/deregister-ami.html))
+
+삭제한 스냅샷이 Recycle Bin 보존 규칙에 들어가면 보존 기간에도 저장 비용이 발생한다.
+백업 정책이 다시 만들거나 Auto Scaling이 인스턴스를 다시 띄우는지도 확인한다.
+([Recycle Bin 요금](https://docs.aws.amazon.com/ebs/latest/userguide/recycle-bin.html))
+
+## 예상 밖 과금에 대응하기
+
+<Steps>
+
+1. 알림의 계정·기간·실제/예측 유형을 확인한다. Bills와 Cost Explorer에서 증가한
+   서비스 → 리전 → Usage type 순으로 범위를 좁힌다.
+2. 해당 리전의 리소스 ID와 생성 시각을 확인한다. 모르는 자원이라면 CloudTrail에서 생성 주체를
+   조사하고, 자격증명 노출 정황이 있으면 해당 키·세션과 권한을 함께 점검한다.
+3. 중단해도 되는 자원인지, 보존할 데이터·연결된 서비스가 있는지 확인한 뒤 비용 원인을 정리한다.
+   Terraform·CloudFormation·Auto Scaling 등 다시 생성하는 설정도 확인한다.
+4. 다른 리전과 부속 자원까지 확인하고, 다음 비용 갱신 후 증가 추세가 멎었는지 확인한다.
+5. 설명되지 않는 청구는 계정·기간·서비스·리소스·조치 기록을 정리해
+   [AWS 결제 지원](https://docs.aws.amazon.com/awsaccountbilling/latest/aboutv2/billing-get-answers.html)에 문의한다.
+
+</Steps>
+
+이미 발생한 요금은 리소스 삭제로 사라지지 않는다. 삭제 직후 그래프가 그대로여도 집계 지연일 수
+있지만, 계속 증가한다면 아직 남은 자원이나 사용료 외 항목을 다시 확인한다.
+
+## 운영 체크리스트
+
+- [ ] 일상 신원으로 Bills·Cost Explorer·Budgets에 접근할 수 있다.
+- [ ] 월 예산에 actual 알림을 넣었고, forecasted 알림의 이력 요건을 이해한다.
+- [ ] 예산의 크레딧 포함 여부·대상 서비스·리전을 확인했다.
+- [ ] Free Tier 적용 조건, 현재 플랜, 크레딧 잔액·만료일을 확인했다.
+- [ ] 알림 이메일 주소·스팸함을 확인하고, SNS를 사용한다면 구독을 승인했다.
+- [ ] 실습 후 인스턴스뿐 아니라 볼륨·스냅샷·네트워크 자원도 확인한다.
+- [ ] 다음 집계에서 비용 증가가 멎었는지 확인한다.
+
+<LinkCard title="1. IAM — 신원과 권한" description="현재 계정·역할과 실제 권한을 확인하고, root와 일상 인증을 분리한다." href="/aws/iam/" />

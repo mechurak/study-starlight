@@ -1,0 +1,43 @@
+export default {
+	navOrder: 350,
+	catalogOrder: 350,
+	label: 'AWS',
+	title: 'AWS 운영',
+	icon: 'cloud',
+	aliases: ['Amazon Web Services', '아마존 웹 서비스'],
+	description: '개인 학습 계정의 운영 기본 — IAM 권한, 비용 확인과 알림, VPC 네트워크와 연결 진단.',
+	category: 'infra',
+	tags: ['cloud'],
+	termIntro: 'required',
+	reviewIntervalDays: 90,
+	groups: [
+		{ id: 'account', label: '계정 운영의 기본' },
+		{ id: 'network', label: '네트워크' },
+	],
+	map: [
+		{
+			label: '1장',
+			href: '/aws/iam/',
+			title: 'IAM — 누가 무엇을 할 수 있나',
+			tone: 'key',
+			desc: 'root 보호 · 사용자와 역할 · MFA · CLI 인증 · 권한 진단',
+			note: '어떤 신원으로 로그인하고, 권한이 막히면 어디부터 확인할까?',
+		},
+		{
+			label: '2장',
+			href: '/aws/billing/',
+			title: '비용 — 얼마나 쓰고 어디서 새나',
+			tone: 'warn',
+			desc: 'Billing 접근 · Budgets · Free Tier와 크레딧 · Cost Explorer · 남은 리소스',
+			note: '청구액이 0이어도 무엇을 확인하고, 예상 밖 비용은 어떻게 추적할까?',
+		},
+		{
+			label: '3장',
+			href: '/aws/vpc/',
+			title: 'VPC — 어디로 연결되고 무엇이 막나',
+			tone: 'zone',
+			desc: '서브넷 · 라우팅 · 인터넷 연결 · 보안 그룹 · Endpoint · 연결 진단',
+			note: '통신 경로와 허용 규칙을 구분하고, 필요한 연결만 열 수 있을까?',
+		},
+	],
+};
