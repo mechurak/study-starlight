@@ -191,6 +191,19 @@ export default {
 				]
 			],
 			"tone": "bad"
+		},
+		{
+			"label": "11장",
+			"title": "Helm",
+			"href": "/cka-udemy/11-helm/",
+			"desc": "설치 확인 · repo/search · chart 버전 upgrade · history/rollback · 이미지 함정",
+			"items": [
+				[
+					"cka 16장",
+					"/cka/16-helm-kustomize/"
+				]
+			],
+			"tone": "bad"
 		}
 	]
 };
