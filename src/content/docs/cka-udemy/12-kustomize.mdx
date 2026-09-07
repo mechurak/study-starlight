@@ -1,6 +1,6 @@
 ---
 title: "12. Kustomize 실습 — resources · transformers · patches"
-description: "리소스 묶기, transformer 범위, strategic merge·JSON6902 삭제 패치, inline 문자열 문법, 결과 검증과 시험 문서·CLI 확인"
+description: "리소스 묶기와 staging 전용 Deployment 추가, transformer 범위, JSON6902 이미지 교체·삭제, 패치 파일 구분, 적용 경로와 시험 문서"
 deckGroup: cluster-lifecycle
 sidebar:
   order: 120
@@ -16,8 +16,9 @@ import Thesis from '../../../components/docs/Thesis.astro';
 `kustomization.yaml`이 그 목록이고, Kustomize가 읽어 최종 리소스 YAML을 만든 다음
 `kubectl`이 클러스터에 보낸다. 파일을 작성하는 것과 실제 적용하는 것은 별도 단계다.
 
-이 장은 리소스를 한 목록으로 묶고 이름·라벨·이미지 등을 변환하거나 패치로 특정 항목을 삭제하는 실습과, 문법이 기억나지 않을 때 시험에서 확인할 수 있는
-범위를 다룬다. base·overlay·patch의 원리는
+이 장은 리소스를 한 목록으로 묶고, 환경별로 새 Deployment를 추가하거나 기존 리소스의
+이미지·라벨·컨테이너를 변경하는 실습을 다룬다. 문법이 기억나지 않을 때 시험에서 확인할 수 있는
+문서와 도구도 함께 정리한다. base·overlay·patch의 원리는
 [cka 16장 — Kustomize](/cka/16-helm-kustomize/#kustomize)에서 이어 본다.
 
 ## 여러 폴더의 리소스를 하나로 묶기
@@ -73,6 +74,72 @@ import Thesis from '../../../components/docs/Thesis.astro';
    적용 뒤에는 마지막 명령으로 해당 리소스가 실제로 존재하는지 확인한다.
 
 </Steps>
+
+### staging에만 MySQL Deployment 추가
+
+요구: staging 환경에만 `mysql-depl.yaml`을 추가한다. Deployment 이름은
+`mysql-deployment`, 컨테이너 이름과 이미지는 `mysql`, replicas는 1이며,
+환경변수 `MYSQL_ROOT_PASSWORD=mypassword`를 설정한다.
+
+**새 리소스는 staging의 `resources`에 등록한다.** 공통 base에 등록하면 그 base를 쓰는
+다른 환경에도 포함될 수 있다. 파일을 staging 폴더에 놓는 것만으로는 자동 등록되지 않는다.
+([공식 문서 — Bases and Overlays](https://kubernetes.io/docs/tasks/manage-kubernetes-objects/kustomization/#bases-and-overlays))
+
+먼저 기존 `kustomization.yaml`을 읽고, `mysql-depl.yaml`이 아직 없는지 확인한다.
+실습 터미널에서 다음 명령으로 Deployment 골격을 생성할 수 있다.
+
+```bash
+cd /root/code/k8s/overlays/staging
+cat kustomization.yaml
+ls
+kubectl create deployment mysql-deployment \
+  --image=mysql --replicas=1 \
+  --dry-run=client -o yaml > mysql-depl.yaml
+```
+
+`--dry-run=client -o yaml`은 리소스를 실제 생성하지 않고 YAML을 출력한다.
+selector와 Pod label도 자동으로 맞춰지므로 전체 Deployment를 외워서 작성할 필요가 없다.
+([공식 create deployment 레퍼런스](https://kubernetes.io/docs/reference/kubectl/generated/kubectl_create/kubectl_create_deployment/))
+생성된 label은 예제 해설의 `component: mysql`과 달라도 된다. 문제에서 label을 지정하지 않았다면
+`spec.selector.matchLabels`와 Pod template의 label이 일치하는지 확인한다.
+
+생성한 파일의 `mysql` 컨테이너에 아래처럼 `env`를 추가한다. 다음은 **컨테이너 부분 발췌**이며,
+`env`는 `image`와 같은 들여쓰기 수준이다.
+
+```yaml
+      containers:
+        - name: mysql
+          image: mysql
+          env:
+            - name: MYSQL_ROOT_PASSWORD
+              value: mypassword
+```
+
+staging의 기존 `resources` 목록에 새 파일을 추가한다. 예를 들어 기존 base 참조가
+`../../base`라면 최종 목록은 다음과 같다. 실제 랩의 다른 항목도 유지한다.
+
+```yaml
+# overlays/staging/kustomization.yaml
+resources:
+  - ../../base
+  - mysql-depl.yaml
+```
+
+```bash
+# staging 폴더에서 실행
+kubectl kustomize .
+kubectl apply -k .
+kubectl get -k . -o yaml
+```
+
+미리보기에서 MySQL Deployment가 포함됐는지, replicas가 1인지, 컨테이너의 이미지와
+환경변수가 요구와 일치하는지 확인한다. 적용 뒤 실제 Deployment에서도 같은 필드를 확인하고,
+`kubectl get -k .`에서 READY가 `1/1`인지 확인한다. 준비되지 않았다면
+[완료 검증](#미리보기와-완료-검증-구분하기)의 rollout·Pod Events 확인으로 이어 간다.
+
+새 Deployment가 출력되지 않으면 `resources` 연결과 실행한 overlay 경로를 먼저 확인한다.
+기존 리소스가 출력에서 사라졌다면 새 파일을 추가하면서 기존 base 참조를 지웠는지 확인한다.
+잘못된 파일이나 참조를 고친 뒤 같은 staging 경로로 다시 렌더하고 적용한다.
 
 ## Transformer는 적용 범위부터 고른다
 
@@ -252,7 +319,7 @@ kubectl get -k .
 ## Patch로 특정 필드·항목 수정하기
 
 패치는 원본 리소스 전체를 다시 쓰지 않고 필요한 변경만 적는 방법이다.
-**대상 선택 → 변경 위치 확인 → 패치 작성 → 루트 렌더 검증 → 적용** 순서로 접근한다.
+**대상 선택 → 변경 위치 확인 → 패치 작성 → 적용할 구성 렌더 검증 → 적용** 순서로 접근한다.
 Kustomize의 `patches`는 strategic merge와 JSON6902를 지원한다.
 ([공식 문서 — Customizing](https://kubernetes.io/docs/tasks/manage-kubernetes-objects/kustomization/#customizing))
 
@@ -266,6 +333,82 @@ Kustomize에서는 작업 목록을 YAML로 작성할 수 있다.
 ([RFC 6902 — 학습용](https://www.rfc-editor.org/rfc/rfc6902))
 파일에 따로 쓰는지, inline으로 직접 쓰는지는 패치 방식과 별개다. 문제에서 방식과 위치를
 지정하면 그대로 따른다.
+
+### resources와 patches의 path는 파일 역할이 다르다
+
+`resources`는 **배포 대상 정의를 가져오는 목록**, `patches` 항목의 `path`는
+**그 대상에 적용할 수정 내용을 읽는 파일 경로**다. 예를 들어 다음 staging 구성은
+base의 리소스와 새 MySQL Deployment를 모은 뒤, 그중 API Deployment에 이미지 패치를 적용한다.
+
+```yaml
+resources:
+  - ../../base
+  - mysql-depl.yaml
+patches:
+  - target:
+      kind: Deployment
+      name: api-deployment
+    path: api-image-patch.yaml
+```
+
+`mysql-depl.yaml`에는 독립된 Deployment 정의가 들어간다.
+`api-image-patch.yaml`에는 다음처럼 변경 작업만 들어간다.
+
+```yaml
+- op: replace
+  path: /spec/template/spec/containers/0/image
+  value: caddy
+```
+
+바깥 `path: api-image-patch.yaml`은 **파일 위치**, 안쪽
+`path: /spec/template/spec/containers/0/image`는 **리소스 내부 필드 위치**다.
+파일 경로는 `kustomization.yaml`이 있는 디렉터리를 기준으로 해석한다.
+별도 파일 대신 `patch: |-` 아래에 같은 작업 목록을 넣으면 inline 패치가 된다.
+패치 내용은 새 리소스 정의가 아니므로 `resources`에 넣지 않는다.
+([공식 문서 — Customizing](https://kubernetes.io/docs/tasks/manage-kubernetes-objects/kustomization/#customizing))
+
+### QA에서 inline JSON6902로 API 이미지 교체
+
+요구: QA 환경의 `api-deployment`에서 API 컨테이너 이미지를 `caddy`로 바꾸되,
+inline JSON6902 패치를 사용하고 QA 설정을 실제 적용한다.
+먼저 QA 설정과 원본 Deployment를 읽고 컨테이너 순서를 확인한다.
+
+```bash
+cd /root/code/k8s/overlays/QA
+cat kustomization.yaml
+kubectl kustomize .
+```
+
+아래 패치는 API 컨테이너가 **첫 번째 컨테이너일 때** 사용한다.
+`containers/0`은 이름이 아니라 배열 인덱스이며 두 번째 컨테이너라면 `containers/1`이다.
+Deployment의 Pod template을 바꾸므로 경로는 `/spec/template/spec/containers/0/image`다.
+
+```yaml
+# overlays/QA/kustomization.yaml — 기존 resources 유지
+# patches가 이미 있으면 그 목록에 항목을 추가한다
+patches:
+  - target:
+      kind: Deployment
+      name: api-deployment
+    patch: |-
+      - op: replace
+        path: /spec/template/spec/containers/0/image
+        value: caddy
+```
+
+`target`으로 Deployment를 선택하고 `replace`로 존재하는 이미지 필드를 교체한다.
+문제에서 inline JSON6902를 요구했으므로 이 형식으로 작성한다.
+
+```bash
+kubectl kustomize .
+kubectl apply -k .
+kubectl get -k . -o yaml
+```
+
+미리보기와 실제 Deployment의 `spec.template.spec.containers`에서 API 이미지가 `caddy`인지
+확인하고 rollout 완료도 확인한다. 다른 컨테이너가 바뀌면 인덱스를, missing path 오류가 나면
+`spec/template/spec` 경로와 해당 컨테이너의 `image` 존재 여부를 확인한다.
+공통 base에 변경을 적었다면 이를 원래대로 고치고 QA overlay에 패치를 둔다.
 
 ### Strategic merge — memcached 컨테이너 삭제
 
@@ -400,6 +543,24 @@ selector 오류를 해결하려고 selector까지 무작정 지우지 않는다.
 네임스페이스를 사용해 `kubectl rollout status deployment/<이름> -n <네임스페이스>`로
 완료를 기다리고, 실패하면 해당 Pod의 `describe`와 Events로 내려간다.
 
+### 현재 디렉터리와 overlay 경로 구분
+
+명령의 `.`은 **현재 셸 디렉터리**다. staging을 적용하려면 staging 폴더로 이동해
+실행하거나, 어느 위치에서든 다음처럼 경로를 명시한다.
+
+```bash
+kubectl kustomize /root/code/k8s/overlays/staging
+kubectl apply -k /root/code/k8s/overlays/staging
+kubectl get -k /root/code/k8s/overlays/staging -o yaml
+```
+
+이 경로의 `kustomization.yaml`이 시작점이다. 그 안의 `../../base`, `mysql-depl.yaml`,
+패치 파일 경로는 **설정 파일이 있는 폴더 기준**으로 해석한다. 명령을 실행한 셸 위치 기준이 아니다.
+QA 문제라면 세 명령 모두 `/root/code/k8s/overlays/QA`를 지정한다.
+overlay 폴더 이름만으로 namespace가 정해지지는 않으므로 최종 YAML의 이름·namespace를 확인한다.
+
+### 별도 CLI의 결과를 적용하기
+
 별도 Kustomize CLI가 있을 때는 다음처럼 두 단계를 파이프로 연결할 수도 있다.
 
 ```bash
@@ -509,14 +670,33 @@ cat kustomization.yaml
 | label·이름·namespace·annotation | 같은 페이지의 [Setting cross-cutting fields](https://kubernetes.io/docs/tasks/manage-kubernetes-objects/kustomization/#setting-cross-cutting-fields). 라벨 예제는 `commonLabels` 대신 `labels` 사용 |
 | `apiVersion`·`kind` 두 줄 | 위 문서에 없다. 기본 표기를 익히고, 별도 CLI가 있을 때만 `kustomize create`로 생성 |
 
+### 이번 환경별 문제에서 문서를 활용하는 순서
+
+새 Deployment 골격은 `kubectl create deployment --help`로 옵션을 확인하고 생성한다.
+환경변수의 위치가 기억나지 않으면 다음 명령으로 컨테이너의 `env` 구조를 확인한다.
+
+```bash
+kubectl explain deployment.spec.template.spec.containers.env
+```
+
+Kustomize 연결 문법은 [Composing](https://kubernetes.io/docs/tasks/manage-kubernetes-objects/kustomization/#composing)의
+`resources`를 찾는다. JSON6902는 같은 페이지의
+[Customizing](https://kubernetes.io/docs/tasks/manage-kubernetes-objects/kustomization/#customizing)에서
+`Json6902`를 검색한다. 현재 예제는 별도 패치 파일로 `/spec/replicas`를 교체한다.
+이미지 문제에서는 경로와 값을 바꾸고, inline 요구라면 파일을 가리키는 `path: patch.yaml`을
+`patch: |-`와 작업 본문으로 바꾸면 된다. 이 변환과 컨테이너 인덱스 확인은 직접 연습해 둔다.
+
 ## 이 장에서 남길 것
 
 - `find . -name '*.yaml'`로 경로를 확인하고, 필요한 파일만 `resources`에 나열한다.
 - `resources`는 와일드카드를 지원하지 않는다. 디렉터리 참조에는 하위 설정 파일이 필요하다.
+- 특정 환경에만 새 리소스를 추가하면 해당 overlay의 `resources`에 등록하고 기존 base 참조를 유지한다.
+- `patches` 항목의 `path`는 수정 파일, JSON6902 작업의 `path`는 리소스 내부 필드다. QA 이미지 교체는 `replace`와 정확한 컨테이너 인덱스로 작성한다.
 - 전체 변환은 루트, 일부 그룹 변환은 해당 하위 설정에 둔다. 적용 범위는 `resources`의 참조 관계로 결정된다.
 - `commonLabels`는 selector도 바꾼다. `images.name`은 기존 이미지, `newName`은 이름 교체, `newTag`는 태그 교체다.
 - 컨테이너 삭제는 strategic merge의 `name` + `$patch: delete`, 특정 라벨 삭제는 JSON6902의 `target` + `op: remove` + 정확한 `path`로 연습한다.
 - `patch: |-`는 패치를 담은 여러 줄 문자열이다. Deployment 라벨과 Pod template 라벨의 경로를 구분한다.
+- 명령의 `.`은 현재 디렉터리, 설정 안의 상대 경로는 `kustomization.yaml` 위치 기준이다. 적용할 overlay를 명시해도 된다.
 - `kubectl kustomize .`는 미리보기, `apply -k .`는 적용, `get -k .`는 해당 목록의 실제 상태 조회다.
 - 이 랩에서는 `apiVersion`·`kind`를 모두 적는다. 실행 가능 여부와 채점 조건을 구분한다.
 - 별도 CLI 설치를 가정하지 않는다. 공식 문서에서 찾을 수 있는 예제와 외워 둘 두 줄을 구분한다.

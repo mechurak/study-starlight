@@ -209,7 +209,7 @@ export default {
 			"label": "12장",
 			"title": "Kustomize",
 			"href": "/cka-udemy/12-kustomize/",
-			"desc": "resources · transformer 범위 · strategic merge·JSON6902 삭제 · 적용·검증 · 시험 문서",
+			"desc": "환경별 resources 추가 · transformer 범위 · JSON6902 교체·삭제 · 적용 경로·검증 · 시험 문서",
 			"items": [["cka 16장", "/cka/16-helm-kustomize/"]],
 			"tone": "bad"
 		}
