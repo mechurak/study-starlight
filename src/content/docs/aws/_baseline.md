@@ -57,3 +57,10 @@
 공식 문서로 보정한 주요 지점은 S3 단일 AZ 클래스 예외, RDS Multi-AZ instance/cluster 구분,
 DynamoDB의 강한 읽기·GSI 제약, 서버리스의 복수 과금 축, Lambda 소스별 재시도,
 API Gateway REST/HTTP·proxy 구분, Cognito 향상된 인증 흐름, X-Ray SDK/daemon의 maintenance mode다.
+
+2026-09-08에 사용자가 제공한 AWS Training 「실습 2: Amazon VPC 인프라 구축」 버전 7.12.4를
+바탕으로 `vpc.mdx`에 실습 해설을 추가했다. 원문의 절차·스크립트·이미지는 복제하지 않고
+CIDR 선택, 세 가지 요청 경로, Session Manager 조건, 첫 부팅의 네트워크 의존성과 결과 예측을
+새로 서술했다. 단일 AZ·IPv4·Zonal public NAT 구성을 전제로 하며, 인스턴스 Name 태그 조건은
+실습 환경 전용 제약으로 구분한다. 추가 절의 동작은 AWS 공식 문서로 확인했고 기존 장 전체의
+`reviewedAt`은 유지했다.
