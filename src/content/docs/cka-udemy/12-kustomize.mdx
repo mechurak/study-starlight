@@ -1,6 +1,6 @@
 ---
-title: "12. Kustomize 실습 — resources · transformers · patches"
-description: "리소스 묶기와 staging 전용 Deployment 추가, transformer 범위, JSON6902 이미지 교체·삭제, 패치 파일 구분, 적용 경로와 시험 문서"
+title: "12. Kustomize 실습 — resources · transformers · patches · components"
+description: "리소스 묶기와 staging 전용 Deployment 추가, transformer 범위, JSON6902 이미지 교체·삭제, 패치 파일 구분, 선택 기능을 묶는 components, 적용 경로와 시험 문서"
 deckGroup: cluster-lifecycle
 sidebar:
   order: 120
@@ -17,7 +17,7 @@ import Thesis from '../../../components/docs/Thesis.astro';
 `kubectl`이 클러스터에 보낸다. 파일을 작성하는 것과 실제 적용하는 것은 별도 단계다.
 
 이 장은 리소스를 한 목록으로 묶고, 환경별로 새 Deployment를 추가하거나 기존 리소스의
-이미지·라벨·컨테이너를 변경하는 실습을 다룬다. 문법이 기억나지 않을 때 시험에서 확인할 수 있는
+이미지·라벨·컨테이너를 변경하고, Components로 선택 기능을 재사용하는 실습을 다룬다. 문법이 기억나지 않을 때 시험에서 확인할 수 있는
 문서와 도구도 함께 정리한다. base·overlay·patch의 원리는
 [cka 16장 — Kustomize](/cka/16-helm-kustomize/#kustomize)에서 이어 본다.
 
@@ -524,6 +524,165 @@ selector 오류를 해결하려고 selector까지 무작정 지우지 않는다.
 불변이며, 문제에서 요구한 변경 범위를 먼저 확인해야 한다.
 잘못된 패치는 파일 내용을 정상으로 고친 뒤 같은 검증 순서로 다시 적용한다.
 
+## Components — 선택한 환경에만 기능 묶음 추가하기
+
+상황: dev와 staging에만 디버그 설정을 추가하려는데, ConfigMap과 Deployment 패치를 각
+폴더에 복사하면 같은 수정이 반복된다. **Component는 선택 기능에 필요한 리소스·패치·생성기를
+한 디렉터리에 묶어 재사용하는 Kustomize 설정**이다. 필요한 overlay만 이 묶음을 참조한다.
+[KodeKloud Components 노트](https://notes.kodekloud.com/docs/Kustomize/Kustomize-Basics/Components/page)는
+DB·캐시를 선택하는 예제로 이 패턴을 설명한다. 아래는 연결과 검증에 집중한 **재구성 예제**이며,
+랩의 파일명이나 채점 조건을 그대로 옮긴 것은 아니다.
+
+- **base**에는 여러 환경이 공유할 출발 리소스를 둔다.
+- **overlay**는 base를 불러와 환경별 변경과 사용할 기능을 조합하는 빌드 진입점이다.
+- **component**에는 일부 환경이 선택할 기능을 둔다. 자체 리소스 추가와 함께, 불러온 쪽의
+  리소스에 패치를 적용할 수 있다.
+
+### Component 파일 만들기
+
+전제: 기존 `base/kustomization.yaml`이 `api-deployment` Deployment를 등록하고 있고,
+그 안의 컨테이너 이름은 `api`다. 먼저 원본에서 두 이름을 확인한다. 이 예제는 `LOG_LEVEL`을
+컨테이너에 전달하는 설정을 검증하며, 실제 로그 동작은 앱이 이 환경변수를 지원해야 바뀐다.
+
+```text
+k8s/
+  base/
+    kustomization.yaml
+    api-depl.yaml
+  components/
+    debug/
+      kustomization.yaml
+      debug-config.yaml
+      api-patch.yaml
+  overlays/
+    dev/kustomization.yaml
+    staging/kustomization.yaml
+    prod/kustomization.yaml
+```
+
+Component도 파일명은 `kustomization.yaml`이다. 일반 base·overlay의
+`v1beta1` / `Kustomization`과 달리 아래 두 줄로 선언한다.
+([Kustomize 공식 Components 예제 — 학습용](https://github.com/kubernetes-sigs/kustomize/blob/master/examples/components.md#components-example))
+
+```yaml
+# components/debug/kustomization.yaml
+apiVersion: kustomize.config.k8s.io/v1alpha1
+kind: Component
+resources:
+  - debug-config.yaml
+patches:
+  - path: api-patch.yaml
+```
+
+새로 추가할 ConfigMap은 `resources`에, 기존 Deployment의 수정 내용은 `patches`에 둔다.
+Component 안에서 `../../base`를 다시 불러오지 않는다. base는 아래에서 overlay가 가져온다.
+
+```yaml
+# components/debug/debug-config.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: debug-config
+data:
+  LOG_LEVEL: debug
+```
+
+```yaml
+# components/debug/api-patch.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: api-deployment
+spec:
+  template:
+    spec:
+      containers:
+        - name: api
+          env:
+            - name: LOG_LEVEL
+              valueFrom:
+                configMapKeyRef:
+                  name: debug-config
+                  key: LOG_LEVEL
+```
+
+이 strategic merge patch는 `api` 컨테이너에 환경변수를 연결한다. 예제의 base에는
+`LOG_LEVEL`이 없다고 가정한다. 기존에 같은 이름의 환경변수가 있다면 `value`인지
+`valueFrom`인지 먼저 확인하고, 병합 결과에 두 필드가 함께 남지 않도록 패치를 조정한다.
+
+### Overlay에서 components로 선택하기
+
+dev와 staging의 `kustomization.yaml`에 각각 다음 구성을 둔다.
+기존 설정이 있다면 `resources`와 다른 변경을 유지하며 `components` 항목을 추가한다.
+
+```yaml
+# overlays/dev/kustomization.yaml
+# overlays/staging/kustomization.yaml도 같은 구성
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - ../../base
+components:
+  - ../../components/debug
+```
+
+prod는 base만 참조한다.
+
+```yaml
+# overlays/prod/kustomization.yaml
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - ../../base
+```
+
+`components:`에는 **Component 디렉터리 경로**를 적는다. 기준은 이 overlay의 설정 파일 위치다.
+여러 기능을 쓰려면 이 목록에 Component 경로를 추가한다. 같은 리소스·필드를 여러 Component가
+수정한다면 조합한 최종 결과도 확인해야 한다.
+
+### 선택·미선택 환경 함께 검증하기
+
+```bash
+# k8s/에서 실행 — 클러스터에 적용하지 않는 미리보기
+kubectl kustomize overlays/dev
+kubectl kustomize overlays/staging
+kubectl kustomize overlays/prod
+```
+
+dev·staging에는 `debug-config`와 `api` 컨테이너의 `LOG_LEVEL` 참조가 모두 있어야 한다.
+prod에는 둘 다 없어야 하며, 모든 환경에서 기존 Deployment가 한 번씩만 나와야 한다.
+`Component` 자체는 결과 YAML의 Kubernetes 리소스로 출력되지 않는다.
+
+요구된 대상이 dev라면 실제 적용도 dev에만 한다. 최종 YAML에서 확인한 이름·namespace를 사용한다.
+
+```bash
+kubectl diff -k overlays/dev
+kubectl apply -k overlays/dev
+kubectl get -k overlays/dev -o yaml
+kubectl rollout status deployment/api-deployment
+```
+
+`diff`의 종료 코드 1은 변경이 있다는 뜻이다. 적용 후에는 ConfigMap의 값, Deployment의 환경변수
+참조, rollout 완료를 함께 확인한다. 환경별 namespace를 쓴다면 rollout 명령에도 `-n`을 붙인다.
+
+### 실패하면 선언·참조·패치 대상을 확인하기
+
+- **Component 종류를 기대한다는 오류**: 참조 대상의 `kind: Component`와 `v1alpha1`을 확인한다.
+  일반 Kustomization의 두 줄을 그대로 복사하지 않는다.
+- **resources로 불러오다 종류 오류**: overlay의 `resources`에는 base를, `components`에는
+  Component를 둔다. `components/debug`를 `resources` 목록으로 옮겨 해결하지 않는다.
+- **패치 대상을 찾지 못함**: overlay가 base를 불러오는지, Deployment 이름·kind·namespace가
+  맞는지 확인한다. 이 예제의 Component는 부모가 제공할 Deployment에 의존하므로,
+  `kubectl kustomize components/debug`만 실행하면 대상이 없다. overlay를 빌드한다.
+- **리소스 중복 오류**: Component가 base를 다시 불러오거나 같은 리소스를 여러 경로에서
+  추가했는지 확인한다.
+- **prod에도 기능이 들어감**: 공통 base에 참조나 패치를 넣었는지 확인하고, 필요한 overlay로 옮긴다.
+
+잘못 연결했다면 해당 overlay의 참조를 고친 뒤 세 환경을 다시 렌더한다. `components`에서
+항목을 빼면 이후 생성 YAML에서 기능이 빠지지만, 이미 적용한 ConfigMap이 자동 삭제되지는 않는다.
+복구 시 Deployment 설정을 먼저 확인·적용하고, 남은 리소스는 사용 여부와 문제의 삭제 요구를
+확인해 처리한다. `delete -k overlays/dev`는 앱 전체도 삭제할 수 있어 기능 해제용으로 쓰지 않는다.
+
 ## 미리보기와 완료 검증 구분하기
 
 `kubectl kustomize .`가 성공해도 클러스터에는 아직 아무것도 적용하지 않았다.
@@ -571,7 +730,7 @@ kustomize build k8s/ | kubectl apply -f -
 `build`는 YAML 생성, `apply -f -`의 마지막 `-`는 표준입력에서 YAML을 읽는다는 뜻이다.
 이 실습에서는 `kubectl apply -k /root/code/k8s`만으로도 적용할 수 있다.
 
-## 실패하면 경로와 입력 형식부터 확인하기
+### 실패하면 경로와 입력 형식부터 확인하기
 
 | 증상·시도 | 원인과 수정 |
 |---|---|
@@ -690,6 +849,7 @@ Kustomize 연결 문법은 [Composing](https://kubernetes.io/docs/tasks/manage-k
 
 - `find . -name '*.yaml'`로 경로를 확인하고, 필요한 파일만 `resources`에 나열한다.
 - `resources`는 와일드카드를 지원하지 않는다. 디렉터리 참조에는 하위 설정 파일이 필요하다.
+- 선택 기능은 `v1alpha1` / `kind: Component`로 묶고 overlay의 `components`에서 고른다. 선택·미선택 환경을 모두 렌더해 범위를 확인한다.
 - 특정 환경에만 새 리소스를 추가하면 해당 overlay의 `resources`에 등록하고 기존 base 참조를 유지한다.
 - `patches` 항목의 `path`는 수정 파일, JSON6902 작업의 `path`는 리소스 내부 필드다. QA 이미지 교체는 `replace`와 정확한 컨테이너 인덱스로 작성한다.
 - 전체 변환은 루트, 일부 그룹 변환은 해당 하위 설정에 둔다. 적용 범위는 `resources`의 참조 관계로 결정된다.
