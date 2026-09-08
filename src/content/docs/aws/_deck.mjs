@@ -90,5 +90,13 @@ export default {
 			desc: 'CloudFormation·CDK·SAM · CI/CD · 지표·로그·추적 · 감사',
 			note: '무엇을 배포했고 요청이 어디서 실패했는지 연결할 수 있을까?',
 		},
+		{
+			label: '9장',
+			href: '/aws/high-availability-lab/',
+			title: '고가용성 실습 — 장애가 나도 요청을 처리하려면',
+			tone: 'zone',
+			desc: 'ALB·대상 그룹·ASG · 인스턴스 프로파일 · Aurora · NAT·라우팅',
+			note: '왜 이 설정을 선택하며, 장애 뒤 무엇을 관찰해야 할까?',
+		},
 	],
 };

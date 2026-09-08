@@ -91,6 +91,29 @@ STS(Security Token Service)가 발급하는 임시 자격증명은 **Access key 
 서버가 역할을 맡을 수 있는지, 그 역할로 S3 객체를 읽을 수 있는지, S3까지 통신할 수 있는지는
 각각 **신뢰·권한·네트워크**의 질문이다.
 
+### EC2에 연결한 프로파일과 역할 확인하기
+
+시작 템플릿의 **Advanced details → IAM instance profile**은 EC2에 전달할 역할의 프로파일을
+선택하는 곳이다. IAM 콘솔에서 EC2용 역할을 만들면 같은 이름의 프로파일도 자동 생성된다.
+프로파일과 역할은 별개이므로 이름이 항상 같다고 가정하지 않는다.
+([프로파일 생성과 관리](https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles_use_switch-role-ec2_instance-profiles.html))
+
+| 확인할 질문 | 확인 경로 |
+|---|---|
+| 서버는 어떤 역할을 사용하는가? | EC2 → Instances → 대상 → Security의 IAM role, 시작 템플릿의 프로파일 |
+| EC2가 이 역할을 맡을 수 있는가? | IAM → Roles → 대상 → Trust relationships에서 EC2 서비스 주체 확인 |
+| 어떤 API·자원에 권한이 있는가? | 같은 역할의 Permissions → 정책 본문의 Action·Resource·Condition |
+| 그 권한이 왜 필요한가? | 사용자 데이터·앱 코드의 AWS API 호출과 정책 대조 |
+
+운영자가 콘솔에서 서버를 만드는 권한과 서버 안의 앱이 사용하는 역할은 다르다.
+프로파일을 지정하는 운영자에게는 해당 역할을 서비스에 전달할 `iam:PassRole` 권한도 필요할 수 있다.
+([역할 전달 권한](https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles_use_passrole.html))
+
+[고가용성 실습](/aws/high-availability-lab/#왜-inventory-app-role을-고르는가)에서는 미리 준비된
+`Inventory-App-Role` 관련 프로파일을 시작 템플릿에 지정한다. 교체 서버에도 앱의 권한을 연결하려는
+선택이며, 이름만으로 실제 정책을 추정하지 않는다. IAM 권한·보안 그룹·DB 로그인 정보는 각각
+AWS API·네트워크·DB 인증이라는 다른 조건이다.
+
 ## root 사용자 보호
 
 ### 먼저 해둘 설정

@@ -1,0 +1,323 @@
+---
+title: "9. 고가용성 실습 — 장애가 나도 요청을 처리하려면"
+description: ALB·Target Group·ASG·IAM instance profile·Aurora·NAT와 라우트 테이블을 개념, 콘솔 위치, 설정 이유, 장애 관찰로 연결한다
+deckGroup: operations
+sidebar:
+  order: 90
+aliases: [고가용성, HA, ALB, Target Group, Auto Scaling Group, 시작 템플릿, Inventory-App-Role, 장애 조치]
+reviewedAt: 2026-09-08
+---
+
+import Thesis from '../../../components/docs/Thesis.astro';
+import TermIntro from '../../../components/docs/TermIntro.astro';
+
+<Thesis>고가용성을 구성하려면 요청 경로의 장애 지점을 찾고, 대체 자원·전환·재생성에 필요한 조건을 함께 준비해야 한다.</Thesis>
+
+<TermIntro terms={[
+  ['고가용성', 'High Availability · HA', '장애의 영향을 줄이고 복구하여 서비스를 사용할 수 있는 시간을 높이는 설계 목표.'],
+  ['AZ', 'Availability Zone', '리전 안의 격리된 가용 영역. 같은 AZ에만 둔 자원은 AZ 장애를 함께 겪을 수 있다.'],
+  ['티어', 'Tier', '앱 처리와 데이터 저장처럼 역할에 따라 나눈 시스템의 층.'],
+]} />
+
+서버를 두 대 만들었다고 요청 전달·DB·외부 연결까지 모두 준비되는 것은 아니다. 이 장은
+AWS Training 「실습 4: Amazon VPC에서 고가용성 구성」의 인벤토리 앱을 사례로,
+**어느 부품이 없어지면 무엇이 멈추고, 누가 어떻게 복구하는가**를 설명한다.
+실습의 클릭 절차 대신 구성 선택의 이유와 확인할 증거를 정리한다. 실제 AWS 환경에서 측정한 결과는 아니다.
+
+[VPC 경로](/aws/vpc/), [EC2의 실행 조건](/aws/compute/), [IAM 역할](/aws/iam/)을
+이 사례에 연결한다. 콘솔 위치는 제공된 실습 가이드와 공식 문서의 영어 메뉴명을 기준으로 하며,
+화면이 달라지면 서비스 검색으로 진입해 대상 리소스 이름과 ID를 먼저 맞춘다.
+
+## 초기 구성에서 장애 지점 찾기
+
+| 초기 상태 | 예상할 문제 | 바꾸는 구성 |
+|---|---|---|
+| ALB 뒤 앱 서버 1대 | 서버가 멈추면 대신 처리할 대상이 없다 | 두 AZ에 앱 서버 배치 |
+| 앱 서버를 수동으로 준비 | 서버가 없어져도 원하는 대수로 돌아오지 않는다 | 시작 템플릿과 ASG |
+| Aurora DB 인스턴스 1대 | writer 장애 시 즉시 승격할 다른 인스턴스가 없다 | 다른 AZ에 reader 추가 |
+| 두 AZ가 Zonal NAT 하나를 공유 | NAT가 있는 AZ 장애가 다른 AZ의 외부 연결에 전파된다 | AZ별 NAT와 각 서브넷의 경로 |
+
+### 세 가지 요청 경로
+
+| 요청 | 이 실습의 경로 | NAT가 필요한가? |
+|---|---|---|
+| 사용자 웹 요청 | 브라우저 → ALB → 앱 서버, 응답은 ALB → 브라우저 | 이 응답 경로에는 필요 없다 |
+| 인벤토리 조회·수정 | 앱 서버 → Aurora의 사설 주소 | VPC 내부 통신이므로 필요 없다 |
+| 서버의 외부 다운로드 | 앱 서버 → 같은 AZ의 NAT → IGW → 인터넷 | 해당 IPv4 인터넷 경로에 사용한다 |
+
+IGW(Internet Gateway)는 VPC의 인터넷 연결 구성 요소다. 라우트 테이블은 중간 서버가 아니라
+목적지별 전달 규칙이다. VPC 내부 목적지에는 `local` 경로가 적용되므로 모든 패킷이 NAT로 가지 않는다.
+([서브넷 라우트 테이블](https://docs.aws.amazon.com/vpc/latest/userguide/subnet-route-tables.html))
+
+아래는 최종 구성의 **요청 전달과 서버 관리 관계**다. NAT 경로와 DB는 뒤에서 따로 본다.
+
+```d2 layout=elk pad=40 title="ALB가 대상 그룹에 등록된 두 AZ의 EC2로 요청을 전달하고 ASG가 같은 EC2를 생성·교체하는 관계"
+direction: down
+browser: 브라우저
+alb: "ALB\n리스너·규칙"
+tg: "Target Group\n대상 목록·상태 확인 설정"
+asg: "ASG\n원하는 대수 유지"
+a: "EC2\nAZ 1"
+b: "EC2\nAZ 2"
+browser -> alb: HTTP 요청 { style.animated: true }
+alb -> tg: 전달 대상 그룹
+tg -> a: 대상 선택
+tg -> b: 대상 선택
+asg -> a: 생성·교체 { style.stroke-dash: 3 }
+asg -> b: 생성·교체 { style.stroke-dash: 3 }
+```
+
+움직이는 화살표와 실선은 요청 전달 관계, ASG에서 내려오는 점선은 관리 관계다. Target Group 자체가 패킷을 중계하는 서버는 아니며,
+ALB가 그룹의 등록 대상에 직접 요청을 보낸다. ASG도 사용자 요청이 통과하는 장비가 아니다.
+([ALB와 ASG 연결](https://docs.aws.amazon.com/autoscaling/ec2/userguide/autoscaling-load-balancer.html))
+
+## 개념과 콘솔 위치를 함께 찾기
+
+### 사용자 요청과 서버 관리
+
+| 개념 | 담당하는 일 | 콘솔 위치 |
+|---|---|---|
+| ALB · Application Load Balancer | HTTP·HTTPS 요청을 받고 대상으로 전달 | EC2 → Load Balancing → Load Balancers |
+| Listener · 리스너 | 수신 프로토콜·포트 지정 | ALB 선택 → Listeners and rules |
+| Rule · 규칙 | 경로·호스트 등의 조건에 따른 전달 동작 결정 | 리스너 선택 → Rules |
+| Target Group · 대상 그룹 | 등록 대상·대상 포트·상태 확인 설정 관리 | EC2 → Load Balancing → Target Groups |
+| ASG · Auto Scaling Group | 원하는 EC2 용량 유지, 정책에 따른 조정 | EC2 → Auto Scaling → Auto Scaling Groups |
+| Launch Template · 시작 템플릿 | 새 EC2의 생성 설정과 버전 보관 | EC2 → Instances → Launch Templates |
+
+리스너에 들어온 요청은 규칙에 따라 처리되고, 일치하는 추가 규칙이 없으면 기본 규칙을 적용한다.
+이 실습에서는 `Inventory-LB`의 HTTP 리스너가 어느 대상 그룹으로 전달하는지 확인한다.
+([리스너와 규칙](https://docs.aws.amazon.com/elasticloadbalancing/latest/application/load-balancer-listeners.html))
+
+### 네트워크·권한·DB
+
+| 개념 | 담당하는 일 | 콘솔 위치 |
+|---|---|---|
+| Subnet · 서브넷 | 한 AZ 안의 IP 주소 범위 | VPC → Subnets |
+| Route Table · 라우트 테이블 | 목적지별 다음 경로 결정 | VPC → Route tables |
+| NAT Gateway | 이 실습의 외부 IPv4 연결에 주소 변환 제공 | VPC → NAT gateways |
+| Security Group · 보안 그룹 | 연결된 자원의 네트워크 트래픽 허용 규칙 | VPC 또는 EC2 → Security groups |
+| IAM Role · 역할 | 신뢰한 주체가 사용할 AWS 권한 | IAM → Roles |
+| Instance Profile | IAM 역할을 EC2에 연결 | 시작 템플릿 → Advanced details → IAM instance profile |
+| Aurora DB cluster | 공유 스토리지를 사용하는 writer·reader 구성 | Aurora and RDS → Databases |
+
+메뉴를 찾은 뒤에는 **이름뿐 아니라 VPC·AZ·리소스 ID**도 맞춘다. 같은 `Inventory-App` 이름이
+보안 그룹·대상 그룹·EC2 태그에 쓰여도 서로 다른 리소스다.
+
+## 실습이 미리 준비한 것 확인하기
+
+실습은 기존 VPC·서브넷·IGW·NAT 하나·ALB·대상 그룹·AppServer·Aurora를 제공한다.
+참가자는 그 위에 시작 템플릿·ASG·Aurora reader·두 번째 NAT와 경로를 구성한다.
+처음부터 전체 앱을 만드는 실습이 아니므로 **선택하는 기존 자원의 내용**을 확인해야 한다.
+
+| 이미 있는 항목 | 이번에 하는 일 | 내용을 확인할 곳 |
+|---|---|---|
+| `Inventory-App-Role` 관련 프로파일 | 새 서버에도 연결 | IAM 역할의 Permissions·Trust relationships |
+| `Inventory-App` 보안 그룹 | 시작 템플릿에서 선택 | Inbound rules의 ALB 보안 그룹 참조 |
+| AppServer 사용자 데이터 | 복사해 새 서버에도 적용 | EC2 → 인스턴스 → Actions → Instance settings → Edit user data에서 읽기 |
+| ALB·대상 그룹 | ASG와 연결 | 리스너의 전달 동작, 대상 그룹의 Targets·Health checks |
+| Aurora와 앱의 DB 설정 | 기존 설정 사용, reader 추가 | 클러스터 Endpoints와 앱 설정의 접속 주소 |
+
+가이드에는 역할의 정책 본문과 사용자 데이터 원문이 없다. 따라서 이 노트도
+`Inventory-App-Role`을 S3 전용이나 설정 조회 전용이라고 단정하지 않는다.
+앱이 외부 파일을 받는지, AWS API로 설정을 읽는지는 실제 스크립트·코드와 대조한다.
+
+## 새 서버가 혼자 준비되게 만들기
+
+### 시작 템플릿으로 서버 재현하기
+
+| 설정 | 제공하는 것 | 빠뜨리거나 어긋나면 |
+|---|---|---|
+| AMI · Amazon Machine Image | OS와 이미지에 포함된 초기 파일 | 앱 설치 방식과 OS가 맞지 않을 수 있다 |
+| Instance type | CPU·메모리 등 실행 용량 | 서버는 떠도 필요한 처리 능력이 부족할 수 있다 |
+| Security groups | 앱 서버에 적용할 통신 허용 규칙 | ALB가 앱 포트로 접근하지 못할 수 있다 |
+| IAM instance profile | 앱이 사용할 역할 연결 | 역할 자격증명에 의존하는 AWS API 호출이 실패할 수 있다 |
+| User data | 첫 부팅 시 설치·설정·앱 시작 작업 | OS만 실행되고 웹 앱은 준비되지 않을 수 있다 |
+
+ASG는 이 템플릿을 참조해 서버를 만든다. AMI만으로 앱이 준비되는지, 사용자 데이터 실행까지
+필요한지 구분하고 ASG가 참조하는 템플릿 **버전**도 기록한다.
+([시작 템플릿](https://docs.aws.amazon.com/autoscaling/ec2/userguide/launch-templates.html))
+
+### 왜 Inventory-App-Role을 고르는가?
+
+역할을 새로 만드는 단계 없이 선택하므로 이 실습은 역할과 프로파일이 미리 준비되어 있다는 전제다.
+정책은 **허용 작업**, 역할은 **신뢰한 주체가 사용할 권한**, 프로파일은 **역할과 EC2의 연결**을 맡는다.
+IAM 콘솔에서 EC2용 역할을 생성하면 같은 이름의 프로파일도 만들어진다. 다른 도구로 만들었다면
+이름이 다를 수 있으며, 시작 화면의 선택 목록은 프로파일 이름이다.
+([프로파일과 역할](https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles_use_switch-role-ec2_instance-profiles.html))
+
+확인 순서는 **프로파일에 연결된 역할 → 역할의 정책 → 프로그램의 호출**이다.
+IAM → Roles → `Inventory-App-Role`에서 Permissions의 `Action`·`Resource`와
+Trust relationships의 EC2 서비스 주체 `ec2.amazonaws.com`을 확인한다.
+조회가 제한된 실습 계정이라면 확인하지 못한 권한을 추측으로 채우지 않는다.
+
+EC2 안의 AWS SDK·CLI는 일반적인 기본 자격증명 구성에서 인스턴스 메타데이터를 통해
+역할의 임시 자격증명을 얻는다. 시작 템플릿에 이를 연결하면 교체 서버마다 장기 키를 넣을 필요가 없다.
+([EC2의 임시 자격증명](https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_temp_use-resources.html))
+
+:::tip[세 가지 접근 조건을 구분한다]
+보안 그룹은 네트워크 통신, IAM 역할은 AWS API 권한, 이 실습의 DB 사용자명·비밀번호는 DB 로그인을
+담당한다. 역할을 붙이는 것만으로 Aurora의 DB 로그인까지 해결되지는 않는다.
+일반 개념은 [IAM 장의 프로파일 확인 방법](/aws/iam/#ec2에-연결한-프로파일과-역할-확인하기)에서 다시 볼 수 있다.
+:::
+
+### 외부 연결은 서버 복구에도 필요할 수 있다
+
+사용자 데이터가 인터넷에서 패키지를 설치한다면 NAT 장애는 **새 서버의 준비 과정**도 막을 수 있다.
+이미 실행 중인 앱이 외부 통신 없이 응답하는 동안에도 대체 서버는 준비되지 않을 수 있다는 뜻이다.
+`running` 상태만 확인하지 말고 설치 완료와 대상 그룹의 상태까지 확인한다.
+[첫 부팅의 네트워크 의존성](/aws/vpc/#첫-부팅의-설치도-네트워크에-의존한다)과 연결해서 읽는다.
+
+## ALB·Target Group·ASG를 연결하기
+
+### 그룹 두 개는 무엇이 다른가?
+
+**ASG의 목록은 대수를 관리하는 서버들**, **대상 그룹의 목록은 요청 전달 대상으로 등록된 서버들**이다.
+ASG를 기존 대상 그룹에 연결하면 ASG가 생성하는 EC2가 자동 등록된다.
+([자동 등록·등록 해제](https://docs.aws.amazon.com/autoscaling/ec2/userguide/autoscaling-load-balancer.html))
+
+이 실습에서 ASG 서버가 2대인데 대상 그룹에는 처음 3대가 보이는 이유는 기존 AppServer도 등록되어 있기
+때문이다. 기존 대상을 등록 해제하면 ASG의 서버만으로 서비스하는지 확인할 수 있다.
+`Deregister`는 EC2 종료가 아니며, `draining`은 등록 해제 중의 연결 정리 상태다.
+([대상 상태](https://docs.aws.amazon.com/elasticloadbalancing/latest/application/target-group-health-checks.html))
+
+### 두 AZ와 Desired·Min·Max 2의 의미
+
+ASG에 서로 다른 AZ의 프라이빗 서브넷 두 개를 지정해 배치 범위를 정한다.
+Desired는 원하는 용량, Min·Max는 조정 범위다. 이 실습처럼 세 값을 모두 2로 정하면
+부하에 따른 증설보다 **2대 유지와 손실된 서버의 교체**를 관찰한다.
+([ASG 개요](https://docs.aws.amazon.com/autoscaling/ec2/userguide/what-is-amazon-ec2-auto-scaling.html))
+
+서버 하나만 남은 동안에도 전체 요청을 감당할지는 별도 용량 문제다. 두 AZ 배치와 두 대 유지가
+무오류·무중단을 보장하지 않으며, 서버 로컬에만 저장한 세션·파일도 교체 시 문제가 될 수 있다.
+
+### ALB 상태 확인과 ASG의 교체 판단
+
+| 관찰 위치 | 알 수 있는 것 | 그것만으로는 모르는 것 |
+|---|---|---|
+| EC2 → Status checks | 인스턴스·기반 시스템 상태 | 앱의 모든 기능이 정상인지 |
+| ASG → Instance management | 그룹 소속과 수명 주기 | 대상 그룹에서 요청을 받을 준비가 됐는지 |
+| Target Group → Targets | ALB의 상태 확인 결과·이유 | 주문·쓰기 등 모든 업무 기능이 정상인지 |
+
+ALB는 대상 그룹에 정한 경로·포트·성공 코드로 상태를 검사한다. 정상 대상이 남아 있다면 비정상 대상으로의
+전달을 제외한다. 모든 대상이 비정상이면 등록된 비정상 대상에도 전달하는 **fail-open** 동작이 있으므로
+“상태 확인이 모든 실패 요청을 차단한다”고 이해하지 않는다.
+([ALB 상태 확인](https://docs.aws.amazon.com/elasticloadbalancing/latest/application/target-group-health-checks.html))
+
+ASG가 ELB 상태 확인 결과로 교체하려면 해당 상태 확인을 활성화해야 한다. 대상 그룹을 연결하는 것과
+이 옵션을 켜는 것은 별도다. 제공된 절차만으로 활성화됐다고 단정하지 말고 그룹의 Health checks를 본다.
+**인스턴스 종료 실험의 성공만으로 웹 프로세스 장애도 자동 교체된다고 결론 내릴 수 없다.**
+([ASG 상태 확인 유형](https://docs.aws.amazon.com/autoscaling/ec2/userguide/health-checks-overview.html))
+
+Health check grace period의 300초는 초기화 중 성급한 교체를 줄이는 유예 기간이다.
+앱 설치를 완료시키거나 ALB의 검사 자체를 멈추는 설정이 아니다.
+([상태 확인 유예 기간](https://docs.aws.amazon.com/autoscaling/ec2/userguide/health-check-grace-period.html))
+
+## Aurora의 쓰기 역할을 이어받게 하기
+
+### 다른 AZ의 reader는 어떤 대안인가?
+
+Aurora는 DB 인스턴스와 공유 스토리지를 구분한다. reader가 없는 초기 클러스터도 스토리지는 여러 AZ에
+복제되지만, writer를 대신할 준비된 DB 인스턴스는 없다. 다른 AZ에 reader를 추가하면 읽기 처리와
+writer 장애 시 승격 후보를 확보한다. 이 실습의 Aurora Replica를 일반 RDS의 독립적인 읽기 복제본과
+섞어 이해하지 않는다.
+([Aurora의 데이터·인스턴스 가용성](https://docs.aws.amazon.com/AmazonRDS/latest/AuroraUserGuide/Concepts.AuroraHighAvailability.html))
+
+### 엔드포인트와 연결 복구를 관찰한다
+
+| 접속 주소 | 목적 | 실습에서 확인할 것 |
+|---|---|---|
+| Cluster endpoint · writer endpoint | 현재 writer에 연결 | 앱 설정이 이 주소를 사용하는지 |
+| Reader endpoint | reader들에 읽기 연결을 분산 | 앱이 읽기용 연결을 별도로 사용하는지 |
+| Instance endpoint | 특정 DB 인스턴스에 연결 | writer 교체를 따라가야 하는 곳에 고정해 두지 않았는지 |
+
+reader를 추가하는 것만으로 기존 앱의 읽기 쿼리가 자동 분리되지는 않는다. Reader endpoint는
+연결을 분산하며, 한 연결의 쿼리를 매번 다른 reader로 나누는 기능으로 읽지 않는다.
+([Aurora 엔드포인트](https://docs.aws.amazon.com/AmazonRDS/latest/AuroraUserGuide/Aurora.Overview.Endpoints.html))
+
+Failover 실행 전후에 Databases의 **Role·AZ**와 **Events**를 기록한다. `inventory-primary`라는
+이름이 그대로여도 역할은 바뀔 수 있으므로 이름 대신 Writer·Reader를 본다.
+클러스터 엔드포인트는 새 writer를 가리키지만 기존 연결은 끊길 수 있어 앱의 재연결도 필요하다.
+콘솔의 역할 전환과 앱의 조회·쓰기 복구를 따로 관찰한다.
+([장애 조치와 연결 복구](https://docs.aws.amazon.com/AmazonRDS/latest/AuroraUserGuide/Concepts.AuroraHighAvailability.html))
+
+## NAT와 라우트 테이블로 장애 범위 줄이기
+
+### 출구 생성과 경로 적용은 별도다
+
+NAT(Network Address Translation) Gateway는 이 실습에서 프라이빗 서버가 시작한 외부 IPv4 연결의
+출구다. 인터넷 사용자가 앱으로 들어오는 입구는 ALB다. **Zonal public NAT** 기준으로
+각 AZ의 퍼블릭 서브넷에 NAT를 두고 같은 AZ의 프라이빗 서브넷이 이를 사용하게 한다.
+([Zonal NAT의 AZ 의존성](https://docs.aws.amazon.com/vpc/latest/userguide/nat-gateway-basics.html))
+
+| 연결된 서브넷 | 목적지 | 대상 |
+|---|---|---|
+| Private Subnet 1의 라우트 테이블 | `0.0.0.0/0` | AZ 1의 NAT |
+| Private Subnet 2의 라우트 테이블 | `0.0.0.0/0` | AZ 2의 NAT |
+| 각 NAT가 있는 퍼블릭 서브넷 | `0.0.0.0/0` | VPC의 IGW |
+
+두 번째 NAT만 만들고 끝내면 Private Subnet 2는 예전 NAT를 계속 쓸 수 있다.
+Route tables → 새 테이블 → **Routes**에서 목적지와 NAT ID를 확인한 뒤,
+**Subnet associations**에서 Private Subnet 2 연결을 확인한다. 마지막으로 Subnets → Private Subnet 2 →
+Route table에서 실제 적용된 경로를 다시 읽는다.
+([서브넷 연결과 main 라우트 테이블](https://docs.aws.amazon.com/vpc/latest/userguide/subnet-route-tables.html))
+
+### 어디까지 가용성을 높였는가?
+
+AZ별 경로는 한 AZ의 NAT 문제를 다른 AZ의 외부 연결로 전파하지 않도록 구성한다.
+실패한 AZ의 서버를 다른 NAT로 자동 우회시키는 설정은 아니다. 경로와 연결을 검사했다면
+“구성을 확인했다”고 기록하고, AZ 장애를 실제 시험한 것처럼 쓰지 않는다.
+
+추가 NAT·EC2·reader는 비용과 대기 용량을 늘린다. 장애 범위를 줄이는 이점과 유지 비용을 함께 기록한다.
+현재는 Regional NAT도 있으므로 모든 NAT가 반드시 AZ별 수동 배치라고 일반화하지 않는다.
+[Regional NAT와 Zonal NAT](/aws/vpc/#az-배치와-regional-nat),
+[구성과 비용](/aws/vpc/#구성과-비용을-함께-점검하기)을 함께 본다.
+
+## 예측·관찰·해석으로 실습 기록하기
+
+### 실험마다 남길 여섯 항목
+
+아래 양식을 복사하고 실제로 본 값만 채운다. 추가 장애 조작은 교육 환경에서 허용된 범위에서만 수행한다.
+
+```text
+질문: 이 구성 요소가 없어지면 어떤 요청이 영향을 받는가?
+예측: 남은 처리 자원과 복구 담당자는 누구인가?
+조작: 바꾼 리소스 ID·설정·시각은 무엇인가?
+관찰: 요청 성공/실패, 응답 인스턴스, 상태·이벤트, 회복 시각
+해석: 예측과 무엇이 같거나 달랐고, 어떤 증거로 설명하는가?
+검증 한계: 이번 조작으로 확인하지 못한 장애·부하·기능은 무엇인가?
+```
+
+| 대상 | 실행 전 예측 | 관찰할 증거 |
+|---|---|---|
+| ASG 서버 한 대 종료 | 남은 서버가 처리하고 ASG가 대체 서버 생성 | 요청 결과·응답 ID, ASG Activity, 새 대상의 healthy 시각 |
+| Aurora 수동 Failover | reader가 writer로 승격, 앱 연결 복구 필요 가능 | Role·Events, 조회·쓰기 성공 여부와 회복 시각 |
+| 두 번째 NAT와 경로 연결 | AZ 2의 외부 연결이 AZ 2 NAT 사용 | NAT의 AZ·상태, Routes와 Subnet associations |
+
+**사용자 요청이 성공하는 시점과 서버 두 대가 다시 준비된 시점**을 나눠 기록한다.
+그 사이에는 서비스가 동작해도 여유 용량이 줄어 있을 수 있다.
+새로 고침 몇 번이 성공했다면 관찰한 요청의 성공만 확인한 것이다. 서버 ID가 매번 교대로 나와야 하는 것도 아니다.
+인스턴스 종료는 AZ 전체 장애 시험이 아니고, 수동 DB 장애 조치는 모든 실제 DB 장애의 재현이 아니다.
+
+### 증상에서 확인 화면으로 이동하기
+
+| 질문 | 먼저 볼 곳 | 확인할 내용 |
+|---|---|---|
+| ALB가 어느 앱으로 보내는가? | Load Balancers → 리스너·규칙 | 포트·조건·전달 대상 그룹 |
+| 서버는 켜졌는데 요청을 못 받는가? | Target Groups → Targets·Health checks | 등록, 상태 이유, 검사 경로·포트·코드 |
+| 왜 서버가 다시 생겼는가? | ASG → Activity | 생성·교체 원인 |
+| 원하는 대수를 유지하는가? | ASG → Details·Instance management | 용량 설정·실제 소속·AZ |
+| 앱의 AWS API 호출이 거부되는가? | IAM → Roles → Permissions | 실제 역할·Action·Resource와 오류 대조 |
+| 외부 다운로드가 안 되는가? | Subnets → Route table | 실제 연결된 테이블·NAT 대상·NAT의 상태 |
+| DB 전환 후 쓰기가 안 되는가? | Aurora → Databases·Events와 앱 설정 | 현재 writer·엔드포인트·재연결 오류 |
+
+### 가이드를 덮고 답할 질문
+
+- 대상 그룹에는 3대인데 ASG에는 2대인 이유는 무엇인가?
+- ALB가 앱의 비정상을 감지하는 것과 ASG가 교체하는 것은 어떻게 연결되는가?
+- `Inventory-App-Role`의 이름만 보고 권한을 알 수 있는가? 어디서 확인하는가?
+- NAT 장애 중 기존 웹 응답은 성공하지만 대체 서버 준비는 실패할 수 있는 이유는 무엇인가?
+- reader 추가, writer 전환, 앱 연결 복구는 각각 어디서 확인하는가?
+- 이번 관찰로 확인한 가용성과 아직 확인하지 못한 장애 범위는 무엇인가?
+
+교육 환경에서는 실습 종료 절차로 자원을 정리한다. 개인 계정에서 재현했다면 종료한 EC2 외에도
+ALB·NAT·DB·볼륨·공인 IPv4 등이 남는지 [비용 장의 정리 기준](/aws/billing/#멈춰도-남는-비용)을 따른다.
