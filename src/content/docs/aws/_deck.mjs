@@ -98,5 +98,13 @@ export default {
 			desc: 'ALB·대상 그룹·ASG · 인스턴스 프로파일 · Aurora · NAT·라우팅',
 			note: '왜 이 설정을 선택하며, 장애 뒤 무엇을 관찰해야 할까?',
 		},
+		{
+			label: '10장',
+			href: '/aws/serverless-lab/',
+			title: '서버리스 실습 — 업로드 한 건을 여러 작업으로',
+			tone: 'zone',
+			desc: 'S3·SNS·SQS·Lambda · 팬아웃 · 권한 · 입력 · 재시도·DLQ',
+			note: '작업 하나가 멈추면 어디에 쌓이고, 어떻게 복구할까?',
+		},
 	],
 };

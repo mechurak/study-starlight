@@ -1,0 +1,293 @@
+---
+title: "10. 서버리스 실습 — 업로드 한 건을 여러 작업으로 처리하기"
+description: S3·SNS·SQS·Lambda로 사진 처리 작업을 분리하고, 화살표별 권한·입력 구조·재시도·실패 관찰을 연결한다
+deckGroup: operations
+sidebar:
+  order: 100
+aliases: [서버리스 실습, 팬아웃, Fan-out, 이미지 리사이즈, visibility timeout, DLQ, raw message delivery]
+reviewedAt: 2026-09-09
+---
+
+import { LinkCard, Steps } from '@astrojs/starlight/components';
+import Thesis from '../../../components/docs/Thesis.astro';
+import TermIntro from '../../../components/docs/TermIntro.astro';
+
+<Thesis>업로드 알림을 작업별 큐로 나누면 각 작업의 대기와 재시도를 분리할 수 있으며, 완료 여부는 출력과 실패 경로까지 확인해야 한다.</Thesis>
+
+<TermIntro terms={[
+  ['팬아웃', 'Fan-out', '한 알림을 여러 구독자에게 전달해 각자 처리하게 하는 구조.'],
+  ['SNS', 'Simple Notification Service', '주제에 게시한 알림을 구독자들에게 전달하는 서비스.'],
+  ['SQS', 'Simple Queue Service', '소비자가 처리할 메시지를 보관하는 대기열 서비스.'],
+]} />
+
+사진 한 장을 올리면 작은 썸네일과 모바일용 이미지가 모두 필요하다. 모바일 처리가 멈춰도 썸네일은
+계속 만들고, 밀린 모바일 작업은 나중에 이어서 처리하고 싶다. 이 장은 AWS Training
+「실습 5: 서버리스 아키텍처 구축」을 사례로 **무엇을 분리했고, 실패한 작업은 어디에 남는가**를 설명한다.
+
+[서버리스 장](/aws/serverless/)의 호출 방식·권한·멱등성을 실제 연결에 적용한다.
+제공된 실습의 클릭 절차·코드·이미지를 복제하지 않고 구조와 진단 질문을 새로 정리했다.
+아래 실험 결과는 예측이며, 실제 계정에서 실행해 측정한 결과가 아니다.
+
+## 업로드 알림을 두 작업으로 나누기
+
+```d2 layout=elk pad=40 title="S3 업로드 알림을 SNS가 두 SQS 큐에 전달하고 Lambda가 각각 읽어 썸네일과 모바일 이미지를 만든다"
+direction: down
+classes: {
+  key: { style: { fill: "#dbeafe"; stroke: "#2563eb"; font-color: "#1e3a8a" } }
+  zone: { style: { fill: "#ede9fe"; stroke: "#7c3aed"; font-color: "#4c1d95" } }
+  ok: { style: { fill: "#dcfce7"; stroke: "#16a34a"; font-color: "#14532d" } }
+}
+ingest: "S3 / ingest/*.jpg" { shape: cylinder; class: ok }
+topic: "SNS / 업로드 알림" { class: zone }
+thumbq: "SQS / 썸네일 큐" { class: key }
+mobileq: "SQS / 모바일 큐" { class: key }
+thumbfn: "Lambda / 썸네일 처리" { class: key }
+mobilefn: "Lambda / 모바일 처리" { class: key }
+thumbout: "S3 / thumbnail/" { shape: cylinder; class: ok }
+mobileout: "S3 / mobile/" { shape: cylinder; class: ok }
+ingest -> topic: "객체 생성 알림" { style.animated: true }
+topic -> thumbq: "전달" { style.animated: true }
+topic -> mobileq: "전달" { style.animated: true }
+thumbq -> thumbfn: "Lambda가 읽음" { style.animated: true }
+mobileq -> mobilefn: "Lambda가 읽음" { style.animated: true }
+thumbfn -> thumbout: "결과 저장" { style.animated: true }
+mobilefn -> mobileout: "결과 저장" { style.animated: true }
+```
+
+그림에서 SNS·SQS를 지나는 것은 **버킷과 객체 key를 담은 알림**이다. 사진 바이트는 S3에 있고,
+각 함수가 원본을 다운로드한다. 그림의 S3 노드 세 개는 이 실습에서는 **같은 버킷의 서로 다른 prefix**다.
+원본 다운로드 경로는 그림에서 생략했다. `ingest/*.jpg` 표기는 대상 범위를 나타내며 실제 필터에
+별표를 입력한다는 뜻은 아니다.
+
+### 큐 하나에 소비자 둘을 붙이면 왜 다른가?
+
+| 구조 | 메시지 처리 의미 | 적합한 목적 |
+|---|---|---|
+| 큐 하나 · 소비자 여러 개 | 소비자들이 작업을 경쟁해서 가져간다 | 같은 종류의 작업 처리량 늘리기 |
+| SNS · 구독 큐 두 개 | 각 큐가 알림을 받아 자기 작업으로 처리한다 | 썸네일과 모바일 이미지 모두 만들기 |
+
+공유 큐에서는 모든 소비자가 각 메시지를 받는다고 보장하지 않는다. 여기서는 작업 종류별 큐를 둬
+모바일 함수의 실패·적체와 썸네일 작업의 대기를 분리한다. 다만 계정 동시 실행 한도 같은 공유 자원까지
+자동 격리되는 것은 아니다. [SNS와 SQS 연결](https://docs.aws.amazon.com/sns/latest/dg/subscribe-sqs-queue-to-sns-topic.html)에서
+구독과 큐 전달 권한을 함께 확인한다.
+
+### EC2를 Lambda로 바꾸면 무엇이 이동하는가?
+
+서버 준비·패치·워커 프로세스 유지 대신 함수 코드·패키지·메모리·timeout·동시 실행을 관리한다.
+짧고 간헐적인 이미지 작업에서는 유휴 서버 운영을 줄일 수 있지만, 실제 비용 우위는 호출량·처리 시간과
+메모리, S3·SNS·SQS·로그 비용을 함께 비교해야 한다.
+[컴퓨팅 장의 실행 조건과 비용](/aws/compute/#서버리스에서도-비용과-실행-조건을-확인하기)으로 연결해서 읽는다.
+
+## 알림 범위와 전달 보장을 먼저 정하기
+
+### Standard는 순서 보장 실습이 아니다
+
+이 실습의 SNS topic과 SQS queue는 **Standard**다. 도입부에 엄격한 순서·중복 제거가 언급되더라도
+실제 구성이 그 조건을 보장한다고 읽으면 안 된다. S3 알림 자체가 적어도 한 번 전달을 전제로 하고
+발생 순서대로 도착한다는 보장도 없다. S3의 직접 SNS 알림 대상은 Standard topic이며 버킷과 같은
+리전에 있어야 한다. FIFO로 이름이나 유형만 바꾸는 것으로 해결되지 않는다.
+([S3 대상과 전달 보장](https://docs.aws.amazon.com/AmazonS3/latest/userguide/notification-how-to-event-types-and-destinations.html))
+
+### 입력 prefix는 재귀 실행을 막는다
+
+S3 → 버킷 → Properties → Event notifications에서 `ObjectCreated` 계열 이벤트와
+prefix `ingest/`, suffix `.jpg`를 확인한다. `.jpeg`로 올리면 이 suffix에 맞지 않는다.
+결과도 같은 버킷에 쓰므로 입력 prefix 제한을 없애면 결과 저장이 다시 처리 이벤트를 만들 수 있다.
+별도 출력 버킷을 쓰는 방법도 있다.
+([재귀 실행 주의](https://docs.aws.amazon.com/AmazonS3/latest/userguide/notification-how-to-event-types-and-destinations.html))
+
+이 필터는 **어떤 객체의 알림을 만들지** 정한다. SNS 구독 필터가 **어느 구독자에게 전달할지** 정하는
+것과 구분한다. 이 사례는 같은 사진 알림을 두 큐 모두에 전달하는 구성을 전제로 한다.
+
+## 화살표마다 권한을 확인하기
+
+| 요청 | 허용을 확인할 곳 | 작업·범위를 읽는 기준 |
+|---|---|---|
+| S3 → SNS | SNS topic의 Access policy | `s3.amazonaws.com`의 `sns:Publish`, 해당 topic ARN |
+| SNS → SQS | 각 queue의 Access policy | `sns.amazonaws.com`의 `sqs:SendMessage`, 해당 queue ARN과 topic 조건 |
+| Lambda의 큐 읽기·삭제 | 함수 Execution role | 해당 큐의 `sqs:ReceiveMessage`, `sqs:DeleteMessage`, `sqs:GetQueueAttributes` |
+| 함수의 원본 읽기·결과 쓰기 | Execution role과 S3 정책 | `s3:GetObject`는 입력 객체, `s3:PutObject`는 작업별 출력 객체 범위 |
+| 함수의 로그 기록 | Execution role | CloudWatch Logs의 필요한 생성·기록 권한 |
+
+S3 게시 권한에는 `aws:SourceAccount`와 버킷 ARN을 제한하는 `aws:SourceArn` 조건을 함께 검토한다.
+계정 조건만으로는 그 계정의 특정 버킷 하나를 식별하지 못한다. SNS → SQS도 `aws:SourceArn`으로
+해당 topic을 제한한다. 콘솔에서 구독을 만들며 큐 정책을 설정해 주더라도 실제 저장된 정책을 읽는다.
+([S3 목적지 정책](https://docs.aws.amazon.com/AmazonS3/latest/userguide/grant-destinations-permissions-to-s3.html),
+[SNS의 큐 전달 권한](https://docs.aws.amazon.com/sns/latest/dg/subscribe-sqs-queue-to-sns-topic.html))
+
+SQS 경로는 Lambda의 **이벤트 소스 매핑(event source mapping)**이 실행 역할로 큐를 읽고 함수를
+호출한다. SQS가 `lambda:InvokeFunction`으로 직접 밀어 넣는 구조로 이해하지 않는다.
+KMS로 암호화했다면 관련 키 정책·복호화 권한도 별도로 확인한다.
+([SQS 매핑의 실행 역할](https://docs.aws.amazon.com/lambda/latest/dg/services-sqs-configure.html))
+
+실습의 사전 제공 `LabExecutionRole`은 이름만으로 실제 정책을 알 수 없다. IAM → Roles에서
+Permissions와 Lambda 서비스의 역할 인수를 허용하는 Trust relationships를 대조한다.
+실습의 topic 정책 전체를 개인 계정의 최소 권한 템플릿으로 그대로 사용하지 않는다.
+
+## 함수가 받은 입력과 배포 계약 읽기
+
+### JSON 포장을 바깥에서 안으로 벗긴다
+
+SNS 구독의 raw message delivery가 꺼진 경우 입력은 다음 층을 가진다.
+
+| 층 | 확인할 필드 | 담긴 내용 |
+|---|---|---|
+| Lambda event | `Records[]` | 이번 호출의 SQS 메시지 batch |
+| SQS record | `messageId`, `body` | 큐 메시지 식별자와 SNS 봉투의 JSON 문자열 |
+| SNS 봉투 | `Message` | S3 이벤트의 JSON 문자열 |
+| S3 이벤트 | `Records[].s3` | 버킷 이름과 객체 key 등 |
+
+따라서 `body`를 JSON으로 읽은 뒤 `Message`를 다시 JSON으로 읽는다. raw delivery를 켜면 SNS 봉투가
+제거되어 `body`에서 S3 이벤트를 바로 읽게 된다. 구독 설정과 파서를 함께 변경해야 한다.
+([SNS raw delivery](https://docs.aws.amazon.com/sns/latest/dg/sns-large-payload-raw-message-delivery.html))
+
+S3 이벤트의 객체 key는 URL 인코딩되어 있다. 예를 들어 `ingest/my+photo.jpg`는 공백이 있는
+`ingest/my photo.jpg`를 나타낼 수 있다. Python에서는 `unquote_plus`로 디코딩한 key를 S3 API에
+사용한다. 제공된 코드에는 이 함수가 import되어 있지만 호출되지는 않는다.
+([S3 이벤트 필드](https://docs.aws.amazon.com/AmazonS3/latest/userguide/notification-content-structure.html))
+
+### 테스트 메시지와 업무 이벤트는 구조가 다르다
+
+SNS에서 보낸 `Hello world`는 S3 이벤트 JSON이 아니다. S3 알림 설정 때 발생하는 `s3:TestEvent`도
+일반 객체 이벤트의 `Records` 배열을 갖지 않는다. 따라서 제공된 파서에서는 JSON 파싱이나 필드 접근이
+실패할 수 있다. “세 종류의 로그가 남는다”와 “세 번 모두 이미지 처리에 성공한다”는 다른 주장이다.
+([S3 테스트 이벤트](https://docs.aws.amazon.com/AmazonS3/latest/userguide/notification-content-structure.html))
+
+알려진 테스트 이벤트는 형식을 검증하고 별도로 처리한다. 예상하지 못한 입력은 증거를 남기고 실패
+보관 경로로 보내도록 설계한다. 모든 예외를 삼키고 성공을 반환하면 실제 업무 메시지까지 삭제될 수 있다.
+콘솔에서 메시지를 조회한 것만으로 삭제되지는 않으므로 초기 테스트 메시지가 큐에 남았는지도 확인한다.
+
+### 런타임·handler·패키지는 한 묶음이다
+
+| 확인할 것 | 실패를 해석하는 기준 |
+|---|---|
+| Handler | `모듈명.함수명`과 ZIP 안 파일·함수가 일치하는가? |
+| Python·Pillow | Python 버전뿐 아니라 Lambda의 Linux 환경과 CPU 아키텍처에 맞는 의존성인가? |
+| Memory·Timeout | 다운로드·변환·업로드를 포함한 실제 작업에 충분한가? |
+| `/tmp` | 입력·결과 파일을 둘 임시 공간이 충분하고 사용 후 정리하는가? |
+
+실습의 Python 3.12 지정은 제공된 ZIP과의 실행 계약이다. 이후 런타임을 바꿀 때는 의존성도 검증한다.
+Pillow 같은 네이티브 의존성은 로컬에서 동작하는 패키지를 그대로 압축했다고 Lambda에서 동작하는 것이
+아니다. `/tmp`는 실행 환경별 임시 저장소이며 영구 결과는 S3에 둔다.
+([Python 배포 패키지](https://docs.aws.amazon.com/lambda/latest/dg/python-package.html),
+[임시 저장소](https://docs.aws.amazon.com/lambda/latest/dg/configuration-ephemeral-storage.html))
+
+## 실패한 메시지가 다시 보이는 과정
+
+### 조회·성공·재시도를 구분한다
+
+<Steps>
+
+1. **조회**: Lambda의 매핑이 SQS 메시지를 읽는다. 메시지는 큐에 남지만 visibility timeout 동안 다른 조회에서 숨겨진다.
+2. **성공**: 함수가 batch 처리를 성공하면 Lambda가 해당 메시지를 큐에서 삭제한다.
+3. **실패**: 기본 동작에서는 실패한 batch의 메시지가 visibility timeout 뒤 다시 보이고 재처리 대상이 된다.
+4. **반복 실패**: 원본 큐의 redrive policy로 `maxReceiveCount`와 DLQ를 구성하면 반복 실패 메시지를 분리할 수 있다.
+
+</Steps>
+
+**Visibility timeout은 숨기는 시간이고 함수 timeout은 실행 한도**다. AWS는 전자를 함수 timeout의
+최소 6배로 권장하며 batch window를 사용하면 그 시간도 더하도록 안내한다. 예를 들어 함수 timeout이
+10초이고 batch window가 0초라면 권장 기준은 최소 60초다. 함수 timeout은 큐 visibility timeout을
+넘을 수 없다. 큐의 보존 기간은 이 두 시간과 또 다른 설정이다.
+([SQS 매핑 설정](https://docs.aws.amazon.com/lambda/latest/dg/services-sqs-configure.html))
+
+이 경로는 [Lambda 직접 비동기 호출](/aws/serverless/#비동기-호출-lambda가-이벤트를-접수하고-실행한다)의
+기본 두 번 재시도 규칙을 적용하지 않는다. DLQ(Dead-letter queue)는 원본 **SQS 큐의 실패 보관 설정**에서
+확인하며, 함수의 비동기 호출용 DLQ와 혼동하지 않는다.
+([SQS 처리 동작](https://docs.aws.amazon.com/lambda/latest/dg/with-sqs.html))
+
+### Batch size 1과 부분 실패 응답
+
+실습의 batch size 1은 호출 한 번에 SQS 메시지 하나를 처리하여 관찰을 단순하게 한다. 동시 실행을
+1로 제한하거나 중복을 막는 설정은 아니다. batch를 늘리면 하나의 실패로 이미 성공한 메시지까지
+재처리될 수 있다.
+
+부분 실패 응답을 쓰려면 매핑의 `ReportBatchItemFailures` 설정과 함수가 실패한 SQS `messageId`를
+반환하는 구현을 함께 준비한다. 설정만 켜거나 응답만 바꾸는 것으로 끝내지 않는다. 함수가 예외를 밖으로
+던지면 전체 batch 실패가 된다. 부분 실패 응답도 모든 중복을 제거하는 장치는 아니다.
+([부분 실패 처리](https://docs.aws.amazon.com/lambda/latest/dg/services-sqs-errorhandling.html))
+
+### 같은 작업을 다시 해도 결과를 망가뜨리지 않기
+
+같은 메시지가 재전달되거나 결과 업로드 직후 함수가 실패할 수 있다. 멱등성은 이 재처리가 불필요한
+부작용을 만들지 않도록 하는 성질이다. 실습처럼 파일의 마지막 이름만 출력 key에 쓰면
+`ingest/a/photo.jpg`와 `ingest/b/photo.jpg`가 같은 결과 이름에 충돌할 수 있다.
+
+출력 key는 전체 입력 key와 변환 종류를 구분하도록 설계한다. 같은 key의 원본을 덮어쓸 수 있다면
+버전 관리 시 `versionId`를 작업 식별과 원본 읽기에 사용하고, 재처리 시 어느 버전을 읽을지도 정한다.
+동일 key 이벤트의 선후 판단에는 `sequencer`를 활용할 수 있지만 서로 다른 key 사이의 순서를
+비교하는 값은 아니다. 예전 작업이 최신 결과를 덮어쓰는 문제는 단순한 고정 출력 이름만으로 해결되지 않는다.
+([S3 버전·sequencer 필드](https://docs.aws.amazon.com/AmazonS3/latest/userguide/notification-content-structure.html))
+
+## 결과가 없을 때 경로를 좁히기
+
+### 호출이 없나, 실행이 실패했나?
+
+| 증상 | 먼저 볼 곳 | 확인할 증거 |
+|---|---|---|
+| 어느 큐에도 도착하지 않는다 | S3 Event notifications → SNS topic·Subscriptions | prefix·suffix, 대상 ARN·리전, 게시 정책과 구독 |
+| 한 큐에만 도착하지 않는다 | 해당 SNS 구독 → SQS Access policy | queue ARN, 구독 필터, topic의 전달 권한 |
+| 큐에 쌓이지만 함수 호출이 없다 | Lambda → Configuration → Triggers | 매핑의 Enabled 상태, queue ARN, 실행 역할, 동시 실행 제한 |
+| 함수 호출은 있지만 결과가 없다 | Lambda → Monitor → CloudWatch logs | 파싱·handler·Pillow·S3 접근·timeout 오류 |
+| 같은 오류가 반복된다 | SQS 메시지·원본 큐의 DLQ 설정 | `messageId`, `ApproximateReceiveCount`, 테스트 메시지 잔류 |
+| 함수 성공인데 원하는 결과가 없다 | 출력 객체와 업무 식별자 | 다른 prefix·이름 충돌·예전 결과인지, 처리 상태 기록 |
+
+제공된 가이드에는 트리거가 Disabled라는 안내 뒤 별도의 활성화 단계가 보이지 않는다. 생성 성공
+문구만 보지 말고 매핑의 현재 상태를 확인한다. Disabled면 새 polling이 진행되지 않는다.
+([매핑 생성·활성화](https://docs.aws.amazon.com/lambda/latest/dg/services-sqs-configure.html))
+
+### 큐 대기와 함수 실행을 따로 관측한다
+
+SQS의 `ApproximateNumberOfMessagesVisible`은 처리 가능한 대기량,
+`ApproximateNumberOfMessagesNotVisible`은 조회되어 숨겨진 메시지 수,
+`ApproximateAgeOfOldestMessage`는 가장 오래된 미삭제 메시지의 나이를 살피는 지표다.
+근삿값이며 반복 실패 메시지 제외 등의 조건이 있으므로 업무 처리 지연의 정확한 장부로 쓰지는 않는다.
+([SQS 지표](https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/sqs-available-cloudwatch-metrics.html))
+
+Lambda에서는 `Invocations`, `Errors`, `Duration`, `Throttles`를 함께 본다. `IteratorAge`는 이 SQS
+작업의 대기 시간을 보는 지표가 아니며, 비동기 전달 관련 지표를 SQS 재처리 지표로 대신 쓰지 않는다.
+([Lambda 지표별 적용 범위](https://docs.aws.amazon.com/lambda/latest/dg/monitoring-metrics-types.html))
+
+로그에는 요청 ID, SQS 메시지 ID, 입력 bucket·key, 변환 종류, 출력 key와 성공·실패를 연결해 남긴다.
+SNS 전달 성공·Lambda 호출 성공·이미지 결과 확인을 서로 다른 단계로 기록한다. DLQ가 비었더라도
+아직 재시도 중이거나 보존 기간이 지난 것일 수 있으므로 성공 증거로 단정하지 않는다.
+
+## 예측하고 관찰한 뒤 복구까지 확인하기
+
+| 실험 | 예상할 변화 | 확인할 결과 |
+|---|---|---|
+| 모바일 매핑만 비활성화하고 새 사진 업로드 | 썸네일은 처리되고 모바일 큐에는 작업 대기 | 새 썸네일 객체, 모바일 대기량, 다시 활성화한 뒤 모바일 결과 |
+| `.jpeg` 파일 업로드 | `.jpg` suffix에 맞지 않아 해당 알림 없음 | 원본 존재와 큐 유입 여부를 분리해서 기록 |
+| 공백이 있는 파일명 업로드 | 디코딩하지 않는 파서에서 원본 조회 실패 가능 | 이벤트 key, 디코딩한 key, S3 API 오류 |
+| 동일 S3 이벤트를 다시 전달 | 같은 업무가 재처리될 수 있음 | 출력 충돌·중복 부작용·입력 버전 선택 |
+| 서로 다른 하위 prefix에 같은 파일명 업로드 | 마지막 파일명만 쓰는 출력 규칙이면 충돌 | 두 입력과 각 결과 key의 대응 |
+| 잘못된 메시지로 반복 실패 재현 | 재시도되고 설정된 수신 횟수 기준을 넘으면 DLQ 이동 | 수신 횟수, 오류, DLQ 메시지와 수정 후 재처리 결과 |
+
+추가 조작은 실습 환경에서 허용된 범위에서 수행한다. 비활성화 전 이미 시작된 실행은 끝날 수 있으므로
+매핑 상태 변경 시각과 **새로 올린 사진의 key**를 기록한다. DLQ 재처리는 원인을 고치고 멱등성을 확인한
+뒤 진행한다. 원본 객체가 남아 있어야 복구할 수 있다는 점도 확인한다.
+
+```text
+질문: 어떤 작업을 멈추거나 실패시켰는가?
+예측: 어느 큐에 쌓이고 어느 결과는 계속 만들어지는가?
+조작: 대상 ARN, 설정 변경, 입력 key, 실행 시각
+관찰: 큐 상태, 메시지 ID·수신 횟수, 함수 로그, 출력 key
+복구: 설정·코드 수정 뒤 대기 작업과 실패 작업이 처리됐는가?
+검증 한계: 중복·순서 역전·부하 중 실제로 확인하지 못한 것은 무엇인가?
+```
+
+### Lifecycle과 이메일은 무엇을 확장하는가?
+
+`ingest/` 원본을 30일 뒤 만료시키면 재처리 가능한 기간에도 영향을 준다. 버전 관리 버킷에서는
+현재 버전 만료와 이전 버전 영구 삭제가 다른 동작이며, 만료 시점이 곧 물리 삭제 완료 시점은 아니다.
+출력 prefix까지 같은 규칙이 적용되는지도 확인한다.
+([S3 만료와 버전 관리](https://docs.aws.amazon.com/AmazonS3/latest/userguide/lifecycle-expire-general-considerations.html))
+
+같은 SNS topic에 이메일을 구독하면 **업로드 알림**을 받는다. 처리 완료 알림이 필요하면 함수의 성공
+이후 별도 이벤트를 발행하도록 설계해야 한다. 이메일은 구독 확인을 마쳐야 수신한다.
+([이메일 구독](https://docs.aws.amazon.com/sns/latest/dg/sns-email-notifications.html))
+
+개인 계정에서 재현했다면 함수 외에도 큐·DLQ·topic·S3 객체와 버전·로그 보존을 확인하며
+[비용 장의 정리 기준](/aws/billing/#멈춰도-남는-비용)을 따른다.
+
+<LinkCard title="6. 서버리스 — 호출 방식과 실패 책임 다시 보기" description="이번 SQS 매핑을 API 동기 호출·Lambda 직접 비동기 호출과 비교한다." href="/aws/serverless/" />
