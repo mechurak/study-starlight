@@ -106,5 +106,13 @@ export default {
 			desc: 'S3·SNS·SQS·Lambda · 팬아웃 · 권한 · 입력 · 재시도·DLQ',
 			note: '작업 하나가 멈추면 어디에 쌓이고, 어떻게 복구할까?',
 		},
+		{
+			label: '11장',
+			href: '/aws/cloudfront-lab/',
+			title: '콘텐츠 전송 실습 — CloudFront와 S3 원본 보호',
+			tone: 'zone',
+			desc: 'Behavior·오리진 · OAC·권한 · 캐시·진단 · 교차 리전 복제',
+			note: '요청은 어디로 가고, 누가 원본을 읽으며, 변경은 언제 보일까?',
+		},
 	],
 };

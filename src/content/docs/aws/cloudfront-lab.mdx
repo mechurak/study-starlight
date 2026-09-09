@@ -1,0 +1,306 @@
+---
+title: "11. 콘텐츠 전송 실습 — CloudFront로 전달하고 S3 원본 보호하기"
+description: ALB·S3로 요청을 나누는 Behavior, OAC와 버킷 정책, 캐시 갱신·접근 실패 진단과 교차 리전 복제를 연결한다
+deckGroup: operations
+sidebar:
+  order: 110
+aliases: [CloudFront, CDN, OAC, 오리진 액세스 제어, 캐시 무효화, CRR, 교차 리전 복제]
+reviewedAt: 2026-09-09
+---
+
+import { LinkCard, Steps } from '@astrojs/starlight/components';
+import Thesis from '../../../components/docs/Thesis.astro';
+import TermIntro from '../../../components/docs/TermIntro.astro';
+
+<Thesis>CloudFront의 요청 경로·캐시와 S3의 읽기 권한을 함께 맞추고, 원본 접근 차단과 사용자 열람 제한을 별도로 검증한다.</Thesis>
+
+<TermIntro terms={[
+  ['CloudFront', 'Amazon CloudFront', '사용자 가까운 엣지에서 콘텐츠를 전달하는 CDN(Content Delivery Network) 서비스.'],
+  ['오리진', 'Origin', 'CloudFront가 콘텐츠를 가져오는 원본 서버나 S3 버킷.'],
+  ['OAC', 'Origin Access Control', 'CloudFront가 S3 오리진에 인증된 요청을 보내도록 구성하는 기능.'],
+]} />
+
+[서버리스 실습](/aws/serverless-lab/)에서 사진을 가공했다면 이제 그 결과를 사용자에게 전달해야 한다.
+웹 화면은 ALB(Application Load Balancer) 뒤의 앱이 만들고 이미지는 S3에 저장하되,
+사용자는 하나의 CloudFront 도메인으로 둘 다 요청하게 할 수 있다.
+
+이 장은 AWS Training 「실습 6: Amazon S3 오리진으로 Amazon CloudFront 배포 구성」을 사례로
+**요청이 어디로 가고, 누가 원본을 읽으며, 변경은 언제 보이는가**를 설명한다.
+실습의 `CachedObjects/logo.png`를 전달용 사진의 예로 사용한다. 앞 장의 출력 버킷과 자동 연결된
+환경이라는 뜻은 아니다. 원문의 클릭 절차·이미지를 복제하지 않고 구조와 확인 질문을 새로 작성했다.
+아래 결과는 구성에 따른 예측이며 실제 AWS 계정에서 실행해 측정한 결과가 아니다.
+
+## 하나의 도메인에서 두 오리진으로 나누기
+
+CloudFront 배포(distribution)는 도메인·오리진·요청 처리 설정을 묶는다. 캐시 Behavior는
+요청 경로에 적용할 오리진과 캐시·프로토콜 정책 등을 정한다. 오리진을 추가하기만 해서는
+그 오리진으로 요청을 보내는 규칙이 생기지 않는다.
+
+```d2 layout=elk pad=40 title="사용자의 CloudFront 요청은 경로에 따라 ALB 또는 S3를 선택하고, 캐시로 응답하지 못하면 해당 오리진을 조회한다"
+direction: down
+classes: {
+  key: { style: { fill: "#dbeafe"; stroke: "#2563eb"; font-color: "#1e3a8a" } }
+  zone: { style: { fill: "#ede9fe"; stroke: "#7c3aed"; font-color: "#4c1d95" } }
+  ok: { style: { fill: "#dcfce7"; stroke: "#16a34a"; font-color: "#14532d" } }
+}
+viewer: "사용자 / 브라우저" { class: key }
+cdn: "CloudFront\nBehavior 선택 · 캐시 확인" { class: zone }
+webapp: "ALB → 앱\n기본 오리진" { class: key }
+photos: "S3 / 사진 객체\nOAC + 버킷 정책" { shape: cylinder; class: ok }
+viewer -> cdn: "HTTPS 요청" { style.animated: true }
+cdn -> webapp: "기본 *\n원본 조회 시" { style.animated: true }
+cdn -> photos: "CachedObjects/*.png\n원본 조회 시 서명" { style.animated: true }
+```
+
+그림의 아래 화살표는 **오리진 조회가 필요한 경우**다. 유효한 캐시가 있으면 CloudFront가 응답하며
+매번 ALB·S3까지 요청하지 않는다. CloudFront는 VPC의 서브넷 안에 두는 장비가 아니며,
+이 그림은 NAT·인터넷 게이트웨이를 순서대로 거치는 네트워크 구성도가 아니다.
+([CloudFront 전달 흐름](https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/Introduction.html))
+
+### Behavior는 가장 구체적인 패턴을 자동 선택하지 않는다
+
+다음 표는 `CachedObjects/*.png` Behavior와 ALB를 가리키는 기본 Behavior만 있는 경우다.
+오리진 선택 이후 실제 조회 여부는 캐시 상태에 달려 있다.
+
+| 요청 경로 | 적용 Behavior | 선택한 오리진 |
+|---|---|---|
+| `/` | 기본 `*` | ALB |
+| `/CachedObjects/logo.png` | `CachedObjects/*.png` | S3 |
+| `/CachedObjects/logo.jpg` | 기본 `*` | ALB |
+| `/cachedobjects/logo.png` | 기본 `*` | ALB |
+
+패턴은 대소문자를 구분하며 **목록 순서의 첫 일치**를 적용한다. 어떤 개별 패턴에도 맞지 않으면
+기본 Behavior가 적용된다. 따라서 `.jpg` 요청은 무조건 CloudFront 오류가 되는 것이 아니라
+이 구성에서는 ALB 쪽 응답에 달려 있다. 나중에 `CachedObjects/*`를 추가하면 두 패턴의 순서를 확인한다.
+패턴은 라우팅 규칙이므로 S3 객체 자체의 권한 정책과 혼동하지 않는다.
+([Behavior와 Path pattern](https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/DownloadDistValuesCacheBehavior.html))
+
+### Origin path는 요청 경로 앞에 붙는다
+
+이 실습은 Origin path를 비워 두므로 `/CachedObjects/logo.png` 요청이 같은 S3 key로 이어진다.
+Origin path에 `/CachedObjects`까지 넣으면 원본에서는 `CachedObjects/CachedObjects/logo.png`를
+찾게 된다. Behavior의 패턴은 요청에서 prefix를 잘라 내는 rewrite 규칙이 아니다.
+([Origin path](https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/DownloadDistValuesOrigin.html#DownloadDistValuesOriginPath))
+
+## S3를 비공개로 유지하며 CloudFront에 읽기 허용하기
+
+퍼블릭 액세스 차단(Block Public Access)을 끄는 것만으로 객체 읽기가 허용되지는 않는다.
+차단 설정과 실제 Allow 정책을 나눠 봐야 한다. 원 실습의 공개 → 비공개 전환은 두 상태를 비교하기 위한
+장치이며, 개인 계정에서 최종 구성을 만들 때는 처음부터 차단을 켜고 비공개 버킷을 사용해도 된다.
+계정 수준과 버킷 수준의 차단 설정도 함께 적용된다.
+([S3 퍼블릭 액세스 차단](https://docs.aws.amazon.com/AmazonS3/latest/userguide/access-control-block-public-access.html))
+
+:::caution[실습 문구 보정]
+태스크 5.2는 차단을 사용하는 단계인데 본문에는 전체 차단의 “선택 취소”라고 적혀 있다.
+최종 목표는 **전체 차단을 켜고 공개 읽기 정책을 제거한 상태**에서 지정한 CloudFront 배포의 읽기를
+허용하는 것이다. 차단 설정만 확인하고 이전의 공개 정책을 남기지 않는다.
+:::
+
+### OAC는 요청을 서명하고 버킷 정책은 권한을 부여한다
+
+OAC의 `Sign requests (recommended)`는 CloudFront의 원본 요청을 서명한다.
+버킷 정책에서는 서비스 Principal `cloudfront.amazonaws.com`에 읽기를 허용하고
+`AWS:SourceArn`으로 사용할 배포를 한정한다. OAC를 만들기만 하거나 버킷 정책만 저장해서는
+두 설정의 연결을 확인한 것이 아니다.
+
+아래는 이 장에서 사용하는 **현재 객체 읽기용 최소 예시**다. 버킷 이름·12자리 계정 ID·배포 ID를
+자신의 값으로 바꾸며, 배포 ARN 자리에 OAC ID나 배포 도메인을 넣지 않는다.
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "ReadImagesFromStudyDistribution",
+      "Effect": "Allow",
+      "Principal": { "Service": "cloudfront.amazonaws.com" },
+      "Action": "s3:GetObject",
+      "Resource": "arn:aws:s3:::study-photos-example/CachedObjects/*",
+      "Condition": {
+        "StringEquals": {
+          "AWS:SourceArn": "arn:aws:cloudfront::111122223333:distribution/EDISTRIBUTIONID"
+        }
+      }
+    }
+  ]
+}
+```
+
+`Resource`는 버킷 자체가 아닌 전달할 객체 prefix다. 이 예시는 업로드·삭제·목록 조회를 허용하지 않는다.
+기존 [IAM 장](/aws/iam/)의 Principal·Action·Resource·Condition을 이 요청에 대입해 읽는다.
+([OAC와 버킷 정책](https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/private-content-restricting-access-to-s3.html))
+
+이 Allow는 다른 IAM 신원의 권한을 모두 취소하는 Deny가 아니다. 별도로 권한을 가진 운영자의
+S3 직접 접근까지 차단됐다고 해석하지 않는다. 여기서 확인할 것은 **익명 S3 URL을 통한 우회 접근**이다.
+([S3 접근 관리](https://docs.aws.amazon.com/AmazonS3/latest/userguide/access-management.html))
+
+### 엔드포인트와 암호화도 확인한다
+
+일반 S3 버킷 오리진과 S3 정적 웹사이트 엔드포인트는 다르다. 웹사이트 엔드포인트는 custom origin으로
+다루며 OAC를 사용할 수 없다. 새 버킷의 Object Ownership은 기본인 `Bucket owner enforced`를 기준으로 한다.
+OAC의 항상 서명 설정은 CloudFront → S3 구간의 HTTPS도 보장한다. 사용자 → CloudFront 구간은
+Behavior의 Viewer protocol policy에서 `Redirect HTTP to HTTPS` 또는 `HTTPS only`를 따로 선택한다.
+
+객체가 SSE-KMS(AWS Key Management Service 키를 사용하는 서버 측 암호화)라면 KMS 키 정책도
+확인해야 한다. OAI(Origin Access Identity)는 이전 방식이고, 이번 장은 AWS가 권장하는 OAC를 사용한다.
+([OAC 전제와 SSE-KMS](https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/private-content-restricting-access-to-s3.html))
+
+## 원본 보호와 사용자 열람 제한은 별개다
+
+| 구간 | 막으려는 문제 | 이 장에서 확인할 설정 |
+|---|---|---|
+| 사용자 → CloudFront | 권한 없는 사용자의 열람 | 필요하다면 서명된 URL·서명된 쿠키 |
+| CloudFront → S3 | 익명 사용자의 원본 우회 읽기 | OAC·버킷 정책·퍼블릭 액세스 차단 |
+
+OAC를 붙였어도 사용자 제한이 없는 CloudFront URL은 누구나 요청할 수 있다.
+유료 사진이나 개인 앨범을 전달한다면 앱이 로그인·구매·소유권을 확인한 뒤 유효기간이 있는
+CloudFront 서명 URL 등을 발급하는 흐름을 추가한다. [Cognito 장](/aws/cognito/)에서 받은
+로그인 토큰이 저절로 CloudFront 열람 권한이 되는 것은 아니다.
+([CloudFront 서명 URL 흐름](https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/private-content-signed-urls.html))
+
+이 실습에서 보호한 것은 S3 오리진이다. ALB 직접 URL도 거부되는 구성으로 바뀌었다고 가정하지 않는다.
+
+## 캐시에서 무엇이 같고 언제 바뀌는가
+
+### 캐시 키는 같은 응답을 재사용할 요청의 기준이다
+
+`CachingOptimized`는 쿼리 문자열·쿠키를 캐시 키에 포함하지 않으며, 압축 구분을 위한 정규화된
+`Accept-Encoding`을 사용한다. 따라서 이 정책에서 `logo.png?v=2`는 새 캐시 항목을 보장하는
+방법이 아니다. 사용자나 쿼리 값에 따라 내용이 달라지는 API에 사진용 정책을 그대로 적용하지 않는다.
+
+TTL(Time to Live)은 캐시 유효 시간을 정한다. 이 정책의 최소 TTL은 1초, 기본은 24시간,
+최대는 365일이다. 최소 TTL이 0보다 크면 원본의 `no-cache`·`no-store`·`private`에도 최소 기간
+캐시될 수 있으므로 정책 이름만 보고 선택하지 않는다.
+([CachingOptimized 설정](https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/using-managed-cache-policies.html#managed-cache-policy-caching-optimized))
+
+캐시 정책은 키와 TTL을 정하고, origin request policy는 키에 넣지 않아도 원본에 전달할 값을
+추가할 수 있다. **원본으로 전달한다는 것과 캐시 응답을 구분한다는 것은 다르다.**
+([캐시 정책과 원본 요청 정책](https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/controlling-origin-requests.html))
+
+### 파일 변경과 배포 설정 변경은 다른 시간을 기다린다
+
+S3 객체를 덮어써도 이미 저장된 CloudFront 캐시가 즉시 교체되지는 않는다. 객체의 `Cache-Control`과
+캐시 정책의 TTL을 함께 본다. 이는 S3의 객체 쓰기 후 강한 읽기 일관성과 다른 계층의 동작이다.
+([캐시 만료](https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/Expiration.html),
+[S3 일관성](https://docs.aws.amazon.com/AmazonS3/latest/userguide/Welcome.html#ConsistencyModel))
+
+| 변경 방법 | 독자가 확인할 결과 |
+|---|---|
+| 같은 key에 덮어쓰기 | 유효한 캐시는 이전 내용을 줄 수 있음 |
+| 해당 경로 무효화(invalidation) | 완료 후 CloudFront가 다음 요청에서 원본을 다시 가져옴 |
+| `logo-v2.png`로 업로드하고 참조 URL 변경 | 새 경로의 객체를 요청함 |
+
+여기서 파일명 버전은 **S3 Versioning과 별개**다. S3 버전을 늘려도 CloudFront 요청 URL이 같으면
+그 자체로 캐시 키가 바뀌지 않는다. CloudFront 무효화가 브라우저에 이미 저장된 사본까지 지우지도 않는다.
+반복 배포에서는 파일명·경로에 버전이나 콘텐츠 해시를 넣는 방식을 검토한다.
+([무효화와 파일 버전](https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/Invalidation.html))
+
+반면 Behavior·OAC 연결 변경은 **배포 설정의 전파 완료**를 기다린다. 배포의 활성화 여부인
+`Enabled`와 전파 상태인 `Deployed`를 구분한다. CLI v2에서는 다음 명령으로 전파 완료를 기다릴 수 있다.
+`DISTRIBUTION_ID`는 실제 배포 ID로 바꾼다.
+
+```bash
+aws cloudfront wait distribution-deployed --id DISTRIBUTION_ID
+```
+
+이 명령이 성공해도 객체 무효화 완료나 이미지 내용까지 검증한 것은 아니다.
+([distribution-deployed](https://docs.aws.amazon.com/cli/latest/reference/cloudfront/wait/distribution-deployed.html))
+
+## 콘솔에서 연결을 확인하고 결과를 비교하기
+
+<Steps>
+
+1. **CloudFront → 배포 → Origins**에서 ALB와 일반 S3 버킷의 도메인, Origin path,
+   S3 오리진에 연결된 OAC와 서명 설정을 확인한다.
+2. **Behaviors**에서 경로 패턴의 순서, 각 오리진, Viewer protocol policy와 캐시 정책을 확인한다.
+   `/`와 이미지 요청이 서로 다른 오리진을 고르는 이유를 먼저 예측한다.
+3. **S3 → 버킷 → Permissions**에서 공개 Allow 제거, 전체 퍼블릭 액세스 차단,
+   CloudFront Principal·배포 ARN·객체 Resource를 대조한다. **Objects**에서 실제 key도 확인한다.
+4. 배포 설정이 전파된 뒤 아래 두 URL을 새 요청으로 비교한다. 이미지 표시 여부에 더해
+   HTTP 상태와 응답 헤더를 기록한다.
+
+</Steps>
+
+아래 두 도메인은 예시다. S3 콘솔의 객체 URL과 자신의 CloudFront 도메인으로 바꿔 실행한다.
+`curl`은 브라우저 캐시·로그인 세션을 사용하지 않으며, `-D -`는 GET 응답 헤더를 출력하고
+`-o /dev/null`은 내려받은 본문을 버린다. 서명 URL이 아닌 일반 객체 URL로 익명 접근을 비교한다.
+
+```bash
+curl -sS -D - -o /dev/null 'https://study-photos-example.s3.ap-northeast-2.amazonaws.com/CachedObjects/logo.png'
+curl -sS -D - -o /dev/null 'https://d111111abcdef8.cloudfront.net/CachedObjects/logo.png'
+```
+
+| 관찰 | 정상 구성에서의 예측 | 이것만으로 확인되지 않는 것 |
+|---|---|---|
+| 익명 S3 직접 GET | `403 AccessDenied` | 운영자 IAM 권한까지 모두 차단됐는지 |
+| CloudFront 이미지 GET | `200`과 이미지 본문 | 캐시 적중 여부·사용자 인증 여부 |
+| 같은 CloudFront URL 반복 GET | `X-Cache`의 Hit/Miss, `Age` 등을 관찰 | 매번 같은 엣지·캐시 상태인지 |
+| CloudFront `/` 요청 | 기존 웹 앱 응답 | 모든 이미지 경로가 S3로 향하는지 |
+
+이미지 화면이 같다는 사실은 캐시 적중의 증거가 아니다. `X-Cache: Hit from cloudfront`처럼
+캐시 응답임을 나타내는 헤더를 확인한다.
+([캐시 응답 확인](https://repost.aws/knowledge-center/cloudfront-custom-object-caching))
+
+로깅을 켠 환경에서는 요청 시각·경로와
+`x-edge-result-type`의 `Hit`·`Miss`·`RefreshHit`도 함께 확인한다. 로그 전달은 지연될 수 있다.
+([CloudFront 로그 필드](https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/standard-logs-reference.html))
+
+이미 캐시된 객체의 성공만으로 현재 OAC 권한이 정상이라고 단정하지 않는다. 권한을 확인하려면
+같은 허용 prefix와 Behavior에 맞는 **새 테스트 key**로 원본 조회가 필요한 요청을 만든다.
+한 번의 성공·실패를 모든 엣지의 상태로 일반화하지 않는다.
+
+## 실패했을 때는 경로부터 좁힌다
+
+| 증상 | 먼저 확인할 곳 |
+|---|---|
+| 이미지 대신 웹 앱 HTML이 옴 | Behavior 패턴·대소문자·순서·선택 오리진 |
+| S3는 403이고 CloudFront도 403 | key·Origin path, OAC 연결·서명, 버킷 정책의 ARN·Resource, 필요 시 KMS 권한 |
+| S3 직접 URL이 계속 200 | 브라우저 사본인지 새 익명 요청인지, 공개 정책·차단 설정·서명 쿼리 유무 |
+| 권한을 고쳤는데 이전 오류가 반복됨 | 배포 전파와 오류 캐시 TTL |
+| 새 파일을 올렸는데 이전 이미지가 보임 | 같은 key인지, TTL·무효화 완료·브라우저 캐시 |
+
+객체가 없는 경우도 권한 조건에 따라 S3가 404 대신 403을 반환할 수 있다. 403을 보자마자
+퍼블릭 액세스를 열지 말고 객체 존재 여부와 요청 key부터 확인한다.
+([S3 GetObject 오류와 권한](https://docs.aws.amazon.com/AmazonS3/latest/API/API_GetObject.html))
+
+CloudFront는 일부 오류 응답도 캐시하며 기본 오류 캐시 기간은 10초다. 실제 기간은
+오류별 설정과 원본 헤더에 영향을 받는다. 따라서 설정 저장·배포 완료·오류 캐시 만료를 나눠 기록한다.
+([오류 캐시](https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/custom-error-pages-expiration.html))
+
+## 확장: 다른 리전에 복제하면 전송도 자동 전환될까?
+
+CRR(Cross-Region Replication)은 다른 리전의 버킷으로 객체를 비동기 복제한다.
+CloudFront 캐시는 전달용 사본이고 CRR은 별도 버킷의 객체 복사본이라는 점부터 구분한다.
+양쪽 버킷에 Versioning을 켜고 S3가 복제할 IAM 역할·권한을 부여해야 한다.
+대상 버킷을 퍼블릭으로 만드는 것은 복제 요건이 아니다.
+([복제 개요](https://docs.aws.amazon.com/AmazonS3/latest/userguide/replication.html),
+[복제 요건](https://docs.aws.amazon.com/AmazonS3/latest/userguide/replication-requirements.html))
+
+일반적인 live replication은 규칙 적용 이후의 새 객체 중 규칙에 해당하는 것을 대상으로 한다.
+규칙을 만들기 전에 올린 `logo.png`가 자동으로 나타날 것으로 기대하지 않는다.
+기존 객체는 S3 Batch Replication을 별도로 사용한다.
+([기존 객체 복제](https://docs.aws.amazon.com/AmazonS3/latest/userguide/replication.html#batch-replication-s3-use-cases))
+
+새 객체를 올린 뒤에는 소스의 `PENDING` → `COMPLETED`, 대상의 `REPLICA`를 확인한다.
+실패하면 소스의 `FAILED`와 역할 권한·버전 관리·암호화 설정을 조사한다.
+익명 URL 공개 없이 권한을 가진 콘솔·CLI로 대상 객체를 확인할 수 있다.
+([복제 상태 확인](https://docs.aws.amazon.com/AmazonS3/latest/userguide/replication-status.html))
+
+### 복제 대상 버킷도 별도의 오리진이다
+
+대상 버킷을 CloudFront에 추가하려면 일반 S3 오리진으로 등록하고 OAC를 연결하며,
+대상 버킷 정책에도 해당 배포의 읽기를 허용해야 한다. 어떤 Behavior가 사용할지도 지정한다.
+원본 버킷의 정책이 대상 버킷에 같은 권한을 자동 부여한다고 가정하지 않는다.
+
+CRR 설정만으로 기존 CloudFront 오리진이 자동 전환되지는 않는다. 장애 시 전환하려면
+primary·secondary 오리진을 묶는 origin group과 장애 판단 조건 등을 별도로 구성한다.
+CloudFront origin failover는 `GET`·`HEAD`·`OPTIONS` 요청에 적용되며, 복제가 아직 끝나지 않은
+객체는 대상에 없을 수 있다. 이 장에서는 자동 장애 조치의 실제 구성·검증까지 확장하지 않는다.
+([CloudFront origin failover](https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/high_availability_origin_failover.html))
+
+개인 계정에서 재현했다면 CloudFront 배포·OAC·두 버킷의 현재/이전 객체 버전·로그와 기존 ALB·EC2를
+함께 정리 대상으로 기록한다. 원 실습의 종료 버튼이 개인 계정의 리소스를 정리해 주지는 않는다.
+구체적인 확인 기준은 [비용 장](/aws/billing/#멈춰도-남는-비용)과
+[OAC 연결 배포 삭제 안내](https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/private-content-restricting-access-to-s3.html#delete-distribution-oac-s3)을 따른다.
+
+<LinkCard title="5. 저장소와 DB — 객체와 보존 범위 다시 보기" description="캐시·S3 Versioning·교차 리전 복제를 객체 저장과 보존 관점에서 구분한다." href="/aws/storage/" />
