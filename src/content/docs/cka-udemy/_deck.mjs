@@ -179,7 +179,7 @@ export default {
 			"label": "10장",
 			"title": "모니터링과 트러블슈팅",
 			"href": "/cka-udemy/10-troubleshooting/",
-			"desc": "metrics-server · 증상별 로그 진입점 · 네트워크 트러블슈팅",
+			"desc": "metrics-server · 로그 진입점 · control plane 명령·경로·마운트 복구 · 네트워크 트러블슈팅",
 			"items": [
 				[
 					"cka 8장",
