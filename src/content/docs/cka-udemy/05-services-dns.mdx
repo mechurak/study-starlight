@@ -1,6 +1,6 @@
 ---
 title: "5. Service와 DNS — 세 IP 대역과 이름 규칙"
-description: "Service 조회·생성, 노드/Pod/Service IP 대역 찾기, kube-proxy 확인, CoreDNS 설정과 FQDN(전체 도메인 이름), Calico CNI 설치"
+description: "Service 라벨·selector 진단, expose로 생성, 노드/Pod/Service IP 대역 찾기, CoreDNS와 FQDN, Calico CNI 설치"
 deckGroup: services-dns
 sidebar:
   order: 50
@@ -40,6 +40,61 @@ service-definition-1.yaml file.* — 는 정의 파일의 빈칸(셀렉터·포�
 셀렉터와 Pod 라벨이 맞아야 엔드포인트가 생긴다 — 0개면 셀렉터 불일치부터 의심.
 실제 데이터 소스는 EndpointSlice다 ([cka 9장](/cka/09-services/)).
 :::
+
+### 첫 조회 — Pod 라벨과 Service selector를 나란히 본다
+
+애플리케이션이 MySQL에 연결하지 못하면, 먼저 문제의 아키텍처에 적힌 **Service 이름·포트·대상
+Pod**와 현재 상태를 비교한다. 아래 예제의 `k`는 `alias k=kubectl`을 설정한 셸을 전제로 한다.
+
+```bash
+k -n beta get pod --show-labels -o wide
+k -n beta get svc -o wide
+```
+
+첫 명령에서는 Pod의 `READY`, `STATUS`, `IP`, `NODE`, `LABELS`를 본다. 둘째에서는 Service의
+`NAME`, `PORT(S)`, `SELECTOR`를 본다. Service selector가 `name=mysql`이면 같은 네임스페이스의
+Pod에 그 라벨이 있어야 한다. **Pod 이름이나 Service 자체의 라벨과 비교하는 것이 아니다.**
+옵션은 `--show-label`이 아니라 **`--show-labels`**다.
+
+`get svc -o wide`의 `PORT(S)`는 Service가 받는 `port`를 보여 주며, NodePort 타입이면
+`port:nodePort` 형태다. **Pod로 전달하는 `targetPort`는 표시하지 않는다.** 목록의 `3306/TCP`만
+보고 포트 설정이 맞다고 결론 내리지 말고, 대상 Service를 상세 조회한다.
+
+```bash
+k -n beta describe svc mysql-service
+# Selector / Port / TargetPort / Endpoints를 확인
+```
+
+`port`는 클라이언트가 접속하는 Service 포트이고, `targetPort`는 Service가 연결할 Pod 쪽 포트다.
+두 값의 역할은 [Service 공식 문서](https://kubernetes.io/docs/concepts/services-networking/service/#defining-a-service)에서
+확인할 수 있다. 전체 필드가 필요하면 `k -n beta get svc mysql-service -o yaml`로 본다.
+이 유형은 `custom-columns`를 외우지 않아도 **목록은 `get`, 상세 진단은 `describe`**로 해결할 수 있다.
+
+### 명령형 생성 — expose의 이름과 selector를 구분한다
+
+기존 Pod를 Service로 노출할 때는 다음 명령을 쓴다. 아래는 `alpha`에 `name=mysql` 라벨을 가진
+`mysql` Pod가 있고, 아직 `mysql-service`가 없는 경우다.
+
+```bash
+k -n alpha get pod -l name=mysql --show-labels
+k -n alpha expose pod mysql \
+  --name=mysql-service \
+  --port=3306 \
+  --target-port=3306 \
+  --selector=name=mysql
+```
+
+`pod mysql`은 **기준으로 삼을 기존 Pod 이름**, `--name=mysql-service`는 **새 Service 이름**이다.
+Pod 이름이 다르면 `pod mysql` 부분을 조회 결과로 바꾼다. `--selector=name=mysql`은 대상 라벨 조건을
+요구사항과 정확히 맞춘다. 생략하면 Pod 라벨에서 추론하며, Service 타입의 기본값은 `ClusterIP`다.
+옵션은 [`kubectl expose` 공식 문서](https://kubernetes.io/docs/reference/kubectl/generated/kubectl_expose/)에서 확인한다.
+
+단순 생성은 이처럼 명령형 커맨드로 끝내고, 추가 필드를 편집해야 하면 같은 명령 뒤에
+`--dry-run=client -o yaml > service.yaml`을 붙여 초안을 만든 뒤 수정·적용한다.
+문제에서 매니페스트 파일 작성을 요구하면 그 요구도 충족한다.
+
+이름이 잘못된 Service 교체와 기존 `targetPort` 수정은
+[10장 MySQL 연결 실패 사례](/cka-udemy/10-troubleshooting/#애플리케이션-연결-실패--mysql-service-진단)에서 다룬다.
 
 ## 환경 탐색 — Practice Test: Explore Environment
 
@@ -466,6 +521,8 @@ Service YAML은 `kubectl expose ... --dry-run=client -o yaml`로 뼈대를 얻�
 ## 이 장에서 남길 것
 
 - 조회형 문제는 명령보다 **열 이름**(TYPE·Endpoints·INTERNAL-IP·CLUSTER-IP)을 기억한다
+- Service 장애는 `get pod --show-labels -o wide`와 `get svc -o wide`로 대조하고, 숨은 `targetPort`는 `describe`로 본다
+- `expose pod`의 Pod 이름, `--name`의 Service 이름, `--selector`의 대상 라벨을 구분한다
 - 세 IP 대역(노드/Pod/Service)은 각각 다른 명령으로 찾는다 — 컨트롤 플레인 Pod은 호스트 IP라 제외
 - 듣는 포트는 랩에서 `netstat -nplt`, 현재 환경에서는 `sudo ss -lntp`로 찾는다
 - CNI 조회는 경로 두 개다 — 설정은 `/etc/cni/net.d/`, 바이너리는 `/opt/cni/bin/`.

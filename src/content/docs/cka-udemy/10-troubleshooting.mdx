@@ -1,6 +1,6 @@
 ---
 title: "10. 모니터링과 트러블슈팅"
-description: "metrics-server 설치와 kubectl top, 컨테이너 로그, kube-proxy·CNI 네트워크 장애 진단"
+description: "metrics-server 설치와 kubectl top, 컨테이너 로그, MySQL Service 이름·targetPort 수정, kube-proxy·CNI 네트워크 장애 진단"
 deckGroup: cluster-lifecycle
 sidebar:
   order: 100
@@ -13,7 +13,7 @@ import { LinkCard } from '@astrojs/starlight/components';
 
 원본 레포의 트러블슈팅 실습 중 Control Plane Failure와 Worker Node Failure는
 요약이 비어 있어 뺐다 — 그 두 유형의 진단 순서는 [cka 18장](/cka/18-troubleshooting/)이
-컨트롤 플레인 층·노드 층 절에서 다룬다. 여기 남긴 것은 셋이다.
+컨트롤 플레인 층·노드 층 절에서 다룬다. 이 장에서는 모니터링·로그 진단, 애플리케이션 연결 실패와 네트워크 장애를 다룬다.
 
 :::tip[실습 전 확인]
 먼저 `kubectl get nodes`와 `kubectl get pods -A`로 **컨트롤 플레인 · 노드 · 앱 중 어느
@@ -111,8 +111,7 @@ kubectl logs webapp-1 --previous       # 재시작 전 로그 — CrashLoopBackO
 노드에 배치된 뒤 **컨테이너 생성·실행 중** 실패했는지를 가른다.
 
 ```bash
-kubectl get pod <pod> \
-  -o custom-columns='NAME:.metadata.name,NODE:.spec.nodeName,PHASE:.status.phase'
+kubectl get pod <pod> -o wide       # STATUS / NODE 확인
 kubectl describe pod <pod>
 ```
 
@@ -155,11 +154,88 @@ API 서버·스케줄러·컨트롤러 매니저는 보통 스태틱 Pod이므�
 [클러스터 트러블슈팅](https://v1-35.docs.kubernetes.io/docs/tasks/debug/debug-cluster/),
 [`crictl`로 노드 디버깅](https://v1-35.docs.kubernetes.io/docs/tasks/debug/debug-cluster/crictl/).
 
+## 애플리케이션 연결 실패 — MySQL Service 진단
+
+앱이 MySQL에 연결하지 못하는 두 실습 사례다. **증상 → 이름·selector·포트 대조 → 틀린 필드만
+수정 → 실제 연결 검증** 순서로 접근한다. 아래의 `k`는 `alias k=kubectl`을 설정한 셸을 전제로 한다.
+
+```bash
+k -n beta get pod --show-labels -o wide
+k -n beta get svc -o wide
+k -n beta describe svc mysql-service
+```
+
+Pod 라벨과 Service selector를 비교한 뒤, `describe`의 `TargetPort`를 아키텍처와 대조한다.
+`get svc -o wide`에는 `targetPort`가 나오지 않는다. 각 열의 의미와 `expose` 옵션은
+[5장 Service 조회·생성](/cka-udemy/05-services-dns/#첫-조회--pod-라벨과-service-selector를-나란히-본다)에 있다.
+네임스페이스는 아래 각 사례에 맞춰 바꾼다.
+
+### 이름 오류 — alpha의 mysql을 mysql-service로 교체한다
+
+앱이 `mysql-service`라는 이름으로 접속하는데 Service는 `mysql`로 만들어져 있다면, selector와
+포트가 맞아도 앱이 기대한 이름을 찾지 못한다. 기존 객체의 이름은 `edit`으로 바꿀 수 없으므로
+올바른 이름의 Service를 만든다. 다음은 **잘못된 `mysql` Service를 삭제·교체하는 이 실습**의 명령이다.
+
+```bash
+k -n alpha get pod --show-labels -o wide
+k -n alpha get svc -o wide
+k -n alpha describe svc mysql
+
+# 조회한 실제 Pod 이름이 mysql인 경우
+k -n alpha delete svc mysql
+k -n alpha expose pod mysql \
+  --name=mysql-service \
+  --port=3306 \
+  --target-port=3306 \
+  --selector=name=mysql
+
+k -n alpha describe svc mysql-service
+```
+
+`pod mysql`은 조회한 실제 Pod 이름으로 바꾼다. 새 Service의 selector가 `name=mysql`,
+Port와 TargetPort가 `3306`인지 확인하고, 대상 Pod IP가 연결됐는지 본다. 이어서 문제의 앱·테스트로
+MySQL 연결을 재시도한다. 실패하면 아래 포트 진단과 계층별 검증으로 이어간다.
+
+### targetPort 오류 — beta의 기존 Service를 edit으로 수정한다
+
+Service 이름과 selector는 맞지만 `TargetPort`가 아키텍처의 `3306`과 다르면 기존 Service를 수정한다.
+[`kubectl edit`](https://kubernetes.io/docs/reference/kubectl/generated/kubectl_edit/)은 저장한 변경을
+서버에 반영하므로 별도로 `apply`하거나 Service·Pod를 재생성할 필요가 없다.
+
+```bash
+k -n beta describe svc mysql-service
+k -n beta edit svc mysql-service
+```
+
+에디터에서 **`spec.ports` 아래의 `targetPort`만** `3306`으로 바꾸고 저장한다. 아래는 수정할 부분이며,
+객체 전체를 덮어쓸 YAML이 아니다.
+
+```yaml
+spec:
+  ports:
+    - port: 3306
+      targetPort: 3306
+```
+
+저장 뒤 `k -n beta describe svc mysql-service`로 `TargetPort: 3306/TCP`와 대상 Pod IP를 확인한다.
+EndpointSlice를 직접 보려면 다음 명령을 쓴다.
+
+```bash
+k -n beta get endpointslices \
+  -l kubernetes.io/service-name=mysql-service -o wide
+```
+
+엔드포인트 주소가 없으면 selector와 Pod 라벨·Ready 상태를 확인한다. 반대로 **엔드포인트가 있어도
+숫자 `targetPort`가 틀리면 접속에 실패할 수 있다.** 주소 등록은 MySQL이 그 포트에서 실제로
+응답한다는 증거가 아니다. 마지막에는 문제에서 제공한 앱·테스트 또는 MySQL 클라이언트로 연결을
+재검증한다. 일반 HTTP용 `curl`로 MySQL 응답을 검사하지 않는다.
+더 넓은 연결 문제는 [5장의 계층별 검증 절](/cka-udemy/05-services-dns/#service--dns--외부-경로를-한-겹씩-검증하기)로 이어간다.
+
 ## 네트워크 장애 — Practice Test: Troubleshoot Network
 
 원본 풀이: [10-Practice-Test-Troubleshoot-Network.md](https://github.com/kodekloudhub/certified-kubernetes-administrator-course/blob/master/docs/12-Troubleshooting/10-Practice-Test-Troubleshoot-Network.md)
 
-두 시나리오가 네트워크 층 진단의 대표 패턴이다.
+Service 설정을 확인한 뒤 CNI·kube-proxy 쪽으로 좁혀졌다면 다음 두 시나리오를 참고한다.
 
 **시나리오 1 — CNI가 없다.** — *Troubleshooting Test 1* — Pod이 `ContainerCreating`에 멈춰 있고, describe의
 Events에 `unable to allocate IP address` — CNI(Container Network Interface) 플러그인이
@@ -198,7 +274,7 @@ kubectl edit ds -n kube-system kube-proxy            # --config=/var/lib/kube-pr
 | 노드·control plane | `Troubleshooting Clusters` / `crictl` | [Troubleshooting Clusters](https://kubernetes.io/docs/tasks/debug/debug-cluster/)에서 kubelet·control plane 진입점을, API가 죽었으면 [Debugging Kubernetes nodes with crictl](https://kubernetes.io/docs/tasks/debug/debug-cluster/crictl/)에서 런타임 명령을 확인 |
 
 트러블슈팅 문제에서는 새 YAML을 쓰기 전에 공식 체크리스트로 실패 층을 정한다. 원인이 필드 오타로
-좁혀진 뒤에만 `kubectl get ... -o yaml`로 현재 객체를 뽑아 최소 수정한다.
+좁혀지면 `kubectl edit`으로 해당 필드를 수정하거나, `kubectl get ... -o yaml`로 현재 객체를 뽑아 최소 수정한다.
 
 ## 이 장에서 남길 것
 
@@ -207,6 +283,8 @@ kubectl edit ds -n kube-system kube-proxy            # --config=/var/lib/kube-pr
 - 로그는 `-c`(컨테이너 지정)와 `--previous`(재시작 전) 두 옵션이 점수를 가른다
 - `nodeName`이 비어 있으면 Events, 배치 뒤에는 컨테이너 로그, NotReady면 kubelet 로그로 층을 바꾼다
 - control plane 로그는 API가 살아 있으면 `kubectl logs`, 죽었으면 노드에서 `crictl logs`
+- Service 이름 오류는 올바른 이름으로 생성하고, `targetPort` 오류는 `edit svc`로 수정한 뒤 실제 연결을 검증한다
+- 엔드포인트가 있어도 숫자 `targetPort`가 틀리면 연결에 실패할 수 있다
 - `ContainerCreating` + IP 할당 실패 = CNI 문제
 - 시스템 Pod 크래시 = 로그 → 마운트 → ConfigMap 파일명 대조
 
