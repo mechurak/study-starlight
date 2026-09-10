@@ -28,11 +28,16 @@ import { Steps, Card, CardGrid, Tabs, TabItem } from '@astrojs/starlight/compone
 2. **vim 설정** — 탭 문자로 YAML을 깨뜨리지 않기 위해
 
    ```bash
-   cat <<'EOF' > ~/.vimrc
+   # 기존 설정이 있으면 vim ~/.vimrc로 필요한 항목만 수정
+   cat <<'EOF' >> ~/.vimrc
    set expandtab
    set tabstop=2
+   set softtabstop=2
    set shiftwidth=2
+   set autoindent
    set number
+   set incsearch
+   set hlsearch
    EOF
    ```
 
@@ -42,9 +47,26 @@ import { Steps, Card, CardGrid, Tabs, TabItem } from '@astrojs/starlight/compone
 특히 `$do`는 거의 모든 문제에서 쓰게 된다.
 
 :::caution[함정]
-`~/.vimrc`는 **지금 열려 있는 vim에는 적용되지 않는다.**
-시험 시작 직후, 아무것도 열기 전에 만들 것.
+`~/.vimrc` 변경은 이미 열려 있는 Vim에 자동 반영되지 않는다. `:source ~/.vimrc`로 다시 읽는다.
+SSH 대상 노드나 `sudo -i` 이후 root는 다른 설정 파일을 쓴다. 현재 Vim에서만 빠르게 맞추려면
+`:setlocal expandtab tabstop=2 softtabstop=2 shiftwidth=2 autoindent number`를 실행한다.
 :::
+
+### Vim 직전 확인용 치트시트
+
+모든 키는 `Esc`로 일반 모드에 돌아온 뒤 사용한다. `:` 명령·검색은 마지막에 `Enter`를 누른다.
+
+| 목적 | 키 |
+|---|---|
+| 줄 맨 앞 / 첫 글자 / 맨 뒤 | `0` / `^` / `$` |
+| 첫 글자 앞 / 줄 끝에서 입력 | `I` / `A` |
+| 검색 / 다음 / 반대 방향 | `/문자열` / `n` / `N` |
+| 줄 들여쓰기 / 내어쓰기 | `>>` / `<<` |
+| 블록 이동 | `V` → `j`·`k`로 선택 → `>`·`<`, 다시 선택은 `gv` |
+| 취소 / 다시 실행 | `u` / `Ctrl+r` |
+| 저장 종료 / 변경 버리고 종료 | `:wq` / `:q!` |
+
+설정 의미·붙여넣기·모드 구분은 [1장 Vim 기본 조작](/cka/01-exam/#vim-최소-세트)을 참고한다.
 
 ## 문제마다 반복하는 3단계
 

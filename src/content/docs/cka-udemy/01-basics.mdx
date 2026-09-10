@@ -159,20 +159,36 @@ kubectl config view --kubeconfig=my-kube-config \
 실수를 가장 빨리 줄일 수 있다.
 :::
 
-:::caution[함정 — 문서 YAML을 vim에 붙여넣으면 들여쓰기가 밀린다]
-vim이 붙여넣기를 타이핑으로 알고 줄마다 autoindent를 다시 적용해서 계단처럼 밀리는 것이다.
-붙여넣기 전에 `:set paste`, 끝나면 `:set nopaste`. 이미 어긋났으면 고치려 들지 말고 `u`로
-통째로 되돌린 뒤 다시 붙인다. 랩을 시작하면 먼저 만들어 두는 게 안전하다 —
+### Vim으로 YAML을 고치는 짧은 연습
+
+초기 설정과 키 설명은 [CKA 1장 Vim 최소 세트](/cka/01-exam/#vim-최소-세트)가 정본이다.
+연습 전에 Vim에서 `:setlocal expandtab tabstop=2 softtabstop=2 shiftwidth=2 autoindent number`를
+실행한다. 아래 파일은 편집 연습용이며, 클러스터에 리소스를 만들지 않는다.
 
 ```bash
-cat > ~/.vimrc <<'EOF'
-set tabstop=2 shiftwidth=2 expandtab
-EOF
+kubectl run vim-practice --image=nginx --dry-run=client -o yaml > vim-practice.yaml
+vim vim-practice.yaml
 ```
 
-특히 `expandtab`이 중요하다. Tab 문자가 들어가면 눈으로는 멀쩡해 보이는데 **YAML 파서가 탭을
-거부**해서 apply가 깨진다. 복사해 온 블록의 깊이를 내 파일에 맞출 때는 `V`로 줄들을 선택하고
-`>`·`<`로 `shiftwidth`만큼(2칸)씩 옮긴다.
+1. `Esc` → `/image:` → `Enter`로 이미지 필드를 찾는다. `n`은 다음 검색 결과다.
+2. `0`·`^`·`$`를 각각 눌러 줄 시작, 첫 글자, 마지막 문자의 차이를 확인한다.
+3. `A`로 줄 끝에서 입력을 시작해 `:alpine`을 붙이고 `Esc`로 나온다. 값은 `nginx:alpine`이 된다.
+4. 현재 줄에서 `>>`로 2칸 오른쪽 이동 후 `<<`로 원래 깊이로 돌아온다.
+5. `V` → `j`로 두 줄을 선택하고 `>`로 이동한다. `gv` → `<`로 같은 두 줄을 원래 위치로 되돌린다.
+6. `:wq`로 저장하고 다음 명령으로 YAML과 리소스 구조를 확인한다.
+
+```bash
+kubectl create --dry-run=client -f vim-practice.yaml -o yaml
+```
+
+출력에서 이미지 변경과 들여쓰기를 확인한다. client dry-run은 실제 Pod를 만들지 않으므로
+스케줄링·이미지 다운로드·실행 성공을 검증하지는 않는다.
+
+:::caution[함정 — 문서 YAML을 붙여넣은 뒤 들여쓰기가 밀린다]
+터미널·Vim의 붙여넣기 처리에 따라 자동 들여쓰기가 중복 적용될 수 있다.
+`Esc` → `u`로 잘못 붙인 부분을 되돌리고 `:set paste` → `i` → 터미널 붙여넣기 → `Esc` →
+`:set nopaste` 순으로 다시 시도한다. 평소에는 `nopaste`로 편집한다.
+복사해 온 블록의 깊이는 `V`로 줄들을 선택한 뒤 `>`·`<`로 맞춘다. 같은 계층의 필드가 정렬됐는지 확인한다.
 :::
 
 ## 이 장에서 남길 것
