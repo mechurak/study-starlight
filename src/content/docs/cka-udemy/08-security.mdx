@@ -296,8 +296,45 @@ kubectl create rolebinding dev-user-binding --role=developer --user=dev-user -n 
 
 :::tip[--as로 확인까지가 한 세트]
 만들라는 문제든 고치라는 문제든, 끝은 항상
-`kubectl get pods --as dev-user`(또는 `kubectl auth can-i ... --as ...`)로 검증한다.
+`kubectl get pods --as dev-user` 또는
+[`kubectl auth can-i`](https://kubernetes.io/docs/reference/kubectl/generated/kubectl_auth/kubectl_auth_can-i/)로
+검증한다. `can-i`는 실제 오브젝트를 만들지 않고 **이 주체가 이 요청을 할 수 있는지**만 답한다.
 :::
+
+문제 문장을 먼저 `can-i` 명령으로 바꾸면, Role에 넣을 값과 완료 검증 명령을 한 번에 얻는다.
+
+```bash
+kubectl auth can-i create deployments.apps --as=dev-user -n blue
+```
+
+| 명령의 조각 | RBAC에서 확인하거나 채울 자리 |
+|---|---|
+| `--as=dev-user` | RoleBinding의 `subjects[].name` |
+| `-n blue` | Role과 RoleBinding의 `metadata.namespace` |
+| `create` | Role의 `rules[].verbs` |
+| `deployments` | Role의 `rules[].resources` |
+| `apps` | Role의 `rules[].apiGroups` |
+
+리소스의 복수형이나 API group이 기억나지 않으면 외우지 말고 discovery 결과를 확인한다.
+
+```bash
+kubectl api-resources | grep -w deployments
+# deployments   deploy   apps/v1   true   Deployment
+```
+
+`apps/v1`에서 group은 `apps`이고 `v1`은 version이라 Role에 쓰지 않는다. Pod처럼 APIVERSION이
+`v1`만 표시되는 core group은 `apiGroups: [""]`로 쓴다. rules YAML 골격까지 필요하면 임시 Role을
+적용하지 않고 출력만 만들 수 있다.
+
+```bash
+kubectl create role rule-template -n blue \
+  --verb=create --resource=deployments.apps \
+  --dry-run=client -o yaml
+```
+
+출력의 `rules`를 참고한다. 공식 예시는
+[Using RBAC Authorization의 Role examples](https://kubernetes.io/docs/reference/access-authn-authz/rbac/#role-examples)에
+리소스별 `apiGroups`·`resources`·`verbs` 조합으로 정리되어 있다.
 
 :::caution[함정 — resourceNames]
 "특정 이름의 리소스만" 허용하는 Role은 rules에 `resourceNames: ["blue-app"]`가 붙는다
@@ -318,6 +355,12 @@ kubectl edit role developer -n blue
 - apiGroups: ["apps"]
   resources: ["deployments"]
   verbs: ["create"]
+```
+
+저장 뒤 같은 명령이 `yes`인지 확인한다.
+
+```bash
+kubectl auth can-i create deployments.apps --as=dev-user -n blue
 ```
 
 :::caution[함정 — Deployment는 apps 그룹]
