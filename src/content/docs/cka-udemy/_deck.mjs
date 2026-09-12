@@ -116,15 +116,24 @@ export default {
 			"tone": "key"
 		},
 		{
-			"label": "개편 전 3장",
-			"title": "Pod 설정",
+			"label": "6장",
+			"title": "command와 args 수정",
 			"href": "/cka-udemy/03-pod-config/",
-			"desc": "command/args · ConfigMap 반영 · Secret · securityContext · 멀티 컨테이너 · init",
+			"desc": "Pod 소유자 · command/args · sh -c · 실행 결과",
 			"items": [
 				[
 					"cka 4장",
 					"/cka/04-pods/"
-				],
+				]
+			],
+			"tone": "ok"
+		},
+		{
+			"label": "7장",
+			"title": "ConfigMap과 Secret 주입",
+			"href": "/cka-udemy/configmap-secret/",
+			"desc": "env · envFrom · volume · 변경 반영 · 읽기 전용 Secret",
+			"items": [
 				[
 					"cka 6장",
 					"/cka/06-config/"
@@ -133,7 +142,33 @@ export default {
 			"tone": "ok"
 		},
 		{
-			"label": "4장",
+			"label": "8장",
+			"title": "init과 sidecar 구성",
+			"href": "/cka-udemy/init-sidecar/",
+			"desc": "공유 volume · Downward API · 네이티브 sidecar · init 복구",
+			"items": [
+				[
+					"cka 4장",
+					"/cka/04-pods/"
+				]
+			],
+			"tone": "ok"
+		},
+		{
+			"label": "9장",
+			"title": "securityContext 실행 권한",
+			"href": "/cka-udemy/security-context/",
+			"desc": "runAsUser 우선순위 · 컨테이너 capability · 실행 검증",
+			"items": [
+				[
+					"cka 4장",
+					"/cka/04-pods/"
+				]
+			],
+			"tone": "ok"
+		},
+		{
+			"label": "개편 전 4장",
 			"title": "스케줄링",
 			"href": "/cka-udemy/04-scheduling/",
 			"desc": "수동 배치 · 라벨/taint · affinity · quota · DaemonSet 업데이트 · 스태틱 Pod",

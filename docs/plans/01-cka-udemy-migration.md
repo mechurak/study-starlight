@@ -99,17 +99,17 @@ h2와 h3를 모두 기록한다. 목적 제목은 원제목을 기본으로 하�
 
 | 원본 절 | 처리 | 목적 파일·절 |
 |---|---|---|
-| command와 args — Practice Test: Commands and Arguments | 유지 | `03-pod-config` — 해당 작업의 command와 args — Practice Test: Commands and Arguments |
+| command와 args — Practice Test: Commands and Arguments | 유지 | `03-pod-config` — command와 args — Practice Test: Commands and Arguments |
 | ↳ BusyBox — args 한 줄과 sh -c의 경계 | 유지 | `03-pod-config` — 해당 작업의 BusyBox — args 한 줄과 sh -c의 경계 |
-| 환경 변수와 ConfigMap — Practice Test: Env Variables | 이동 | `configmap-secret` — 해당 작업의 환경 변수와 ConfigMap — Practice Test: Env Variables |
+| 환경 변수와 ConfigMap — Practice Test: Env Variables | 이동 | `configmap-secret` — 환경 변수와 ConfigMap — Practice Test: Env Variables |
 | ↳ ConfigMap 변경 반영을 판정하는 루프 | 이동 | `configmap-secret` — 해당 작업의 ConfigMap 변경 반영을 판정하는 루프 |
-| Secret — Practice Test: Secrets | 이동 | `configmap-secret` — 해당 작업의 Secret — Practice Test: Secrets |
+| Secret — Practice Test: Secrets | 이동 | `configmap-secret` — Secret — Practice Test: Secrets |
 | ↳ 기존 Secret을 읽기 전용 파일로 마운트 — secret-1401 | 이동 | `configmap-secret` — 해당 작업의 기존 Secret을 읽기 전용 파일로 마운트 — secret-1401 |
-| securityContext — Practice Test: Security Contexts | 이동 | `security-context` — 해당 작업의 securityContext — Practice Test: Security Contexts |
-| 멀티 컨테이너 — Practice Test: Multi-Container Pods | 이동 | `init-sidecar` — 해당 작업의 멀티 컨테이너 — Practice Test: Multi-Container Pods |
+| securityContext — Practice Test: Security Contexts | 이동 | `security-context` — securityContext — Practice Test: Security Contexts |
+| 멀티 컨테이너 — Practice Test: Multi-Container Pods | 이동 | `init-sidecar` — 멀티 컨테이너 — Practice Test: Multi-Container Pods |
 | ↳ mc-pod — 노드 이름 주입과 파일 로그 공유 | 이동 | `init-sidecar` — 해당 작업의 mc-pod — 노드 이름 주입과 파일 로그 공유 |
 | ↳ logging-deployment — 네이티브 로그 사이드카 | 이동 | `init-sidecar` — 해당 작업의 logging-deployment — 네이티브 로그 사이드카 |
-| init 컨테이너 — Practice Test: Init-Containers | 이동 | `init-sidecar` — 해당 작업의 init 컨테이너 — Practice Test: Init-Containers |
+| init 컨테이너 — Practice Test: Init-Containers | 이동 | `init-sidecar` — init 컨테이너 — Practice Test: Init-Containers |
 | ↳ orange — init command 오타의 진단·수정·복구 | 이동 | `init-sidecar` — 해당 작업의 orange — init command 오타의 진단·수정·복구 |
 | 시험장에서 공식 문서 찾기 | 통합 | `03-pod-config / configmap-secret / security-context / init-sidecar / exam-search` — 해당 작업의 문서 검색·완료 판정 |
 | 이 장에서 남길 것 | 통합 | `03-pod-config / configmap-secret / security-context / init-sidecar / exam-search` — 해당 작업의 문서 검색·완료 판정 |

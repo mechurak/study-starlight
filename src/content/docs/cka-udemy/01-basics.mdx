@@ -96,7 +96,7 @@ kubectl explain deployment.spec.template.spec.initContainers
 위 명령은 컨테이너 두 개를 **모두 `containers` 아래에** 만든다. 생성된 이름을 요구한 이름으로
 고치고, 컨테이너별 명령·마운트를 추가한다. 네이티브 사이드카라면 해당 컨테이너 블록을
 `initContainers`로 옮겨 `restartPolicy: Always`를 넣는다.
-[logging-deployment 완성 예제](/cka-udemy/03-pod-config/#logging-deployment--네이티브-로그-사이드카)에서 이어서 연습한다.
+[logging-deployment 완성 예제](/cka-udemy/init-sidecar/#logging-deployment--네이티브-로그-사이드카)에서 이어서 연습한다.
 
 `--dry-run=client -o yaml`은 리소스를 생성하지 않고 YAML을 출력한다. 실제 생성·변경은
 `kubectl apply -f logging-deployment.yaml`로 수행한다. 명령 뒤의 `--`는 kubectl 옵션의 끝을 뜻하며,

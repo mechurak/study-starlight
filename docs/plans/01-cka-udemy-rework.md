@@ -1,7 +1,7 @@
 # 1. CKA 실습 덱을 작업 단위로 개편
 
 상태: M0·M1 완료, M2~M8 실행 중
-지금 위치: M2b-1 Deployment·Job 분할 완료. M2b-2 Pod 설정 네 작업 이관부터 이어 간다.
+지금 위치: M2b Workloads·Pod 설정 이관 완료. M2c 배치·리소스·노드별 워크로드부터 이어 간다.
 실행 범위: 이번 실행에서 남은 M2~M8을 묶음별 편집·검증·기록·커밋까지 완료한다.
 실행 모델: M0·M1은 Astra 완료. 이번 M2~M8은 Sol Medium.
 작성일: 2026-09-12
@@ -188,7 +188,7 @@ Kubernetes 문서 내 검색은 가능하지만 외부 검색 결과를 열면 �
 ### M2. 기초와 Workloads
 
 - [x] M2a: `01-basics`의 기본 조작·출력 추출·Pod 작업을 분리한다. Vim·도움말·YAML 생성으로 오는 `cka` 앵커 링크도 갱신한다.
-- [ ] M2b: `02-workloads`, `03-pod-config`를 목차 표대로 작업별로 이관한다. Deployment template 수정과 독립 Pod 재생성의 전제를 남긴다. 분량에 따라 검증·커밋 묶음을 나눈다.
+- [x] M2b: `02-workloads`, `03-pod-config`를 목차 표대로 작업별로 이관한다. Deployment template 수정과 독립 Pod 재생성의 전제를 남긴다. 분량에 따라 검증·커밋 묶음을 나눈다.
 - [ ] M2c: `04-scheduling`을 배치·리소스·노드별 워크로드로 나눈다. 조건과 결과를 연결한다.
 - [ ] M2d: `10-troubleshooting`의 HPA/VPA를 이관한다. metrics 사전 조건과 기대 replica·상태를 남긴다.
 - 검증: 생성 성공과 Ready·rollout·Job 완료·배치 결과가 구분된다. 네이티브 sidecar 등 버전 민감한 예제는 공식 문서 대조 기록을 남긴다.
@@ -406,3 +406,28 @@ M2a에서 이어 설명하고, Job은 terminal condition·소유 Pod·로그를 
   console error 0을 확인했다. `git diff --check`도 통과했다.
 
 다음 묶음은 M2b-2의 command/args·ConfigMap/Secret·init/sidecar·securityContext 이관이다.
+
+
+### M2b-2 — Pod 설정 네 작업 (2026-09-13)
+
+기존 `03-pod-config` URL에는 소유자 판단과 command/args 수정을 남기고,
+`configmap-secret`·`init-sidecar`·`security-context`를 활성화했다. 예약한 6~9장/order
+1060~1090을 적용하고 DeckMap·`cka` 4·6장·시험 전략의 이동 앵커를 새 페이지로 갱신했다.
+
+- 분할 뒤 106 / 167 / 292 / 73줄이다. 독립 Pod의 수정본 준비 후 재생성, Deployment template
+  수정과 rollout, ConfigMap의 env/volume/`subPath` 반영 차이, Secret read-only 마운트,
+  공유 `emptyDir`·Downward API·컨테이너별 로그, init 오타 복구, securityContext 수준별
+  우선순위와 capability 위치를 보존했다. 원본 외부 출처 누락은 0개다.
+- Kubernetes 공식 command/args·ConfigMap 갱신·Secret·Sidecar Containers·Init Containers·
+  Security Context 문서를 대조했다. 네이티브 sidecar는 v1.33 Stable이며
+  `initContainers` + 컨테이너 수준 `restartPolicy: Always`인 현행 구조를 확인했다.
+- 완성 YAML 세 개를 로컬 YAML 파서로 읽어 Secret 이름, 세 컨테이너 이름,
+  sidecar `restartPolicy`와 volume을 확인했다. 로컬 kubectl OpenAPI 검증은 discovery 대상
+  클러스터가 없어 `localhost:8080` 연결 실패했다. 지정 랩이 없어 생성·rollout·로그·권한은
+  실제 클러스터에서 검증하지 않았다.
+- 첫 `pnpm check`는 옮긴 `cka` 앵커 두 개를 잘못 가리켜 실패했고 실제 제목으로 고쳤다.
+  최종 `pnpm check` exit 0 — 380페이지 빌드·32,479개 내부 페이지/앵커 링크 통과.
+  preview + Playwright에서 6~9장 현재 항목과 390px main/문서 폭 390/390,
+  console error 0을 확인했다. `git diff --check`도 통과했다.
+
+다음 묶음은 M2c의 Pod 배치·리소스 제한·DaemonSet과 static Pod 이관이다.

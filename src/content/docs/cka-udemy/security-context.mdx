@@ -1,0 +1,73 @@
+---
+title: "9. securityContext 실행 권한"
+description: "Pod·컨테이너 수준의 runAsUser 우선순위와 Linux capability 위치를 설정하고 실행 결과를 확인한다"
+deckGroup: pods
+sidebar:
+  order: 1090
+reviewedAt: 2026-09-13
+---
+
+import { LinkCard } from '@astrojs/starlight/components';
+import Thesis from '../../../components/docs/Thesis.astro';
+
+<Thesis>권한 필드를 Pod와 컨테이너 중 올바른 수준에 두고 실제 프로세스 사용자와 필요한 capability를 확인한다</Thesis>
+
+`securityContext`는 컨테이너가 어떤 사용자와 Linux 권한으로 실행되는지 제한한다.
+이 페이지에서는 **필드 위치 선택 → 최소 권한 설정 → 컨테이너 내부 실행 결과 확인**을 연습한다.
+Pod 보안의 큰 그림은 [cka 4장 — securityContext](/cka/04-pods/#securitycontext)에서 복습한다.
+
+기존 Pod이면 [6장의 소유자·재생성 판단](/cka-udemy/03-pod-config/)을 먼저 적용한다.
+Pod 수준 값은 여러 컨테이너의 기본값이고 컨테이너 수준 값이 같은 필드를 덮어쓴다.
+
+## securityContext — Practice Test: Security Contexts
+
+원본 풀이: [26-Practice-Test-Security-Context.md](https://github.com/kodekloudhub/certified-kubernetes-administrator-course/blob/master/docs/07-Security/26-Practice-Test-Security-Context.md)
+
+| 과제 | 위치 |
+|---|---|
+| 실행 유저 확인 — *Run the command 'kubectl exec ubuntu-sleeper -- whoami'…* | `k exec ubuntu-sleeper -- whoami` |
+| 유저 바꾸기 — *Set a security context to run as user 1010.* | `securityContext.runAsUser: 1010` |
+| 커널 능력 추가 — *Add SYS_TIME capability to the container's securityContext* | 컨테이너 쪽 `securityContext.capabilities.add: ["SYS_TIME"]` |
+
+필드 이름이 헷갈리면 공식 문서
+[Configure a Security Context](https://kubernetes.io/docs/tasks/configure-pod-container/security-context/)에서
+예시 YAML을 그대로 가져온다.
+
+```yaml
+spec:
+  securityContext:        # Pod 수준 — 모든 컨테이너에 적용
+    runAsUser: 1010
+  containers:
+  - name: ubuntu
+    securityContext:      # 컨테이너 수준 — Pod 수준을 덮어쓴다
+      capabilities:
+        add: ["SYS_TIME"]
+```
+
+:::caution[함정 — capabilities는 컨테이너 수준에만]
+`runAsUser`는 Pod·컨테이너 양쪽에 다 쓸 수 있고 컨테이너 쪽이 이기지만
+(*The User ID defined in the securityContext of the container overrides the User ID in the POD.*),
+**`capabilities`는 컨테이너 수준에만** 존재한다. Pod 수준에 넣으면 거부된다.
+:::
+
+## 공식 문서에서 찾을 것
+
+Kubernetes 문서 내부 검색에서 `Configure Security Context`를 열고
+[Configure a Security Context for a Pod or Container](https://kubernetes.io/docs/tasks/configure-pod-container/security-context/)에서
+Pod 수준 `spec.securityContext.runAsUser`, 컨테이너 수준
+`containers[].securityContext.capabilities` 예제를 가져온다.
+정확한 위치는 `kubectl explain pod.spec.securityContext`와
+`kubectl explain pod.spec.containers.securityContext.capabilities`로 대조한다.
+
+## 완료 판정
+
+`kubectl exec <pod> -- id` 또는 `whoami`로 실제 프로세스 사용자를 확인한다.
+capability가 필요한 작업은 그 작업 자체의 성공까지 확인하고, Pod Security Admission이 거부하면
+Events와 namespace 정책을 읽는다. 오류를 피하려고 privileged를 켜거나 정책을 낮추지 않고,
+문제가 요구한 capability만 컨테이너 수준에 추가한다.
+
+<LinkCard
+  title="10. Pod 배치"
+  description="nodeName·selector·taint·affinity 조건을 읽고 원하는 노드에 배치됐는지 확인한다."
+  href="/cka-udemy/04-scheduling/"
+/>
