@@ -133,6 +133,21 @@ status: review # stable | review | stale
 안정 상태가 되지 않고 **검토 이력 없음**으로 표시된다. 검토가 필요하거나 이미 낡았음을 명시할 때만
 `review`·`stale`을 쓴다. `stable`·`review`·`stale`에는 `reviewedAt`이 반드시 있어야 한다.
 
+## 덱 메타데이터
+
+덱마다 `category`(4종) 하나와 `tags`(최소 하나)를 붙인다. 카테고리는 "어디부터 볼지" 고르는
+굵은 묶음이고, 카테고리를 가로지르는 축(온프렘·실습·인증 같은)은 태그가 맡는다.
+어휘는 `src/data/catalog.mjs`가 전부다 — id는 ASCII 슬러그, label은 한국어다.
+**붙이는 기준은 그 덱이 실제로 여러 장을 쓰는 주제만이다.** 한 장 스쳐 가는 주제는 붙이지 않는다.
+어휘를 새로 추가하면 최소 한 덱이 그걸 써야 한다.
+`_deck.mjs`의 `catalogOrder`가 랜딩 카드 순서, `navOrder`가 topic 전환 순서다.
+
+`_deck.mjs`의 `termIntro: 'required'`인 덱의 학습 본문 장은 첫머리에 `<TermIntro>`를 둔다.
+`index`, `*-glossary`, `*-wrapup`은 제외한다. 새 개념 학습 덱은 `required`, 실습·문제풀이 위주 덱은
+`not-required`로 둔다. `legacy`는 규칙 도입 전 기존 덱에만 쓰며 새 덱에서 선택하지 않는다.
+형식은 `src/components/docs/TermIntro.astro` 머리 주석에 있다.
+새 본문의 `<Thesis>` 필수 조건과 기존 페이지의 `legacyThesis` 제거 규칙은 위 프론트매터 절을 따른다.
+
 ## 근거와 참고 자료
 
 사실·버전·수식·현재성 있는 주장처럼 나중에 근거를 재확인할 필요가 있는 내용에는

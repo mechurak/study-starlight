@@ -7,6 +7,16 @@
 
 ## 현재성 기준
 
+**2026년 9월 12일**에는 Astra에 맞춘 지침·작업 프로세스를 아래 OpenAI 원문으로 재검토했다.
+공유 정본·어댑터 구조는 유지하고, 조건부 읽기·skill 선택 범위·실행 권한·검증 종료 기준을 갱신했다.
+Anthropic 세부 기능과 `timeline` 사례의 확인 시점은 아래 9월 4일 기록을 유지한다. MDX의 `status: review`도
+유지하며, 날짜 갱신을 두 제품의 모든 기능을 새로 실측했다는 뜻으로 해석하지 않는다.
+
+- Astra 지침 정리: <https://developers.openai.com/blog/rethinking-skills-and-prompts-for-gpt-6-astra> (9월 11일 게시)
+- Astra 모델별 보정: <https://developers.openai.com/api/docs/guides/latest-model?model=gpt-6-astra>
+- 재확인: OpenAI AGENTS.md·best practices·ExecPlan·Subagents 문서
+  (<https://learn.chatgpt.com/docs/agent-configuration/subagents>)
+
 **2026년 9월 4일**에 다음 공식 문서와 사례를 확인했다.
 
 - OpenAI 지침 파일: <https://learn.chatgpt.com/docs/agent-configuration/agents-md>
@@ -47,6 +57,9 @@
 - `docs/plans/`를 설명할 때는 OpenAI ExecPlan(`PLANS.md`)이 가장 가까운 공식 대응물임을 밝히고,
   **자기완결 vs 링크**, **연속 실행 vs milestone gate** 두 축의 차이를 이 덱의 선택으로 서술한다.
   1장에서 한 번 설명하고 다른 장에서 반복하지 않는다.
+- milestone은 구현·검증·기록의 단위다. 자동 승인 gate로 취급하지 않는다. 조사·계획만, 특정 milestone까지,
+  전체 완료 중 사용자가 맡긴 실행 범위를 따르고, 추가 결정·권한이 필요한 곳만 확인 지점으로 둔다.
+- Astra의 성향은 모델별 관찰로 표시한다. 공유 지침의 단순화와 제품의 파일 탐색·도구 권한을 혼동하지 않는다.
 - 작업 단위는 "작업 계획(plan)", 파일은 "계획 문서"라고 부른다. 도구의 plan mode가 만드는 임시 plan과
   구분해서 쓴다. "배치"는 `timeline`의 옛 이름이라 사례 설명에서만 쓴다.
 - `timeline` 저장소를 사례로 들 때는 그 저장소의 현재 구조와 맞춘다. 덱에서 권장하는 구조가 사례와
