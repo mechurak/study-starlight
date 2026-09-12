@@ -268,6 +268,22 @@ pv-medium  5Gi
 pv-large   10Gi
 ```
 
+### Deployment 목록 — 지정 열·이름순·파일 저장
+
+`admin2406`의 Deployment를 이름 오름차순으로 저장하는 문제다. `kubectl get -h`에서
+`custom-columns`와 `--sort-by`를 찾고, `get deploy -o yaml`에서 필드 경로를 확인한다.
+
+```bash
+kubectl -n admin2406 get deploy \
+  -o 'custom-columns=DEPLOYMENT:.metadata.name,CONTAINER_IMAGE:.spec.template.spec.containers[*].image,READY_REPLICAS:.status.readyReplicas,NAMESPACE:.metadata.namespace' \
+  --sort-by='.metadata.name' > /opt/admin2406_data
+cat /opt/admin2406_data
+```
+
+이미지는 Deployment의 **Pod 템플릿** 아래에 있고, 준비된 복제본 수는 `.status.readyReplicas`다.
+요구한 헤더를 남기므로 `--no-headers`는 붙이지 않는다. `[*]`가 셸 패턴으로 해석되지 않게
+출력 옵션을 따옴표로 감싸고, 마지막에는 저장 파일의 열·정렬·내용까지 확인한다.
+
 ### aws-user가 사용하는 컨텍스트 이름 필터링
 
 kubeconfig의 컨텍스트는 클러스터·사용자·네임스페이스 선택을 묶은 설정이다.
@@ -313,6 +329,33 @@ kubectl config view --kubeconfig=/root/my-kube-config \
 바깥 큰따옴표는 셸이 표현식을 한 인자로 넘기게 하고, 안쪽 작은따옴표는 비교 문자열을 감싼다.
 여러 컨텍스트가 같은 사용자를 참조하면 조건에 맞는 이름이 모두 나온다. 빈 결과라면
 파일 경로, `contexts` 구조, 사용자 철자와 대소문자를 다시 확인한다.
+
+### VPA 관련 CRD 이름을 파일로 제출하기
+
+`controlplane`의 `/root/vpa-crds.txt`에 VerticalPodAutoscaler 관련 이름을 저장하라는 문제는
+VPA 객체가 아니라 **CustomResourceDefinition(CRD), 즉 리소스 정의 자체**를 조회한다.
+지정 노드에서 `hostname`을 확인한 뒤 실행한다. CRD는 클러스터 범위라 `-n`·`-A`가 필요 없다.
+
+```bash
+hostname
+kubectl get crd | grep -i verticalpodautoscaler
+vim /root/vpa-crds.txt
+```
+
+항목이 몇 개 없다면 첫 번째 열의 **이름만 한 줄에 하나씩** Vim에 복사해도 된다.
+`i` → 붙여넣기 → `Esc` → `:wq`로 저장한다. 헤더·생성 시각·`crd/` 접두사는 넣지 않는다.
+예상 이름을 외워 적지 말고 실제 조회 결과의 모든 관련 항목을 옮긴다.
+자동 저장이 편하면 다음을 대신 사용한다.
+
+```bash
+kubectl get crd -o custom-columns=NAME:.metadata.name --no-headers \
+  | grep -i verticalpodautoscaler > /root/vpa-crds.txt
+cat /root/vpa-crds.txt
+```
+
+빈 파일·오타·누락 여부를 최초 목록과 비교한다. 이름만으로 관련성을 판단하기 어려운 CRD는
+`kubectl get crd <이름> -o yaml`의 `spec.names.kind`와 `spec.group`도 확인한다.
+구조는 [공식 CRD 문서](https://kubernetes.io/docs/tasks/extend-kubernetes/custom-resources/custom-resource-definitions/)에서 찾는다.
 
 ### 제출 파일 확인과 실수 복구
 
@@ -361,6 +404,30 @@ kubectl get nodes -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}'
 `kubectl explain pod.spec.containers --recursive`로 확인한다. 둘을 함께 쓰면 버전 차이와 들여쓰기
 실수를 가장 빨리 줄일 수 있다.
 :::
+
+### 시험 중 찾을 곳과 학습용 링크 구분
+
+완성 명령보다 **어디서 찾는지**를 익힌다. 옵션은 `kubectl expose --help` 같은 하위 명령의
+Examples에서, YAML 필드는 `kubectl explain service.spec.ports`에서, 전체 골격은 공식 문서에서 찾는다.
+생성기가 있는 리소스는 `--dry-run=client -o yaml > 파일.yaml`로 시작하고, 제공된 파일이 있으면
+그 파일부터 연다. 짧은 조회 결과는 Vim에 옮겨도 된다. 제출 형식을 충족하면 복잡한 출력식은 필수가 아니다.
+
+2026-09-11 확인한 [Linux Foundation 허용 자료 안내](https://docs.linuxfoundation.org/tc-docs/certification/certification-resources-allowed)에
+따르면 CKA는 Kubernetes docs·blog, Helm docs, Gateway API docs와 문제의 **Quick Reference에 제공된 문서**를
+시험 VM 브라우저에서 볼 수 있다. 배포판에 설치된 문서와 터미널 도움말도 활용한다.
+이 덱의 KodeKloud GitHub 풀이·cri-dockerd 사이트 등 학습용 링크가 자동으로 시험 허용 자료가 되는 것은 아니다.
+Kubernetes 문서 검색에서도 외부 결과는 열지 않는다. 시험 직전에는 위 정본에서 허용 범위를 다시 확인한다.
+
+```bash
+kubectl create deployment --help
+kubectl explain pod.spec.containers --recursive
+systemctl -h
+man systemctl
+helm upgrade --help
+```
+
+`man`에서는 `/--now`처럼 검색하고 `n`으로 다음 결과, `q`로 종료한다.
+브라우저에서는 문서 제목을 검색한 뒤 `Ctrl+F`로 필드 이름을 찾는다.
 
 ### Vim으로 YAML을 고치는 짧은 연습
 

@@ -96,6 +96,57 @@ Pod 이름이 다르면 `pod mysql` 부분을 조회 결과로 바꾼다. `--sel
 이름이 잘못된 Service 교체와 기존 `targetPort` 수정은
 [10장 MySQL 연결 실패 사례](/cka-udemy/10-troubleshooting/#애플리케이션-연결-실패--mysql-service-진단)에서 다룬다.
 
+### messaging — 클러스터 내부에 6379 공개
+
+`within the cluster`는 ClusterIP, `imperative commands`는 명령으로 직접 생성하는 조건이다.
+기본 타입은 ClusterIP이고 `targetPort`를 생략하면 `port` 값을 사용한다.
+
+```bash
+kubectl expose --help
+kubectl expose pod messaging -n default --port=6379 --name=messaging-service
+kubectl describe svc messaging-service -n default
+kubectl get endpointslice -n default -l kubernetes.io/service-name=messaging-service
+```
+
+도움말 Examples의 `expose pod`에서 이름·포트를 바꾼다. Service의 Port·TargetPort가 6379이고,
+EndpointSlice가 준비된 messaging Pod 주소를 가리키는지 확인한다. 비어 있으면 Pod 라벨과 selector부터 비교한다.
+
+### hr-web-app — 골격에 nodePort 30082 추가
+
+노드에서 받는 포트가 30082, 앱이 듣는 포트가 8080이면 `nodePort: 30082`, `targetPort: 8080`이다.
+Service 자체의 `port`는 이 문제에서 8080으로 둔다. 기존 Deployment로부터 selector를 가져온다.
+
+```bash
+kubectl expose deployment hr-web-app -n default --name=hr-web-app-service \
+  --type=NodePort --port=8080 --target-port=8080 \
+  --dry-run=client -o yaml > hr-web-app-service.yaml
+vim hr-web-app-service.yaml
+```
+
+생성된 `spec.ports`의 항목에 `nodePort`를 추가한다. 아래는 해당 부분만 발췌한 것이다.
+
+```yaml
+  ports:
+    - port: 8080
+      protocol: TCP
+      targetPort: 8080
+      nodePort: 30082
+```
+
+```bash
+kubectl explain service.spec.ports
+kubectl create -f hr-web-app-service.yaml
+kubectl describe svc hr-web-app-service -n default
+kubectl get endpointslice -n default -l kubernetes.io/service-name=hr-web-app-service
+kubectl get nodes -o wide
+# 접근 가능한 실제 노드 IP로 교체
+curl http://NODE_IP:30082
+```
+
+`8080:30082/TCP` 표시만으로 백엔드 연결을 증명하지는 못한다. EndpointSlice와 실제 HTTP 응답까지 확인한다.
+공식 [Service의 NodePort 절](https://kubernetes.io/docs/concepts/services-networking/service/#type-nodeport)에서
+`nodePort`를 검색하거나 `explain`으로 필드 깊이를 확인한다. 기존 Deployment의 레이블을 유지해야 한다.
+
 ## 환경 탐색 — Practice Test: Explore Environment
 
 원본 풀이: [09-Practice-Test-Explore-Env.md](https://github.com/kodekloudhub/certified-kubernetes-administrator-course/blob/master/docs/09-Networking/09-Practice-Test-Explore-Env.md)

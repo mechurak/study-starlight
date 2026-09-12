@@ -155,6 +155,45 @@ kubectl get deploy -l app.kubernetes.io/instance=dazzling-web \
 `helm list`의 APP VERSION은 차트 메타데이터다. `image.tag`를 values로 따로 고정한 release라면
 실제 이미지와 다를 수 있으므로 마지막 `kubectl` 출력의 이미지 태그까지 확인한다.
 
+### kk-mock1 — podinfo 차트 6.11.2로 업그레이드
+
+릴리스 이름 `kk-mock1`, 네임스페이스 `kk-ns`는 주어졌지만 **저장소 별칭은 조회해서 확인**한다.
+릴리스와 저장소가 우연히 같은 이름일 수 있어도 같다고 가정하지 않는다.
+
+```bash
+helm list -n kk-ns
+helm repo list
+helm repo update
+helm search repo podinfo --versions
+```
+
+검색 결과 NAME이 `podinfo/podinfo`이고 CHART VERSION에 `6.11.2`가 있다면 다음처럼 실행한다.
+NAME이 `kk-mock1/podinfo`라면 두 번째 인자를 그 값으로 바꾼다.
+
+```bash
+helm upgrade kk-mock1 podinfo/podinfo -n kk-ns --version 6.11.2
+helm list -n kk-ns
+helm status kk-mock1 -n kk-ns
+kubectl get deploy,pods -n kk-ns -l app.kubernetes.io/instance=kk-mock1
+```
+
+CHART가 `podinfo-6.11.2`, 상태가 `deployed`인지 확인하고 워크로드 Ready 상태도 본다.
+`helm repo update`는 로컬 저장소 인덱스 갱신이므로 namespace를 지정할 필요가 없다.
+특정 저장소만 갱신하려면 `helm repo update <저장소별칭>`이다. 기존 values 변경은 문제에서 요구하지
+않으면 추가하지 않는다. 실패하면 `helm status`·Pod Events로 원인을 좁히고 아래 history 절에서
+정상 리비전을 확인한다.
+
+```bash
+helm repo update --help
+helm search repo --help
+helm upgrade --help
+```
+
+도움말의 Usage에서 `upgrade RELEASE CHART`, 옵션에서 `--version`을 찾는다.
+[공식 repo update](https://helm.sh/docs/helm/helm_repo_update/)와
+[upgrade](https://helm.sh/docs/helm/helm_upgrade/) 문서도 같은 구조다.
+차트 버전은 APP VERSION과 구분하고, `head`로 출력 일부만 잘라 목표 버전을 놓치지 않는다.
+
 ## 리비전 확인과 롤백 — history에서 정상 번호를 고른다
 
 install·upgrade할 때마다 release에는 revision이 하나씩 쌓인다. 업그레이드 결과가 잘못됐다면

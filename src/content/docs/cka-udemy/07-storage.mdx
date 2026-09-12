@@ -158,6 +158,38 @@ kubectl get pv pv-log
 깨끗한 랩이라면 아직 claim이 없으므로 `Available`이 정상이다. 이미 조건이 맞는 PVC가 있으면 곧바로
 `Bound`가 될 수 있으므로 상태 이름 하나만 외우지 말고 `CLAIM` 열도 함께 본다.
 
+### pv-analytics — PV만 요구하는 문제의 완료 기준
+
+공식 [PV 실습 문서](https://kubernetes.io/docs/tutorials/configuration/configure-persistent-volume-storage/)에서
+`kind: PersistentVolume`을 찾아 복사하고 이름·용량·접근 모드·경로만 요구사항에 맞춘다.
+예제의 `storageClassName: manual` 같은 추가 조건을 무심코 가져오지 않는다.
+
+```yaml
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: pv-analytics
+spec:
+  capacity:
+    storage: 100Mi
+  accessModes:
+    - ReadWriteMany
+  hostPath:
+    path: /pv/data-analytics
+```
+
+```bash
+kubectl explain pv.spec.hostPath
+kubectl create -f pv-analytics.yaml
+kubectl get pv pv-analytics
+kubectl describe pv pv-analytics
+```
+
+`100Mi`, `RWX`, HostPath `/pv/data-analytics`를 확인한다. `volumeMode: Filesystem`은 기본값이어서
+생략할 수 있다. PVC 생성 요구가 없으면 `Available`도 정상이며 일부러 PVC를 추가하지 않는다.
+`ReadWriteMany`를 선언해도 hostPath가 노드 간 공유 스토리지가 되는 것은 아니다.
+[hostPath의 범위](https://kubernetes.io/docs/concepts/storage/volumes/#hostpath)는 노드의 파일시스템이다.
+
 ### 2. PVC 생성 — 앱의 요청
 
 PVC는 네임스페이스 범위 리소스다. 다음 첫 요청은 문제의 값 그대로 `50Mi`와 `ReadWriteOnce`를 쓴다.
@@ -237,6 +269,52 @@ kubectl get pv,pvc
 사용 중인 PVC를 지우면 — `Terminating`에 **멈춘 채 대기**한다 (Pod이 쓰고 있는 동안).
 Pod을 지우면 그제야 삭제되고, PV는 reclaim 정책이 `Retain`이면 `Released`가 된다 —
 **다시 쓸 수 있는 상태가 아니다** (Available로 안 돌아온다).
+
+### alpha-mysql — PV를 고치지 않고 누락된 PVC 생성
+
+관찰: `alpha`의 `alpha-mysql`은 `MYSQL_ALLOW_EMPTY_PASSWORD: 1`과 `/var/lib/mysql`
+마운트가 이미 맞지만, 참조하는 PVC 이름은 **`mysql-alpha-pvc`**다. 별도로 조회한 `alpha-claim`은
+`Used By: <none>`이고 `slow-storage` 클래스 오류가 났다. 먼저 **앱이 실제로 참조하는 PVC**를 찾는다.
+
+```bash
+kubectl -n alpha describe deployment alpha-mysql
+kubectl -n alpha get pods
+kubectl -n alpha describe pod <Pod명>
+kubectl -n alpha get pvc
+kubectl get pv alpha-pv -o yaml
+```
+
+이 실습의 해결은 누락된 `mysql-alpha-pvc` 생성이다. PV의 클래스·접근 모드·용량을 확인한 뒤
+다음 내용을 `mysql-alpha-pvc.yaml`로 저장한다. **PV나 이미 맞는 Deployment 설정은 수정하지 않는다.**
+
+```yaml
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: mysql-alpha-pvc
+  namespace: alpha
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+  storageClassName: slow
+```
+
+클래스는 `slow-storage`가 아니라 **`slow`**다. 제공된 풀이에서는 조건에 맞는 `alpha-pv`로
+자동 바인딩되므로 `volumeName`이 필요 없다. 특정 PV를 명시하려면 PVC의 `spec.volumeName`을
+사용하되 다른 바인딩 조건도 맞아야 한다 — 공식 [PV 예약](https://kubernetes.io/docs/concepts/storage/persistent-volumes/#reserving-a-persistentvolume).
+
+```bash
+kubectl apply -f mysql-alpha-pvc.yaml
+kubectl -n alpha get pvc mysql-alpha-pvc
+kubectl -n alpha rollout status deployment/alpha-mysql --timeout=120s
+kubectl -n alpha get pods
+```
+
+완료 조건은 PVC의 **`Bound`·`VOLUME=alpha-pv`**와 MySQL Pod의 Ready다.
+계속 Pending이면 Pod·PVC Events를, 컨테이너가 재시작하면 `kubectl -n alpha logs <Pod명> --previous`를 본다.
 
 ## StorageClass — Practice Test: Storage Class
 

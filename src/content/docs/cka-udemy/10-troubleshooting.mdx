@@ -89,6 +89,95 @@ CPU가 `1m`처럼 작은 것은 자연스럽다. probe나 런타임의 백그라
 메트릭이 어디서 와서 어디로 가는지(kubelet → metrics-server → HPA)는
 [cka 8장 메트릭 파이프라인](/cka/08-autoscaling/)에 있다.
 
+## 오토스케일러 — 제공된 파일과 CRD 스키마 활용
+
+HPA(Horizontal Pod Autoscaler)는 복제본 수를, VPA(Vertical Pod Autoscaler)는 컨테이너 리소스 요청량을
+조정한다. 개념은 [CKA 오토스케일링 장](/cka/08-autoscaling/)에서 보고 여기서는 생성·검증 순서를 연습한다.
+
+### webapp-hpa — CPU 50%와 축소 안정화 300초
+
+```bash
+cat /root/webapp-hpa.yaml
+vim /root/webapp-hpa.yaml
+kubectl explain hpa.spec.behavior.scaleDown --api-version=autoscaling/v2
+```
+
+제공 파일부터 연다. 다음은 예제 완성본이며 `minReplicas: 2`, `maxReplicas: 10`은 이 예제의 값이다.
+본문에서 최소·최대를 따로 지정하지 않았다면 제공 파일의 값을 유지한다.
+
+```yaml
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: webapp-hpa
+  namespace: default
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: kkapp-deploy
+  minReplicas: 2
+  maxReplicas: 10
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 50
+  behavior:
+    scaleDown:
+      stabilizationWindowSeconds: 300
+```
+
+공식 [Horizontal Pod Autoscaling](https://kubernetes.io/docs/concepts/workloads/autoscaling/horizontal-pod-autoscale/)에서
+`stabilizationWindowSeconds`를 검색한다. CPU 비율은 **CPU request 대비 사용률**이고,
+안정화 창은 최근 300초의 권장 복제본 수 중 큰 값을 고려해 급격한 축소를 억제한다.
+단순히 모든 축소를 무조건 300초 지연하는 타이머로 읽지 않는다.
+
+```bash
+kubectl apply -f /root/webapp-hpa.yaml
+kubectl get hpa webapp-hpa -n default
+kubectl describe hpa webapp-hpa -n default
+```
+
+대상 Deployment, CPU 목표 50%, Scale Down 안정화 300초를 확인한다.
+메트릭이 계속 `<unknown>`이면 Conditions·Events에서 CPU requests 누락과 metrics 수집 실패를 구분한다.
+생성 성공과 실제 스케일링 가능 여부는 별도다.
+
+### analytics-vpa — Recreate 모드로 요청량 조정
+
+공식 [Vertical Pod Autoscaling](https://kubernetes.io/docs/concepts/workloads/autoscaling/vertical-pod-autoscale/)에서
+`updateMode`를 검색해 골격을 가져온다. VPA는 별도 CRD·컨트롤러가 필요하며,
+설치된 환경에서는 `kubectl explain vpa.spec`와 `kubectl explain vpa.spec.updatePolicy`도 활용한다.
+
+```yaml
+apiVersion: autoscaling.k8s.io/v1
+kind: VerticalPodAutoscaler
+metadata:
+  name: analytics-vpa
+  namespace: default
+spec:
+  targetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: analytics-deployment
+  updatePolicy:
+    updateMode: Recreate
+```
+
+```bash
+kubectl create -f analytics-vpa.yaml
+kubectl describe vpa analytics-vpa -n default
+```
+
+`Target Ref`와 `Update Mode: Recreate`를 확인하고, 시간이 지난 뒤 권장값과 Conditions를 본다.
+HPA는 `scaleTargetRef`, VPA는 `targetRef`다. Recreate는 필요 시 Pod를 축출하고 Deployment가
+새 요청량을 가진 Pod를 다시 만들도록 한다. 생성 직후 즉시 축출되어야 하는 것은 아니다.
+기본 구성은 CPU·메모리 요청량을 조정하며 limits도 비례 조정할 수 있다.
+문제가 limits 유지를 명시하면 `resourcePolicy.containerPolicies`의
+`controlledValues: RequestsOnly`를 공식 문서의 **Resource policies**에서 찾아 추가한다.
+
 ## 애플리케이션 로그 — Practice Test: Managing Application Logs
 
 원본 풀이: [06-Practice-Test-Managing-Application-Logs.md](https://github.com/kodekloudhub/certified-kubernetes-administrator-course/blob/master/docs/04-Logging-and-Monitoring/06-Practice-Test-Managing-Application-Logs.md)
