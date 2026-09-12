@@ -35,6 +35,10 @@ export default {
 		{
 			"id": "cluster-lifecycle",
 			"label": "클러스터 운영"
+		},
+		{
+			"id": "rbac",
+			"label": "Cluster Architecture"
 		}
 	],
 	"map": [
@@ -206,11 +210,24 @@ export default {
 			"tone": "bad"
 		},
 		{
-			"label": "12장",
+			"label": "31~33장",
 			"title": "Kustomize",
 			"href": "/cka-udemy/12-kustomize/",
-			"desc": "환경별 resources 추가 · transformer 범위 · JSON6902 교체·삭제 · Components 선택 기능 · 적용 경로·검증 · 시험 문서",
-			"items": [["cka 16장", "/cka/16-helm-kustomize/"]],
+			"desc": "resources·base/overlay 적용 → 범위별 변환 → 특정 대상 patch",
+			"items": [
+				[
+					"범위별 변환",
+					"/cka-udemy/kustomize-transformers/"
+				],
+				[
+					"특정 대상 수정·삭제",
+					"/cka-udemy/kustomize-patches/"
+				],
+				[
+					"cka 16장",
+					"/cka/16-helm-kustomize/"
+				]
+			],
 			"tone": "bad"
 		}
 	]

@@ -1,0 +1,208 @@
+---
+title: "32. Kustomize — 범위별 변환"
+description: "resources 참조 관계를 따라 이름·라벨·namespace·annotation·이미지의 변경 범위를 고른다"
+deckGroup: rbac
+sidebar:
+  order: 1320
+reviewedAt: 2026-09-12
+---
+
+import { LinkCard } from '@astrojs/starlight/components';
+import Thesis from '../../../components/docs/Thesis.astro';
+
+<Thesis>변환 범위는 폴더 위치가 아니라 resources를 따라 모인 리소스로 결정된다</Thesis>
+
+같은 이미지나 라벨을 여러 YAML에서 일일이 바꾸면 빠뜨리기 쉽다. Transformer는 한 설정이
+모은 리소스에 공통 변경을 적용한다. 이 페이지에서는 **요구한 그룹만 바뀌도록 설정 위치를 고른다**.
+
+[기본 묶기·적용](/cka-udemy/12-kustomize/)을 먼저 읽고, base·overlay 원리는
+[cka 16장](/cka/16-helm-kustomize/#kustomize)에서 확인한다.
+특정 Deployment의 필드 하나만 고치려면 [patch](/cka-udemy/kustomize-patches/)를 쓴다.
+
+## Transformer는 적용 범위부터 고른다
+
+Transformer는 모아 둔 리소스의 이름·라벨·이미지 같은 필드를 일괄 변환하는 기능이다.
+문제에서 먼저 찾을 것은 **무엇을 바꾸는가**와 **어디까지 바꾸는가**다.
+전체 프로젝트이면 루트 설정, db만이면 db 설정, nginx와 monitoring만이면 두 설정을 고른다.
+
+이 랩은 기본 페이지의 base·overlay 예제와 달리 **하위 폴더에도 `kustomization.yaml`이 있는 구조**다.
+루트가 다음처럼 각 하위 설정을 참조하고, db는 다시 sql·nosql의 리소스를 모은다고 가정한다.
+실제 랩의 기존 `resources`를 먼저 읽고, 아래 예제로 통째로 덮어쓰지 않는다.
+
+```yaml
+# k8s/kustomization.yaml의 resources 예시
+resources:
+  - db
+  - message-broker
+  - nginx
+  - monitoring
+```
+
+**범위는 파일시스템의 하위 폴더 전체가 아니라 `resources`를 따라 모인 리소스다.**
+루트가 `db/db-depl.yaml` 같은 원본 파일을 직접 참조하면 `db/kustomization.yaml`에 적힌
+변환은 거치지 않는다. db 설정을 적용하려면 루트에서 `db` 디렉터리를 참조해야 한다.
+([공식 문서 — Bases and Overlays](https://kubernetes.io/docs/tasks/manage-kubernetes-objects/kustomization/#bases-and-overlays))
+
+| 문제의 대상 | 확인·수정할 파일 | 필드와 답 |
+|---|---|---|
+| 전체 리소스의 라벨 조회 | `k8s/kustomization.yaml` | `commonLabels` → `sandbox: dev` |
+| sql·nosql을 포함한 db의 접두사 조회 | `k8s/db/kustomization.yaml` | `namePrefix` → `data-` |
+| monitoring의 네임스페이스 조회 | `k8s/monitoring/kustomization.yaml` | `namespace` → `logging` |
+| nginx·monitoring에만 annotation 추가 | 두 폴더의 `kustomization.yaml` | `commonAnnotations` → `owner: bob@gmail.com` |
+| 프로젝트 전체 postgres 이미지 교체 | `k8s/kustomization.yaml` | `images`의 `newName: mysql` |
+| nginx 폴더의 nginx 태그 변경 | `k8s/nginx/kustomization.yaml` | `images`의 `newTag: "1.23"` |
+
+ **현재 값을 묻는 문제에서는 수정하지 않는다**. 설정을 읽고 렌더된 결과로
+확인한다.  변경을 요구하면 기존 키에 내용을 병합하고, 같은 YAML 키를 두 번
+만들지 않는다. 아래 코드들은 각 파일의 최상위에 들어갈 **관련 필드만 발췌한 것**이다.
+
+### 전체 라벨 — commonLabels 읽기
+
+```yaml
+# k8s/kustomization.yaml
+commonLabels:
+  sandbox: dev
+```
+
+답은 키와 값을 함께 읽은 **`sandbox: dev`**다. 이 변환은 리소스의 `metadata.labels`뿐 아니라
+Deployment·Service의 selector와 Pod template 라벨 등에도 반영된다.
+현행 문서의 [Setting cross-cutting fields](https://kubernetes.io/docs/tasks/manage-kubernetes-objects/kustomization/#setting-cross-cutting-fields)는
+다음 `labels` 형식을 사용한다. `commonLabels`는 deprecated이지만 기존 랩에서는 만날 수 있다.
+([공식 소스의 deprecated 표시 — 학습용](https://github.com/kubernetes-sigs/kustomize/blob/master/api/types/kustomization.go))
+
+```yaml
+# 새로 작성할 때 commonLabels와 같은 selector 반영을 원하면
+labels:
+  - pairs:
+      sandbox: dev
+    includeSelectors: true
+```
+
+두 형식을 동시에 추가하지 않는다. `labels`는 기본으로 selector를 바꾸지 않으므로
+`includeSelectors: true`를 빼면 같은 동작이 아니다.
+실습이 기존 값을 묻거나 특정 필드 사용을 요구하면 그 형식을 따른다.
+
+:::caution[함정 — 라벨 추가가 selector 변경이 될 수 있다]
+이미 배포된 Deployment의 selector는 변경할 수 없다. `commonLabels` 또는
+`includeSelectors: true`를 나중에 추가해 적용하면 immutable 오류가 날 수 있다.
+`kubectl diff -k .`에서 selector까지 달라지는지 보고, 라벨만 필요한 요구라면 selector 변경을
+피하는 `labels` 설정을 검토한다. 오류를 없애려고 Deployment부터 삭제하지 않는다.
+:::
+
+### db 이름의 접두사 — namePrefix
+
+```yaml
+# k8s/db/kustomization.yaml
+namePrefix: data-
+```
+
+답은 **`data-`**다. db의 `resources`가 sql과 nosql을 모두 참조하면 양쪽에 적용된다.
+예를 들어 `metadata.name: postgres`는 `data-postgres`가 된다.
+루트에 쓰면 다른 서비스의 이름도 바뀌므로 db 범위를 벗어난다.
+접두사는 컨테이너 이미지 이름을 바꾸는 설정이 아니다.
+
+### monitoring 네임스페이스 — namespace
+
+```yaml
+# k8s/monitoring/kustomization.yaml
+namespace: logging
+```
+
+답은 **`logging`**이다. monitoring에서 모은 Deployment·Service 같은 네임스페이스 소속
+리소스에 적용된다. ClusterRole 같은 클러스터 범위 리소스를 네임스페이스 소속으로 바꾸지는 않는다.
+또한 이 필드만으로 Namespace 오브젝트가 생성되지는 않는다.
+적용을 요구받았다면 `kubectl get namespace logging`으로 존재 여부를 확인하고,
+필요한 Namespace 생성은 문제의 요구에 맞춰 처리한다.
+
+### 두 그룹에만 annotation — commonAnnotations
+
+```yaml
+# k8s/nginx/kustomization.yaml과
+# k8s/monitoring/kustomization.yaml 각각에 추가
+commonAnnotations:
+  owner: bob@gmail.com
+```
+
+루트에 넣으면 db·message-broker까지 영향을 받는다.
+두 하위 설정에 각각 추가하고, 전체 렌더 결과의 `metadata.annotations.owner`를 확인한다.
+nginx·monitoring에 값이 생겼는지와 함께 다른 그룹에는 이번 변경이 들어가지 않았는지도 본다.
+
+## 이미지 변환 — newName과 newTag 구분하기
+
+`images`의 `name`은 **변경할 기존 이미지 이름을 찾는 키**다. Deployment 이름이나
+`containers[].name`을 넣는 자리가 아니다.
+`newName`은 이미지 이름 교체, `newTag`는 태그 교체다.
+([공식 문서 — Customizing의 images 예제](https://kubernetes.io/docs/tasks/manage-kubernetes-objects/kustomization/#customizing))
+
+### 전체 postgres를 mysql로 교체
+
+```yaml
+# k8s/kustomization.yaml
+images:
+  - name: postgres
+    newName: mysql
+```
+
+루트가 모은 리소스에서 `postgres` 이미지가 바뀐다. `postgres`는 `mysql`이 되며,
+`postgres:15`처럼 태그가 있었다면 `mysql:15`로 **기존 태그가 유지**된다.
+`newName`만으로 새 이미지에 적합한 태그를 골라 주지는 않는다.
+`registry.example.com/postgres`처럼 경로가 붙은 이미지라면 실제 이미지 이름에 맞춰 `name`도 확인한다.
+
+:::caution[함정 — 이미지 변환은 DB 마이그레이션이 아니다]
+이 문제는 이미지 문자열 변환 연습이다. PostgreSQL의 데이터·환경변수·포트·볼륨 구성이
+MySQL용으로 바뀌지는 않는다. 렌더 성공과 애플리케이션 기동 성공을 구분하고,
+실제 적용까지 요구받았다면 변경된 이미지의 존재 여부와 워크로드 상태도 확인한다.
+:::
+
+### nginx 폴더의 nginx 태그만 변경
+
+```yaml
+# k8s/nginx/kustomization.yaml
+images:
+  - name: nginx
+    newTag: "1.23"
+```
+
+이미지 이름은 유지하고 태그만 `1.23`으로 바꾼다. 태그는 문자열이므로 따옴표로 감싼다.
+루트에 쓰면 다른 그룹에서 사용하는 nginx까지 바뀔 수 있다.
+
+### 하위 결과와 전체 결과를 모두 확인
+
+```bash
+cd /root/code/k8s
+kubectl kustomize db
+kubectl kustomize nginx
+kubectl kustomize monitoring
+kubectl kustomize .
+```
+
+하위 렌더에서는 해당 그룹의 변경을, **마지막 루트 렌더에서는 부모 변환까지 반영된 결과**를 본다.
+원본 YAML 파일이 그대로인 것은 정상이다. Kustomize는 원본을 덮어쓰지 않고 결과를 생성한다.
+확인할 필드는 `metadata.labels`, `metadata.name`, `metadata.namespace`,
+`metadata.annotations`, `spec.template.spec.containers[].image`다.
+
+하위 결과는 맞고 루트 결과가 틀리면 루트의 `resources`가 하위 설정을 거치는지,
+루트에 같은 필드를 바꾸는 변환이 있는지 확인한다.
+적용까지 요구한 문제에서는 아래 순서로 이어 간다.
+
+```bash
+kubectl diff -k .
+kubectl apply -k .
+kubectl get -k .
+```
+
+이름·namespace 변환은 적용 대상의 식별자를 바꾼다. 이전 이름이나 namespace에 이미 있던
+리소스가 자동 이동·삭제되는 것은 아니므로, 변경 전후 대상을 구분해 요구 범위만 처리한다.
+
+## 공식 예제에서 바꿀 필드
+
+Kubernetes 문서 내부에서 `kustomize`를 검색한다.
+[Setting cross-cutting fields](https://kubernetes.io/docs/tasks/manage-kubernetes-objects/kustomization/#setting-cross-cutting-fields)의
+`labels`·`namePrefix`·`namespace`·`commonAnnotations`를 찾아 요구된 값과 **설정 위치**를 고른다.
+이미지는 [Customizing](https://kubernetes.io/docs/tasks/manage-kubernetes-objects/kustomization/#customizing)의
+`images` 블록에서 `name`을 기존 이미지로, `newName`·`newTag`를 요구 값으로 바꾼다.
+
+범위 안의 변경과 범위 밖의 비변경을 함께 확인한다. 적용·rollout·실패 시 복구는
+[공통 완료 검증](/cka-udemy/12-kustomize/#미리보기와-완료-검증-구분하기)을 따른다.
+
+<LinkCard title="특정 대상 수정·삭제" href="/cka-udemy/kustomize-patches/" />

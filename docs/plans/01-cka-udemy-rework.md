@@ -178,7 +178,7 @@ Kubernetes 문서 내 검색은 가능하지만 외부 검색 결과를 열면 �
 
 - 선행: M0의 이관 계약을 확정한다. M1 시범 결과로 조정이 필요하면 계약과 예약표를 함께 갱신한다.
 - 원본: `12-kustomize.mdx` 전체, `cka/16-helm-kustomize.mdx`의 Kustomize 절.
-- [ ] M1a: 기존 `12-kustomize.mdx`에는 resources·base/overlay·미리보기·적용을 남긴다. `kustomize-transformers.mdx`로 범위별 이름·라벨·이미지 변환을, `kustomize-patches.mdx`로 특정 대상 수정·삭제를 옮긴다.
+- [x] M1a: 기존 `12-kustomize.mdx`에는 resources·base/overlay·미리보기·적용을 남긴다. `kustomize-transformers.mdx`로 범위별 이름·라벨·이미지 변환을, `kustomize-patches.mdx`로 특정 대상 수정·삭제를 옮긴다.
 - [ ] M1b: `kustomize-components.mdx`에 선택 기능 사례를 옮긴다. 해당 주제의 학습 보충임을 표시하고 필수 시험 출제라고 단정하지 않는다.
 - [ ] 예제의 디렉터리·리소스 이름을 되도록 공유하고, 동일한 미리보기 설명은 한 번 설명한 뒤 필요한 차이만 쓴다.
 - [ ] 공식 페이지에 실제 있는 예제와 별도로 익힐 문법을 구분한다. 기존 랩의 kind 채점 관찰을 일반 CKA 채점 규칙으로 확대하지 않는다.
@@ -295,3 +295,24 @@ M0 문서 대조: 공식 PDF 본문 27항목, LF 시험 환경 v1.35·허용 자
 M0 저장소 검증: `pnpm check` exit 0 — 371페이지 빌드·31,796개 내부 링크 통과.
 `git diff --check` 통과. 계획·baseline만 변경하여 브라우저 검증은 해당하지 않는다.
 M0 묶음은 이 기록과 함께 커밋한다. 다음 작업은 M1a다.
+
+
+### M1a — 기본 적용·변환·patch (2026-09-13)
+
+기존 URL은 기본 적용에 유지했다. 31~33장/order 1310~1330을 활성화하고 index·DeckMap을
+실제 세 페이지로 연결했다. Components는 다음 M1b까지 기존 URL에 유지하므로 현재 기본 페이지는
+411줄이며, 선택 기능을 옮긴 뒤 한 작업 목표로 줄인다. 변환 208줄·patch 248줄이다.
+
+- 원본 단일 파일 목록과 하위 설정 참조의 차이를 보존했다. 공통 base의 api-deployment를 제공해
+  QA patch와 다음 components가 같은 이름·경로를 사용한다. mongo 라벨 삭제는 별도 랩 전제를 명시했다.
+- 공식 Kustomize·patch·diff·LF 문서와 Components·기본값 소스를 대조했다. Kubernetes 본문에
+  apiVersion/kind·`$patch: delete`가 없고 `Json6902`·`includeSelectors` 예제가 있음을 확인했다.
+- 로컬 kubectl v1.36.4 / 내장 Kustomize v5.8.1로 본문 YAML 블록을 추출해 렌더했다.
+  base 1개, staging MySQL 추가·prod 비변경, caddy 교체, memcached만 삭제, Pod template org만 삭제,
+  newName의 기존 태그 유지·nginx만 newTag·namespace·annotation 범위·selector 라벨을 확인했다.
+  `commonLabels` deprecation 경고는 기존 랩 형식을 확인한 것으로 예상된 결과다.
+- `pnpm check` exit 0: 373페이지·31,920개 내부 링크 통과. preview + Playwright에서 세 페이지의
+  사이드바·DeckMap 링크와 390px main/문서 넘침 없음 확인. `git diff --check` 통과.
+- 지정 랩 없음: 클러스터 diff·apply·get·rollout 및 실제 앱 동작은 실행하지 않았다.
+
+다음 묶음은 M1b 선택 기능 이동과 시범 전체 검토·Sol 인계다.
