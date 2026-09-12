@@ -1,0 +1,150 @@
+---
+title: "13. HPA 설정과 검증"
+description: "제공된 HPA를 CPU·메모리 목표에 맞게 수정하고 metrics·requests·replica 상태를 함께 검증한다"
+deckGroup: pods
+sidebar:
+  order: 1130
+reviewedAt: 2026-09-13
+---
+
+import { LinkCard } from '@astrojs/starlight/components';
+import Thesis from '../../../components/docs/Thesis.astro';
+
+<Thesis>HPA는 객체 생성만 확인하지 않고 메트릭 API와 대상 Pod의 request를 먼저 확인한 뒤 현재·목표 replica를 읽어야 한다.</Thesis>
+
+> 짝이 되는 개념 장: [cka 8. 오토스케일링](/cka/08-autoscaling/)
+
+이 장의 과제는 제공된 HPA 파일을 요구한 CPU 또는 메모리 목표로 고치고, 실제로 replica를 계산할
+수 있는 상태인지 확인하는 것이다. HPA는 Deployment 같은 대상의 복제본 수를 조정한다.
+
+리소스 `Utilization`은 현재 사용량을 Pod의 request와 비교한 비율이다. 따라서 metrics API가
+응답하고 대상 컨테이너에 해당 리소스 request가 있어야 한다. `kubectl apply` 성공과 HPA의
+`TARGETS`가 숫자로 나오는 상태를 별도로 판정한다.
+
+## 사전 조건 — 메트릭과 request를 먼저 확인한다
+
+```bash
+kubectl get apiservice v1beta1.metrics.k8s.io
+kubectl top pods
+kubectl get deployment kkapp-deploy \
+  -o jsonpath='{.spec.template.spec.containers[*].resources.requests}{"\n"}'
+```
+
+APIService가 `Available=True`이고 `kubectl top`이 값을 반환해야 resource metric을 읽을 수 있다.
+CPU 목표에는 `requests.cpu`, 메모리 목표에는 `requests.memory`가 필요하다. 설치·수집이 아직
+준비되지 않았다면 [metrics-server 실습](/cka-udemy/10-troubleshooting/#metrics-server--practice-test-monitor-cluster-components)에서
+선행 조건을 해결한다.
+
+## webapp-hpa — CPU 50%와 축소 안정화 300초
+
+```bash
+cat /root/webapp-hpa.yaml
+vim /root/webapp-hpa.yaml
+kubectl explain hpa.spec.behavior.scaleDown --api-version=autoscaling/v2
+```
+
+제공 파일부터 연다. 다음 완성본의 최소·최대값은 이 예제의 조건이다. 문제에서 따로 지정하지 않았다면
+제공 파일의 값을 유지한다.
+
+```yaml
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: webapp-hpa
+  namespace: default
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: kkapp-deploy
+  minReplicas: 2
+  maxReplicas: 10
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 50
+  behavior:
+    scaleDown:
+      stabilizationWindowSeconds: 300
+```
+
+`stabilizationWindowSeconds: 300`은 최근 300초의 권장 replica 중 가장 큰 값을 고려해 급격한 축소를
+억제한다. 모든 축소를 무조건 300초 뒤에 한 번 실행하는 타이머는 아니다.
+
+```bash
+kubectl apply --dry-run=server -f /root/webapp-hpa.yaml
+kubectl apply -f /root/webapp-hpa.yaml
+kubectl get hpa webapp-hpa
+kubectl describe hpa webapp-hpa
+```
+
+## backend-hpa — memory utilization 65%로 바꾼다
+
+CPU 예제를 메모리 문제에 재사용할 때는 `resource.name`과 목표값뿐 아니라 대상·namespace·최소·최대
+replica를 모두 문제와 맞춘다.
+
+```yaml
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: backend-hpa
+  namespace: backend
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: backend-deployment
+  minReplicas: 3
+  maxReplicas: 15
+  metrics:
+    - type: Resource
+      resource:
+        name: memory
+        target:
+          type: Utilization
+          averageUtilization: 65
+```
+
+```bash
+kubectl apply --dry-run=server -f /root/webapp-hpa.yaml
+kubectl apply -f /root/webapp-hpa.yaml
+kubectl get hpa backend-hpa -n backend
+kubectl describe hpa backend-hpa -n backend
+kubectl get deploy backend-deployment -n backend \
+  -o jsonpath='{.spec.template.spec.containers[*].resources.requests.memory}{"\n"}'
+```
+
+`TARGETS`가 `<unknown>/65%`라면 객체는 생성됐지만 replica 계산은 아직 불가능하다. `describe hpa`의
+Conditions·Events에서 `FailedGetResourceMetric` 같은 수집 오류와 request 누락을 구분한다. target
+Deployment 이름이나 namespace가 틀렸다면 `AbleToScale` 조건에서도 드러난다.
+
+## 공식 문서에서 찾을 것
+
+| 검색어 | 가져올 필드·판정 |
+|---|---|
+| `Horizontal Pod Autoscaling` | [`autoscaling/v2`, request 대비 Utilization, 안정화 창](https://kubernetes.io/docs/concepts/workloads/autoscaling/horizontal-pod-autoscale/) |
+| `HorizontalPodAutoscaler v2` | [`scaleTargetRef`, `metrics`, `behavior`, status 필드](https://kubernetes.io/docs/reference/kubernetes-api/autoscaling/horizontal-pod-autoscaler-v2/) |
+| `Resource metrics pipeline` | [metrics-server → Metrics API → HPA 경로](https://kubernetes.io/docs/tasks/debug/debug-cluster/resource-metrics-pipeline/) |
+
+## 완료 판정
+
+```bash
+kubectl get hpa webapp-hpa \
+  -o custom-columns='NAME:.metadata.name,CURRENT:.status.currentReplicas,DESIRED:.status.desiredReplicas,MIN:.spec.minReplicas,MAX:.spec.maxReplicas'
+kubectl get deployment kkapp-deploy
+```
+
+- HPA의 target, metric 종류·목표, min/max와 scaleDown 안정화 값이 문제와 같다.
+- `TARGETS`의 현재값이 `<unknown>`이 아니고 Conditions에서 `AbleToScale=True`다.
+- 부하가 주어진 문제라면 `desiredReplicas`와 Deployment replicas가 기대 범위로 변했다.
+
+부하가 없는 랩에서는 임의의 큰 부하를 만들지 않고 위 조건과 현재·목표 replica를 제출 증거로 남긴다.
+
+<LinkCard
+  title="14. VPA CRD 읽기"
+  description="별도 설치된 VPA의 targetRef·updateMode·recommendation을 확인한다."
+  href="/cka-udemy/vpa/"
+/>

@@ -1,0 +1,153 @@
+---
+title: "14. VPA CRD 읽기"
+description: "별도 설치된 VPA CRD의 targetRef와 Recreate 정책을 설정하고 recommendation·적용 상태를 확인한다"
+deckGroup: pods
+sidebar:
+  order: 1140
+reviewedAt: 2026-09-13
+---
+
+import { LinkCard } from '@astrojs/starlight/components';
+import Thesis from '../../../components/docs/Thesis.astro';
+
+<Thesis>VPA는 기본 Kubernetes API가 아니므로 설치 여부와 실제 CRD 스키마를 먼저 읽고, 생성 결과보다 recommendation과 새 Pod의 request를 확인한다.</Thesis>
+
+> 개념 연결: [cka 8. 오토스케일링](/cka/08-autoscaling/), [cka 17. CRD와 오퍼레이터](/cka/17-extensions/#crd와-오퍼레이터)
+
+:::note[학습 보충]
+이 페이지는 설치된 VPA CRD를 다루는 기존 사례다. 독립적인 VPA 설치나 오퍼레이터 구축 전체를
+연습하는 랩은 아니며, VPA가 기본 Kubernetes에 포함된 API라고 가정하지 않는다.
+:::
+
+이 장의 과제는 이미 VPA가 설치된 환경에서 대상 Deployment와 업데이트 모드를 지정하고 결과를
+읽는 것이다. HPA가 replica 수를 바꾸는 것과 달리 VPA는 컨테이너의 CPU·메모리 requests를
+권장하거나 적용한다.
+
+먼저 CRD와 컨트롤러 존재를 확인한다. 설치되지 않았다면 YAML을 써도 API 서버가 kind를 알지 못하므로
+그 상태를 문서 작성 오류와 구분한다.
+
+## 설치된 CRD와 스키마 확인
+
+```bash
+kubectl get crd verticalpodautoscalers.autoscaling.k8s.io
+kubectl api-resources --api-group=autoscaling.k8s.io
+kubectl -n kube-system get deployment \
+  -l app.kubernetes.io/name=vpa
+kubectl explain vpa.spec
+kubectl explain vpa.spec.updatePolicy
+```
+
+배포 이름과 라벨은 설치 방식마다 다를 수 있다. CRD가 보이는데 위 라벨 조회 결과가 없다면
+`kubectl get deployments -A | grep -i vpa`처럼 실제 설치 리소스를 찾는다. `kubectl explain`은
+클러스터에 등록된 CRD 스키마를 읽으므로 버전별 필드 차이를 확인하는 첫 도구다.
+
+## analytics-vpa — Recreate 모드로 요청량 조정
+
+```yaml
+apiVersion: autoscaling.k8s.io/v1
+kind: VerticalPodAutoscaler
+metadata:
+  name: analytics-vpa
+  namespace: default
+spec:
+  targetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: analytics-deployment
+  updatePolicy:
+    updateMode: Recreate
+```
+
+HPA는 `scaleTargetRef`, VPA는 `targetRef`다. `Recreate`에서는 현재 request와 권장값 차이가 충분할 때
+VPA updater가 Pod을 축출할 수 있고, Deployment가 대체 Pod을 만들면 admission controller가 새
+request를 적용한다. VPA 객체 생성 직후 즉시 축출되어야 하는 것은 아니다.
+
+:::caution[targetRef는 같은 namespace에서 찾는다]
+`targetRef` 안에는 namespace 필드가 없다. VPA와 대상 Deployment를 같은 namespace에 만들고,
+다른 namespace의 동명 Deployment를 보고 성공으로 오판하지 않는다. 먼저 두 객체의
+`metadata.namespace`와 target 이름을 함께 확인한다.
+:::
+
+```bash
+kubectl get vpa analytics-vpa -o jsonpath='{.metadata.namespace}{"\t"}{.spec.targetRef.name}{"\n"}'
+kubectl get deployment analytics-deployment -o name
+```
+
+```bash
+kubectl apply --dry-run=server -f analytics-vpa.yaml
+kubectl apply -f analytics-vpa.yaml
+kubectl describe vpa analytics-vpa
+kubectl get vpa analytics-vpa \
+  -o jsonpath='{.status.recommendation.containerRecommendations}{"\n"}'
+kubectl get pods -l app=analytics -w
+```
+
+recommendation이 비어 있다면 수집 시간이 필요한지, metrics-server와 recommender가 정상인지,
+targetRef가 실제 workload를 가리키는지 Events와 컨트롤러 로그로 나눈다. 대체 Pod이 생겼다면
+기존 Pod의 request와 비교한다.
+
+```bash
+kubectl get pods -l app=analytics \
+  -o jsonpath='{range .items[*]}{.metadata.name}{"\t"}{.spec.containers[*].resources.requests}{"\n"}{end}'
+```
+
+### recommendation과 적용을 구분한다
+
+`status.recommendation`은 권장 크기를 계산했다는 증거이고, 새 Pod의 request는 그 권장이 실제로
+적용됐다는 증거다. 둘을 같은 상태로 취급하지 않는다.
+
+| 관찰 | 뜻 | 다음 확인 |
+|---|---|---|
+| VPA 객체만 있고 recommendation 없음 | 대상·메트릭·recommender 중 하나가 아직 준비되지 않음 | VPA Conditions·Events와 recommender 로그 |
+| recommendation은 있으나 기존 Pod request 그대로 | 권장은 계산됐지만 업데이트가 아직 실행되지 않음 | updateMode, updater, 축출 Events |
+| 새 Pod이 생겼으나 request 그대로 | admission 단계가 권장을 주입하지 못함 | admission controller와 새 Pod Events |
+| 새 Pod request가 target 범위 | Recreate 적용 완료 | workload Ready와 limits 조건 |
+
+```bash
+kubectl get vpa analytics-vpa -o yaml
+kubectl get events --sort-by=.lastTimestamp \
+  --field-selector involvedObject.name=analytics-vpa
+kubectl -n kube-system get pods | grep -i vpa
+```
+
+컨트롤러 이름은 설치 방식마다 다르므로 로그 명령을 고정하지 않는다. 위 조회에서 실제 recommender,
+updater, admission controller Pod 이름을 찾은 뒤 해당 namespace와 이름으로 `kubectl logs`를 실행한다.
+
+## limits를 유지하라는 조건
+
+VPA의 기본 `controlledValues`는 `RequestsAndLimits`이므로 request-to-limit 비율에 따라 limits도
+조정할 수 있다. 문제에서 limits를 유지하라고 했다면 대상 컨테이너 정책에 `RequestsOnly`를 둔다.
+
+```yaml
+spec:
+  resourcePolicy:
+    containerPolicies:
+      - containerName: "*"
+        controlledValues: RequestsOnly
+```
+
+필드 지원 여부와 enum은 `kubectl explain vpa.spec.resourcePolicy.containerPolicies`로 현재 CRD에서
+확인한다. 다른 컨테이너별 최소·최대값이 이미 있으면 전체 정책으로 덮어쓰지 않고 기존 항목을 보존한다.
+
+## 공식 문서에서 찾을 것
+
+| 검색어 | 확인할 계약 |
+|---|---|
+| `Vertical Pod Autoscaling` | [별도 CRD·컨트롤러 전제, `targetRef`, update mode, status recommendation](https://kubernetes.io/docs/concepts/workloads/autoscaling/vertical-pod-autoscale/) |
+| `Vertical Pod Autoscaler repository` | [설치 구성과 실제 CRD 스키마](https://github.com/kubernetes/autoscaler/tree/master/vertical-pod-autoscaler) |
+
+공식 개념 문서는 최신 VPA 기능을 함께 설명할 수 있다. 시험 환경에서는 문서의 모든 mode를 있다고
+가정하지 말고 `kubectl explain`과 설치된 CRD의 served version을 우선한다.
+
+## 완료 판정
+
+- VPA CRD와 컨트롤러가 설치돼 있고 `analytics-vpa`의 targetRef가 실제 Deployment와 일치한다.
+- Update Mode가 `Recreate`이고 status에 컨테이너별 target/lower/upper recommendation이 생겼다.
+- 적용까지 요구했다면 대체 Pod의 실제 requests가 권장값 범위로 바뀌었다.
+- limits 유지 조건이 있다면 `controlledValues: RequestsOnly`이고 새 Pod의 limits가 유지됐다.
+
+<LinkCard
+  title="15. Service와 EndpointSlice"
+  description="selector와 EndpointSlice를 맞추고 Service 경로를 계층별로 검증한다."
+  href="/cka-udemy/05-services-dns/"
+/>

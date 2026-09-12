@@ -1,7 +1,7 @@
 # 1. CKA 실습 덱을 작업 단위로 개편
 
 상태: M0·M1 완료, M2~M8 실행 중
-지금 위치: M2c 배치·리소스·노드별 워크로드 이관 완료. M2d HPA·VPA부터 이어 간다.
+지금 위치: M2 기초·Workloads 이관 완료. M3a Service·DNS·네트워크 환경부터 이어 간다.
 실행 범위: 이번 실행에서 남은 M2~M8을 묶음별 편집·검증·기록·커밋까지 완료한다.
 실행 모델: M0·M1은 Astra 완료. 이번 M2~M8은 Sol Medium.
 작성일: 2026-09-12
@@ -190,7 +190,7 @@ Kubernetes 문서 내 검색은 가능하지만 외부 검색 결과를 열면 �
 - [x] M2a: `01-basics`의 기본 조작·출력 추출·Pod 작업을 분리한다. Vim·도움말·YAML 생성으로 오는 `cka` 앵커 링크도 갱신한다.
 - [x] M2b: `02-workloads`, `03-pod-config`를 목차 표대로 작업별로 이관한다. Deployment template 수정과 독립 Pod 재생성의 전제를 남긴다. 분량에 따라 검증·커밋 묶음을 나눈다.
 - [x] M2c: `04-scheduling`을 배치·리소스·노드별 워크로드로 나눈다. 조건과 결과를 연결한다.
-- [ ] M2d: `10-troubleshooting`의 HPA/VPA를 이관한다. metrics 사전 조건과 기대 replica·상태를 남긴다.
+- [x] M2d: `10-troubleshooting`의 HPA/VPA를 이관한다. metrics 사전 조건과 기대 replica·상태를 남긴다.
 - 검증: 생성 성공과 Ready·rollout·Job 완료·배치 결과가 구분된다. 네이티브 sidecar 등 버전 민감한 예제는 공식 문서 대조 기록을 남긴다.
 
 ### M3. Networking
@@ -457,3 +457,27 @@ DaemonSet 전략 링크를 갱신했다.
   main/문서 폭 390/390, console error 0을 확인했다. `git diff --check`도 통과했다.
 
 다음 묶음은 M2d의 HPA 설정·검증과 VPA 보충 사례 이관이다.
+
+
+### M2d — HPA 설정·VPA CRD 보충 (2026-09-13)
+
+`10-troubleshooting`에는 metrics-server 설치와 `kubectl top`을 남기고, 오토스케일러 절을
+`autoscaling` 13장/order 1130과 `vpa` 14장/order 1140으로 옮겼다. DeckMap과 `cka` 8장의
+손 연습 링크를 분리하고, metrics 페이지에서 HPA 실습으로 이어지는 링크를 추가했다.
+
+- 새 페이지는 150 / 153줄이고 기존 트러블슈팅 페이지는 855줄로 줄었다. HPA의 CPU·memory
+  Utilization, min/max, 축소 안정화, `<unknown>` 실패 분기와 target/current/desired replica 판정을
+  보존했다. VPA는 별도 CRD·컨트롤러가 필요한 학습 보충으로 표시하고 targetRef·Recreate·
+  recommendation과 실제 새 Pod request, `RequestsOnly` 조건을 구분했다. 원본 외부 출처 누락은 0개다.
+- Kubernetes 공식 HPA 개념·v2 API·resource metrics pipeline·VPA 문서를 대조했다. resource
+  Utilization에는 해당 request가 필요하고, 안정화 창은 단순 지연 타이머가 아니며, VPA는 기본
+  Kubernetes API가 아니라 별도 설치하는 CRD임을 확인했다. 최신 VPA mode를 시험 환경에 있다고
+  가정하지 않고 설치된 CRD의 `kubectl explain`을 우선하도록 했다.
+- HPA·VPA YAML 네 블록을 로컬 YAML 파서로 읽었다. 클러스터가 없어 API discovery·server-side
+  dry-run, metrics 수집, replica 변경, VPA recommendation·Pod 재생성은 실행하지 않았다.
+- `pnpm check` exit 0 — 384페이지 빌드·32,857개 내부 페이지/앵커 링크 통과.
+  preview + Playwright에서 DeckMap의 13·14장 링크, 두 페이지 현재 항목과 390px
+  main/문서 폭 390/390, console error 0을 확인했다. `git diff --check`도 통과했다.
+
+M2의 1~14장과 order 1010~1140을 모두 활성화했다. 다음 묶음은 M3a의 Service·DNS·네트워크
+환경 분리이며, CNI 설치는 M7 kubeadm과 연결하되 독립 전체 설치 실습으로 확대하지 않는다.

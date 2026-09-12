@@ -207,6 +207,36 @@ export default {
 			"tone": "ok"
 		},
 		{
+			"label": "13장",
+			"title": "HPA 설정과 검증",
+			"href": "/cka-udemy/autoscaling/",
+			"desc": "metrics API · resource requests · CPU/memory Utilization · replica 판정",
+			"items": [
+				[
+					"cka 8장",
+					"/cka/08-autoscaling/"
+				]
+			],
+			"tone": "ok"
+		},
+		{
+			"label": "14장",
+			"title": "VPA CRD 읽기",
+			"href": "/cka-udemy/vpa/",
+			"desc": "별도 CRD · targetRef · Recreate · recommendation · RequestsOnly",
+			"items": [
+				[
+					"cka 8장",
+					"/cka/08-autoscaling/"
+				],
+				[
+					"cka 17장",
+					"/cka/17-extensions/"
+				]
+			],
+			"tone": "ok"
+		},
+		{
 			"label": "5장",
 			"title": "Service와 DNS",
 			"href": "/cka-udemy/05-services-dns/",
