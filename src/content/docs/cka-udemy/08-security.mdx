@@ -332,6 +332,91 @@ Role의 rules와 RoleBinding의 subjects는 edit로 자유롭게 고치지만, `
 roleRef가 틀렸을 때만 삭제 후 재생성.**
 :::
 
+### john-developer — 제공된 CSR로 인증서 발급과 Pod 권한 연결
+
+요구는 사용자 `john`의 CSR `john-developer`를 승인하고, `development`에서 Pod의
+`create,list,get,update,delete`를 허용하는 Role `developer`를 연결하는 것이다.
+**인증서 발급은 신원 확인, RoleBinding은 그 신원에 대한 권한 연결**이다. 일반 사용자를 저장하는
+`User` 리소스나 Linux 계정을 따로 만들지 않는다.
+
+개인 키 `/root/CKA/john.key`와 CSR 파일 `/root/CKA/john.csr`가 이미 있으므로 재생성하지 않는다.
+먼저 CSR의 CN(Common Name)이 `john`인지 확인한다. CSR 오브젝트 이름과 사용자 이름은 다르다.
+
+```bash
+openssl req -in /root/CKA/john.csr -noout -subject
+cat /root/CKA/john.csr | base64 | tr -d '\n'
+```
+
+[공식 클라이언트 CSR 예제](https://kubernetes.io/docs/tasks/tls/certificate-issue-client-csr/#create-a-kubernetes-certificatesigningrequest)를
+복사해 `metadata.name`과 `request`를 바꾼다. `request`에는 바로 위 명령의 **자신의 CSR 출력값**을
+넣는다. 풀이에 실린 긴 base64 문자열이나 개인 키 내용을 복사하지 않는다.
+
+```yaml
+apiVersion: certificates.k8s.io/v1
+kind: CertificateSigningRequest
+metadata:
+  name: john-developer
+spec:
+  signerName: kubernetes.io/kube-apiserver-client
+  request: <john.csr를-base64로-인코딩한-값>
+  usages:
+    - digital signature
+    - key encipherment
+    - client auth
+```
+
+위 자리표시자를 실제 값으로 바꾸어 `john-developer.yaml`로 저장한다. CSR은 클러스터 범위라
+namespace를 넣지 않는다. 이 signer는 `client auth`를 필수로 요구하고 나머지 두 usages도 허용한다.
+공식 입문 예제처럼 `usages: [client auth]`만 쓰는 것도 유효하다.
+[signer의 허용 용도](https://kubernetes.io/docs/reference/access-authn-authz/certificate-signing-requests/#kubernetes-signers)가 정본이다.
+
+```bash
+kubectl apply -f john-developer.yaml
+kubectl certificate approve john-developer
+kubectl get csr john-developer
+```
+
+`Approved,Issued`까지 확인한다. `Approved`만 있으면 승인과 발급을 구분해
+`kubectl describe csr john-developer` 및 `status.certificate`를 확인한다.
+`signerName`·`usages`가 잘못되었거나 서명 컨트롤러가 처리하지 못한 원인을 먼저 찾는다.
+
+```bash
+kubectl get ns development
+# 없을 때만 생성
+kubectl create ns development
+kubectl create role developer -n development \
+  --resource=pods --verb=create,list,get,update,delete
+kubectl create rolebinding developer-role-binding -n development \
+  --role=developer --user=john
+```
+
+RoleBinding 이름은 원문 요구사항에 없으므로 여기서는 실습 솔루션의 이름을 사용했다.
+연결 대상 사용자는 `john-developer`가 아니라 **CN과 같은 `john`**이다.
+`watch`·`patch`·다른 리소스 권한을 임의로 추가하지 않는다.
+
+```bash
+for verb in create list get update delete; do
+  kubectl auth can-i "$verb" pods --as=john -n development
+done
+kubectl auth can-i delete deployments --as=john -n development
+kubectl auth can-i list pods --as=john -n default
+```
+
+새 사용자에게 다른 권한이 없는 이 실습에서는 앞의 다섯 결과는 `yes`, 뒤의 두 결과는 `no`다.
+`no`가 예상과 다르면 `kubectl describe role developer -n development`와
+`kubectl describe rolebinding developer-role-binding -n development`에서 verbs·resource·subject·roleRef를 비교한다.
+Role rules·Binding subjects 오류는 해당 객체만 수정하고, `roleRef` 오류는 수정 불가이므로
+대상 Binding만 다시 만든다. 허용되지 않아야 할 작업이 `yes`라면 다른 Binding의 추가 권한도 조회한다.
+
+`--as=john`은 관리자의 가장(impersonation) 권한으로 **인가를 검사**한다. john의 인증서와 개인 키로
+접속한 것은 아니다. 문제의 CSR·RBAC 설정은 여기까지 검증하고, 실제 클라이언트 접속이나 kubeconfig를
+별도로 요구할 때 발급된 인증서를 추출해 기존 키와 연결한다.
+
+```bash
+kubectl get csr john-developer -o jsonpath='{.status.certificate}' \
+  | base64 -d > /root/CKA/john.crt
+```
+
 ### ClusterRole — Practice Test: Cluster Roles
 
 원본 풀이: [20-Practice-Test-Cluster-Roles.md](https://github.com/kodekloudhub/certified-kubernetes-administrator-course/blob/master/docs/07-Security/20-Practice-Test-Cluster-Roles.md)

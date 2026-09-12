@@ -115,6 +115,37 @@ kubectl run httpd --image=httpd:alpine --expose --port 80
 ```
 :::
 
+### 도움말 → YAML 뼈대 → 필요한 필드만 수정
+
+옵션은 `-h`, YAML의 필드 위치는 `explain`으로 찾는다. `create -h`에서 리소스를 고른 뒤
+하위 명령의 Examples까지 내려가면 문제의 이름·이미지·복제본 수를 바로 넣을 수 있다.
+
+```bash
+kubectl create -h
+kubectl create deployment -h
+kubectl create deployment logging-deployment -n logging-ns \
+  --image=busybox --image=busybox --replicas=1 \
+  --dry-run=client -o yaml > logging-deployment.yaml
+
+kubectl explain deployment.spec.template.spec.volumes
+kubectl explain deployment.spec.template.spec.containers.volumeMounts
+kubectl explain deployment.spec.template.spec.initContainers
+```
+
+[`--image`는 반복해서 지정할 수 있다](https://kubernetes.io/docs/reference/kubectl/generated/kubectl_create/kubectl_create_deployment/).
+위 명령은 컨테이너 두 개를 **모두 `containers` 아래에** 만든다. 생성된 이름을 요구한 이름으로
+고치고, 컨테이너별 명령·마운트를 추가한다. 네이티브 사이드카라면 해당 컨테이너 블록을
+`initContainers`로 옮겨 `restartPolicy: Always`를 넣는다.
+[logging-deployment 완성 예제](/cka-udemy/03-pod-config/#logging-deployment--네이티브-로그-사이드카)에서 이어서 연습한다.
+
+`--dry-run=client -o yaml`은 리소스를 생성하지 않고 YAML을 출력한다. 실제 생성·변경은
+`kubectl apply -f logging-deployment.yaml`로 수행한다. 명령 뒤의 `--`는 kubectl 옵션의 끝을 뜻하며,
+그 뒤에는 컨테이너 실행 명령을 넣을 수 있다. 컨테이너마다 명령이 다르면 YAML에서 각각 작성한다.
+
+StorageClass·CSR처럼 전용 `create` 하위 명령이 없는 리소스는 공식 YAML 예제에서 시작한다.
+옵션으로 모든 필드를 표현하려고 오래 찾기보다 생성기가 만드는 부분과 직접 채울 부분을 구분한다.
+공식 명령을 복사해 수정할 편집 공간은 [시험용 VSCodium 메모](/cka/19-exam-strategy/#vscodium에서-공식-명령을-수정하기)를 참고한다.
+
 ## JSONPath와 정렬 — Practice Test: Advanced Kubectl Commands
 
 원본 풀이: [04-Practice-Test-Advance-Kubectl-Commands.md](https://github.com/kodekloudhub/certified-kubernetes-administrator-course/blob/master/docs/13-Other-Topics/04-Practice-Test-Advance-Kubectl-Commands.md)

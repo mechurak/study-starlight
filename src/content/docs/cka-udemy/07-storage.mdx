@@ -429,6 +429,55 @@ Pending이다. 또한 Pod의 `spec.nodeName`은 스케줄러를 우회하므로 
 노드를 제한해야 하면 `nodeSelector`나 affinity를 쓴다.
 :::
 
+### local-sc — 기본 클래스와 확장 허용까지 설정
+
+요구는 `local-sc` 생성, `no-provisioner`, `WaitForFirstConsumer`, 확장 허용, 기본 클래스 지정이다.
+StorageClass는 전용 `kubectl create storageclass` 생성기가 없으므로
+[공식 Storage Classes 예제](https://kubernetes.io/docs/concepts/storage/storage-classes/)에서 YAML을 가져온다.
+
+```bash
+kubectl get sc
+```
+
+기존 `(default)` 클래스 이름을 기록해 둔다. 아래를 `local-sc.yaml`로 저장한다.
+StorageClass는 namespace가 없으며 **`spec:`도 없이** 설정 필드를 최상위에 둔다.
+
+```yaml
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: local-sc
+  annotations:
+    storageclass.kubernetes.io/is-default-class: "true"
+provisioner: kubernetes.io/no-provisioner
+volumeBindingMode: WaitForFirstConsumer
+allowVolumeExpansion: true
+```
+
+annotation 값 `"true"`는 문자열이고 `allowVolumeExpansion: true`는 불리언이다.
+`default: true` 같은 별도 필드를 만드는 것이 아니다.
+
+```bash
+kubectl apply -f local-sc.yaml
+# 다른 기본 클래스가 있을 때만, 조회한 실제 이름으로 실행
+kubectl annotate sc <기존-기본-클래스> \
+  storageclass.kubernetes.io/is-default-class="false" --overwrite
+kubectl get sc
+kubectl get sc local-sc -o yaml
+```
+
+기본 표시를 가진 다른 클래스가 여러 개면 각각 해제한다. 기존 클래스를 삭제하지 않는다.
+`local-sc (default)`와 `PROVISIONER`, `VOLUMEBINDINGMODE`, `ALLOWVOLUMEEXPANSION`의 세 값을
+확인하면 이 생성 문제는 완료다. 기본 클래스가 여러 개일 때의 선택 규칙과 전환 방법은
+[기본 StorageClass 변경](https://kubernetes.io/docs/tasks/administer-cluster/change-default-storage-class/)에서 확인한다.
+
+`no-provisioner`는 PV를 자동으로 만들지 않으며, `WaitForFirstConsumer`는 소비 Pod의 배치 조건을
+고려할 때까지 바인딩을 늦춘다. `allowVolumeExpansion: true`는 클래스의 확장 허용 설정이고,
+이것만으로 로컬 볼륨의 실제 확장 기능이 생기지는 않는다. 이 문제는 PV·PVC 생성이나 확장 실행을 요구하지 않는다.
+
+기본 클래스를 잘못 해제했다면 기록해 둔 원래 클래스의 annotation을 `"true"`로 복구하고,
+잘못 지정한 클래스는 `"false"`로 바꾼 뒤 `get sc`로 확인한다.
+
 ## 정적·동적 프로비저닝 완료 판정
 
 ### 정적 PV — Bound 뒤에 실제 마운트까지

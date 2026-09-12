@@ -65,12 +65,13 @@ Ingress 리소스는 **백엔드 Service가 있는 네임스페이스**에 만�
 :::
 
 :::tip[명령형 생성 — 문법은 외우지 않고 -h로 조립한다]
-`kubectl create ingress ingress-pay -n critical-space --rule="/pay=pay-service:8282"`
+`kubectl create ingress ingress-pay -n critical-space --rule="/pay*=pay-service:8282"`
 한 줄로도 만들 수 있고, `--annotation key=value`로 annotation까지 같이 붙는다.
 `--rule`·`--annotation` 문법은 외울 대상이 아니다 — `kubectl create ingress -h`의
 Examples에 그대로 나오므로, 기억할 것은 이 서브커맨드가 있다는 사실뿐이다.
-함정 하나: `--rule`의 경로는 `/*`로 끝나야 `pathType: Prefix`가 되고 아니면 `Exact`다.
-솔루션과 맞추려면 `--dry-run=client -o yaml`로 뼈대만 뽑아 `pathType`을 고치고 apply한다.
+함정 하나: 경로 끝의 `*`가 `pathType: Prefix`를 지정한다. `/pay*`는 `path: /pay`,
+`/*`는 `path: /`를 만든다. `*`를 빼면 `Exact`가 된다.
+`--dry-run=client -o yaml`로 뽑아 `path`·`pathType`을 확인하고 apply한다.
 :::
 
 :::tip[annotation은 클러스터의 기존 Ingress에서 복사한다]
@@ -90,6 +91,60 @@ kubectl get ingress <이름> -n app-space -o yaml # annotation 블록을 통째�
 문제가 annotation **이름을 직접 준다면** 복사할 것도 없다 — 기존 리소스에는
 `kubectl annotate ingress <이름> -n <ns> <key>="<value>"` 한 줄이 edit보다 빠르다.
 :::
+
+### webapp-ingress — host·Prefix·IngressClass를 한 명령으로
+
+`ingress-ns`의 기존 Service `webapp-svc:80`으로 `kodekloud-ingress.app/` 요청을 보낸다.
+Deployment `webapp-deploy`는 이미 있으므로 Ingress가 참조할 **Service 이름과 Service 포트**를 확인한다.
+이 실습에서는 `nginx` 클래스 지정까지 해야 컨트롤러가 처리했다.
+
+```bash
+kubectl get svc webapp-svc -n ingress-ns
+kubectl get ingressclass
+kubectl create ingress -h
+kubectl create ingress webapp-ingress -n ingress-ns \
+  --class=nginx \
+  --rule="kodekloud-ingress.app/*=webapp-svc:80" \
+  --dry-run=client -o yaml > ingress.yaml
+```
+
+[`create ingress`의 Examples](https://kubernetes.io/docs/reference/kubectl/generated/kubectl_create/kubectl_create_ingress/)에서
+`--rule=host/path=service:port` 형식을 찾는다. `*`가 셸에 해석되지 않도록 rule 값은 따옴표로 감싼다.
+`--class=nginx`는 다음 YAML의 `spec.ingressClassName`으로 들어간다.
+
+```yaml
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: kodekloud-ingress.app
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: webapp-svc
+                port:
+                  number: 80
+```
+
+`nginx`는 이 환경의 클래스 이름이지 모든 클러스터의 고정값이 아니다. 다른 실습에서는
+`kubectl get ingressclass`와 기존 Ingress를 확인한다. YAML을 직접 편집할 때도
+`ingressClassName`은 `rules`와 같은 깊이다.
+
+```bash
+kubectl apply -f ingress.yaml
+kubectl describe ingress webapp-ingress -n ingress-ns
+curl -s http://kodekloud-ingress.app/
+```
+
+완료는 앱 응답까지 확인한다. `curl -s`가 아무것도 보이지 않으면 `curl -v`로 DNS·접속·HTTP 응답을
+구분한다. 클래스 누락은 파일에 `ingressClassName: nginx`를 추가해 다시 `apply`한다.
+백엔드가 연결되지 않으면 아래 EndpointSlice의 주소·준비 상태와 Service selector를 확인한다.
+
+```bash
+kubectl get endpointslice -n ingress-ns -l kubernetes.io/service-name=webapp-svc -o yaml
+```
 
 ### 규칙에 안 맞는 요청 — 기본 백엔드는 두 층에서 정해진다
 

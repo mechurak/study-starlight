@@ -147,6 +147,40 @@ kubectl get deployment nginx-deploy -o wide
 [Deployments — Checking Rollout History](https://kubernetes.io/docs/concepts/workloads/controllers/deployment/#checking-rollout-history-of-a-deployment)에서
 `annotate`를 검색해 예제를 복사한다. 이 annotation이 `rollout history`의 `CHANGE-CAUSE`에 표시된다.
 
+### nginx-deploy — apply로 생성과 rolling update를 모두 수행
+
+`nginx:1.16`, 복제본 1개로 생성한 뒤 `nginx:1.17`로 올리되 **생성과 변경 모두 `kubectl apply`를
+사용하라**는 조건이다. 위 변경 사유 기록 문제와 이름이 같지만 이번에는 annotation이 요구되지 않는다.
+새 Deployment의 [기본 전략은 `RollingUpdate`](https://kubernetes.io/docs/concepts/workloads/controllers/deployment/#strategy)이므로
+이미지를 바꾸어 적용하면 롤아웃이 시작된다.
+
+```bash
+kubectl create deployment nginx-deploy --image=nginx:1.16 --replicas=1 \
+  --dry-run=client -o yaml > nginx.yaml
+kubectl apply -f nginx.yaml
+kubectl rollout status deployment/nginx-deploy --timeout=120s
+```
+
+`create`는 YAML 생성에만 사용했고 실제 리소스는 `apply`로 만들었다. **1.16 배포가 완료된 뒤**
+`vim nginx.yaml`에서 `image: nginx:1.16`을 `image: nginx:1.17`로 바꾸고 다시 적용한다.
+
+```bash
+kubectl apply -f nginx.yaml
+kubectl rollout status deployment/nginx-deploy --timeout=120s
+kubectl get deployment nginx-deploy -o wide
+kubectl describe deployment nginx-deploy
+kubectl get pods -l app=nginx-deploy \
+  -o custom-columns='NAME:.metadata.name,IMAGE:.spec.containers[*].image,READY:.status.containerStatuses[*].ready'
+```
+
+완료 기준은 Deployment `READY 1/1`, 이미지 `nginx:1.17`, `StrategyType: RollingUpdate`,
+새 Pod의 이미지·준비 상태다. 최초 생성 직후 곧바로 1.17을 적용하면 1.16 배포 완료를 확인하지 못한다.
+복제본 1개여도 기본 전략은 업데이트 중 새 Pod를 추가할 수 있으므로 잠깐 Pod가 두 개 보이는 것은 정상이다.
+
+실패하면 새 Pod의 Events부터 확인한다. 이미지 오타라면 파일을 고쳐 다시 `apply`하고,
+1.16으로 복구할 때도 파일의 태그를 되돌려 `apply`한 뒤 `rollout status`를 확인한다.
+작업 방식을 지정한 문제에서는 `set image`·`edit`·`rollout undo`로 대신 끝내지 않는다.
+
 ### 실패한 롤아웃은 새 ReplicaSet부터 내려간다
 
 `set image`가 성공했다는 출력은 새 템플릿이 저장됐다는 뜻일 뿐, 새 Pod이 준비됐다는 뜻이 아니다.
