@@ -33,10 +33,6 @@ export default {
 			"label": "네트워킹"
 		},
 		{
-			"id": "services-dns",
-			"label": "네트워킹 (개편 전)"
-		},
-		{
 			"id": "storage",
 			"label": "스토리지와 보안"
 		},
@@ -284,15 +280,37 @@ export default {
 			"tone": "warn"
 		},
 		{
-			"label": "6장",
-			"title": "Ingress와 NetworkPolicy",
+			"label": "18장",
+			"title": "Ingress와 TLS",
 			"href": "/cka-udemy/06-ingress-netpol/",
-			"desc": "Ingress · Gateway API · 외부 요청 검증 · NetworkPolicy",
+			"desc": "IngressClass · host/path · controller · TLS · 외부 HTTP/HTTPS",
 			"items": [
 				[
 					"cka 11장",
 					"/cka/11-ingress-gateway/"
-				],
+				]
+			],
+			"tone": "warn"
+		},
+		{
+			"label": "19장",
+			"title": "Gateway와 HTTPRoute",
+			"href": "/cka-udemy/gateway/",
+			"desc": "CRD와 구현체 · listener · parentRefs · attachment 조건 · 실제 요청",
+			"items": [
+				[
+					"cka 11장",
+					"/cka/11-ingress-gateway/"
+				]
+			],
+			"tone": "warn"
+		},
+		{
+			"label": "20장",
+			"title": "NetworkPolicy 허용과 차단",
+			"href": "/cka-udemy/network-policy/",
+			"desc": "pod/namespace selector · ingress/egress · DNS · 허용/차단 검증",
+			"items": [
 				[
 					"cka 12장",
 					"/cka/12-networkpolicy/"

@@ -1,7 +1,7 @@
 # 1. CKA 실습 덱을 작업 단위로 개편
 
 상태: M0·M1 완료, M2~M8 실행 중
-지금 위치: M3a Service·DNS·네트워크 환경 이관 완료. M3b Ingress·Gateway·NetworkPolicy부터 이어 간다.
+지금 위치: M3 Networking 이관 완료. M4 볼륨·정적/동적 스토리지부터 이어 간다.
 실행 범위: 이번 실행에서 남은 M2~M8을 묶음별 편집·검증·기록·커밋까지 완료한다.
 실행 모델: M0·M1은 Astra 완료. 이번 M2~M8은 Sol Medium.
 작성일: 2026-09-12
@@ -74,7 +74,7 @@ M1에서 실제 slug·순서를 확정하고 이 표에 기록한다. 페이지 
 | `04-scheduling.mdx` | Workloads | `04-scheduling`의 nodeName·selector·taint·affinity 배치 / `resource-limits`의 requests·limits·quota / `daemonset-static-pod`의 DaemonSet·static Pod 관리 | 7·6·5·4 |
 | `10-troubleshooting.mdx`의 오토스케일러 | Workloads | HPA 설정·검증. VPA는 설치된 CRD를 읽는 보충 사례로 분리 | 8·17 |
 | `05-services-dns.mdx` | Networking | `05-services-dns`의 Service·EndpointSlice / `dns`의 DNS·CoreDNS / `network-environment`의 노드·Pod·Service 대역과 CNI 확인. CNI 설치는 M7의 kubeadm과 연결 | 9·10·15·17 |
-| `06-ingress-netpol.mdx` | Networking | Ingress·TLS / Gateway·HTTPRoute / NetworkPolicy 허용·차단 | 11·12 |
+| `06-ingress-netpol.mdx` | Networking | `06-ingress-netpol`의 Ingress·TLS / `gateway`의 Gateway·HTTPRoute / `network-policy`의 NetworkPolicy 허용·차단 | 11·12 |
 | `07-storage.mdx` | Storage | 볼륨·정적 PV/PVC 연결 / StorageClass·동적 프로비저닝·quota | 13 |
 | `08-security.mdx` | Cluster Architecture | TLS·CSR·kubeconfig / Role·Binding·can-i / ServiceAccount·imagePullSecrets / admission | 14 |
 | `09-cluster-lifecycle.mdx` | Cluster Architecture | kubeadm 설치·클러스터 확인 / drain·업그레이드 / etcd 백업·복구. cri-docker 패키지 절은 랩 환경 보충으로 표시 | 15 |
@@ -196,7 +196,7 @@ Kubernetes 문서 내 검색은 가능하지만 외부 검색 결과를 열면 �
 ### M3. Networking
 
 - [x] M3a: `05-services-dns`에서 Service·DNS·네트워크 환경을 분리한다. CNI 설치와 M7의 연결 위치를 기록한다.
-- [ ] M3b: `06-ingress-netpol`을 Ingress·Gateway·NetworkPolicy로 분리한다.
+- [x] M3b: `06-ingress-netpol`을 Ingress·Gateway·NetworkPolicy로 분리한다.
 - 검증: Service selector와 EndpointSlice, DNS 해석, 외부 HTTP 요청, NetworkPolicy 허용·차단 등 작업별 성공 증거가 있다. CNI·컨트롤러 설치 전제를 숨기지 않는다.
 
 ### M4. Storage
@@ -506,3 +506,28 @@ DeckMap·index·`cka` 9·10·15장과 트러블슈팅의 이동 앵커를 갱신
   main/문서 폭 390/390, console error 0을 확인했다. `git diff --check`도 통과했다.
 
 다음 묶음은 M3b의 Ingress·TLS, Gateway·HTTPRoute, NetworkPolicy 허용·차단 분리다.
+
+
+### M3b — Ingress·Gateway·NetworkPolicy (2026-09-13)
+
+기존 `06-ingress-netpol` URL에는 Ingress 규칙·컨트롤러·TLS와 외부 요청 검증을 남기고,
+`gateway` 19장/order 1190과 `network-policy` 20장/order 1200을 만들었다. 모든 페이지를
+`services` 그룹으로 옮겨 과도기 `services-dns` 그룹을 제거하고 DeckMap·`cka` 11·12장 링크를
+작업별 페이지로 갱신했다.
+
+- 분할 뒤 302 / 204 / 196줄이다. Ingress 리소스와 컨트롤러 구분·default backend·TLS Secret·
+  실제 Host/path 요청, Gateway API CRD와 구현체 구분·listener·parentRefs·attachment 조건,
+  NetworkPolicy의 선택 방향·additive 허용·빈 규칙·DNS UDP/TCP 53과 허용/차단 요청을 보존했다.
+  원본 외부 출처 누락은 0개다.
+- Kubernetes 공식 Ingress·Gateway API·NetworkPolicy 문서와 Gateway API 가이드를 대조했다.
+  Ingress는 컨트롤러가 필요하고, Gateway API는 add-on CRD와 구현체가 모두 필요하며,
+  NetworkPolicy는 구현 CNI가 있어야 효력이 나고 source egress와 destination ingress가 모두
+  허용해야 연결된다는 전제를 완료 판정에 반영했다.
+- Ingress·Gateway·NetworkPolicy YAML 여섯 블록을 로컬 YAML 파서로 읽었다. 지정 클러스터가 없어
+  API/구현체 discovery, server-side dry-run, TLS·Gateway·허용/차단 실제 요청은 실행하지 않았다.
+- `pnpm check` exit 0 — 388페이지 빌드·33,247개 내부 페이지/앵커 링크 통과.
+  preview + Playwright에서 DeckMap의 18~20장 링크, 세 페이지 현재 항목과 390px
+  main/문서 폭 390/390, console error 0을 확인했다. `git diff --check`도 통과했다.
+
+M3의 15~20장과 `services` 그룹을 모두 활성화했다. 다음 묶음은 M4의 볼륨·정적 PV/PVC와
+StorageClass·동적 프로비저닝·quota 분리다.
