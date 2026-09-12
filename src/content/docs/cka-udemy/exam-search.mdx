@@ -1,0 +1,94 @@
+---
+title: "39. 작업별 명령·문서 검색 색인"
+description: "시험 작업을 첫 관찰 명령과 공식 문서 검색어, 해당 CKA 실습 페이지로 연결하는 짧은 색인"
+deckGroup: exam-strategy
+sidebar:
+  order: 1390
+reviewedAt: 2026-09-13
+---
+
+import { LinkCard } from '@astrojs/starlight/components';
+import Thesis from '../../../components/docs/Thesis.astro';
+
+<Thesis>
+문제의 명사를 리소스로, 동사를 첫 명령으로 바꾼 뒤 이 표의 영문 검색어로 공식 문서 예제를 찾고,
+연결된 실습 페이지의 완료 기준으로 결과를 판정한다.
+</Thesis>
+
+이 페이지는 정답 모음이 아니라 **출발점 색인**이다. 먼저 context·namespace·대상 노드를 확인하고,
+표의 첫 명령으로 현재 상태를 관찰한다. 작성법이 필요하면 공식 문서에서 표시된 검색어를 찾고,
+링크된 실습에서 바꿀 필드와 실제 성공 조건을 확인한다.
+
+시험 브라우저에서는 허용된 공식 사이트 내부 검색을 사용한다. 설치·업그레이드 문서는 문제의
+Kubernetes 버전으로 바꾸고, KodeKloud·GitHub 예제와 학습 보충은 Quick Reference가 제공한 경우에만 연다.
+
+## 기초와 Workloads
+
+| 작업·실습 | 첫 명령 | 공식 문서 검색어 |
+|---|---|---|
+| [kubectl 기본 조작](/cka-udemy/01-basics/) | `kubectl create --help` | `kubectl Cheat Sheet` |
+| [JSONPath 추출·정렬](/cka-udemy/jsonpath/) | `kubectl get <resource> -o json` | `JSONPath Support` |
+| [Pod 생성·상태](/cka-udemy/pods/) | `kubectl get pods -o wide` | `Pod Lifecycle` |
+| [Deployment rollout·rollback](/cka-udemy/02-workloads/) | `kubectl rollout status deploy/<name>` | `Deployments rolling back` |
+| [Job 완료·실패](/cka-udemy/jobs/) | `kubectl get jobs` | `Jobs terminal conditions` |
+| [command·args](/cka-udemy/03-pod-config/) | `kubectl get pod <name> -o yaml` | `Define Command and Arguments` |
+| [ConfigMap·Secret 주입](/cka-udemy/configmap-secret/) | `kubectl create configmap --help` | `Configure Pod ConfigMap` |
+| [init·sidecar](/cka-udemy/init-sidecar/) | `kubectl logs <pod> -c <container>` | `Sidecar Containers` |
+| [securityContext](/cka-udemy/security-context/) | `kubectl exec <pod> -- id` | `Security Context` |
+| [Pod 배치](/cka-udemy/04-scheduling/) | `kubectl describe pod <name>` | `Assign Pods to Nodes` |
+| [resources·quota](/cka-udemy/resource-limits/) | `kubectl describe pod <name>` | `Resource Management for Pods` |
+| [DaemonSet·static Pod](/cka-udemy/daemonset-static-pod/) | `kubectl get daemonsets -A` | `DaemonSet rolling update` |
+| [HPA](/cka-udemy/autoscaling/) | `kubectl get hpa` | `Horizontal Pod Autoscaling` |
+| [VPA 보충](/cka-udemy/vpa/) | `kubectl api-resources` | 설치된 CRD는 `kubectl explain vpa.spec` 우선 |
+
+## Networking과 Storage
+
+| 작업·실습 | 첫 명령 | 공식 문서 검색어 |
+|---|---|---|
+| [Service·EndpointSlice](/cka-udemy/05-services-dns/) | `kubectl get svc,endpointslices` | `Service EndpointSlice` |
+| [DNS·CoreDNS](/cka-udemy/dns/) | `kubectl get pods -n kube-system -l k8s-app=kube-dns` | `Debugging DNS Resolution` |
+| [네트워크 환경·CNI](/cka-udemy/network-environment/) | `kubectl get nodes -o wide` | `Container Runtimes CNI` |
+| [Ingress·TLS](/cka-udemy/06-ingress-netpol/) | `kubectl get ingress,ingressclass` | `Ingress TLS` |
+| [Gateway·HTTPRoute](/cka-udemy/gateway/) | `kubectl api-resources` | `Gateway API HTTPRoute` |
+| [NetworkPolicy](/cka-udemy/network-policy/) | `kubectl get networkpolicy -A` | `Network Policies` |
+| [볼륨·정적 PV/PVC](/cka-udemy/07-storage/) | `kubectl get pv,pvc` | `Persistent Volumes` |
+| [StorageClass·동적 PV](/cka-udemy/storage-class/) | `kubectl get storageclass` | `Storage Classes WaitForFirstConsumer` |
+
+## 접근 제어와 클러스터 운영
+
+| 작업·실습 | 첫 명령 | 공식 문서 검색어 |
+|---|---|---|
+| [TLS·CSR·kubeconfig](/cka-udemy/08-security/) | `kubectl auth whoami` | `Issue Certificate Kubernetes API Client` |
+| [RBAC](/cka-udemy/rbac/) | `kubectl auth can-i <verb> <resource>` | `Using RBAC Authorization` |
+| [ServiceAccount·imagePullSecrets](/cka-udemy/service-account/) | `kubectl get pod <name> -o yaml` | `Service Accounts` |
+| [Admission](/cka-udemy/admission/) | `kubectl get --raw='/readyz?verbose'` | `Admission Controllers` |
+| [kubeadm 설치·CNI](/cka-udemy/09-cluster-lifecycle/) | `kubeadm init --help` | `Creating cluster kubeadm` |
+| [drain·업그레이드](/cka-udemy/cluster-upgrade/) | `kubectl get nodes` | `Upgrading kubeadm clusters` |
+| [etcd 백업·복구](/cka-udemy/etcd-backup-restore/) | `etcdctl version` | `Operating etcd clusters Kubernetes` |
+| [Helm release](/cka-udemy/11-helm/) | `helm list -A` | `helm upgrade version` |
+| [Kustomize 적용](/cka-udemy/12-kustomize/) | `kubectl kustomize <dir>` | `Declarative Management Kustomize` |
+| [Kustomize 변환](/cka-udemy/kustomize-transformers/) | `kubectl kustomize <root>` | `Kustomize images labels namespace` |
+| [Kustomize patch](/cka-udemy/kustomize-patches/) | `kubectl kustomize <overlay>` | `Kustomize patches` |
+| [Kustomize Components 보충](/cka-udemy/kustomize-components/) | `kustomize build <overlay>` | 문제의 Quick Reference 또는 로컬 `kustomize --help` |
+
+## Troubleshooting
+
+| 작업·실습 | 첫 명령 | 공식 문서 검색어 |
+|---|---|---|
+| [metrics·앱 로그](/cka-udemy/10-troubleshooting/) | `kubectl get pods -A -o wide` | `Debug Pods` |
+| [컨트롤 플레인 복구](/cka-udemy/control-plane-failure/) | `kubectl get pods -n kube-system` | `Troubleshooting Clusters crictl` |
+| [워커 노드 복구](/cka-udemy/worker-failure/) | `kubectl get nodes` | `Troubleshooting Clusters worker nodes` |
+| [Service·네트워크 장애](/cka-udemy/network-failure/) | `kubectl get svc,endpointslices` | `Debug Services` |
+
+## 색인을 쓰고 끝내는 조건
+
+1. 첫 명령으로 현재 상태를 저장하고, 증상만으로 원인을 단정하지 않는다.
+2. 공식 예제의 API 버전·kind·필드 위치를 확인해 문제의 이름·namespace·값만 바꾼다.
+3. 생성·수정된 오브젝트와 실제 동작을 나눠 확인한다. 장애 복구는 처음 실패한 요청까지 반복한다.
+4. 기대한 허용뿐 아니라 거부·비변경·다른 namespace처럼 범위 밖 조건도 필요한 만큼 확인한다.
+
+<LinkCard
+  title="CKA 19. 시험장에서 찾고 검증하기"
+  description="시간 배분, 문서 검색, 제출 전 검증 루프를 개념 덱에서 정리한다."
+  href="/cka/19-exam-strategy/"
+/>

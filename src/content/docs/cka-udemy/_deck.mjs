@@ -43,6 +43,10 @@ export default {
 		{
 			"id": "troubleshooting",
 			"label": "Troubleshooting"
+		},
+		{
+			"id": "exam-strategy",
+			"label": "시험 대비"
 		}
 	],
 	"map": [
@@ -532,6 +536,19 @@ export default {
 				]
 			],
 			"tone": "bad"
+		},
+		{
+			"label": "39장",
+			"title": "작업별 명령·문서 검색 색인",
+			"href": "/cka-udemy/exam-search/",
+			"desc": "작업 → 첫 관찰 명령 → 공식 문서 검색어 → 완료 판정",
+			"items": [
+				[
+					"cka 19장",
+					"/cka/19-exam-strategy/"
+				]
+			],
+			"tone": "key"
 		}
 	]
 };
