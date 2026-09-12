@@ -1,0 +1,301 @@
+---
+title: "38. Service와 네트워크 장애"
+description: "애플리케이션 연결 실패를 Service·EndpointSlice·노드·CNI·kube-proxy 층으로 좁혀 복구한다."
+deckGroup: troubleshooting
+sidebar:
+  order: 1380
+reviewedAt: 2026-09-13
+---
+
+import { LinkCard } from '@astrojs/starlight/components';
+import Thesis from '../../../components/docs/Thesis.astro';
+
+<Thesis>
+네트워크 장애는 이름이나 CNI라는 추측에서 시작하지 않는다. 요청을 보내는 앱부터 Service,
+EndpointSlice, 대상 Pod, 노드 네트워크로 한 겹씩 내려가며 처음 깨지는 경계를 찾는다.
+</Thesis>
+
+Service 이름·selector·port·targetPort 같은 API 객체 오류와 CNI 초기화·kube-proxy 설정 파일
+오류를 분리한다. 수정 뒤에는 컴포넌트 Running뿐 아니라 처음 실패했던 앱 요청의 성공까지 확인한다.
+
+> 개념 연결: [cka 9. Service](/cka/09-services/) · [cka 18. 트러블슈팅](/cka/18-troubleshooting/)
+
+## 애플리케이션 연결 실패 — MySQL Service 진단
+
+앱이 MySQL에 연결하지 못하는 두 실습 사례다. **증상 → 이름·selector·포트 대조 → 틀린 필드만
+수정 → 실제 연결 검증** 순서로 접근한다. 아래의 `k`는 `alias k=kubectl`을 설정한 셸을 전제로 한다.
+
+```bash
+k -n beta get pod --show-labels -o wide
+k -n beta get svc -o wide
+k -n beta describe svc mysql-service
+```
+
+Pod 라벨과 Service selector를 비교한 뒤, `describe`의 `TargetPort`를 아키텍처와 대조한다.
+`get svc -o wide`에는 `targetPort`가 나오지 않는다. 각 열의 의미와 `expose` 옵션은
+[15장 Service 조회·생성](/cka-udemy/05-services-dns/#첫-조회--pod-라벨과-service-selector를-나란히-본다)에 있다.
+네임스페이스는 아래 각 사례에 맞춰 바꾼다.
+
+### 이름 오류 — alpha의 mysql을 mysql-service로 교체한다
+
+앱이 `mysql-service`라는 이름으로 접속하는데 Service는 `mysql`로 만들어져 있다면, selector와
+포트가 맞아도 앱이 기대한 이름을 찾지 못한다. 기존 객체의 이름은 `edit`으로 바꿀 수 없으므로
+올바른 이름의 Service를 만든다. 다음은 **잘못된 `mysql` Service를 삭제·교체하는 이 실습**의 명령이다.
+
+```bash
+k -n alpha get pod --show-labels -o wide
+k -n alpha get svc -o wide
+k -n alpha describe svc mysql
+
+# 조회한 실제 Pod 이름이 mysql인 경우
+k -n alpha delete svc mysql
+k -n alpha expose pod mysql \
+  --name=mysql-service \
+  --port=3306 \
+  --target-port=3306 \
+  --selector=name=mysql
+
+k -n alpha describe svc mysql-service
+```
+
+`pod mysql`은 조회한 실제 Pod 이름으로 바꾼다. 새 Service의 selector가 `name=mysql`,
+Port와 TargetPort가 `3306`인지 확인하고, 대상 Pod IP가 연결됐는지 본다. 이어서 문제의 앱·테스트로
+MySQL 연결을 재시도한다. 실패하면 아래 포트 진단과 계층별 검증으로 이어간다.
+
+### targetPort 오류 — beta의 기존 Service를 edit으로 수정한다
+
+Service 이름과 selector는 맞지만 `TargetPort`가 아키텍처의 `3306`과 다르면 기존 Service를 수정한다.
+[`kubectl edit`](https://kubernetes.io/docs/reference/kubectl/generated/kubectl_edit/)은 저장한 변경을
+서버에 반영하므로 별도로 `apply`하거나 Service·Pod를 재생성할 필요가 없다.
+
+```bash
+k -n beta describe svc mysql-service
+k -n beta edit svc mysql-service
+```
+
+에디터에서 **`spec.ports` 아래의 `targetPort`만** `3306`으로 바꾸고 저장한다. 아래는 수정할 부분이며,
+객체 전체를 덮어쓸 YAML이 아니다.
+
+```yaml
+spec:
+  ports:
+    - port: 3306
+      targetPort: 3306
+```
+
+저장 뒤 `k -n beta describe svc mysql-service`로 `TargetPort: 3306/TCP`와 대상 Pod IP를 확인한다.
+EndpointSlice를 직접 보려면 다음 명령을 쓴다.
+
+```bash
+k -n beta get endpointslices \
+  -l kubernetes.io/service-name=mysql-service -o wide
+```
+
+엔드포인트 주소가 없으면 selector와 Pod 라벨·Ready 상태를 확인한다. 반대로 **엔드포인트가 있어도
+숫자 `targetPort`가 틀리면 접속에 실패할 수 있다.** 주소 등록은 MySQL이 그 포트에서 실제로
+응답한다는 증거가 아니다. 마지막에는 문제에서 제공한 앱·테스트 또는 MySQL 클라이언트로 연결을
+재검증한다. 일반 HTTP용 `curl`로 MySQL 응답을 검사하지 않는다.
+더 넓은 연결 문제는 [16장의 계층별 검증 절](/cka-udemy/dns/#service--dns--외부-경로를-한-겹씩-검증하기)로 이어간다.
+
+## 네트워크 장애 — Practice Test: Troubleshoot Network
+
+원본 풀이: [10-Practice-Test-Troubleshoot-Network.md](https://github.com/kodekloudhub/certified-kubernetes-administrator-course/blob/master/docs/12-Troubleshooting/10-Practice-Test-Troubleshoot-Network.md)
+
+같은 `triton` 네임스페이스의 웹앱·MySQL이 실패해도 **앱 Pod의 상태와 시스템 Pod의 오류**에 따라
+진단 경로가 달라진다. 아래는 Flannel을 설치하도록 안내하는 실습 버전 기준이다. 예전 원본 풀이와
+플러그인·Pod 이름이 다를 수 있으므로 현재 문제의 아키텍처와 힌트를 따른다.
+
+먼저 `kubectl get nodes`와 `kubectl get pods -A`를 본다. Test 1은 앱이 `Pending`이므로
+Events → Node → CNI로, Test 2는 앱이 실행 중이고 kube-proxy가 `CrashLoopBackOff`이므로
+kube-proxy 로그 → 실행 옵션 → ConfigMap으로 좁힌다. 앱 Pod가 `Running`이라는 사실만으로
+Service 경유 통신이나 DB 연결 성공까지 보장되지는 않는다.
+
+### Test 1 — Pending에서 CNI 초기화 실패까지 추적한다
+
+```bash
+kubectl -n triton get pods -o wide
+kubectl -n triton describe pod mysql
+```
+
+`Pending`만으로 CNI 장애를 확정하지 않는다. 자원 부족·PVC 문제도 가능하므로 Events의
+스케줄링 실패 이유를 읽는다. 이 실습의 결정적인 증거는 다음과 같다.
+
+```text
+0/1 nodes are available:
+1 node(s) had untolerated taint {node.kubernetes.io/not-ready: }
+```
+
+배치 가능한 정상 노드가 없다는 뜻이다. 아직 실행되지 않은 MySQL의 로그 대신 노드를 확인한다.
+
+```bash
+kubectl get nodes
+kubectl describe node controlplane
+kubectl get pods -A
+kubectl get daemonsets -A
+
+# 문제가 있는 노드에서 실행 — 일반 사용자라면 sudo 사용
+journalctl -u kubelet --since "15 minutes ago" --no-pager \
+  | grep -iE 'cni|NetworkPluginNotReady'
+ls -la /etc/cni/net.d/
+```
+
+`describe node`에서는 `Conditions`의 `Ready` 메시지를 읽는다. kubelet 로그에
+`NetworkPluginNotReady`와 `cni plugin not initialized`가 있고, 네트워크 애드온이 보이지 않으며
+`/etc/cni/net.d/`에 keep 파일만 있다면 CNI(Container Network Interface) 누락·초기화 실패를
+뒷받침한다. 인과관계는 **CNI 초기화 실패 → Node NotReady → not-ready taint로 배치 차단 →
+앱 Pending**이다. [Kubernetes 네트워크 플러그인 문서](https://kubernetes.io/docs/concepts/extend-kubernetes/compute-storage/net/network-plugins/)에서
+런타임과 CNI의 역할을 확인할 수 있다.
+
+CoreDNS의 `ContainerCreating`은 보조 증거다. 그 상태나 `unable to allocate IP address`만으로
+CNI 미설치를 확정하지 않는다. IP 할당 실패는 설치된 플러그인의 설정·주소 풀 문제일 수도 있다.
+`flannel|calico|weave|cilium` 이름 검색에 결과가 없어도 다른 플러그인일 수 있으므로 전체 리소스와
+노드 설정을 함께 본다. 기존 애드온이 있다면 그 Pod의 Events·로그로 초기화 실패 원인을 조사한다.
+
+### CNI 누락 진단과 Flannel 선택은 별도의 판단이다
+
+**CNI가 없다는 오류는 특정 제품을 지정하지 않는다.** 이번 실습에서는 힌트가 Flannel 설치를
+명시했기 때문에 선택한다. 문제 본문과 오류 로그만으로 Flannel을 유일한 정답으로 도출할 수는 없다.
+
+- 문제에 CNI 이름·매니페스트가 주어지면 지정된 것을 사용한다.
+- 기존 클러스터 복구라면 DaemonSet·ConfigMap·노드의 CNI 설정·기존 매니페스트에서 원래 CNI를 찾는다.
+- 새 클러스터이고 지정이 없다면 요구 기능과 환경 호환성에 따라 선택한다.
+
+설치 방법은 [kubeadm 문서의 Installing a Pod network add-on](https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/create-cluster-kubeadm/#pod-network)에서
+공통 조건을 읽고, 선택한 제공자의 공식 문서로 이동한다. Flannel은
+[공식 README의 Deploying flannel manually](https://github.com/flannel-io/flannel#deploying-flannel-manually)
+→ **Deploying Flannel with kubectl**에서 설치 명령과 매니페스트 URL을 찾는다.
+문제에서 버전·URL을 지정했다면 그 지시를 우선하며, 긴 최신 설치 URL을 암기하는 데 집중하지 않는다.
+
+```bash
+kubectl get nodes \
+  -o custom-columns=NAME:.metadata.name,POD_CIDR:.spec.podCIDR
+```
+
+Flannel 기본 매니페스트의 네트워크는 `10.244.0.0/16`이다. 노드별 Pod CIDR은 그 안의 부분 범위로
+할당되며, 클러스터의 네트워크 범위가 다르면 공식 안내에 따라 매니페스트를 맞춘다.
+**CIDR이 기본값과 맞는다는 사실은 Flannel을 사용했다는 증거가 아니다.** 설치 문서의
+CNI 바이너리·커널 모듈 등 전제 조건도 함께 확인한다.
+
+설치 뒤에는 노드부터 앱까지 복구를 확인한다.
+
+```bash
+kubectl wait --for=condition=Ready node/controlplane --timeout=180s
+kubectl -n kube-flannel get pods
+kubectl -n kube-system get pods
+kubectl -n triton get pods -w
+```
+
+웹앱·MySQL이 `1/1 Running`이면 `Ctrl+C`로 관찰을 끝내고 App 탭에서 초록색 페이지를 확인한다.
+이 실습의 NodePort는 `30081`이며 실제 문제의 이름·포트는 유지한다.
+`not-ready` taint를 제거하거나 toleration을 추가해 배치만 강제해도 CNI 초기화 실패는 해결되지 않는다.
+
+### Test 2 — kube-proxy 로그에서 누락된 설정 파일을 찾는다
+
+```bash
+kubectl get pods -A
+kubectl -n kube-system logs <kube-proxy-pod>
+# 직전 종료된 컨테이너의 오류가 필요할 때
+kubectl -n kube-system logs <kube-proxy-pod> --previous
+```
+
+앱은 실행 중이지만 kube-proxy가 반복 종료되고, 로그에 다음 경로가 나온다.
+
+```text
+open /var/lib/kube-proxy/configuration.conf: no such file or directory
+```
+
+이 클러스터에서 [kube-proxy](https://kubernetes.io/docs/reference/command-line-tools-reference/kube-proxy/)는
+Service IP·NodePort 트래픽을 백엔드로 전달하는 규칙을 관리한다. 시작 실패가 Service 연결 장애의
+원인이 될 수 있다. 다만 기존 규칙이 남아 있을 수 있어 kube-proxy 종료가 모든 기존 연결의 즉시
+단절을 뜻하지는 않는다. 먼저 로그로 확인된 설정 파일 오류를 고친다.
+
+### 실행 옵션과 ConfigMap의 파일 경로를 대조한다
+
+```bash
+kubectl -n kube-system get ds kube-proxy -o yaml
+kubectl -n kube-system get cm kube-proxy -o yaml
+```
+
+DaemonSet의 `spec.template.spec`에서 관련 부분을 읽는다. 다음은 잘못된 설정의 발췌다.
+
+```yaml
+containers:
+  - name: kube-proxy
+    command:
+      - /usr/local/bin/kube-proxy
+      - --config=/var/lib/kube-proxy/configuration.conf
+    volumeMounts:
+      - name: kube-proxy
+        mountPath: /var/lib/kube-proxy
+volumes:
+  - name: kube-proxy
+    configMap:
+      name: kube-proxy
+```
+
+`--config`가 읽을 파일을 지정하고, `volumeMounts`가 그 디렉터리에 연결한 볼륨을 알려 준다.
+같은 `name`으로 `volumes`를 따라가면 원본이 `kube-proxy` ConfigMap임을 알 수 있다.
+그 ConfigMap의 주 설정 key는 다음과 같다.
+
+```yaml
+data:
+  config.conf: |-
+    apiVersion: kubeproxy.config.k8s.io/v1alpha1
+    # 이하 설정 생략
+```
+
+[ConfigMap을 파일로 마운트](https://kubernetes.io/docs/concepts/configuration/configmap/#using-configmaps-as-files-from-a-pod)하면
+기본적으로 key가 파일명, value가 파일 내용이다. `configMap.items`가 있으면 `key`와 `path`의
+매핑도 읽는다. 별도 매핑이 없는 이 실습에서 실제 제공 경로는
+`/var/lib/kube-proxy/config.conf`인데 실행 옵션은 `configuration.conf`를 요구한다.
+**올바른 파일명을 외우는 대신 실행 인자 → mountPath → volume name → ConfigMap key/path를 대조한다.**
+
+이 경로는 컨테이너 내부 경로다. 노드 셸에서 같은 이름의 디렉터리에 파일을 만들어도
+ConfigMap 볼륨의 내용은 바뀌지 않는다. 앞선 control plane의 hostPath 사례와 원본 종류가 다르다.
+
+### DaemonSet의 틀린 인자만 수정하고 앱까지 검증한다
+
+```bash
+kubectl -n kube-system edit ds kube-proxy
+```
+
+`spec.template.spec.containers`의 `command` 또는 `args`에서 해당 줄만 바꾼다.
+기존 이미지·다른 인자·볼륨은 유지한다.
+
+```diff
+- - --config=/var/lib/kube-proxy/configuration.conf
++ - --config=/var/lib/kube-proxy/config.conf
+```
+
+Pod만 삭제하면 잘못된 템플릿으로 다시 생성되므로 관리 원본인 DaemonSet을 고친다.
+`RollingUpdate`이면 변경 후 자동 교체된다. `OnDelete`이면 템플릿 수정 후 해당 Pod를 삭제해야
+새 설정을 사용한다. 전략별 절차는 [12장 DaemonSet과 static Pod](/cka-udemy/daemonset-static-pod/#업데이트와-롤백은-전략까지-확인한다)에서 확인한다.
+
+```bash
+kubectl -n kube-system rollout status ds/kube-proxy --timeout=180s
+kubectl -n kube-system get pods -l k8s-app=kube-proxy
+kubectl -n kube-system logs <새-kube-proxy-pod> --tail=30
+kubectl -n triton get pods
+```
+
+새 kube-proxy가 `1/1 Running`을 유지하고 파일 오류가 사라졌는지 확인한 뒤 App 탭에서
+초록색 페이지까지 검증한다. 여전히 실패하면 Service selector·port·targetPort, EndpointSlice,
+앱 로그로 이어간다. 구체적인 명령은 [16장 계층별 연결 검증](/cka-udemy/dns/#service--dns--외부-경로를-한-겹씩-검증하기)에 있다.
+
+## 완료 기준
+
+- 호출 이름과 Service 존재, selector와 EndpointSlice, port와 targetPort를 차례로 대조한다.
+- Pending Pod의 Events에서 taint·CNI 초기화 실패를 구분하고 설치할 CNI는 문제나 기존 구성의 근거로 선택한다.
+- kube-proxy 오류는 실행 인자 → mountPath → volume → ConfigMap key/path를 따라 원본을 찾는다.
+- 수정 뒤 EndpointSlice와 kube-proxy/CNI 상태뿐 아니라 원래 앱의 HTTP·DB 연결 성공을 확인한다.
+
+## 공식 문서에서 찾기
+
+| 작업 | 공식 문서에서 확인할 것 |
+|---|---|
+| Service 경로 | [Debug Services](https://kubernetes.io/docs/tasks/debug/debug-application/debug-service/)의 Pod → Service → EndpointSlice → DNS → kube-proxy 체크리스트 |
+| Pod 네트워크 | [Troubleshooting CNI plugin-related errors](https://kubernetes.io/docs/tasks/administer-cluster/migrating-from-dockershim/troubleshooting-cni-plugin-related-errors/)의 CNI 초기화·설정 진단 |
+| 노드 컴포넌트 | [Troubleshooting Clusters](https://kubernetes.io/docs/tasks/debug/debug-cluster/)의 kubelet·kube-proxy 로그 진입점 |
+
+원인 수정 뒤에도 정상 구성 자체를 다시 확인해야 하면 [15장 Service와 EndpointSlice](/cka-udemy/05-services-dns/)와
+[16장 DNS·CoreDNS](/cka-udemy/dns/)의 기능 검증 절차를 사용한다.

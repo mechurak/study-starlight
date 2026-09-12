@@ -1,7 +1,7 @@
 # 1. CKA 실습 덱을 작업 단위로 개편
 
 상태: M0·M1 완료, M2~M8 실행 중
-지금 위치: M5 접근 제어 이관 완료. M6a 앱·metrics·로그 트러블슈팅부터 이어 간다.
+지금 위치: M6 Troubleshooting 이관 완료. M7a 클러스터 설치·업그레이드·etcd부터 이어 간다.
 실행 범위: 이번 실행에서 남은 M2~M8을 묶음별 편집·검증·기록·커밋까지 완료한다.
 실행 모델: M0·M1은 Astra 완료. 이번 M2~M8은 Sol Medium.
 작성일: 2026-09-12
@@ -80,7 +80,7 @@ M1에서 실제 slug·순서를 확정하고 이 표에 기록한다. 페이지 
 | `09-cluster-lifecycle.mdx` | Cluster Architecture | kubeadm 설치·클러스터 확인 / drain·업그레이드 / etcd 백업·복구. cri-docker 패키지 절은 랩 환경 보충으로 표시 | 15 |
 | `11-helm.mdx` | Cluster Architecture | repo·install·upgrade·rollback의 한 release 관리 흐름. 이미지 이전 사례는 짧은 보충 | 16 |
 | `12-kustomize.mdx` | Cluster Architecture | resources·base/overlay·적용 / 범위별 변환 / patch / components 보충 | 16 |
-| `10-troubleshooting.mdx`의 나머지 | Troubleshooting | metrics·앱 상태·로그 / control plane / worker / 네트워크 장애. Service·DNS 정상 구성은 Networking을 참조 | 18 |
+| `10-troubleshooting.mdx`의 나머지 | Troubleshooting | `10-troubleshooting`의 metrics·앱 상태·로그 / `control-plane-failure` / `worker-failure` / `network-failure`. Service·DNS 정상 구성은 Networking을 참조 | 18 |
 | 기존 검색 표·명령 요약 | 시험 대비 | 작업 → 첫 명령 → 검색어 → 해당 실습 페이지의 짧은 색인 | 19 |
 
 `cka`의 CRD·operator·HA 등과 공식 커리큘럼을 대조하는 일은 M0에 남긴다. 제목이 없다는 이유만으로
@@ -212,8 +212,8 @@ Kubernetes 문서 내 검색은 가능하지만 외부 검색 결과를 열면 �
 
 ### M6. Troubleshooting
 
-- [ ] M6a: `10-troubleshooting`의 남은 내용을 앱·metrics·로그 / control plane / worker로 분리한다.
-- [ ] M6b: 네트워크 장애를 별도 작업으로 정리한다. MySQL 이름·targetPort 사례는 Service 정상 구성과 중복을 줄인다.
+- [x] M6a: `10-troubleshooting`의 남은 내용을 앱·metrics·로그 / control plane / worker로 분리한다.
+- [x] M6b: 네트워크 장애를 별도 작업으로 정리한다. MySQL 이름·targetPort 사례는 Service 정상 구성과 중복을 줄인다.
 - 검증: 증상 → 첫 관찰 → 증거별 수정 → 원래 워크로드 재검증이 이어진다. API 장애 시 노드·런타임 진입과 static Pod 복구의 파일·마운트 대조를 보존한다.
 
 ### M7. 클러스터 운영과 Helm
@@ -582,3 +582,28 @@ admission 요청 검사 분리다.
   390px main/문서 폭 390/390을 확인했다. `git diff --check`도 통과했다.
 
 다음 묶음은 M6a의 앱·metrics·로그, control plane, worker 트러블슈팅 분리다.
+
+
+### M6 — 관찰 대상별 트러블슈팅 (2026-09-13)
+
+기존 `10-troubleshooting` URL에는 metrics-server·`top`·애플리케이션 로그와 상태별 진입점을
+남기고, `control-plane-failure`·`worker-failure`·`network-failure`을 36~38장/order
+1360~1380으로 분리했다. `troubleshooting` 그룹을 활성화하고 DeckMap·`cka` 18장과
+MySQL 이동 앵커를 새 목적지로 갱신했다.
+
+- 분할 뒤 178 / 250 / 233 / 302줄이다. Pod 생성·노드 배정 경계, static Pod 명령·kubeconfig·
+  hostPath 오류, kubelet 중지·CA·API 서버 주소 오류, Service 이름·targetPort, CNI 초기화와
+  kube-proxy ConfigMap 경로 오류를 각각 “첫 증거 → 최소 수정 → 원래 기능” 흐름으로 보존했다.
+  원본 외부 출처 누락은 0개다.
+- Service 정상 구성과 DNS 계층 검증은 15·16장을 참조하게 하고 38장에는 실패 판정만 남겼다.
+  CNI 누락만으로 Flannel을 선택하지 않고 문제 지시나 기존 설치 근거가 필요하다는 조건,
+  컴포넌트 Running이 아니라 처음 실패한 앱 요청까지 복구해야 한다는 완료 기준을 유지했다.
+- Kubernetes 공식 resource metrics pipeline·logging·Pod/Service debug·cluster troubleshooting·
+  crictl·static Pod·kubelet config 문서를 대조했다. 지정 클러스터가 없어 metrics 수집,
+  static Pod·kubelet 수정, Service/EndpointSlice·CNI·kube-proxy와 앱 연결은 실행하지 않았다.
+- `pnpm check` exit 0 — 395페이지 빌드·34,016개 내부 페이지/앵커 링크 통과. 첫 dev 확인은
+  새 topic을 반영하지 못한 장기 실행 서버 캐시 때문에 세 새 slug가 실패했고, 서버 재시작 뒤
+  Playwright에서 DeckMap의 35~38장 링크, 네 페이지 현재 항목과 390px main/문서 폭 390/390을
+  확인했다. `git diff --check`도 통과했다.
+
+다음 묶음은 M7a의 kubeadm 설치·확인, drain·업그레이드, etcd 백업·복구 분리다.

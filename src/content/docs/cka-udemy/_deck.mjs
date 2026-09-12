@@ -43,6 +43,10 @@ export default {
 		{
 			"id": "cluster-lifecycle",
 			"label": "클러스터 운영"
+		},
+		{
+			"id": "troubleshooting",
+			"label": "Troubleshooting"
 		}
 	],
 	"map": [
@@ -410,23 +414,6 @@ export default {
 			"tone": "bad"
 		},
 		{
-			"label": "10장",
-			"title": "모니터링과 트러블슈팅",
-			"href": "/cka-udemy/10-troubleshooting/",
-			"desc": "metrics-server · 로그 진입점 · control plane 명령·경로·마운트 복구 · 네트워크 트러블슈팅",
-			"items": [
-				[
-					"cka 8장",
-					"/cka/08-autoscaling/"
-				],
-				[
-					"cka 18장",
-					"/cka/18-troubleshooting/"
-				]
-			],
-			"tone": "bad"
-		},
-		{
 			"label": "11장",
 			"title": "Helm",
 			"href": "/cka-udemy/11-helm/",
@@ -460,6 +447,66 @@ export default {
 				[
 					"cka 16장",
 					"/cka/16-helm-kustomize/"
+				]
+			],
+			"tone": "bad"
+		},
+		{
+			"label": "35장",
+			"title": "metrics와 애플리케이션 로그",
+			"href": "/cka-udemy/10-troubleshooting/",
+			"desc": "metrics-server · top 단위 · Pod 상태 · Events · 현재/이전 로그",
+			"items": [
+				[
+					"cka 8장",
+					"/cka/08-autoscaling/"
+				],
+				[
+					"cka 18장",
+					"/cka/18-troubleshooting/"
+				]
+			],
+			"tone": "bad"
+		},
+		{
+			"label": "36장",
+			"title": "컨트롤 플레인 복구",
+			"href": "/cka-udemy/control-plane-failure/",
+			"desc": "Pod 생성·배정 · static Pod 명령·kubeconfig·hostPath · 원래 workload",
+			"items": [
+				[
+					"cka 18장",
+					"/cka/18-troubleshooting/"
+				]
+			],
+			"tone": "bad"
+		},
+		{
+			"label": "37장",
+			"title": "워커 노드 복구",
+			"href": "/cka-udemy/worker-failure/",
+			"desc": "kubelet 서비스 · config/kubeconfig · CA · API 서버 주소 · Node Ready",
+			"items": [
+				[
+					"cka 18장",
+					"/cka/18-troubleshooting/"
+				]
+			],
+			"tone": "bad"
+		},
+		{
+			"label": "38장",
+			"title": "Service와 네트워크 장애",
+			"href": "/cka-udemy/network-failure/",
+			"desc": "Service·EndpointSlice · CNI 초기화 · kube-proxy 설정 · 실제 앱 요청",
+			"items": [
+				[
+					"cka 9장",
+					"/cka/09-services/"
+				],
+				[
+					"cka 18장",
+					"/cka/18-troubleshooting/"
 				]
 			],
 			"tone": "bad"

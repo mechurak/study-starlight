@@ -101,7 +101,7 @@ openssl x509 -noout -text -in /etc/kubernetes/pki/etcd/server.crt
 :::caution[함정 — etcd는 CA가 따로다]
 etcd는 **자체 CA**(`pki/etcd/ca.crt`)를 쓴다. API 서버의 `--etcd-cafile`에
 루트 CA를 넣으면 API 서버가 etcd에 못 붙는다 — 이 랩의 마지막 문제이자
-[10장 트러블슈팅](/cka-udemy/10-troubleshooting/)의 단골 원인이다
+[36장 컨트롤 플레인 복구](/cka-udemy/control-plane-failure/)에서 쓰는 경계 진단의 단골 원인이다
 — *ETCD has its own CA. The right CA must be used for the ETCD-CA file in /etc/kubernetes/manifests/kube-apiserver.yaml.*
 
 API 서버 컨테이너 로그에 `127.0.0.1:2379`와

@@ -1,0 +1,249 @@
+---
+title: "36. 컨트롤 플레인 복구"
+description: "Pod 생성·배정 단계를 따라 scheduler와 controller-manager 장애를 좁히고 static Pod 원본을 복구한다."
+deckGroup: troubleshooting
+sidebar:
+  order: 1360
+reviewedAt: 2026-09-13
+---
+
+import { LinkCard } from '@astrojs/starlight/components';
+import Thesis from '../../../components/docs/Thesis.astro';
+
+<Thesis>
+컨트롤 플레인 장애는 “Pod이 없나, 만들어졌지만 노드가 없나”로 담당 컴포넌트를 좁히고,
+Events·로그가 가리키는 static Pod 매니페스트의 최소 필드만 고친다.
+</Thesis>
+
+컴포넌트 Pod의 Running은 중간 증거다. scheduler라면 새 Pod 배정, controller-manager라면
+부족한 Pod 생성, 마지막에는 처음 요청한 Deployment의 Ready 개수까지 돌아와야 완료다.
+
+> 개념 연결: [cka 18. 트러블슈팅](/cka/18-troubleshooting/)
+
+## 컨트롤 플레인 장애 — Control Plane Failure
+
+배포가 동작하지 않거나 scale 뒤 Pod 수가 늘지 않을 때는 **Pod 생성과 노드 배정 중 어디서 멈췄는지**
+먼저 가른다. 이 절은 실습에서 관찰한 scheduler 실행 명령 오타, controller-manager kubeconfig 경로
+오타, 인증서 hostPath 오류를 다룬다. 명령의 `<namespace>`, `<deployment>`, `<app-pod>`는 실제 대상으로 바꾼다.
+
+### Deployment에서 시작해 담당 컴포넌트를 좁힌다
+
+```bash
+kubectl get deployments -A
+kubectl -n <namespace> get deployment <deployment> \
+  -o jsonpath='{.spec.replicas}{"\n"}'
+kubectl -n <namespace> get replicasets
+kubectl -n <namespace> get pods -o wide
+# 대상 Pod가 존재하면 Events 확인
+kubectl -n <namespace> describe pod <app-pod>
+kubectl -n kube-system get pods
+```
+
+Deployment controller는 Deployment의 원하는 상태를 ReplicaSet에 반영하고, ReplicaSet controller는
+부족한 Pod를 생성한다. 이 두 controller는
+[`kube-controller-manager`](https://kubernetes.io/docs/reference/command-line-tools-reference/kube-controller-manager/)에서
+실행된다. scheduler는 생성된 Pod에 노드를 배정한다.
+
+| 관찰 | 우선 조사할 단계 |
+|---|---|
+| `spec.replicas`가 요청한 값으로 바뀌지 않음 | scale 대상·namespace와 요청 결과 |
+| 원하는 개수는 바뀌었지만 새 Pod 자체가 없음 | Deployment·ReplicaSet controller, 해당 객체의 Events |
+| 새 Pod가 `Pending`이고 `NODE`가 `<none>` | scheduler 상태와 Pod의 스케줄링 Events |
+| 노드는 배정됐지만 앱이 실행되지 않음 | 컨테이너 생성·실행 단계의 Events와 로그 |
+
+이 표는 조사 방향이다. Pod 생성 실패는 quota, 미배정은 리소스 부족·taint 등으로도 발생하므로
+**증상만으로 control plane 장애를 확정하지 않는다.** scheduler가 죽어 있으면 실패 이유를 기록할
+프로세스도 없어 `FailedScheduling` 이벤트가 없을 수 있다.
+
+### scheduler — 실행 파일 이름 오타는 Events에서 찾는다
+
+```bash
+kubectl -n kube-system describe pod kube-scheduler-controlplane
+```
+
+실습 Events의 결정적인 부분은 다음과 같다.
+
+```text
+exec: "kube-schedulerrrr": executable file not found in $PATH
+```
+
+`image ... already present`는 이미지가 있다는 뜻이고, `Container created`도 프로세스 실행 성공을
+뜻하지 않는다. 긴 `containerd → shim → OCI → runc` 오류 끝의 `exec` 메시지가 실행 파일 이름을
+가리킨다. `BackOff`는 반복 실패로 재시도 간격을 늘린 결과다. 프로세스가 시작되기 전 실패여서
+`kubectl logs`에는 유용한 출력이 없을 수 있다.
+
+controlplane 노드에서 다음 파일을 열고 `spec.containers[].command`의 첫 항목만 고친다.
+
+```bash
+vim /etc/kubernetes/manifests/kube-scheduler.yaml
+```
+
+```yaml
+# command의 해당 항목 발췌 — 기존 플래그는 유지
+command:
+  - kube-scheduler # 잘못된 kube-schedulerrrr를 수정
+```
+
+### controller-manager — kubeconfig 경로 오타는 로그에서 찾는다
+
+replicas를 2로 늘렸는데 새 Pod가 생기지 않고 controller-manager가 `CrashLoopBackOff`라면 로그를 읽는다.
+
+```bash
+kubectl -n kube-system logs kube-controller-manager-controlplane
+# 현재 로그가 없거나 이전 실행의 원인이 필요할 때
+kubectl -n kube-system logs kube-controller-manager-controlplane --previous
+```
+
+```text
+stat /etc/kubernetes/controller-manager-XXXX.conf: no such file or directory
+```
+
+이번에는 프로세스가 시작한 뒤 지정된 파일을 찾지 못해 종료했다. 앞서 출력된
+`Generated self-signed cert in-memory`는 실패 원인이 아니다.
+[kubeadm의 기본 kubeconfig](https://kubernetes.io/docs/reference/setup-tools/kubeadm/implementation-details/)는
+`/etc/kubernetes/controller-manager.conf`이며 API 서버 접속·인증 정보를 담는다.
+
+```bash
+# controlplane 노드에서 실제 파일 확인 후 manifest 수정
+ls -l /etc/kubernetes/controller-manager.conf
+vim /etc/kubernetes/manifests/kube-controller-manager.yaml
+```
+
+Vim에서 `/controller-manager-XXXX.conf`를 검색해 잘못된 참조를
+`/etc/kubernetes/controller-manager.conf`로 바꾼다. 예를 들어 `--kubeconfig`가 틀렸다면 다음과 같다.
+
+```yaml
+- --kubeconfig=/etc/kubernetes/controller-manager.conf
+```
+
+로그만으로 어느 옵션이 틀렸는지까지 확정할 수는 없다. `--authentication-kubeconfig`,
+`--authorization-kubeconfig` 등 실제 manifest에서 해당 경로를 쓰는 위치를 대조한다.
+
+### controller-manager — 파일 없음에서 hostPath 오류까지 추적한다
+
+replicas를 3으로 늘린 뒤 다시 멈췄고 로그가 다음과 같다면, 확인된 사실은
+**컨테이너 안에서 CA 인증서 파일을 찾지 못했다는 것**이다. CA는 인증서를 검증하는 인증 기관이다.
+아직 volume 오류로 단정할 수 없다.
+
+```text
+unable to load client CA provider: open /etc/kubernetes/pki/ca.crt: no such file or directory
+```
+
+manifest에서 `/ca.crt`를 검색해 실행 인자를 확인하고, `volumeMounts`의 이름으로 `volumes`를 따라간다.
+아래는 잘못된 설정의 관련 부분만 발췌한 예시다. 이름은 실제 manifest를 따른다.
+
+```yaml
+spec:
+  containers:
+    - name: kube-controller-manager
+      command:
+        - kube-controller-manager
+        - --client-ca-file=/etc/kubernetes/pki/ca.crt
+      volumeMounts:
+        - name: k8s-certs
+          mountPath: /etc/kubernetes/pki
+          readOnly: true
+  volumes:
+    - name: k8s-certs
+      hostPath:
+        path: /etc/kubernetes/WRONG-PKI-DIRECTORY
+        type: DirectoryOrCreate
+```
+
+| 추적할 필드 | 이 예시에서 읽는 뜻 |
+|---|---|
+| `--client-ca-file` | 컨테이너가 `/etc/kubernetes/pki/ca.crt`를 열려고 함 |
+| `volumeMounts.mountPath` | 컨테이너의 `/etc/kubernetes/pki`에 volume을 연결 |
+| `volumeMounts.name` → `volumes.name` | `k8s-certs`라는 같은 이름으로 원본을 찾음 |
+| `hostPath.path` | 노드의 `/etc/kubernetes/WRONG-PKI-DIRECTORY`가 실제 원본 |
+
+[`hostPath`](https://kubernetes.io/docs/concepts/storage/volumes/#hostpath)는 노드의 파일·디렉터리를
+컨테이너에 연결한다. 컨테이너와 노드의 경로 이름이 같아야 하는 것은 아니다. 이 예시에서는 컨테이너가
+요청한 `ca.crt`가 **노드의 `/etc/kubernetes/WRONG-PKI-DIRECTORY/ca.crt`로 연결된다.**
+
+controlplane 노드에서 실제 원본과 비교한다.
+
+```bash
+ls -l /etc/kubernetes/pki/ca.crt
+ls -ld /etc/kubernetes/WRONG-PKI-DIRECTORY
+ls -l /etc/kubernetes/WRONG-PKI-DIRECTORY/ca.crt
+```
+
+정상 경로에 파일이 있지만 연결된 경로에는 없다면 잘못된 `hostPath`라는 근거가 확보된다.
+manifest에서 해당 volume의 원본만 수정한다.
+
+```yaml
+hostPath:
+  path: /etc/kubernetes/pki
+  type: DirectoryOrCreate
+```
+
+:::caution[마운트가 성공해도 필요한 파일은 없을 수 있다]
+`DirectoryOrCreate`는 지정한 디렉터리가 없으면 빈 디렉터리를 만든다. 인증서를 채워 주지는 않는다.
+따라서 잘못된 경로의 마운트 자체는 성공하고 controller-manager가 파일을 열 때 실패할 수 있다.
+volume 설정 문제여도 `FailedMount` 이벤트가 반드시 나오는 것은 아니다.
+:::
+
+파일 없음은 **실행 인자 → 컨테이너 mountPath → 같은 name의 volume → 노드 원본 파일** 순으로
+추적한다. 인자 오타, 마운트 누락, 잘못된 hostPath, 원본 파일 누락을 이 대조로 구분한다.
+
+### static Pod 수정과 원래 워크로드 복구를 검증한다
+
+이 실습의 scheduler와 controller-manager는 kubelet이 로컬 manifest를 읽어 관리하는 **static Pod**다.
+[공식 static Pod 동작](https://kubernetes.io/docs/tasks/configure-pod-container/static-pod/)에 따라
+controlplane 노드에서 `vim /etc/kubernetes/manifests/<component>.yaml`로 바로 수정하고 `:wq`로 저장하면
+kubelet이 변경을 감지해 Pod를 재생성한다. 권한이 부족하면 `sudo vim`을 쓴다.
+별도 `kubectl apply`나 kubelet 재시작은 필요하지 않으며, `kubectl edit pod` 대신 노드의 원본을 고친다.
+
+백업은 선택 사항이다. 만들 경우 감시 디렉터리 밖에 둔다.
+
+```bash
+# 예: controller-manager를 편집하기 전에 실행
+cp /etc/kubernetes/manifests/kube-controller-manager.yaml \
+  /root/kube-controller-manager.yaml.bak
+```
+
+`manifests` 안의 `.bak`도 kubelet이 읽을 수 있다. 수정 실수로 상태가 악화되면 외부에 둔 백업을
+원본 경로로 복원하고 다시 상태·Events·로그를 확인한다.
+
+```bash
+# 고친 컴포넌트만 선택 — READY 1/1, STATUS Running 확인 후 Ctrl+C
+kubectl -n kube-system get pod kube-scheduler-controlplane -w
+kubectl -n kube-system get pod kube-controller-manager-controlplane -w
+
+# 원래 요청한 replica 수와 실제 상태 확인
+kubectl -n <namespace> get deployment <deployment> \
+  -o jsonpath='{.spec.replicas}{"\n"}'
+kubectl -n <namespace> get deployment <deployment>
+kubectl -n <namespace> get pods -o wide
+kubectl -n <namespace> rollout status deployment/<deployment> --timeout=120s
+```
+
+:::tip[완료 기준은 원래 문제의 해결]
+컴포넌트의 `Running`만 보고 끝내지 않는다. scheduler 복구 뒤에는 새 Pod의 노드 배정,
+controller-manager 복구 뒤에는 부족한 Pod 생성, 최종적으로 Deployment의 `READY`가 요청한
+`2/2` 또는 `3/3`인지 확인한다. 원하는 replica 수가 이미 저장됐다면 다시 scale할 필요가 없다.
+Pod가 생성된 뒤 다른 이유로 실패하면 새 Events를 기준으로 다음 층을 조사한다.
+:::
+
+## 완료 기준
+
+- Deployment → ReplicaSet → Pod 흐름에서 생성 전과 노드 배정 전 실패를 구분한다.
+- 실행 명령·kubeconfig 경로·CA 파일 오류를 Events와 로그로 확정하고 static Pod 원본만 수정한다.
+- API가 죽었을 때는 control plane 노드의 `crictl`로 진입하고, 감시 디렉터리 밖에 백업을 둔다.
+- 컴포넌트 정상화 뒤 원래 Deployment의 원하는 replica·Ready·rollout을 확인한다.
+
+## 공식 문서에서 찾기
+
+| 작업 | 공식 문서에서 확인할 것 |
+|---|---|
+| 클러스터 진단 | [Troubleshooting Clusters](https://kubernetes.io/docs/tasks/debug/debug-cluster/)의 control plane 점검 순서 |
+| API 없는 진입 | [Debugging nodes with crictl](https://kubernetes.io/docs/tasks/debug/debug-cluster/crictl/)의 컨테이너 조회·로그 |
+| static Pod 원본 | [Create static Pods](https://kubernetes.io/docs/tasks/configure-pod-container/static-pod/)의 kubelet 감시·mirror Pod 동작 |
+| kubeadm 파일 | [kubeadm implementation details](https://kubernetes.io/docs/reference/setup-tools/kubeadm/implementation-details/)의 기본 kubeconfig·manifest 경로 |
+
+<LinkCard
+  title="37. 워커 노드 복구"
+  description="kubelet 서비스·config·kubeconfig 오류를 구분하고 Node Ready를 되살린다."
+  href="/cka-udemy/worker-failure/"
+/>
