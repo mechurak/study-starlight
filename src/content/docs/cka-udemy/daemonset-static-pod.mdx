@@ -1,0 +1,152 @@
+---
+title: "12. DaemonSet과 static Pod"
+description: "DaemonSet rollout과 static Pod 파일을 각각의 원본에서 수정하고 노드별 실행 결과를 검증한다"
+deckGroup: pods
+sidebar:
+  order: 1120
+reviewedAt: 2026-09-13
+---
+
+import { LinkCard } from '@astrojs/starlight/components';
+import Thesis from '../../../components/docs/Thesis.astro';
+
+<Thesis>DaemonSet은 API의 Pod 템플릿이 원본이고 static Pod은 각 노드의 매니페스트 파일이 원본이므로, 같은 노드별 워크로드라도 수정·삭제 경로가 다르다.</Thesis>
+
+> 짝이 되는 개념 장: [cka 5. Workloads](/cka/05-workloads/#daemonset--노드마다-하나씩), [cka 4. Pod](/cka/04-pods/#스태틱-pod-만들기--시험-단골)
+
+이 장의 과제는 노드마다 필요한 워크로드를 만들고 실제 배치를 확인하는 것이다. DaemonSet은 API
+서버에 저장된 컨트롤러가 대상 노드마다 Pod을 관리한다. static Pod은 해당 노드의 kubelet이 로컬
+파일을 읽어 직접 관리하고, API 서버에는 관찰용 mirror Pod만 보인다.
+
+따라서 DaemonSet은 템플릿과 rollout을 수정하지만, static Pod은 먼저 대상 노드와 `staticPodPath`를
+찾아 파일을 수정한다. API에 보이는 Pod만 지우는 것은 static Pod의 영구 삭제가 아니다.
+
+## DaemonSet — Practice Test: DaemonSets
+
+원본 풀이: [15-Practice-Test-DaemonSets.md](https://github.com/kodekloudhub/certified-kubernetes-administrator-course/blob/master/docs/03-Scheduling/15-Practice-Test-DaemonSets.md)
+
+```bash
+kubectl get ds -A
+kubectl describe ds kube-proxy -n kube-system
+```
+
+`kubectl create daemonset` 명령은 없다. 익숙한 Deployment 골격을 만든 뒤 종류와 불필요한 필드를
+고치는 방법이 빠르다.
+
+```bash
+kubectl create deployment elasticsearch -n kube-system \
+  --image=registry.k8s.io/fluentd-elasticsearch:1.20 \
+  --dry-run=client -o yaml > ds.yaml
+```
+
+`kind`를 `DaemonSet`으로 바꾸고 `replicas`와 Deployment 전용 `strategy`, 생성 결과에 섞인
+`status`를 제거한다. `spec.selector.matchLabels`와 `spec.template.metadata.labels`는 같은 값으로
+유지한다. 적용 뒤 `DESIRED`, `CURRENT`, `READY`가 대상 노드 수와 맞는지 확인한다.
+
+### 업데이트와 롤백은 전략까지 확인한다
+
+```bash
+kubectl -n kube-system get ds elasticsearch \
+  -o jsonpath='{.spec.updateStrategy.type}{"\n"}'
+kubectl -n kube-system rollout status ds/elasticsearch --timeout=120s
+kubectl -n kube-system rollout history ds/elasticsearch
+kubectl -n kube-system get pods -l app=elasticsearch \
+  -o custom-columns='NAME:.metadata.name,NODE:.spec.nodeName,READY:.status.containerStatuses[*].ready,IMAGE:.spec.containers[*].image'
+```
+
+기본 `RollingUpdate`가 실패하면 정상 리비전으로 되돌리고 완료까지 기다린다.
+
+```bash
+kubectl -n kube-system rollout undo ds/elasticsearch --to-revision=2
+kubectl -n kube-system rollout status ds/elasticsearch --timeout=120s
+```
+
+:::caution[OnDelete는 기존 Pod을 자동 교체하지 않는다]
+`OnDelete`에서는 이미지 변경뿐 아니라 `rollout undo`도 DaemonSet 템플릿만 바꾼다. 노드별 이미지를
+확인하고 오래된 Pod을 하나씩 삭제해 되돌린 템플릿으로 재생성한 뒤 다시 검증한다.
+:::
+
+## static Pod — Practice Test: Static Pods
+
+원본 풀이: [17-Practice-Test-StaticPods.md](https://github.com/kodekloudhub/certified-kubernetes-administrator-course/blob/master/docs/03-Scheduling/17-Practice-Test-StaticPods.md)
+
+| 과제 | 확인·수정 경로 |
+|---|---|
+| static Pod 찾기 | 이름의 노드명 접미사와 `kubectl get pods -A -o wide`의 NODE |
+| 매니페스트 경로 찾기 | kubelet `--config` 파일의 `staticPodPath` |
+| 만들기 | 대상 노드의 `staticPodPath`에 `kind: Pod` 파일 배치 |
+| 지우기 | 대상 노드에 접속해 원본 파일 삭제 |
+
+```bash
+ps -aux | grep '[k]ubelet'
+grep staticPodPath /var/lib/kubelet/config.yaml
+
+kubectl run static-busybox --image=busybox \
+  --dry-run=client -o yaml --command -- sleep 1000 \
+  > /etc/kubernetes/manifests/static-busybox.yaml
+```
+
+`--command` 뒤의 `sleep 1000`은 컨테이너의 command를 대체한다. 현재 `kubectl run`은 항상 Pod을
+만들기 때문에 예전 generator 관용구인 `--restart=Never`는 종류 선택에 필요하지 않다. 계속 떠 있어야
+하는 static Pod이라면 기본 `restartPolicy: Always`가 자연스럽다.
+
+:::caution[파일이 원본이다]
+mirror Pod을 `kubectl delete`해도 kubelet이 다시 만든다. `kubectl get pods -o wide`로 노드를 찾고,
+그 노드의 실제 `staticPodPath`에서 파일을 지워야 사라진다. 감시 디렉터리는 확장자로 필터링되지
+않으므로 백업 파일도 그 안에 두지 않는다.
+:::
+
+### nginx-critical — 대상 노드의 경로부터 확인한다
+
+`node01`에 만들라는 조건은 매니페스트의 `nodeName`을 쓰라는 뜻이 아니다. node01의 kubelet이
+감시하는 디렉터리에 파일을 놓으라는 뜻이다.
+
+```bash
+ssh node01
+sudo grep staticPodPath /var/lib/kubelet/config.yaml
+sudo test -d /etc/kubernetes/manifests
+exit
+
+kubectl run nginx-critical --image=nginx \
+  --dry-run=client -o yaml > /tmp/nginx-critical.yaml
+scp /tmp/nginx-critical.yaml node01:/tmp/nginx-critical.yaml
+ssh node01 'sudo cp /tmp/nginx-critical.yaml /etc/kubernetes/manifests/nginx-critical.yaml'
+
+kubectl get pod -o wide | grep nginx-critical
+kubectl wait --for=condition=Ready pod/nginx-critical-node01 --timeout=90s
+```
+
+kubeadm 노드에는 보통 `staticPodPath: /etc/kubernetes/manifests`가 이미 있다. 이 경우 파일을 놓기
+위해 kubelet을 재시작할 필요가 없다. 필드가 없어 kubelet 설정 자체를 추가했다면
+`sudo systemctl restart kubelet` 뒤 `systemctl is-active kubelet`까지 확인한다.
+
+## 공식 문서에서 찾을 것
+
+| 검색어 | 가져올 필드·판정 |
+|---|---|
+| `DaemonSet` | [`apps/v1`, selector/label 짝, `template.spec`](https://kubernetes.io/docs/concepts/workloads/controllers/daemonset/) |
+| `Update DaemonSet` | [`spec.updateStrategy.type`, RollingUpdate와 OnDelete 차이](https://v1-35.docs.kubernetes.io/docs/tasks/manage-daemon/update-daemon-set/) |
+| `Rollback DaemonSet` | [리비전 조회와 `rollout undo`](https://v1-35.docs.kubernetes.io/docs/tasks/manage-daemon/rollback-daemon-set/) |
+| `Create static Pods` | [`staticPodPath`, 파일로 둘 Pod 매니페스트](https://kubernetes.io/docs/tasks/configure-pod-container/static-pod/) · [v1.35 기준](https://v1-35.docs.kubernetes.io/docs/tasks/configure-pod-container/static-pod/) |
+
+## 완료 판정
+
+```bash
+kubectl -n kube-system get ds elasticsearch -o wide
+kubectl -n kube-system get pods -l app=elasticsearch -o wide
+kubectl get pods -A -o wide | grep -- '-node01'
+```
+
+- DaemonSet의 `DESIRED=CURRENT=READY`이고 대상 노드마다 기대 이미지의 Pod이 하나씩 있다.
+- `OnDelete` 복구라면 기존 Pod도 직접 교체해 노드별 이미지가 되돌아왔다.
+- static Pod 파일은 요구한 노드의 실제 `staticPodPath`에 있고 mirror Pod의 NODE와 Ready가 맞다.
+- 삭제 문제라면 API의 mirror Pod가 아니라 대상 노드의 원본 파일을 제거했다.
+
+DaemonSet은 selector가 가리키는 Pod 수와 노드 분포를 함께 보고, static Pod은 이름 접미사만 믿지
+않고 `NODE` 열을 확인한다. 요구한 이미지나 명령도 `kubectl get pod -o yaml`로 마지막에 대조한다.
+
+<LinkCard
+  title="13. Service와 EndpointSlice"
+  description="selector와 EndpointSlice를 맞추고 Service 경로를 계층별로 검증한다."
+  href="/cka-udemy/05-services-dns/"
+/>

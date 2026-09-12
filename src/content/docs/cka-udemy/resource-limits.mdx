@@ -1,0 +1,155 @@
+---
+title: "11. 리소스 제한과 quota"
+description: "requests·limits를 설정하고 LimitRange 기본값과 ResourceQuota의 총량 제한을 검증한다"
+deckGroup: pods
+sidebar:
+  order: 1110
+reviewedAt: 2026-09-13
+---
+
+import { LinkCard } from '@astrojs/starlight/components';
+import Thesis from '../../../components/docs/Thesis.astro';
+
+<Thesis>리소스 제한은 YAML을 저장하는 작업이 아니라 새 Pod의 실제 requests·limits와 quota의 Used/Hard, 초과 요청의 거부를 함께 증명하는 작업이다.</Thesis>
+
+> 짝이 되는 개념 장: [cka 6. 설정과 리소스](/cka/06-config/#리소스-관리)
+
+이 장의 과제는 컨테이너에 CPU·메모리 requests와 limits를 설정하고, 네임스페이스 정책이 실제로
+적용되는지 확인하는 것이다. requests는 스케줄링의 기준이고 limits는 런타임 상한이다. 메모리 상한을
+넘어 종료된 컨테이너는 `OOMKilled`로 보이므로 단순 애플리케이션 오류와 구분한다.
+
+`LimitRange`와 `ResourceQuota`를 만들었다는 출력만으로는 부족하다. 정책 적용 뒤 새 Pod을 만들어
+기본값 주입을 보고, quota의 Used/Hard를 확인한 다음, 한도를 넘는 추가 Pod이 거부되는지까지 본다.
+
+## 리소스 요청과 제한 — Practice Test: Resource Limits
+
+원본 풀이: [13-Practice-Test-Resource-Limits.md](https://github.com/kodekloudhub/certified-kubernetes-administrator-course/blob/master/docs/03-Scheduling/13-Practice-Test-Resource-Limits.md)
+
+```bash
+kubectl describe pod rabbit
+kubectl get pod elephant \
+  -o jsonpath='{.status.containerStatuses[0].lastState.terminated.reason}{"\n"}'
+```
+
+`describe`의 Requests/Limits에서 현재 값을 읽는다. 종료 원인이 `OOMKilled`라면 메모리 limit 초과를
+먼저 의심하고, 요구된 값으로 Pod 스펙을 고쳐 재생성한다.
+
+```yaml
+resources:
+  requests:
+    memory: 15Mi
+  limits:
+    memory: 20Mi
+```
+
+일반적인 실습에서는 독립 Pod 스펙을 수정한 뒤 재생성한다. Kubernetes v1.35부터 컨테이너 리소스의
+in-place resize가 GA지만, 문제에서 resize를 요구하거나 클러스터가 지원하는지 확인하지 않았다면
+재생성 경계를 임의로 바꾸지 않는다. 자세한 차이는 [cka 4장](/cka/04-pods/#리소스-in-place-변경-kubernetes-v135-ga)에 있다.
+
+### 종료 원인과 스케줄링 실패를 구분한다
+
+메모리 limit 초과는 실행 뒤 `OOMKilled`로 종료되지만, requests를 수용할 노드가 없으면 컨테이너가
+시작되기 전 Pending에 머문다. 전자는 `lastState.terminated.reason`, 후자는 Pod Events의
+`Insufficient cpu`·`Insufficient memory`를 확인한다. CPU limit 초과는 보통 컨테이너 종료가 아니라
+throttling으로 나타나므로 `OOMKilled`와 같은 방식으로 판정하지 않는다.
+
+```bash
+kubectl describe pod elephant
+kubectl get events --field-selector involvedObject.name=elephant --sort-by=.lastTimestamp
+```
+
+## 네임스페이스 제한 — 기본값과 총량을 따로 증명한다
+
+`LimitRange`는 개별 Pod·컨테이너의 기본값과 최소·최대치를 정하고, `ResourceQuota`는 네임스페이스
+전체 사용량을 제한한다.
+
+```yaml
+# quota-check.yaml
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: defaults
+  namespace: quota-check
+spec:
+  limits:
+    - type: Container
+      default:
+        cpu: 500m
+        memory: 256Mi
+      defaultRequest:
+        cpu: 100m
+        memory: 128Mi
+---
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: compute
+  namespace: quota-check
+spec:
+  hard:
+    requests.cpu: 100m
+    requests.memory: 128Mi
+    limits.cpu: 500m
+    limits.memory: 256Mi
+    pods: "1"
+```
+
+```bash
+kubectl create namespace quota-check
+kubectl apply -f quota-check.yaml
+
+# 정책이 생긴 뒤 resources를 생략한 새 Pod을 만든다
+kubectl -n quota-check create deployment quota-check --image=nginx:1.29-alpine
+kubectl -n quota-check rollout status deployment/quota-check --timeout=120s
+
+kubectl -n quota-check get pod -l app=quota-check \
+  -o jsonpath='{.items[0].spec.containers[0].resources}{"\n"}'
+kubectl -n quota-check describe resourcequota compute
+
+# 두 번째 Pod 생성은 총량을 넘는다
+kubectl -n quota-check scale deployment quota-check --replicas=2
+kubectl -n quota-check describe replicaset
+```
+
+마지막 Events에 `FailedCreate`, `403 Forbidden`, `exceeded quota`가 보이면 총량 제한이 작동한 것이다.
+Deployment의 replicas가 2로 바뀌었다고 두 번째 Pod까지 생성된 것은 아니다. 컨트롤러가 실패한 실제
+지점인 ReplicaSet 이벤트를 확인한다.
+
+:::caution[LimitRange는 기존 Pod을 소급 변경하지 않는다]
+기본 requests와 limits는 admission 시점에 새로 생성되는 Pod에 들어간다. 정책보다 먼저 존재하던
+Pod을 조회해 “주입되지 않았다”고 결론 내리지 말고, 정책 적용 뒤 새 Pod으로 검증한다.
+:::
+
+## 공식 문서에서 찾을 것
+
+| 검색어 | 가져올 필드·판정 |
+|---|---|
+| `Resource Management for Pods and Containers` | [`containers[].resources.requests`와 `limits`](https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/) |
+| `Limit Ranges` | [`spec.limits`, default/defaultRequest와 403 거부](https://kubernetes.io/docs/concepts/policy/limit-range/) · [v1.35 기준](https://v1-35.docs.kubernetes.io/docs/concepts/policy/limit-range/) |
+| `Resource Quotas` | [`spec.hard`, status의 Used/Hard](https://kubernetes.io/docs/concepts/policy/resource-quotas/) · [v1.35 기준](https://v1-35.docs.kubernetes.io/docs/concepts/policy/resource-quotas/) |
+
+## 완료 판정
+
+```bash
+kubectl get pod elephant -o jsonpath='{.spec.containers[0].resources}{"\n"}'
+kubectl -n quota-check get limitrange defaults -o yaml
+kubectl -n quota-check get resourcequota compute
+kubectl -n quota-check get deployment,replicaset,pod
+```
+
+- 대상 컨테이너의 실제 requests·limits가 요구값과 같다.
+- 정책 적용 뒤 만든 Pod에 LimitRange 기본값이 주입됐다.
+- ResourceQuota의 Used/Hard가 예상과 같고, 초과 Pod 생성은 ReplicaSet Events에서 거부됐다.
+
+실패 증거를 확인하기 전에 namespace를 지우면 원인을 다시 만들 수 없다. 네 줄의 결과와
+ReplicaSet Events를 확인한 뒤에만 실습 리소스를 정리한다.
+
+```bash
+kubectl delete namespace quota-check
+```
+
+<LinkCard
+  title="12. DaemonSet과 static Pod"
+  description="노드마다 실행하는 두 방식의 원본·업데이트·완료 기준을 구분한다."
+  href="/cka-udemy/daemonset-static-pod/"
+/>

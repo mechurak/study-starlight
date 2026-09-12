@@ -29,10 +29,6 @@ export default {
 			"label": "Workloads와 스케줄링"
 		},
 		{
-			"id": "basics",
-			"label": "Workloads와 스케줄링 (개편 전)"
-		},
-		{
 			"id": "services-dns",
 			"label": "네트워킹"
 		},
@@ -168,14 +164,44 @@ export default {
 			"tone": "ok"
 		},
 		{
-			"label": "개편 전 4장",
-			"title": "스케줄링",
+			"label": "10장",
+			"title": "Pod 배치 조건",
 			"href": "/cka-udemy/04-scheduling/",
-			"desc": "수동 배치 · 라벨/taint · affinity · quota · DaemonSet 업데이트 · 스태틱 Pod",
+			"desc": "nodeName · selector · taint/toleration · nodeAffinity · Pending Events",
 			"items": [
 				[
 					"cka 7장",
 					"/cka/07-scheduling/"
+				]
+			],
+			"tone": "ok"
+		},
+		{
+			"label": "11장",
+			"title": "리소스 제한과 quota",
+			"href": "/cka-udemy/resource-limits/",
+			"desc": "requests/limits · OOMKilled · LimitRange · ResourceQuota",
+			"items": [
+				[
+					"cka 6장",
+					"/cka/06-config/"
+				]
+			],
+			"tone": "ok"
+		},
+		{
+			"label": "12장",
+			"title": "DaemonSet과 static Pod",
+			"href": "/cka-udemy/daemonset-static-pod/",
+			"desc": "노드별 Pod · updateStrategy · rollback · staticPodPath · mirror Pod",
+			"items": [
+				[
+					"cka 5장",
+					"/cka/05-workloads/"
+				],
+				[
+					"cka 4장",
+					"/cka/04-pods/"
 				]
 			],
 			"tone": "ok"

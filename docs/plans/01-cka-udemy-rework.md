@@ -1,7 +1,7 @@
 # 1. CKA 실습 덱을 작업 단위로 개편
 
 상태: M0·M1 완료, M2~M8 실행 중
-지금 위치: M2b Workloads·Pod 설정 이관 완료. M2c 배치·리소스·노드별 워크로드부터 이어 간다.
+지금 위치: M2c 배치·리소스·노드별 워크로드 이관 완료. M2d HPA·VPA부터 이어 간다.
 실행 범위: 이번 실행에서 남은 M2~M8을 묶음별 편집·검증·기록·커밋까지 완료한다.
 실행 모델: M0·M1은 Astra 완료. 이번 M2~M8은 Sol Medium.
 작성일: 2026-09-12
@@ -71,7 +71,7 @@ M1에서 실제 slug·순서를 확정하고 이 표에 기록한다. 페이지 
 | `01-basics.mdx` | 기초·Workloads | kubectl·namespace·YAML·Vim 기본 조작 / JSONPath 추출·정렬 / Pod 생성·상태 확인 | 3·4 |
 | `02-workloads.mdx` | Workloads | ReplicaSet·Deployment 생성과 rollout·rollback / Job 완료·실패 | 5 |
 | `03-pod-config.mdx` | Workloads | command·args 수정 / ConfigMap·Secret 주입 / init·sidecar 구성 / securityContext로 실행 권한 설정 | 4·6 |
-| `04-scheduling.mdx` | Workloads | nodeName·selector·taint·affinity 배치 / requests·limits·quota / DaemonSet·static Pod 관리 | 7·6 |
+| `04-scheduling.mdx` | Workloads | `04-scheduling`의 nodeName·selector·taint·affinity 배치 / `resource-limits`의 requests·limits·quota / `daemonset-static-pod`의 DaemonSet·static Pod 관리 | 7·6·5·4 |
 | `10-troubleshooting.mdx`의 오토스케일러 | Workloads | HPA 설정·검증. VPA는 설치된 CRD를 읽는 보충 사례로 분리 | 8·17 |
 | `05-services-dns.mdx` | Networking | Service·EndpointSlice / DNS·CoreDNS / 노드·Pod·Service 대역과 CNI 확인. CNI 설치는 M7의 kubeadm과 연결 | 9·10·15 |
 | `06-ingress-netpol.mdx` | Networking | Ingress·TLS / Gateway·HTTPRoute / NetworkPolicy 허용·차단 | 11·12 |
@@ -189,7 +189,7 @@ Kubernetes 문서 내 검색은 가능하지만 외부 검색 결과를 열면 �
 
 - [x] M2a: `01-basics`의 기본 조작·출력 추출·Pod 작업을 분리한다. Vim·도움말·YAML 생성으로 오는 `cka` 앵커 링크도 갱신한다.
 - [x] M2b: `02-workloads`, `03-pod-config`를 목차 표대로 작업별로 이관한다. Deployment template 수정과 독립 Pod 재생성의 전제를 남긴다. 분량에 따라 검증·커밋 묶음을 나눈다.
-- [ ] M2c: `04-scheduling`을 배치·리소스·노드별 워크로드로 나눈다. 조건과 결과를 연결한다.
+- [x] M2c: `04-scheduling`을 배치·리소스·노드별 워크로드로 나눈다. 조건과 결과를 연결한다.
 - [ ] M2d: `10-troubleshooting`의 HPA/VPA를 이관한다. metrics 사전 조건과 기대 replica·상태를 남긴다.
 - 검증: 생성 성공과 Ready·rollout·Job 완료·배치 결과가 구분된다. 네이티브 sidecar 등 버전 민감한 예제는 공식 문서 대조 기록을 남긴다.
 
@@ -431,3 +431,29 @@ M2a에서 이어 설명하고, Job은 terminal condition·소유 Pod·로그를 
   console error 0을 확인했다. `git diff --check`도 통과했다.
 
 다음 묶음은 M2c의 Pod 배치·리소스 제한·DaemonSet과 static Pod 이관이다.
+
+
+### M2c — 배치·리소스·노드별 워크로드 (2026-09-13)
+
+기존 `04-scheduling` URL에는 nodeName·selector·taint·toleration·nodeAffinity 배치를 남기고,
+`resource-limits`와 `daemonset-static-pod`를 11·12장/order 1110·1120으로 분리했다. 예약한
+`pods` 그룹으로 모두 옮겨 과도기 `basics` 그룹을 제거하고 DeckMap·`cka` 7장·트러블슈팅의
+DaemonSet 전략 링크를 갱신했다.
+
+- 분할 뒤 183 / 155 / 152줄이다. nodeName의 스케줄러 우회·재생성, 라벨 후보와 taint 허용
+  후보의 교집합, Pending Events, requests/limits와 OOMKilled, LimitRange의 새 Pod 주입,
+  ResourceQuota의 ReplicaSet 거부, DaemonSet의 RollingUpdate·OnDelete 복구, static Pod의
+  노드별 파일 원본·mirror Pod·kubelet 재시작 조건을 보존했다. 원본 외부 출처 누락은 0개다.
+- Kubernetes 공식 Pod 배치·taint/toleration·LimitRange·ResourceQuota·DaemonSet 업데이트·
+  static Pod 문서를 대조했다. toleration은 배치를 보장하지 않고, LimitRange는 admission 시점에
+  적용되며, OnDelete는 템플릿 변경 뒤 기존 Pod을 자동 교체하지 않는다는 경계를 확인했다.
+- YAML 코드 블록 여섯 개를 로컬 YAML 파서로 읽었고, kubectl v1.36.4로 DaemonSet에 쓸
+  Deployment 골격의 kind·image를 확인했다. static Pod용 `kubectl run --dry-run=client`는 discovery
+  대상 클러스터가 없어 `localhost:8080` 연결 실패했다. 지정 랩이 없어 배치·quota·rollout·
+  static Pod 파일 감시는 실제 클러스터에서 실행하지 않았다.
+- 첫 `pnpm check`는 새 페이지의 Thesis import 경로 오타로 실패했고 기존 덱 경로로 고쳤다.
+  최종 `pnpm check` exit 0 — 382페이지 빌드·32,659개 내부 페이지/앵커 링크 통과.
+  preview + Playwright에서 DeckMap의 10~12장 링크, 각 페이지 현재 항목과 390px
+  main/문서 폭 390/390, console error 0을 확인했다. `git diff --check`도 통과했다.
+
+다음 묶음은 M2d의 HPA 설정·검증과 VPA 보충 사례 이관이다.
