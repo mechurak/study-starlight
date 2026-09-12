@@ -333,6 +333,43 @@ kubectl describe gateway web-gateway -n nginx-gateway
 GatewayClass·컨트롤러를 확인한다. 생성 요구만 있으면 HTTPRoute·백엔드를 추가하지 않는다.
 경로가 기억나지 않으면 Gateway API 사이트의 **Guides → Getting started**에서 예제를 찾는다.
 
+### 기존 Gateway를 HTTPS 443 리스너로 고친다
+
+기존 리소스 수정 문제는 먼저 현재 listener와 Secret을 확인하고, `spec.listeners`의 해당 항목만
+HTTP 80에서 HTTPS 443으로 바꾼다. Gateway와 Secret이 같은 `cka5673` 네임스페이스에 있으면
+기본 `Secret` 참조에 별도 `ReferenceGrant`가 필요 없다.
+
+```bash
+kubectl get gateway web-gateway -n cka5673 -o yaml
+kubectl get secret kodekloud-tls -n cka5673
+kubectl edit gateway web-gateway -n cka5673
+```
+
+리스너의 완성 형태는 다음과 같다. `mode: Terminate`는 Gateway가 인증서로 TLS를 종료한다는 뜻이다.
+
+```yaml
+listeners:
+  - name: https
+    protocol: HTTPS
+    port: 443
+    hostname: kodekloud.com
+    tls:
+      mode: Terminate
+      certificateRefs:
+        - name: kodekloud-tls
+```
+
+```bash
+kubectl describe gateway web-gateway -n cka5673
+# Listeners의 Attached Routes와 status.conditions의 Accepted·Programmed를 확인
+```
+
+:::caution[함정 — HTTPS listener와 Route는 서로 다른 층이다]
+Gateway를 443으로 바꿔도 Route가 자동으로 생기거나 hostname이 맞춰지지는 않는다. 기존 HTTPRoute가
+이 listener에 계속 붙는지는 `kubectl describe httproute -n cka5673`의 `Accepted`와
+`ResolvedRefs`로 별도 확인한다. Secret이 다른 네임스페이스에 있으면 단순 이름 참조로는 부족하다.
+:::
+
 ### HTTPRoute의 parentRefs — 세 값을 클러스터에서 캐낸다
 
 Gateway 다음 문제는 그 Gateway에 HTTPRoute를 붙이는 것이다. Route 자체는 **백엔드 Service와
@@ -501,6 +538,36 @@ spec:
 NetworkPolicy가 있어도 **podSelector에 안 걸린 Pod은 여전히 전부 허용**이다.
 "internal → payroll이 되는 이유"류의 보기 문제는 이 기본값을 묻는 것이다 —
 랩의 정답 보기도 *Only internal applications can access payroll service* 다.
+:::
+
+### 후보 세 개 중 가장 좁은 허용 정책을 고른다
+
+"frontend 네임스페이스만 backend에 접근"은 deny 규칙을 찾는 문제가 아니다. backend Pod을 ingress
+격리한 뒤, 출발지 `namespaceSelector`가 frontend만 정확히 고르는 후보를 선택한다.
+
+```bash
+for file in /root/net-pol-{1,2,3}.yaml; do
+  echo "### $file"
+  yq '.metadata, .spec.podSelector, .spec.policyTypes, .spec.ingress' "$file"
+done
+
+kubectl get ns frontend databases --show-labels
+kubectl get netpol -n backend -o yaml
+kubectl apply --dry-run=server -f /root/net-pol-3.yaml
+kubectl apply -f /root/net-pol-3.yaml
+kubectl get netpol -n backend
+```
+
+보통 정답 후보는 `namespaceSelector.matchLabels.kubernetes.io/metadata.name: frontend`만 허용하고
+databases를 peers에 넣지 않는다. `podSelector: {}`가 backend 네임스페이스의 모든 Pod을 고르는지,
+혹은 문제에서 지정한 backend 앱 라벨만 고르는지도 함께 확인한다.
+
+:::caution[함정 — 기존 정책은 그대로 보이고 허용은 합쳐진다]
+문제가 "기존 정책을 삭제하지 말라"고 했으므로 적용 뒤 `net-policy-3` 하나만 보여야 한다는 풀이는
+검증 기준으로 쓸 수 없다. 기존 정책과 새 정책이 함께 보이는 것이 정상이다. 더구나 NetworkPolicy는
+우선순위나 deny 규칙이 없고 **모든 허용 규칙의 합집합**이다. 기존 정책 하나가 같은 backend Pod에
+databases를 이미 허용한다면 좁은 정책을 추가해도 그 허용을 취소할 수 없다. 후보를 적용하기 전에
+기존 정책의 `podSelector`와 ingress peers가 겹치는지 반드시 확인한다.
 :::
 
 ### 적용 결과를 세 방향으로 증명하기

@@ -106,6 +106,41 @@ kubectl get pods                 # ② 워크로드 층 — Running/Ready
 하지만 시험·실무에서 "배포하라"는 지시는 ②까지가 완료 조건이라고 보고 둘 다 확인하는
 습관을 남긴다. release는 `deployed`인데 Pod이 비정상이면 다음 절의 분기로 내려간다.
 
+### 취약 이미지에서 release를 역추적해 제거한다
+
+리소스 이름과 Helm release 이름이 같다고 추측하지 않는다. 가장 직접적인 방법은 모든 네임스페이스의
+release를 열거하고, Helm이 각 release에 렌더한 manifest에서 정확한 이미지 문자열을 찾는 것이다.
+
+```bash
+helm list -A
+
+helm list -A -o json \
+  | jq -r '.[] | [.name, .namespace] | @tsv' \
+  | while IFS=$'\t' read -r release namespace; do
+      if helm get manifest "$release" -n "$namespace" \
+        | grep -Fq 'kodekloud/webapp-color:v1'; then
+        printf '%s\t%s\n' "$release" "$namespace"
+      fi
+    done
+```
+
+출력된 release와 namespace를 그대로 제거 명령에 넣는다. 제거 전 한 번 더 manifest를 열어 이미지와
+대상을 확인하면 비슷한 이름의 release를 지우는 실수를 피할 수 있다.
+
+```bash
+helm get manifest <RELEASE> -n <NAMESPACE> \
+  | grep -n -F 'kodekloud/webapp-color:v1'
+helm uninstall <RELEASE> -n <NAMESPACE>
+helm list -A
+```
+
+:::tip[현재 오브젝트와 Helm 기록을 구분한다]
+`kubectl get deploy ... | jq`는 지금 실행 중인 Deployment의 이미지를 찾는 데 좋지만 StatefulSet,
+DaemonSet, Job이나 init container를 빠뜨리기 쉽고 release 이름도 직접 알려 주지 않는다.
+`helm get manifest`는 release → 렌더된 리소스 → 이미지의 연결을 한 번에 보존한다. 누군가 Helm 밖에서
+이미지를 수정했을 가능성이 있으면 그때는 실제 워크로드도 함께 조회한다.
+:::
+
 ## 차트 버전 업그레이드 — `--version`은 CHART VERSION
 
 *Upgrade the nginx version to 1.27.x and use the Helm chart version 18.3.6 from the

@@ -220,7 +220,8 @@ tol -> c: 진동 방지 { style.stroke-dash: 3 }
 
 :::caution[함정]
 `averageUtilization`은
-**`requests.cpu`에 대한 비율**이다. limits가 아니다.
+CPU 메트릭이면 **`requests.cpu`**, memory 메트릭이면 **`requests.memory`에 대한 비율**이다.
+limits가 아니다.
 **requests가 없으면 HPA는 `<unknown>` 을 표시하고 아무것도 못 한다.**
 :::
 

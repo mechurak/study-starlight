@@ -492,6 +492,47 @@ Service와 달리 **Pod은 기본적으로 DNS 레코드가 없거나 IP 기반*
 "Pod을 이름으로 조회하라"는 보기가 나오면 의심부터 할 것 — 원리는 [cka 10장](/cka/10-dns/).
 :::
 
+### nginx-resolver — Service DNS와 Pod IP를 따로 증명한다
+
+이 유형은 생성보다 **무엇을 검증하라고 했는지 분리하는 것**이 핵심이다. Service 이름 조회는
+Service의 ClusterIP를 확인하고, Pod IP 기반 이름 조회는 `<점 대신 하이픈>.<ns>.pod` 형식의
+레코드를 확인한다. 출력 파일 경로는 문제에서 지정한 노드 경로이므로 리다이렉트는 kubectl 바깥에 둔다.
+
+```bash
+kubectl run nginx-resolver --image=nginx
+kubectl wait --for=condition=Ready pod/nginx-resolver --timeout=90s
+kubectl expose pod nginx-resolver \
+  --name=nginx-resolver-service --port=80 --target-port=80 --type=ClusterIP
+
+mkdir -p /root/CKA
+kubectl run test-nslookup --image=busybox:1.28 --rm -i --restart=Never \
+  -- nslookup nginx-resolver-service > /root/CKA/nginx.svc
+
+POD_IP=$(kubectl get pod nginx-resolver -o jsonpath='{.status.podIP}')
+POD_DNS="${POD_IP//./-}.default.pod"
+kubectl run test-nslookup --image=busybox:1.28 --rm -i --restart=Never \
+  -- nslookup "$POD_DNS" > /root/CKA/nginx.pod
+```
+
+Pod IP 기반 레코드는 DNS 구현이 제공하는 형식이고, 안정적인 애플리케이션 주소로 쓰는 대상은
+Service다. 또한 두 `nslookup`은 모두 **이름 해석**만 증명한다. 문제 문장이 Pod IP의 network
+reachability까지 요구한다면 실제 요청을 한 번 더 보내야 한다.
+
+```bash
+kubectl run test-reachability --image=busybox:1.28 --rm -i --restart=Never \
+  -- wget -qO- "http://$POD_IP"
+
+grep -E 'Name:|Address' /root/CKA/nginx.svc /root/CKA/nginx.pod
+kubectl get svc nginx-resolver-service
+kubectl get endpointslice -l kubernetes.io/service-name=nginx-resolver-service
+```
+
+:::caution[함정 — 풀이의 `nslookup` 두 번은 reachability 검사가 아니다]
+`nslookup 10-244-1-5.default.pod`가 성공해도 패킷이 nginx까지 도달했다는 뜻은 아니다.
+채점 파일에는 요구된 조회 출력을 남기되, 통신 확인은 `wget http://POD_IP`처럼 애플리케이션 포트에
+실제 요청해서 끝낸다. 네임스페이스가 `default`가 아니면 Pod DNS의 가운데도 그 네임스페이스로 바꾼다.
+:::
+
 ## Service → DNS → 외부 경로를 한 겹씩 검증하기
 
 Service를 만들었다는 사실만으로 트래픽 경로가 완성되지는 않는다. **백엔드 → Service → DNS →

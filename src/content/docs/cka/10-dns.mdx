@@ -376,6 +376,8 @@ hosts {
 :::tip[시험]
 `nslookup kubernetes.default` 가 성공하면 DNS는 정상이다.
 이 이름은 **어느 클러스터에나 항상 존재**하므로 기준점으로 쓰기 좋다.
+다만 `nslookup`은 이름 해석만 확인한다. Pod IP나 Service 포트의 실제 reachability는
+`wget`, `curl`, `nc`처럼 대상 포트에 연결하는 명령으로 따로 증명한다.
 :::
 
 ### DNS 증상별 원인

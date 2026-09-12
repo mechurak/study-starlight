@@ -171,6 +171,10 @@ Helm이 푸는 문제는 "**남이 만든 수십 장짜리 매니페스트를, �
 - **`helm get values` vs `get manifest`** — 앞은 **내가 준 값**, 뒤는 그 값으로 렌더된
   **최종 YAML**이다. "무엇이 실제로 적용됐나"를 볼 때는 `get manifest`다
 
+특정 이미지가 어느 release에서 왔는지 찾을 때도 이 연결을 거꾸로 쓴다. `helm list -A`로
+release와 네임스페이스를 얻고, 각 `helm get manifest RELEASE -n NAMESPACE`에서 이미지 문자열을
+찾으면 리소스 이름을 release 이름으로 오인하지 않는다.
+
 ### 값 오버라이드 — 실무의 핵심
 
 <Tabs>

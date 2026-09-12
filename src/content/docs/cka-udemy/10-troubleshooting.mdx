@@ -145,6 +145,48 @@ kubectl describe hpa webapp-hpa -n default
 메트릭이 계속 `<unknown>`이면 Conditions·Events에서 CPU requests 누락과 metrics 수집 실패를 구분한다.
 생성 성공과 실제 스케일링 가능 여부는 별도다.
 
+### backend-hpa — memory utilization 65%로 바꾼다
+
+CPU 예제를 memory 문제에 재사용할 때는 `resource.name`만 바꾸는 것이 핵심이다. `Utilization`은
+절대 메모리 양이 아니라 각 Pod의 **memory request 대비 사용률**이므로 대상 Deployment에
+`resources.requests.memory`가 있어야 계산된다.
+
+```yaml
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: backend-hpa
+  namespace: backend
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: backend-deployment
+  minReplicas: 3
+  maxReplicas: 15
+  metrics:
+    - type: Resource
+      resource:
+        name: memory
+        target:
+          type: Utilization
+          averageUtilization: 65
+```
+
+제공 파일이 `/root/webapp-hpa.yaml`에 있다면 그 파일을 고쳐 **절대 경로로** 적용한다.
+
+```bash
+kubectl apply --dry-run=server -f /root/webapp-hpa.yaml
+kubectl apply -f /root/webapp-hpa.yaml
+kubectl get hpa backend-hpa -n backend
+kubectl describe hpa backend-hpa -n backend
+kubectl get deploy backend-deployment -n backend \
+  -o jsonpath='{.spec.template.spec.containers[*].resources.requests.memory}{"\n"}'
+```
+
+`REFERENCE`, `MINPODS`, `MAXPODS`, `TARGETS`를 확인한다. `TARGETS`가 `<unknown>/65%`라면 YAML
+생성은 성공했지만 완료는 아니다. Events에서 metrics-server 문제와 memory request 누락을 구분한다.
+
 ### analytics-vpa — Recreate 모드로 요청량 조정
 
 공식 [Vertical Pod Autoscaling](https://kubernetes.io/docs/concepts/workloads/autoscaling/vertical-pod-autoscale/)에서
