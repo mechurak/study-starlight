@@ -1,0 +1,307 @@
+---
+title: "24. RBAC 권한 부여와 검증"
+description: "Role·ClusterRole과 Binding을 구성하고 허용·거부 및 실제 인증서 사용자의 권한을 검증한다."
+deckGroup: rbac
+sidebar:
+  order: 1240
+reviewedAt: 2026-09-13
+---
+
+import { LinkCard } from '@astrojs/starlight/components';
+import Thesis from '../../../components/docs/Thesis.astro';
+
+<Thesis>
+RBAC 작업은 요구 문장을 주체·범위·API 그룹·리소스·동사로 번역하고, 허용해야 할 요청과
+막혀야 할 요청을 모두 확인해야 끝난다.
+</Thesis>
+
+`--as`와 `auth can-i`는 빠른 인가 검사다. 인증서로 실제 로그인한 증거는 아니므로 CSR 통합
+사례에서는 전용 kubeconfig의 `auth whoami`와 권한 판정을 별도로 확인한다.
+
+> 짝이 되는 개념 장: [cka 14. 인증 · 인가 · RBAC](/cka/14-rbac/)
+
+## RBAC으로 권한 주기
+
+### Role과 RoleBinding — Practice Test: RBAC
+
+원본 풀이: [18-Practice-Test-RBAC.md](https://github.com/kodekloudhub/certified-kubernetes-administrator-course/blob/master/docs/07-Security/18-Practice-Test-RBAC.md)
+
+```bash
+# "Run the command kubectl describe pod kube-apiserver-controlplane -n kube-system and look for --authorization-mode"
+kubectl describe pod kube-apiserver-controlplane -n kube-system | grep authorization-mode
+# "Run the command kubectl get roles --all-namespaces"
+kubectl get roles -A
+# "Check the verbs associated to the kube-proxy role"
+kubectl describe role kube-proxy -n kube-system       # 리소스·verbs 읽기
+# "Run the command kubectl get pods --as dev-user"
+kubectl get pods --as dev-user                        # 권한 시험해보기
+kubectl create role developer --verb=list,create,delete --resource=pods -n default
+kubectl create rolebinding dev-user-binding --role=developer --user=dev-user -n default
+```
+
+:::tip[--as로 확인까지가 한 세트]
+만들라는 문제든 고치라는 문제든, 끝은 항상
+`kubectl get pods --as dev-user` 또는
+[`kubectl auth can-i`](https://kubernetes.io/docs/reference/kubectl/generated/kubectl_auth/kubectl_auth_can-i/)로
+검증한다. `can-i`는 실제 오브젝트를 만들지 않고 **이 주체가 이 요청을 할 수 있는지**만 답한다.
+:::
+
+문제 문장을 먼저 `can-i` 명령으로 바꾸면, Role에 넣을 값과 완료 검증 명령을 한 번에 얻는다.
+
+```bash
+kubectl auth can-i create deployments.apps --as=dev-user -n blue
+```
+
+| 명령의 조각 | RBAC에서 확인하거나 채울 자리 |
+|---|---|
+| `--as=dev-user` | RoleBinding의 `subjects[].name` |
+| `-n blue` | Role과 RoleBinding의 `metadata.namespace` |
+| `create` | Role의 `rules[].verbs` |
+| `deployments` | Role의 `rules[].resources` |
+| `apps` | Role의 `rules[].apiGroups` |
+
+리소스의 복수형이나 API group이 기억나지 않으면 외우지 말고 discovery 결과를 확인한다.
+
+```bash
+kubectl api-resources | grep -w deployments
+# deployments   deploy   apps/v1   true   Deployment
+```
+
+`apps/v1`에서 group은 `apps`이고 `v1`은 version이라 Role에 쓰지 않는다. Pod처럼 APIVERSION이
+`v1`만 표시되는 core group은 `apiGroups: [""]`로 쓴다. rules YAML 골격까지 필요하면 임시 Role을
+적용하지 않고 출력만 만들 수 있다.
+
+```bash
+kubectl create role rule-template -n blue \
+  --verb=create --resource=deployments.apps \
+  --dry-run=client -o yaml
+```
+
+출력의 `rules`를 참고한다. 공식 예시는
+[Using RBAC Authorization의 Role examples](https://kubernetes.io/docs/reference/access-authn-authz/rbac/#role-examples)에
+리소스별 `apiGroups`·`resources`·`verbs` 조합으로 정리되어 있다.
+
+:::caution[함정 — resourceNames]
+"특정 이름의 리소스만" 허용하는 Role은 rules에 `resourceNames: ["blue-app"]`가 붙는다
+— *New roles and role bindings are created in the blue namespace. Check it out. Check the resourceNames configured on the role*.
+edit로 고칠 때 이 필드를 놓치면 계속 403이다.
+:::
+
+기존 Role을 고치는 문제는 `kubectl edit`가 기본이다 —
+*Add a new rule in the existing role developer to grant the dev-user permissions to create
+deployments in the blue namespace. Remember to add api group "apps"*.
+
+```bash
+kubectl edit role developer -n blue
+```
+
+```yaml
+# rules 배열에 항목을 추가한다
+- apiGroups: ["apps"]
+  resources: ["deployments"]
+  verbs: ["create"]
+```
+
+저장 뒤 같은 명령이 `yes`인지 확인한다.
+
+```bash
+kubectl auth can-i create deployments.apps --as=dev-user -n blue
+```
+
+:::caution[함정 — Deployment는 apps 그룹]
+Pod는 core group이라 `apiGroups: [""]`지만 Deployment는 `apps`다. 빈 문자열로 두면
+rule이 있어도 권한이 안 먹는다 — 문제가 "api group을 잊지 말라"고 강조하는 이유다.
+:::
+
+:::caution[함정 — RoleBinding의 roleRef는 immutable]
+Role의 rules와 RoleBinding의 subjects는 edit로 자유롭게 고치지만, `roleRef`는 수정
+불가라 저장이 거부된다. 연결된 Role 이름이 틀렸으면 RoleBinding을 지우고 다시 만든다.
+정리하면 — **새로 만들 땐 `kubectl create role/rolebinding`, 고칠 땐 `kubectl edit`,
+roleRef가 틀렸을 때만 삭제 후 재생성.**
+:::
+
+### john-developer — 제공된 CSR로 인증서 발급과 Pod 권한 연결
+
+요구는 사용자 `john`의 CSR `john-developer`를 승인하고, `development`에서 Pod의
+`create,list,get,update,delete`를 허용하는 Role `developer`를 연결하는 것이다.
+**인증서 발급은 신원 확인, RoleBinding은 그 신원에 대한 권한 연결**이다. 일반 사용자를 저장하는
+`User` 리소스나 Linux 계정을 따로 만들지 않는다.
+
+개인 키 `/root/CKA/john.key`와 CSR 파일 `/root/CKA/john.csr`가 이미 있으므로 재생성하지 않는다.
+먼저 CSR의 CN(Common Name)이 `john`인지 확인한다. CSR 오브젝트 이름과 사용자 이름은 다르다.
+
+```bash
+openssl req -in /root/CKA/john.csr -noout -subject
+cat /root/CKA/john.csr | base64 | tr -d '\n'
+```
+
+[공식 클라이언트 CSR 예제](https://kubernetes.io/docs/tasks/tls/certificate-issue-client-csr/#create-a-kubernetes-certificatesigningrequest)를
+복사해 `metadata.name`과 `request`를 바꾼다. `request`에는 바로 위 명령의 **자신의 CSR 출력값**을
+넣는다. 풀이에 실린 긴 base64 문자열이나 개인 키 내용을 복사하지 않는다.
+
+```yaml
+apiVersion: certificates.k8s.io/v1
+kind: CertificateSigningRequest
+metadata:
+  name: john-developer
+spec:
+  signerName: kubernetes.io/kube-apiserver-client
+  request: <john.csr를-base64로-인코딩한-값>
+  usages:
+    - digital signature
+    - key encipherment
+    - client auth
+```
+
+위 자리표시자를 실제 값으로 바꾸어 `john-developer.yaml`로 저장한다. CSR은 클러스터 범위라
+namespace를 넣지 않는다. 이 signer는 `client auth`를 필수로 요구하고 나머지 두 usages도 허용한다.
+공식 입문 예제처럼 `usages: [client auth]`만 쓰는 것도 유효하다.
+[signer의 허용 용도](https://kubernetes.io/docs/reference/access-authn-authz/certificate-signing-requests/#kubernetes-signers)가 정본이다.
+
+```bash
+kubectl apply -f john-developer.yaml
+kubectl certificate approve john-developer
+kubectl get csr john-developer
+```
+
+`Approved,Issued`까지 확인한다. `Approved`만 있으면 승인과 발급을 구분해
+`kubectl describe csr john-developer` 및 `status.certificate`를 확인한다.
+`signerName`·`usages`가 잘못되었거나 서명 컨트롤러가 처리하지 못한 원인을 먼저 찾는다.
+
+```bash
+kubectl get ns development
+# 없을 때만 생성
+kubectl create ns development
+kubectl create role developer -n development \
+  --resource=pods --verb=create,list,get,update,delete
+kubectl create rolebinding developer-role-binding -n development \
+  --role=developer --user=john
+```
+
+RoleBinding 이름은 원문 요구사항에 없으므로 여기서는 실습 솔루션의 이름을 사용했다.
+연결 대상 사용자는 `john-developer`가 아니라 **CN과 같은 `john`**이다.
+`watch`·`patch`·다른 리소스 권한을 임의로 추가하지 않는다.
+
+```bash
+for verb in create list get update delete; do
+  kubectl auth can-i "$verb" pods --as=john -n development
+done
+kubectl auth can-i delete deployments --as=john -n development
+kubectl auth can-i list pods --as=john -n default
+```
+
+새 사용자에게 다른 권한이 없는 이 실습에서는 앞의 다섯 결과는 `yes`, 뒤의 두 결과는 `no`다.
+`no`가 예상과 다르면 `kubectl describe role developer -n development`와
+`kubectl describe rolebinding developer-role-binding -n development`에서 verbs·resource·subject·roleRef를 비교한다.
+Role rules·Binding subjects 오류는 해당 객체만 수정하고, `roleRef` 오류는 수정 불가이므로
+대상 Binding만 다시 만든다. 허용되지 않아야 할 작업이 `yes`라면 다른 Binding의 추가 권한도 조회한다.
+
+`--as=john`은 관리자의 가장(impersonation) 권한으로 **인가 결정만 검사**한다. john의 인증서와 개인 키로
+인증한 결과가 아니다. 실제 로그인을 검증하려면 발급된 인증서를 기존 키와 연결한 전용 kubeconfig로
+요청하고, API 서버가 본 신원이 `john`인지 확인한다.
+
+```bash
+kubectl get csr john-developer -o jsonpath='{.status.certificate}' \
+  | base64 -d > /root/CKA/john.crt
+
+# 기존 cluster·CA 설정은 보존하고 john 자격증명과 context를 추가한다.
+cp ~/.kube/config /root/CKA/john.kubeconfig
+kubectl --kubeconfig=/root/CKA/john.kubeconfig config set-credentials john \
+  --client-certificate=/root/CKA/john.crt --client-key=/root/CKA/john.key --embed-certs=true
+kubectl --kubeconfig=/root/CKA/john.kubeconfig config set-context john-development \
+  --cluster=kubernetes --user=john --namespace=development
+kubectl --kubeconfig=/root/CKA/john.kubeconfig config use-context john-development
+kubectl --kubeconfig=/root/CKA/john.kubeconfig auth whoami
+kubectl --kubeconfig=/root/CKA/john.kubeconfig auth can-i create pods
+kubectl --kubeconfig=/root/CKA/john.kubeconfig auth can-i delete deployments
+```
+
+`auth whoami`의 사용자 이름이 `john`이어야 인증 성공이다. 이어지는 두 판정이 각각 `yes`, `no`여야
+의도한 인가 범위도 확인된다. 기존 kubeconfig의 cluster 이름이 `kubernetes`가 아니면
+`kubectl config get-clusters`로 실제 이름을 찾아 `set-context --cluster`에 넣는다.
+
+### ClusterRole — Practice Test: Cluster Roles
+
+원본 풀이: [20-Practice-Test-Cluster-Roles.md](https://github.com/kodekloudhub/certified-kubernetes-administrator-course/blob/master/docs/07-Security/20-Practice-Test-Cluster-Roles.md)
+
+- ClusterRole/ClusterRoleBinding은 **네임스페이스가 없다** — "어느 ns 소속인가"는 함정 질문 — *What namespace is the cluster-admin clusterrole part of?*
+- 개수 세기: `kubectl get clusterroles --no-headers | wc -l` — *Run the command `kubectl get clusterroles --no-headers | wc -l` or `kubectl get clusterroles --no-headers -o json | jq '.items | length'`*
+
+노드 관리자·스토리지 관리자를 만드는 문제 —
+
+```bash
+kubectl create clusterrole node-admin --verb=get,watch,list,create,delete --resource=nodes
+kubectl create clusterrolebinding michelle-binding --clusterrole=node-admin --user=michelle
+
+kubectl create clusterrole storage-admin \
+  --verb=get,watch,list,create,delete --resource=persistentvolumes,storageclasses
+kubectl create clusterrolebinding michelle-storage-admin \
+  --clusterrole=storage-admin --user=michelle
+```
+
+storage-admin 문제가 *Get the API groups and resource names from command `kubectl api-resources`*
+라고 안내하는 이유 — 두 리소스의 API 그룹이 다르다. `persistentvolumes`는 core group이고
+`storageclasses`는 `storage.k8s.io`라서, rules YAML로 풀면 위 RBAC 절의 Deployment `apps`
+그룹과 같은 계열의 함정이 된다. `kubectl create clusterrole`은 리소스 이름에서 그룹을 알아서
+해석하므로 임퍼러티브가 특히 유리한 문제다.
+
+```bash
+kubectl api-resources | grep -E "persistentvolumes |storageclasses"
+# persistentvolumes   pv   v1                  false   PersistentVolume
+# storageclasses      sc   storage.k8s.io/v1   false   StorageClass
+```
+
+:::tip[verb 폭은 문제의 동사에서 읽는다]
+*she will be focusing on the nodes*·*storage admin*처럼 관리 책임을 주는 문구면
+`create,delete`까지, *view*·*list* 같은 조회 문구면 `get,list,watch`로 좁힌다. 애매하면
+넓게 주는 쪽이 안전하다 — 채점은 보통 `kubectl auth can-i list nodes --as michelle` 수준만
+보므로 verb가 남는 건 걸리지 않지만, 모자라면 바로 실패한다.
+
+단 실전 CKA는 이 요령이 필요 없게 **오브젝트 이름·리소스·verb를 스펙으로 명시**하는 쪽이다 —
+자동 채점이라 "storage 담당에게 알아서 권한을 구성하라"류의 열린 문제는 낼 수 없다.
+스펙이 있으면 스펙 그대로가 우선이고, 넓게 주기는 문구만 있을 때의 폴백이다. 그래서 시험
+대비는 "storage에 어떤 리소스가 필요한가"를 외우는 게 아니라, 문제에 적힌 리소스 이름을
+`kubectl api-resources`로 API 그룹까지 변환하는 연습이다.
+:::
+
+표준 verb는 여덟 개다 — `get`·`list`·`watch`·`create`·`update`·`patch`·`delete`·`deletecollection`.
+전체 목록은 공식 문서의 HTTP 메서드 대응표
+[Determine the Request Verb](https://v1-35.docs.kubernetes.io/docs/reference/access-authn-authz/authorization/#determine-the-request-verb)에
+있지만, 시험장에서는 `kubectl api-resources -o wide`가 더 빠르다 — 리소스별로 쓸 수 있는
+VERBS 컬럼이 그대로 나온다. `escalate`·`bind`(Role 권한 상승 제어)·`impersonate`(`--as`
+권한)처럼 RBAC 전용 verb는 [RBAC 문서](https://kubernetes.io/docs/reference/access-authn-authz/rbac/)에 있다.
+
+:::caution[함정 — --user의 User는 리소스가 아니다]
+`--user=michelle`의 User는 API 오브젝트가 아니다 — `kubectl get users` 같은 명령은 없고,
+사용자를 "만드는" 단계도 없다. 인증 단계가 요청에서 꺼낸 신원(클라이언트 인증서의 CN,
+토큰의 클레임)을 binding의 `subjects`(`kind: User`)의 `name` 문자열과 비교할 뿐이다.
+사용자 생성에 해당하는 작업이 [23장의 CSR 승인](/cka-udemy/08-security/#csr-승인--practice-test-certificates-api)이다.
+Group도 같은 문자열이고(인증서의 O 필드 — `system:masters`가 이것), subject 세 종류 중
+**ServiceAccount만 진짜 리소스**라 `--serviceaccount=네임스페이스:이름` 형식으로 지정한다.
+:::
+
+노드·PV·StorageClass처럼 **클러스터 범위 리소스에는 Role이 아니라 ClusterRole**이다 —
+가르는 기준은 [cka 14장](/cka/14-rbac/). rule 여러 개처럼 `kubectl create` 플래그로 표현할 수
+없는 걸 넣어야 해서 rules YAML을 직접 써야 하면 공식
+[RBAC 문서](https://kubernetes.io/docs/reference/access-authn-authz/rbac/)의 예시에서 복사하거나,
+`kubectl create role ... --dry-run=client -o yaml`로 뼈대를 뽑아 고치는 쪽이 문서 검색보다 빠르다.
+
+## 완료 기준
+
+- namespaced 리소스와 클러스터 범위 리소스에 각각 Role·ClusterRole을 선택한다.
+- 요구한 동작은 `yes`, 범위 밖 namespace·resource·verb는 `no`가 나온다.
+- `--as` 결과는 인가 판정으로 기록하고, 실제 인증서 로그인은 해당 kubeconfig의 `auth whoami`로 구분해 증명한다.
+
+## 공식 문서에서 찾기
+
+| 작업 | 공식 문서에서 확인할 것 |
+|---|---|
+| Role·ClusterRole·Binding | [Using RBAC Authorization](https://kubernetes.io/docs/reference/access-authn-authz/rbac/)의 scope, rules, subjects, roleRef 예시 |
+| 권한 판정 | [Authorization overview](https://kubernetes.io/docs/reference/access-authn-authz/authorization/#checking-api-access)의 `kubectl auth can-i`와 impersonation 주의점 |
+
+<LinkCard
+  title="25. ServiceAccount와 imagePullSecrets"
+  description="Pod 신원과 프라이빗 레지스트리 자격증명을 연결한다."
+  href="/cka-udemy/service-account/"
+/>
+

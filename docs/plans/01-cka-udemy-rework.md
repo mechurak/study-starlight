@@ -1,7 +1,7 @@
 # 1. CKA 실습 덱을 작업 단위로 개편
 
 상태: M0·M1 완료, M2~M8 실행 중
-지금 위치: M4 Storage 이관 완료. M5 TLS·RBAC·ServiceAccount·admission부터 이어 간다.
+지금 위치: M5 접근 제어 이관 완료. M6a 앱·metrics·로그 트러블슈팅부터 이어 간다.
 실행 범위: 이번 실행에서 남은 M2~M8을 묶음별 편집·검증·기록·커밋까지 완료한다.
 실행 모델: M0·M1은 Astra 완료. 이번 M2~M8은 Sol Medium.
 작성일: 2026-09-12
@@ -76,7 +76,7 @@ M1에서 실제 slug·순서를 확정하고 이 표에 기록한다. 페이지 
 | `05-services-dns.mdx` | Networking | `05-services-dns`의 Service·EndpointSlice / `dns`의 DNS·CoreDNS / `network-environment`의 노드·Pod·Service 대역과 CNI 확인. CNI 설치는 M7의 kubeadm과 연결 | 9·10·15·17 |
 | `06-ingress-netpol.mdx` | Networking | `06-ingress-netpol`의 Ingress·TLS / `gateway`의 Gateway·HTTPRoute / `network-policy`의 NetworkPolicy 허용·차단 | 11·12 |
 | `07-storage.mdx` | Storage | `07-storage`의 볼륨·정적 PV/PVC 연결 / `storage-class`의 StorageClass·동적 프로비저닝·quota | 13 |
-| `08-security.mdx` | Cluster Architecture | TLS·CSR·kubeconfig / Role·Binding·can-i / ServiceAccount·imagePullSecrets / admission | 14 |
+| `08-security.mdx` | Cluster Architecture | `08-security`의 TLS·CSR·kubeconfig / `rbac`의 Role·Binding·can-i / `service-account`의 ServiceAccount·imagePullSecrets / `admission`의 요청 검사 | 14 |
 | `09-cluster-lifecycle.mdx` | Cluster Architecture | kubeadm 설치·클러스터 확인 / drain·업그레이드 / etcd 백업·복구. cri-docker 패키지 절은 랩 환경 보충으로 표시 | 15 |
 | `11-helm.mdx` | Cluster Architecture | repo·install·upgrade·rollback의 한 release 관리 흐름. 이미지 이전 사례는 짧은 보충 | 16 |
 | `12-kustomize.mdx` | Cluster Architecture | resources·base/overlay·적용 / 범위별 변환 / patch / components 보충 | 16 |
@@ -206,8 +206,8 @@ Kubernetes 문서 내 검색은 가능하지만 외부 검색 결과를 열면 �
 
 ### M5. 접근 제어
 
-- [ ] M5a: `08-security`에서 TLS·CSR·kubeconfig / RBAC을 분리한다. CSR 발급에서 권한 검증까지의 통합 사례는 중복 없이 한쪽에 둔다.
-- [ ] M5b: ServiceAccount·imagePullSecrets / admission을 분리한다. admission 특수 사례는 보충으로 분명히 표시한다.
+- [x] M5a: `08-security`에서 TLS·CSR·kubeconfig / RBAC을 분리한다. CSR 발급에서 권한 검증까지의 통합 사례는 중복 없이 한쪽에 둔다.
+- [x] M5b: ServiceAccount·imagePullSecrets / admission을 분리한다. admission 특수 사례는 보충으로 분명히 표시한다.
 - 검증: 인증 성공과 인가 성공을 구분하고 `can-i`의 허용·거부 양쪽을 설명한다. impersonation으로 확인한 범위를 실제 인증서 로그인 검증과 혼동하지 않는다.
 
 ### M6. Troubleshooting
@@ -558,3 +558,27 @@ StorageClass·동적 프로비저닝·quota 분리다.
 
 다음 묶음은 M5의 TLS·CSR·kubeconfig, Role·Binding, ServiceAccount·imagePullSecrets,
 admission 요청 검사 분리다.
+
+
+### M5 — TLS·RBAC·워크로드 신원·admission (2026-09-13)
+
+기존 `08-security` URL에는 인증서 역할·CSR·kubeconfig와 TLS부터 저장까지의 요청 경계를
+남기고, `rbac`·`service-account`·`admission`을 24~26장/order 1240~1260으로 분리했다.
+`storage` 그룹 이름에서 보안을 제거하고 네 페이지를 `rbac` 그룹에 연결했으며 DeckMap과
+`cka` 14·19장의 이동 앵커를 갱신했다.
+
+- 분할 뒤 360 / 307 / 148 / 146줄이다. 인증서의 서버·클라이언트·CA 역할, CSR 승인과 발급,
+  kubeconfig의 CA 검증과 실제 요청, Role·ClusterRole 범위, ServiceAccount projected token,
+  imagePullSecret, 내장 플러그인과 webhook의 거부·변형 판정을 보존했다. 원본 외부 출처 누락은 0개다.
+- john-developer 통합 사례는 RBAC 페이지 한 곳에만 두었다. 관리자의 `--as=john`은 인가 결정
+  검사일 뿐 인증서 로그인이 아님을 명시하고, 발급 인증서를 넣은 전용 kubeconfig의
+  `auth whoami`와 허용·거부 `can-i`를 별도 완료 증거로 추가했다.
+- 2025 admission 두 랩은 일반 리소스 작성법이 아닌 보충 사례로 표시했다. Kubernetes 공식
+  PKI·CSR·kubeconfig·RBAC·ServiceAccount·private registry·admission·dynamic webhook 문서를
+  대조했고 webhook Service 인증서 이름, `caBundle`, rules와 실패 분기를 완료 기준에 반영했다.
+- 지정 클러스터가 없어 CSR 승인·인증서 로그인·인가 판정·토큰 발급·image pull·API 서버 재시작·
+  webhook 거부/변형은 실행하지 않았다. `pnpm check` exit 0 — 392페이지 빌드·33,672개 내부
+  페이지/앵커 링크 통과. dev + Playwright에서 DeckMap의 23~26장 링크, 네 페이지 현재 항목과
+  390px main/문서 폭 390/390을 확인했다. `git diff --check`도 통과했다.
+
+다음 묶음은 M6a의 앱·metrics·로그, control plane, worker 트러블슈팅 분리다.

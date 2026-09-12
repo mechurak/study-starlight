@@ -34,15 +34,15 @@ export default {
 		},
 		{
 			"id": "storage",
-			"label": "스토리지와 보안"
-		},
-		{
-			"id": "cluster-lifecycle",
-			"label": "클러스터 운영"
+			"label": "스토리지"
 		},
 		{
 			"id": "rbac",
 			"label": "Cluster Architecture"
+		},
+		{
+			"id": "cluster-lifecycle",
+			"label": "클러스터 운영"
 		}
 	],
 	"map": [
@@ -345,10 +345,49 @@ export default {
 			"tone": "zone"
 		},
 		{
-			"label": "8장",
-			"title": "인증서 · kubeconfig · RBAC",
+			"label": "23장",
+			"title": "TLS·CSR·kubeconfig",
 			"href": "/cka-udemy/08-security/",
-			"desc": "TLS · 인증서 · kubeconfig/API · RBAC · ServiceAccount · admission · 저장 확인",
+			"desc": "인증서 역할 · CSR 승인·발급 · kubeconfig · 실제 인증 · API 요청 흐름",
+			"items": [
+				[
+					"cka 14장",
+					"/cka/14-rbac/"
+				]
+			],
+			"tone": "zone"
+		},
+		{
+			"label": "24장",
+			"title": "RBAC 권한 부여와 검증",
+			"href": "/cka-udemy/rbac/",
+			"desc": "Role·ClusterRole · Binding · can-i 허용·거부 · 인증과 인가 구분",
+			"items": [
+				[
+					"cka 14장",
+					"/cka/14-rbac/"
+				]
+			],
+			"tone": "zone"
+		},
+		{
+			"label": "25장",
+			"title": "ServiceAccount와 imagePullSecrets",
+			"href": "/cka-udemy/service-account/",
+			"desc": "Pod 신원 · projected token · 레지스트리 Secret · 실제 image pull",
+			"items": [
+				[
+					"cka 14장",
+					"/cka/14-rbac/"
+				]
+			],
+			"tone": "zone"
+		},
+		{
+			"label": "26장",
+			"title": "Admission 요청 검사",
+			"href": "/cka-udemy/admission/",
+			"desc": "내장 플러그인 · validating/mutating webhook · 거부·변형 검증",
 			"items": [
 				[
 					"cka 14장",
