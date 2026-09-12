@@ -1,0 +1,88 @@
+---
+title: "5. Job 완료와 실패"
+description: "Job의 terminal condition과 소유 Pod·로그를 연결해 완료·실패를 판정하고 재실행한다"
+deckGroup: pods
+sidebar:
+  order: 1050
+reviewedAt: 2026-09-13
+---
+
+import { LinkCard } from '@astrojs/starlight/components';
+import Thesis from '../../../components/docs/Thesis.astro';
+
+<Thesis>Job은 Pod 생성 여부가 아니라 Complete·Failed condition과 실행 로그로 결과를 판정한다</Thesis>
+
+Job은 한 번 끝날 작업을 실행하고 성공 횟수나 실패 한도를 추적한다.
+이 페이지에서는 **terminal condition → Job이 만든 Pod → 컨테이너 로그** 순서로 결과를 확인하고,
+실패한 실행의 증거를 보존한 뒤 수정한 매니페스트로 새 실행을 만든다.
+기본 동작은 [cka 5장 — Job](/cka/05-workloads/#job--끝나는-작업)에서 복습한다.
+
+## Job — 완료·실패·재실행 진단
+
+Job은 Pod이 생겼다는 사실이 아니라 **터미널 condition**으로 성공과 실패를 판정한다.
+성공은 `Complete=True`, 실패는 `Failed=True`이며, 완료된 Job과 Pod은 기본적으로 남으므로
+삭제하기 전에 상태와 로그를 증거로 확인한다.
+
+```bash
+kubectl create job sleepy --image=busybox:1.36 -- sh -c 'sleep 3; echo done'
+kubectl wait --for=condition=complete job/sleepy --timeout=60s
+
+# Job 판정 → 소유 Pod → 실행 출력 순서
+kubectl get job sleepy \
+  -o jsonpath='{range .status.conditions[*]}{.type}{"="}{.status}{" reason="}{.reason}{"\n"}{end}'
+kubectl get pods -l batch.kubernetes.io/job-name=sleepy -o wide
+kubectl logs -l batch.kubernetes.io/job-name=sleepy --all-containers --prefix
+```
+
+`kubectl wait`가 timeout이면 같은 명령을 반복하기보다 Job condition과 Pod을 내려간다.
+
+```bash
+kubectl describe job sleepy
+kubectl get pods -l batch.kubernetes.io/job-name=sleepy
+kubectl describe pod <failed-pod>
+kubectl logs <failed-pod>
+kubectl get events --sort-by=.lastTimestamp
+```
+
+- `DeadlineExceeded`면 Job의 `spec.activeDeadlineSeconds`를 넘겼다
+- `BackoffLimitExceeded`면 Pod 실패가 `spec.backoffLimit`에 닿았다
+- `restartPolicy: Never`는 실패마다 새 Pod가 생기므로 실패 Pod 각각의 로그를 확인한다
+- `restartPolicy: OnFailure`는 같은 Pod 안에서 컨테이너가 재시작하므로 `logs --previous`도 확인한다
+
+:::caution[함정 — 실패한 Job은 저절로 다시 시작하지 않는다]
+Job이 `Failed=True`에 도달하면 원인을 고쳐도 같은 Job이 자동으로 재실행되지 않는다.
+실패 Pod을 지우는 것도 재실행 절차가 아니다. 로그와 condition을 먼저 보존한 뒤 원본 매니페스트를
+고치고 Job을 삭제·재생성해 새 실행으로 검증한다.
+:::
+
+```bash
+kubectl delete job sleepy
+kubectl create -f job.yaml
+kubectl wait --for=condition=complete job/sleepy --timeout=60s
+```
+
+공식 근거: [Jobs](https://v1-35.docs.kubernetes.io/docs/concepts/workloads/controllers/job/).
+
+
+## 공식 문서에서 찾을 것
+
+Kubernetes 문서 내부 검색에서 `Jobs`를 열고
+[Jobs](https://kubernetes.io/docs/concepts/workloads/controllers/job/)의
+`Writing a Job spec`에서 `batch/v1`, Pod template, `restartPolicy: Never`를 가져온다.
+실패를 다룰 때는 같은 문서의 `Pod backoff failure policy`와 `Terminal Job conditions`에서
+`backoffLimit`, `activeDeadlineSeconds`, `Complete`, `Failed`를 찾는다.
+명령 골격은 `kubectl create job --help`, condition 필드는
+`kubectl explain job.status.conditions`로 확인한다.
+
+## 완료 판정
+
+`kubectl wait --for=condition=complete` 성공과 `Complete=True`를 확인한 뒤 소유 Pod의
+종료 상태와 로그가 문제의 기대 출력인지 대조한다. 실패 문제는 `Failed=True`의 reason과
+Pod의 exit code·로그를 함께 남긴다. 삭제·재생성한 뒤에는 이전 실패가 아니라 새 Job UID와
+새 Pod의 condition·로그로 성공을 확인한다.
+
+<LinkCard
+  title="6. command와 args"
+  description="이미지의 ENTRYPOINT·CMD를 Pod spec의 command·args로 바꾸고 실행 결과를 확인한다."
+  href="/cka-udemy/03-pod-config/"
+/>

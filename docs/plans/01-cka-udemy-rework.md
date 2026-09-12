@@ -1,7 +1,7 @@
 # 1. CKA 실습 덱을 작업 단위로 개편
 
 상태: M0·M1 완료, M2~M8 실행 중
-지금 위치: M2a 기초·JSONPath·Pod 분할 완료. M2b Workloads·Pod 설정 이관부터 이어 간다.
+지금 위치: M2b-1 Deployment·Job 분할 완료. M2b-2 Pod 설정 네 작업 이관부터 이어 간다.
 실행 범위: 이번 실행에서 남은 M2~M8을 묶음별 편집·검증·기록·커밋까지 완료한다.
 실행 모델: M0·M1은 Astra 완료. 이번 M2~M8은 Sol Medium.
 작성일: 2026-09-12
@@ -383,3 +383,26 @@ DeckMap의 네 링크를 확인했다. 390px에서 네 페이지 모두 main scr
   main/문서 폭 390/390, console error 0을 확인했다. `git diff --check`도 통과했다.
 
 다음 묶음은 M2b의 Deployment·Job과 command/args·ConfigMap/Secret 이관이다.
+
+
+### M2b-1 — Deployment·Job (2026-09-13)
+
+기존 `02-workloads` URL에는 ReplicaSet·Deployment 생성과 rollout·rollback을 남기고,
+`jobs`를 5장/order 1050으로 분리했다. Deployment의 template 변경과 독립 Pod 수정의 차이를
+M2a에서 이어 설명하고, Job은 terminal condition·소유 Pod·로그를 한 작업 흐름으로 묶었다.
+
+- 분할 뒤 244 / 88줄이다. ReplicaSet template 변경 시 기존 Pod 비교체, selector 불변,
+  Recreate의 rollingUpdate 블록 제거, 지정된 apply 방식, 실패한 새 ReplicaSet 추적·rollback을 보존했다.
+  Job은 `Complete`·`Failed`, `DeadlineExceeded`·`BackoffLimitExceeded`, restartPolicy별 로그,
+  실패 증거 보존 후 삭제·재생성 조건을 보존했다. 원본 외부 출처 누락은 0개다.
+- Kubernetes 공식 ReplicaSet·Deployment·Jobs 문서를 대조했다. 현재 문서에서도 ReplicaSet은
+  template을 바꿔도 기존 Pod을 맞추지 않고, Deployment는 `ProgressDeadlineExceeded`를 보고만 하며,
+  Job의 terminal condition은 `Complete`와 `Failed`임을 확인했다.
+- 로컬 kubectl v1.36.4로 `kubectl create job ... --dry-run=client -o yaml` 골격의
+  `batch/v1`·command·`restartPolicy: Never`를 확인했다. 지정 랩이 없어 rollout·Job 실행은
+  실제 클러스터에서 검증하지 않았다.
+- `pnpm check` exit 0 — 377페이지 빌드·32,228개 내부 페이지/앵커 링크 통과.
+  preview + Playwright에서 4·5장 현재 항목과 390px main/문서 폭 390/390,
+  console error 0을 확인했다. `git diff --check`도 통과했다.
+
+다음 묶음은 M2b-2의 command/args·ConfigMap/Secret·init/sidecar·securityContext 이관이다.

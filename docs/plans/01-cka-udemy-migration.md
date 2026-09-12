@@ -84,14 +84,14 @@ h2와 h3를 모두 기록한다. 목적 제목은 원제목을 기본으로 하�
 
 | 원본 절 | 처리 | 목적 파일·절 |
 |---|---|---|
-| ReplicaSet — Practice Test: ReplicaSets | 유지 | `02-workloads` — 해당 작업의 ReplicaSet — Practice Test: ReplicaSets |
-| Deployment — Practice Test: Deployments | 유지 | `02-workloads` — 해당 작업의 Deployment — Practice Test: Deployments |
+| ReplicaSet — Practice Test: ReplicaSets | 유지 | `02-workloads` — ReplicaSet — Practice Test: ReplicaSets |
+| Deployment — Practice Test: Deployments | 유지 | `02-workloads` — Deployment — Practice Test: Deployments |
 | ↳ hr-web-app — 이미지와 복제본 수만 지정된 생성 | 유지 | `02-workloads` — 해당 작업의 hr-web-app — 이미지와 복제본 수만 지정된 생성 |
-| 롤링 업데이트와 롤백 — Practice Test: Rolling Updates and Rollbacks | 유지 | `02-workloads` — 해당 작업의 롤링 업데이트와 롤백 — Practice Test: Rolling Updates and Rollbacks |
+| 롤링 업데이트와 롤백 — Practice Test: Rolling Updates and Rollbacks | 유지 | `02-workloads` — 롤링 업데이트와 롤백 — Practice Test: Rolling Updates and Rollbacks |
 | ↳ nginx 이미지 변경과 변경 사유 기록 | 유지 | `02-workloads` — 해당 작업의 nginx 이미지 변경과 변경 사유 기록 |
 | ↳ nginx-deploy — apply로 생성과 rolling update를 모두 수행 | 유지 | `02-workloads` — 해당 작업의 nginx-deploy — apply로 생성과 rolling update를 모두 수행 |
 | ↳ 실패한 롤아웃은 새 ReplicaSet부터 내려간다 | 유지 | `02-workloads` — 해당 작업의 실패한 롤아웃은 새 ReplicaSet부터 내려간다 |
-| Job — 완료·실패·재실행 진단 | 이동 | `jobs` — 해당 작업의 Job — 완료·실패·재실행 진단 |
+| Job — 완료·실패·재실행 진단 | 이동 | `jobs` — Job — 완료·실패·재실행 진단 |
 | 시험장에서 공식 문서 찾기 | 통합 | `02-workloads / jobs / exam-search` — 해당 작업의 문서 검색·완료 판정 |
 | 이 장에서 남길 것 | 통합 | `02-workloads / jobs / exam-search` — 해당 작업의 문서 검색·완료 판정 |
 

@@ -90,10 +90,10 @@ export default {
 			"tone": "key"
 		},
 		{
-			"label": "개편 전 2장",
-			"title": "워크로드",
+			"label": "4장",
+			"title": "Deployment rollout과 rollback",
 			"href": "/cka-udemy/02-workloads/",
-			"desc": "ReplicaSet · Deployment rollout/rollback · Job 완료·실패",
+			"desc": "ReplicaSet · Deployment 생성 · rollout · 실패 진단 · rollback",
 			"items": [
 				[
 					"cka 5장",
@@ -103,7 +103,20 @@ export default {
 			"tone": "key"
 		},
 		{
-			"label": "3장",
+			"label": "5장",
+			"title": "Job 완료와 실패",
+			"href": "/cka-udemy/jobs/",
+			"desc": "terminal condition · 소유 Pod · 로그 · 실패 후 재실행",
+			"items": [
+				[
+					"cka 5장",
+					"/cka/05-workloads/"
+				]
+			],
+			"tone": "key"
+		},
+		{
+			"label": "개편 전 3장",
 			"title": "Pod 설정",
 			"href": "/cka-udemy/03-pod-config/",
 			"desc": "command/args · ConfigMap 반영 · Secret · securityContext · 멀티 컨테이너 · init",
