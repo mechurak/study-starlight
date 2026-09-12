@@ -1,65 +1,25 @@
 ---
-title: "1. 기본 조작 — Pod · 네임스페이스 · 명령형 커맨드"
-description: "kubectl 손 속도의 기본기 — 조회·생성·수정 패턴과 JSONPath"
-deckGroup: basics
+title: "1. kubectl 기본 조작"
+description: "namespace를 명시하고 명령형 생성기·도움말·Vim으로 요구한 리소스와 YAML을 만든다"
+deckGroup: architecture
 sidebar:
-  order: 10
+  order: 1010
+reviewedAt: 2026-09-13
 ---
 
 import { LinkCard } from '@astrojs/starlight/components';
 import Thesis from '../../../components/docs/Thesis.astro';
 
-<Thesis>실습은 원본과 상태를 조회해 필요한 명령을 고르고, 실행 결과나 제출 파일을 확인해야 끝난다.</Thesis>
+<Thesis>대상 namespace와 생성 명령을 먼저 고르고, 도움말로 YAML 뼈대를 만든 뒤 실제 생성 여부를 확인한다</Thesis>
 
-> 짝이 되는 개념 장: [cka 2. 아키텍처](/cka/02-architecture/) · [cka 3. kubectl](/cka/03-kubectl/) · [cka 4. Pod](/cka/04-pods/)
+실습의 기본 조작은 명령을 많이 외우는 일이 아니라 **대상 범위와 생성 방식을 틀리지 않는 일**이다.
+이 페이지에서는 namespace를 명시해 리소스를 조회·생성하고, 한 줄로 부족하면 도움말과
+client dry-run으로 YAML 뼈대를 만든다. 조회와 선언형 작업의 원리는
+[cka 3장 — kubectl](/cka/03-kubectl/)에서 복습한다.
 
-이 장의 실습 네 개는 전부 "**조회 → 원인 찾기 → 명령 한 줄로 해결**"의 반복이다.
-여기서 몸에 붙는 패턴이 이후 모든 장의 재료가 된다.
-
-:::tip[실습 전 확인]
-`k`는 시험 환경의 `kubectl` 별칭이다. Pod은 컨테이너를 실행하는 최소 단위이고,
-네임스페이스는 이름의 범위다. 조회 결과가 이상하면 **`get`으로 현상 확인 → `describe`의
-Events로 이유 확인** 순서로 들어간다.
-:::
-
-## Pod 기초 — Practice Test: PODs
-
-원본 풀이: [13-Practice-Test-PODs.md](https://github.com/kodekloudhub/certified-kubernetes-administrator-course/blob/master/docs/02-Core-Concepts/13-Practice-Test-PODs.md)
-
-| 과제 | 명령 |
-|---|---|
-| Pod 개수 세기 — *How many pods exist on the system?* | `k get pods --no-headers \| wc -l` |
-| Pod 만들기 — *Create a new pod with the nginx image.* | `k run nginx --image=nginx` |
-| 이미지·노드 확인 — *What is the image used to create the new pods? / Which nodes are these pods placed on?* | `k get pods -o wide` 또는 `k describe pod <name>` |
-| 컨테이너 상태·에러 원인 — *What is the state of the container agentx in the pod webapp? / Why do you think the container agentx in pod webapp is in error?* | `k describe pod <name>` → State / Events |
-| Pod 삭제 (빠르게) — *Delete the webapp Pod.* | `k delete pod webapp --force` |
-| YAML 뽑아서 생성 — *Create a new pod with the name redis and with the image redis123. Use a pod-definition YAML file.* | `k run redis --image=redis123 --dry-run=client -o yaml > redis.yaml` |
-
-(`--dry-run=client`는 서버에 요청을 보내지 않고 클라이언트에서 검증만 하고 끝낸다는 뜻이다 —
-`-o yaml`과 짝지으면 "만들지 말고 YAML만 뽑기"가 된다. 이 덱 전체에서 반복되는 콤보다.)
-
-*Now change the image on this pod to redis. Once done, the pod should be in a running state.* —
-이미지 이름이 틀린 Pod(`redis123`)을 고치는 방법은 셋 다 알아둔다 —
-
-```bash
-# 1) 매니페스트 고치고 apply
-vi redis.yaml && kubectl apply -f redis.yaml
-# 2) 실행 중인 Pod을 직접 편집 (image는 편집 가능한 몇 안 되는 필드)
-kubectl edit pod redis
-# 3) image만 바로 교체 — pod/<pod이름> <컨테이너이름>=<새이미지>
-kubectl set image pod/redis redis=redis
-```
-
-:::tip[READY 열 읽는 법]
-*What does the READY column in the output of the kubectl get pods command indicate?* —
-`READY 1/2`는 "컨테이너 2개 중 1개 준비됨"이다. Pod 개수가 아니라
-**컨테이너 준비 수 / 전체 수** — 멀티 컨테이너 문제에서 반복해서 나온다.
-:::
-
-:::caution[함정 — --force]
-`--force`는 시험에서는 시간을 벌어주지만, 실무에서는 정리 작업(preStop 등)을
-건너뛴 채 컨테이너를 남길 수 있는 최후 수단이다. 시험용 습관과 실무 습관을 구분할 것.
-:::
+`k`는 시험 환경의 `kubectl` 별칭이다. 여기서는 전체 명령을 익히기 위해 `kubectl`을 주로 쓴다.
+Pod 자체의 생성·상태 판정은 [3장 — Pod 생성과 상태 확인](/cka-udemy/pods/),
+출력 파일 문제는 [2장 — JSONPath 추출과 정렬](/cka-udemy/jsonpath/)로 분리한다.
 
 ## 네임스페이스 — Practice Test: Namespaces
 
@@ -146,289 +106,16 @@ StorageClass·CSR처럼 전용 `create` 하위 명령이 없는 리소스는 공
 옵션으로 모든 필드를 표현하려고 오래 찾기보다 생성기가 만드는 부분과 직접 채울 부분을 구분한다.
 공식 명령을 복사해 수정할 편집 공간은 [시험용 VSCodium 메모](/cka/19-exam-strategy/#vscodium에서-공식-명령을-수정하기)를 참고한다.
 
-## JSONPath와 정렬 — Practice Test: Advanced Kubectl Commands
-
-원본 풀이: [04-Practice-Test-Advance-Kubectl-Commands.md](https://github.com/kodekloudhub/certified-kubernetes-administrator-course/blob/master/docs/13-Other-Topics/04-Practice-Test-Advance-Kubectl-Commands.md)
-
-이 실습은 **원본 구조 확인 → 필드 경로 구성 → 화면에서 결과 확인 → 지정 파일 저장** 순서로 푼다.
-문제의 요구를 먼저 나누면 어떤 출력 옵션을 쓸지 정할 수 있다.
-기본 출력 문법은 [cka 3장 조회와 출력](/cka/03-kubectl/)에서 함께 확인한다.
-
-| 문제의 요구 | 선택할 도구 | 경로의 기준 |
-|---|---|---|
-| 노드 이름·OS 이미지 값만 | `-o jsonpath` | 목록 전체 출력의 `.items[*]`부터 |
-| kubeconfig의 사용자 이름 | `config view -o jsonpath` | 최상위 `.users[*]`부터 |
-| 특정 사용자의 컨텍스트 이름 | JSONPath 필터 `[?(…)]` | 최상위 `.contexts`에서 조건 검사 |
-| PV를 용량순으로 | `--sort-by` | PV 하나의 `.spec.capacity.storage` |
-| NAME·CAPACITY 두 열만 | `-o custom-columns` | 각 PV 안의 필드 경로 |
-
-### 도움말에서 문법 찾기
-
-```bash
-kubectl get -h
-kubectl config view -h
-```
-
-`get -h`의 `-o`에서 JSONPath·custom-columns를, `--sort-by`에서 정렬 옵션을 찾는다.
-[JSONPath 공식 문서](https://kubernetes.io/docs/reference/kubectl/jsonpath/#functions-in-kubernetes-jsonpath)의
-`*` 예제에는 노드 이름 추출에 쓰는 식이 그대로 있고, `?()` 예제에는 조건 필터가 있다.
-문서에서는 문법을 찾고, 실제 필드명과 목록의 시작점은 `-o json` 또는 `-o yaml` 출력으로 확인한다.
-
-### 노드 이름과 OS 이미지 추출
-
-```bash
-kubectl get nodes -o json
-```
-
-관련 부분만 줄이면 다음 구조다. 이름과 OS 값은 예시이며, 실제 출력에서 확인한다.
-
-```json
-{
-  "items": [
-    {
-      "metadata": { "name": "controlplane" },
-      "status": { "nodeInfo": { "osImage": "Ubuntu 22.04.4 LTS" } }
-    },
-    {
-      "metadata": { "name": "node01" },
-      "status": { "nodeInfo": { "osImage": "Ubuntu 22.04.4 LTS" } }
-    }
-  ]
-}
-```
-
-`.items`는 노드 목록, `[*]`는 모든 항목이다. 그 뒤에 각 노드 안에서 원하는 값까지의 경로를 붙인다.
-문제의 “osImages”는 여러 값을 뜻하는 표현이고 실제 필드명은 대소문자를 포함해 `osImage`다.
-
-```bash
-# 화면에서 추출 결과 확인
-kubectl get nodes -o jsonpath='{.items[*].metadata.name}'
-kubectl get nodes -o jsonpath='{.items[*].status.nodeInfo.osImage}'
-
-# 각 문제의 지정 파일로 저장
-kubectl get nodes -o jsonpath='{.items[*].metadata.name}' > /opt/outputs/node_names.txt
-kubectl get nodes -o jsonpath='{.items[*].status.nodeInfo.osImage}' > /opt/outputs/nodes_os.txt
-```
-
-이름 문제의 출력 예시는 `controlplane node01`이다. 헤더 없이 값만 공백으로 구분한다.
-JSON 전체를 요구하는 별도 문제라면 `kubectl get nodes -o json > /opt/outputs/nodes.json`을 쓰지만,
-“이름만” 요구하는 파일에는 JSON 전체를 넣지 않는다.
-
-### kubeconfig 사용자 이름 추출
-
-이번에는 클러스터 리소스 목록이 아니라 지정한 설정 파일을 읽는다.
-[kubectl config view](https://kubernetes.io/docs/reference/kubectl/generated/kubectl_config_view/)는
-kubeconfig를 조회하며 JSONPath 출력도 지원한다.
-
-```bash
-kubectl config view --kubeconfig=/root/my-kube-config
-```
-
-관련 부분은 다음과 같다. 사용자 이름은 예시다.
-
-```yaml
-users:
-  - name: admin
-    user: {}
-  - name: aws-user
-    user: {}
-```
-
-최상위에 `users` 목록이 있으므로 `.users[*].name`을 쓴다.
-노드 목록에서 썼던 `.items[*]`를 기계적으로 붙이지 않는다.
-
-```bash
-kubectl config view --kubeconfig=/root/my-kube-config \
-  -o jsonpath='{.users[*].name}' > /opt/outputs/users.txt
-```
-
-힌트의 `--kubeconfig=my-kube-config`는 현재 디렉터리를 기준으로 한 상대 경로다.
-이 실습의 파일 위치는 `/root/my-kube-config`이므로 절대 경로를 쓰면 작업 위치에 영향을 받지 않는다.
-
-### PV 용량순 정렬
-
-PV(PersistentVolume, 영구 볼륨)의 용량 경로는 다음 명령으로 확인한다.
-
-```bash
-kubectl get pv -o yaml
-```
-
-각 PV 안의 관련 구조는 다음과 같다.
-
-```yaml
-spec:
-  capacity:
-    storage: 5Gi
-```
-
-[`--sort-by`](https://kubernetes.io/docs/reference/kubectl/generated/kubectl_get/)에는
-각 객체에서 비교할 필드 경로를 지정한다. **PV 하나의 경로**이므로 `.items[*]`를 붙이지 않는다.
-
-```bash
-kubectl get pv --sort-by=.spec.capacity.storage
-kubectl get pv --sort-by=.spec.capacity.storage > /opt/outputs/storage-capacity-sorted.txt
-```
-
-이 문제는 특정 열만 요구하지 않으므로 헤더를 포함한 기본 표 전체를 저장한다.
-화면에서 CAPACITY 열의 순서를 확인한 뒤 저장한다.
-
-### 정렬을 유지하면서 NAME·CAPACITY 두 열만 출력
-
-[custom-columns](https://kubernetes.io/docs/reference/kubectl/#custom-columns)는
-`열이름:필드경로`를 쉼표로 연결해 표를 구성한다. 철자는 `custom-columns`다.
-
-```text
--o custom-columns=NAME:.metadata.name,CAPACITY:.spec.capacity.storage
-```
-
-기존 표의 문자열을 잘라내는 대신 각 PV에서 이름과 용량 필드를 직접 고른다.
-정렬은 `--sort-by`, 열 구성은 `-o custom-columns`가 맡으므로 두 옵션을 함께 쓴다.
-
-```bash
-kubectl get pv --sort-by=.spec.capacity.storage \
-  -o custom-columns=NAME:.metadata.name,CAPACITY:.spec.capacity.storage \
-  > /opt/outputs/pv-and-capacity-sorted.txt
-```
-
-출력 예시는 다음과 같다. 문제에서 열 이름을 지정했으므로 `--no-headers`를 붙이지 않는다.
-
-```text
-NAME       CAPACITY
-pv-small   1Gi
-pv-medium  5Gi
-pv-large   10Gi
-```
-
-### Deployment 목록 — 지정 열·이름순·파일 저장
-
-`admin2406`의 Deployment를 이름 오름차순으로 저장하는 문제다. `kubectl get -h`에서
-`custom-columns`와 `--sort-by`를 찾고, `get deploy -o yaml`에서 필드 경로를 확인한다.
-
-```bash
-kubectl -n admin2406 get deploy \
-  -o 'custom-columns=DEPLOYMENT:.metadata.name,CONTAINER_IMAGE:.spec.template.spec.containers[*].image,READY_REPLICAS:.status.readyReplicas,NAMESPACE:.metadata.namespace' \
-  --sort-by='.metadata.name' > /opt/admin2406_data
-cat /opt/admin2406_data
-```
-
-이미지는 Deployment의 **Pod 템플릿** 아래에 있고, 준비된 복제본 수는 `.status.readyReplicas`다.
-요구한 헤더를 남기므로 `--no-headers`는 붙이지 않는다. `[*]`가 셸 패턴으로 해석되지 않게
-출력 옵션을 따옴표로 감싸고, 마지막에는 저장 파일의 열·정렬·내용까지 확인한다.
-
-### aws-user가 사용하는 컨텍스트 이름 필터링
-
-kubeconfig의 컨텍스트는 클러스터·사용자·네임스페이스 선택을 묶은 설정이다.
-`config view` 출력의 관련 부분이 다음과 같다고 하자.
-
-```yaml
-contexts:
-  - name: aws-production
-    context:
-      cluster: aws-cluster
-      user: aws-user
-  - name: local-development
-    context:
-      cluster: local-cluster
-      user: local-user
-```
-
-찾을 것은 `context.user`가 `aws-user`인 항목의 `name`이다.
-위 예시에서는 `aws-production`이며, 사용자 이름이나 클러스터 이름을 출력하는 문제가 아니다.
-
-```text
-.contexts[?(@.context.user=='aws-user')].name
-```
-
-| 부분 | 역할 |
-|---|---|
-| `.contexts` | 검사할 컨텍스트 목록 |
-| `[?(…)]` | 조건을 만족하는 항목만 선택 |
-| `@` | 지금 검사하는 항목 |
-| `@.context.user=='aws-user'` | 각 항목의 사용자 참조와 문자열 비교 |
-| `.name` | 선택된 항목의 컨텍스트 이름 출력 |
-
-[JSONPath 필터 문법](https://kubernetes.io/docs/reference/kubectl/jsonpath/#functions-in-kubernetes-jsonpath)은
-`[*]`로 전부 선택하던 자리에 `[?(조건)]`을 넣는 것으로 익힌다.
-**비교할 필드는 `context.user`, 출력할 필드는 `name`**이라는 구분이 핵심이다.
-
-```bash
-kubectl config view --kubeconfig=/root/my-kube-config \
-  -o jsonpath="{.contexts[?(@.context.user=='aws-user')].name}" \
-  > /opt/outputs/aws-context-name
-```
-
-바깥 큰따옴표는 셸이 표현식을 한 인자로 넘기게 하고, 안쪽 작은따옴표는 비교 문자열을 감싼다.
-여러 컨텍스트가 같은 사용자를 참조하면 조건에 맞는 이름이 모두 나온다. 빈 결과라면
-파일 경로, `contexts` 구조, 사용자 철자와 대소문자를 다시 확인한다.
-
-### VPA 관련 CRD 이름을 파일로 제출하기
-
-`controlplane`의 `/root/vpa-crds.txt`에 VerticalPodAutoscaler 관련 이름을 저장하라는 문제는
-VPA 객체가 아니라 **CustomResourceDefinition(CRD), 즉 리소스 정의 자체**를 조회한다.
-지정 노드에서 `hostname`을 확인한 뒤 실행한다. CRD는 클러스터 범위라 `-n`·`-A`가 필요 없다.
-
-```bash
-hostname
-kubectl get crd | grep -i verticalpodautoscaler
-vim /root/vpa-crds.txt
-```
-
-항목이 몇 개 없다면 첫 번째 열의 **이름만 한 줄에 하나씩** Vim에 복사해도 된다.
-`i` → 붙여넣기 → `Esc` → `:wq`로 저장한다. 헤더·생성 시각·`crd/` 접두사는 넣지 않는다.
-예상 이름을 외워 적지 말고 실제 조회 결과의 모든 관련 항목을 옮긴다.
-자동 저장이 편하면 다음을 대신 사용한다.
-
-```bash
-kubectl get crd -o custom-columns=NAME:.metadata.name --no-headers \
-  | grep -i verticalpodautoscaler > /root/vpa-crds.txt
-cat /root/vpa-crds.txt
-```
-
-빈 파일·오타·누락 여부를 최초 목록과 비교한다. 이름만으로 관련성을 판단하기 어려운 CRD는
-`kubectl get crd <이름> -o yaml`의 `spec.names.kind`와 `spec.group`도 확인한다.
-구조는 [공식 CRD 문서](https://kubernetes.io/docs/tasks/extend-kubernetes/custom-resources/custom-resource-definitions/)에서 찾는다.
-
-### 제출 파일 확인과 실수 복구
-
-처음에는 `>` 없이 실행해 화면 출력을 확인하고, 맞으면 같은 명령에 지정 경로를 붙인다.
-`>`는 kubectl 옵션이 아니라 표준 출력을 파일로 보내는 셸 문법이며 기존 내용을 덮어쓴다.
-
-```bash
-cat /opt/outputs/node_names.txt
-cat /opt/outputs/nodes_os.txt
-cat /opt/outputs/users.txt
-cat /opt/outputs/storage-capacity-sorted.txt
-cat /opt/outputs/pv-and-capacity-sorted.txt
-cat /opt/outputs/aws-context-name
-```
-
-파일마다 실제 값, 불필요한 헤더 여부, 정렬 유지, 정확한 경로를 확인한다.
-JSONPath 기본 출력에는 마지막 줄바꿈이 없어 `cat` 뒤에 프롬프트가 붙어 보일 수 있다.
-프롬프트가 파일에 저장된 것은 아니다. 한 항목당 한 줄을 요구할 때만
-[공식 `range` 예제](https://kubernetes.io/docs/reference/kubectl/jsonpath/#using-jsonpath-expressions-with-kubectl)를
-응용한다.
-
-```bash
-kubectl get nodes -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}'
-```
-
-:::caution[함정 — 화면 출력만으로는 제출이 끝나지 않는다]
-지정 파일 저장까지가 요구사항이다. 실패한 명령도 `>`가 먼저 파일을 비울 수 있으므로,
-빈 파일이면 원본 조회부터 다시 확인한다. 잘못 저장했다면 명령을 고쳐 `>`로 다시 덮어쓴다.
-`>>`로 이어 붙이면 이전 오답이나 중복 행이 남을 수 있다.
-:::
 
 ## 시험장에서 공식 문서 찾기
 
-검색창에는 아래 영문을 그대로 넣는다. YAML이 필요한 문제는 문서를 처음부터 읽지 말고
-예제 매니페스트나 `--dry-run=client -o yaml` 부분으로 바로 이동한다.
+검색창에는 아래 영문을 그대로 넣는다. 문서를 처음부터 읽지 말고 예제 명령이나
+`--dry-run=client -o yaml` 부분으로 바로 이동한다.
 
 | 이 장의 섹션 | 검색어 | 공식 문서에서 가져올 것 |
 |---|---|---|
-| Pod 기초 | `Pods` | [Pods](https://kubernetes.io/docs/concepts/workloads/pods/)의 Pod 예시에서 `apiVersion: v1`, `kind: Pod`, `spec.containers` 골격 |
 | 네임스페이스 | `Namespaces` | [Namespaces](https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/)의 `--namespace` 사용법. YAML이면 `metadata.namespace`만 대상 리소스에 추가 |
 | 명령형 커맨드 | `imperative commands` | [Managing Kubernetes Objects Using Imperative Commands](https://kubernetes.io/docs/tasks/manage-kubernetes-objects/imperative-command/)의 `run`·`expose`·`create`와 `--dry-run=client -o yaml` 조합 |
-| JSONPath와 정렬 | `JSONPath` | [JSONPath Support](https://kubernetes.io/docs/reference/kubectl/jsonpath/)의 `range`, 필터 `?()`, 음수 인덱스 예시. 이 절은 YAML 작성보다 출력식 복사용 |
 
 :::tip[문서와 explain의 역할]
 공식 문서에서는 **완성 예시의 구조**를 찾고, 현재 클러스터의 정확한 필드 경로는
@@ -492,16 +179,18 @@ kubectl create --dry-run=client -f vim-practice.yaml -o yaml
 복사해 온 블록의 깊이는 `V`로 줄들을 선택한 뒤 `>`·`<`로 맞춘다. 같은 계층의 필드가 정렬됐는지 확인한다.
 :::
 
-## 이 장에서 남길 것
 
-- 모든 진단은 `get → describe → Events`로 시작한다
-- `--dry-run=client -o yaml`이 YAML 작성의 출발점이다
-- 만들라는 명령(`run`/`create`/`expose`)은 한 줄로, 고치라는 명령은 `edit`/`set image`/`apply` 셋 중에서
-- DNS는 `<service>.<namespace>`만 기억하면 대부분 풀린다
-- 출력 문제는 원본 구조에서 경로를 찾고, 추출·필터·정렬·열 구성을 구분한 뒤 제출 파일까지 확인한다
+## 완료 판정
+
+- 조회 문제는 namespace와 대상 이름이 맞는지 원문 요구와 다시 대조한다.
+- 명령형 생성은 `kubectl get <type> <name> -n <namespace>`로 실제 오브젝트 생성을 확인한다.
+- YAML 뼈대는 `kubectl create --dry-run=client -f <file> -o yaml`로 구문과 리소스 구조만 확인한다.
+  client dry-run은 스케줄링·이미지 다운로드·앱 동작을 증명하지 않는다.
+- 잘못 만든 리소스를 무조건 삭제하기 전에 `kubectl get -o yaml`로 수정 가능한 필드와
+  소유 controller를 확인한다.
 
 <LinkCard
-  title="2. 워크로드"
-  description="ReplicaSet의 셀렉터 함정, 깨진 YAML 고치기, 롤링 업데이트 전략."
-  href="/cka-udemy/02-workloads/"
+  title="2. JSONPath 추출과 정렬"
+  description="원본 구조에서 필드 경로를 찾고 요구한 표나 파일을 만든다."
+  href="/cka-udemy/jsonpath/"
 />

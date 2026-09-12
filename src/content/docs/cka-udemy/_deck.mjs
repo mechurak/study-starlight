@@ -21,8 +21,16 @@ export default {
 	"termIntro": "not-required",
 	"groups": [
 		{
+			"id": "architecture",
+			"label": "기초"
+		},
+		{
+			"id": "pods",
+			"label": "Workloads와 스케줄링"
+		},
+		{
 			"id": "basics",
-			"label": "워크로드와 스케줄링"
+			"label": "Workloads와 스케줄링 (개편 전)"
 		},
 		{
 			"id": "services-dns",
@@ -44,18 +52,36 @@ export default {
 	"map": [
 		{
 			"label": "1장",
-			"title": "기본 조작",
+			"title": "kubectl 기본 조작",
 			"href": "/cka-udemy/01-basics/",
-			"desc": "Pod · 네임스페이스 · 명령형 커맨드 · JSONPath",
+			"desc": "namespace · 명령형 생성기 · 도움말 · Vim",
 			"items": [
-				[
-					"cka 2장",
-					"/cka/02-architecture/"
-				],
 				[
 					"cka 3장",
 					"/cka/03-kubectl/"
-				],
+				]
+			],
+			"tone": "key"
+		},
+		{
+			"label": "2장",
+			"title": "JSONPath 추출과 정렬",
+			"href": "/cka-udemy/jsonpath/",
+			"desc": "필드 추출 · 조건 필터 · 정렬 · custom-columns · 파일 제출",
+			"items": [
+				[
+					"cka 3장",
+					"/cka/03-kubectl/"
+				]
+			],
+			"tone": "key"
+		},
+		{
+			"label": "3장",
+			"title": "Pod 생성과 상태 확인",
+			"href": "/cka-udemy/pods/",
+			"desc": "Pod 생성 · 노드 · 컨테이너 상태 · Events · Ready",
+			"items": [
 				[
 					"cka 4장",
 					"/cka/04-pods/"
@@ -64,7 +90,7 @@ export default {
 			"tone": "key"
 		},
 		{
-			"label": "2장",
+			"label": "개편 전 2장",
 			"title": "워크로드",
 			"href": "/cka-udemy/02-workloads/",
 			"desc": "ReplicaSet · Deployment rollout/rollback · Job 완료·실패",

@@ -61,12 +61,12 @@ h2와 h3를 모두 기록한다. 목적 제목은 원제목을 기본으로 하�
 
 | 원본 절 | 처리 | 목적 파일·절 |
 |---|---|---|
-| Pod 기초 — Practice Test: PODs | 이동 | `pods` — 해당 작업의 Pod 기초 — Practice Test: PODs |
-| 네임스페이스 — Practice Test: Namespaces | 유지 | `01-basics` — 해당 작업의 네임스페이스 — Practice Test: Namespaces |
-| 명령형 커맨드 — Practice Test: Imperative Commands | 유지 | `01-basics` — 해당 작업의 명령형 커맨드 — Practice Test: Imperative Commands |
-| ↳ 도움말 → YAML 뼈대 → 필요한 필드만 수정 | 유지 | `01-basics` — 해당 작업의 도움말 → YAML 뼈대 → 필요한 필드만 수정 |
-| JSONPath와 정렬 — Practice Test: Advanced Kubectl Commands | 이동 | `jsonpath` — 해당 작업의 JSONPath와 정렬 — Practice Test: Advanced Kubectl Commands |
-| ↳ 도움말에서 문법 찾기 | 이동 | `jsonpath` — 해당 작업의 도움말에서 문법 찾기 |
+| Pod 기초 — Practice Test: PODs | 이동 | `pods` — Pod 기초 — Practice Test: PODs |
+| 네임스페이스 — Practice Test: Namespaces | 유지 | `01-basics` — 네임스페이스 — Practice Test: Namespaces |
+| 명령형 커맨드 — Practice Test: Imperative Commands | 유지 | `01-basics` — 명령형 커맨드 — Practice Test: Imperative Commands |
+| ↳ 도움말 → YAML 뼈대 → 필요한 필드만 수정 | 유지 | `01-basics` — 도움말 → YAML 뼈대 → 필요한 필드만 수정 |
+| JSONPath와 정렬 — Practice Test: Advanced Kubectl Commands | 이동 | `jsonpath` — JSONPath와 정렬 — Practice Test: Advanced Kubectl Commands |
+| ↳ 도움말에서 문법 찾기 | 이동 | `jsonpath` — 도움말에서 문법 찾기 |
 | ↳ 노드 이름과 OS 이미지 추출 | 이동 | `jsonpath` — 해당 작업의 노드 이름과 OS 이미지 추출 |
 | ↳ kubeconfig 사용자 이름 추출 | 이동 | `jsonpath` — 해당 작업의 kubeconfig 사용자 이름 추출 |
 | ↳ PV 용량순 정렬 | 이동 | `jsonpath` — 해당 작업의 PV 용량순 정렬 |
@@ -76,8 +76,8 @@ h2와 h3를 모두 기록한다. 목적 제목은 원제목을 기본으로 하�
 | ↳ VPA 관련 CRD 이름을 파일로 제출하기 | 이동 | `jsonpath` — 해당 작업의 VPA 관련 CRD 이름을 파일로 제출하기 |
 | ↳ 제출 파일 확인과 실수 복구 | 이동 | `jsonpath` — 해당 작업의 제출 파일 확인과 실수 복구 |
 | 시험장에서 공식 문서 찾기 | 통합 | `pods / 01-basics / jsonpath / exam-search` — 해당 작업의 문서 검색·완료 판정 |
-| ↳ 시험 중 찾을 곳과 학습용 링크 구분 | 이동 | `pods / 01-basics / jsonpath / exam-search` — 해당 작업의 시험 중 찾을 곳과 학습용 링크 구분 |
-| ↳ Vim으로 YAML을 고치는 짧은 연습 | 유지 | `01-basics` — 해당 작업의 Vim으로 YAML을 고치는 짧은 연습 |
+| ↳ 시험 중 찾을 곳과 학습용 링크 구분 | 이동 | `01-basics / exam-search` — 시험 중 찾을 곳과 학습용 링크 구분 |
+| ↳ Vim으로 YAML을 고치는 짧은 연습 | 유지 | `01-basics` — Vim으로 YAML을 고치는 짧은 연습 |
 | 이 장에서 남길 것 | 통합 | `pods / 01-basics / jsonpath / exam-search` — 해당 작업의 문서 검색·완료 판정 |
 
 ### 02-workloads.mdx

@@ -1,0 +1,95 @@
+---
+title: "3. Pod 생성과 상태 확인"
+description: "Pod을 생성하고 이미지·노드·컨테이너 상태·Events·Ready를 확인해 실행 성공을 판정한다"
+deckGroup: pods
+sidebar:
+  order: 1030
+reviewedAt: 2026-09-13
+---
+
+import { LinkCard } from '@astrojs/starlight/components';
+import Thesis from '../../../components/docs/Thesis.astro';
+
+<Thesis>Pod 오브젝트 생성과 컨테이너 실행 성공을 구분하고 get·describe·Events로 실제 상태를 확인한다</Thesis>
+
+Pod 생성 명령이 성공해도 이미지 pull이나 컨테이너 시작은 실패할 수 있다.
+이 페이지에서는 Pod을 만들고 **오브젝트 존재 → 배치된 노드 → 컨테이너 상태와 Ready** 순서로
+완료를 판정한다. Pod의 수명 주기와 controller의 역할은
+[cka 4장 — Pod](/cka/04-pods/)에서 복습한다.
+
+손으로 익힐 흐름은 `kubectl run` → `kubectl get -o wide` →
+`kubectl describe` → 필요한 최소 수정이다. 문제의 namespace가 있으면 모든 명령에
+`-n <namespace>`를 붙인다.
+
+## Pod 기초 — Practice Test: PODs
+
+원본 풀이: [13-Practice-Test-PODs.md](https://github.com/kodekloudhub/certified-kubernetes-administrator-course/blob/master/docs/02-Core-Concepts/13-Practice-Test-PODs.md)
+
+| 과제 | 명령 |
+|---|---|
+| Pod 개수 세기 — *How many pods exist on the system?* | `k get pods --no-headers \| wc -l` |
+| Pod 만들기 — *Create a new pod with the nginx image.* | `k run nginx --image=nginx` |
+| 이미지·노드 확인 — *What is the image used to create the new pods? / Which nodes are these pods placed on?* | `k get pods -o wide` 또는 `k describe pod <name>` |
+| 컨테이너 상태·에러 원인 — *What is the state of the container agentx in the pod webapp? / Why do you think the container agentx in pod webapp is in error?* | `k describe pod <name>` → State / Events |
+| Pod 삭제 (빠르게) — *Delete the webapp Pod.* | `k delete pod webapp --force` |
+| YAML 뽑아서 생성 — *Create a new pod with the name redis and with the image redis123. Use a pod-definition YAML file.* | `k run redis --image=redis123 --dry-run=client -o yaml > redis.yaml` |
+
+(`--dry-run=client`는 서버에 요청을 보내지 않고 클라이언트에서 검증만 하고 끝낸다는 뜻이다 —
+`-o yaml`과 짝지으면 "만들지 말고 YAML만 뽑기"가 된다. 이 덱 전체에서 반복되는 콤보다.)
+
+*Now change the image on this pod to redis. Once done, the pod should be in a running state.* —
+이미지 이름이 틀린 Pod(`redis123`)을 고치는 방법은 셋 다 알아둔다 —
+
+```bash
+# 1) 매니페스트 고치고 apply
+vi redis.yaml && kubectl apply -f redis.yaml
+# 2) 실행 중인 Pod을 직접 편집 (image는 편집 가능한 몇 안 되는 필드)
+kubectl edit pod redis
+# 3) image만 바로 교체 — pod/<pod이름> <컨테이너이름>=<새이미지>
+kubectl set image pod/redis redis=redis
+```
+
+:::tip[READY 열 읽는 법]
+*What does the READY column in the output of the kubectl get pods command indicate?* —
+`READY 1/2`는 "컨테이너 2개 중 1개 준비됨"이다. Pod 개수가 아니라
+**컨테이너 준비 수 / 전체 수** — 멀티 컨테이너 문제에서 반복해서 나온다.
+:::
+
+:::caution[함정 — --force]
+`--force`는 API 서버가 노드에서 프로세스 종료를 확인할 때까지 기다리지 않고 Pod 오브젝트를
+지울 수 있다. 같은 이름의 프로세스가 잠시 겹칠 수도 있으므로 일반적인 빠른 삭제 습관으로 쓰지 않는다.
+:::
+
+
+## 공식 문서에서 찾을 것
+
+Kubernetes 문서 내부 검색에서 `Pods`를 열고
+[Pods](https://kubernetes.io/docs/concepts/workloads/pods/)의 예제에서
+`apiVersion: v1`, `kind: Pod`, `spec.containers` 골격을 가져온다.
+상태가 이상하면 [Pod lifecycle](https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/)의
+Pod phase와 container states를 찾고 실제 `describe`의 State·Reason·Events와 대조한다.
+명령 옵션은 `kubectl run --help`, 이미지 수정은
+[`kubectl set image` 레퍼런스](https://kubernetes.io/docs/reference/kubectl/generated/kubectl_set/kubectl_set_image/)에서 찾는다.
+
+## 완료 판정
+
+```bash
+kubectl get pod redis -o wide
+kubectl describe pod redis
+```
+
+Pod 이름이 보이는 것만으로 끝내지 않는다. 요구가 실행 성공이면 `STATUS=Running`과
+`READY 1/1`을 함께 확인하고, 여러 컨테이너면 분모와 분자가 같은지 본다.
+Pending·ImagePullBackOff·CrashLoopBackOff라면 Events와 각 컨테이너의 State·Reason으로
+스케줄링, 이미지, 실행 명령 실패를 구분한다.
+
+독립 Pod은 Deployment의 Pod template과 다르다. controller가 관리하는 Pod을 직접 고치면
+재생성 때 사라지므로 소유자가 있으면 `kubectl get pod redis -o jsonpath='{.metadata.ownerReferences}'`로
+확인하고 해당 workload를 수정한다. 이 랩의 독립 Pod은 이미지 수정 뒤 같은 Pod 상태를 재확인한다.
+강제 삭제는 API가 노드의 프로세스 종료 확인을 기다리지 않으므로 일반 복구 습관으로 쓰지 않는다.
+
+<LinkCard
+  title="4. Deployment rollout과 rollback"
+  description="Deployment의 Pod template을 바꾸고 rollout 상태와 되돌리기를 확인한다."
+  href="/cka-udemy/02-workloads/"
+/>

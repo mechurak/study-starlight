@@ -1,9 +1,9 @@
 # 1. CKA 실습 덱을 작업 단위로 개편
 
-상태: M0·M1 완료
-지금 위치: Kustomize 기준 예제·검증·정보 보존 검토 완료. M2부터 Sol Medium에 인계한다.
-실행 범위: 이번 실행은 M0·M1까지만 완료하고 사용자 읽기·Sol 인계를 보고한 뒤 종료한다. M2~M8은 후속 실행이다.
-실행 모델: 이번 M0·M1은 Astra. 이후 M2~M8은 Sol Medium.
+상태: M0·M1 완료, M2~M8 실행 중
+지금 위치: M2a 기초·JSONPath·Pod 분할 완료. M2b Workloads·Pod 설정 이관부터 이어 간다.
+실행 범위: 이번 실행에서 남은 M2~M8을 묶음별 편집·검증·기록·커밋까지 완료한다.
+실행 모델: M0·M1은 Astra 완료. 이번 M2~M8은 Sol Medium.
 작성일: 2026-09-12
 
 사용자는 `cka`와 `cka-udemy`를 함께 보며 시험을 준비한다. 실습 덱의 긴 설명과 한 페이지에 섞인
@@ -187,7 +187,7 @@ Kubernetes 문서 내 검색은 가능하지만 외부 검색 결과를 열면 �
 
 ### M2. 기초와 Workloads
 
-- [ ] M2a: `01-basics`의 기본 조작·출력 추출·Pod 작업을 분리한다. Vim·도움말·YAML 생성으로 오는 `cka` 앵커 링크도 갱신한다.
+- [x] M2a: `01-basics`의 기본 조작·출력 추출·Pod 작업을 분리한다. Vim·도움말·YAML 생성으로 오는 `cka` 앵커 링크도 갱신한다.
 - [ ] M2b: `02-workloads`, `03-pod-config`를 목차 표대로 작업별로 이관한다. Deployment template 수정과 독립 Pod 재생성의 전제를 남긴다. 분량에 따라 검증·커밋 묶음을 나눈다.
 - [ ] M2c: `04-scheduling`을 배치·리소스·노드별 워크로드로 나눈다. 조건과 결과를 연결한다.
 - [ ] M2d: `10-troubleshooting`의 HPA/VPA를 이관한다. metrics 사전 조건과 기대 replica·상태를 남긴다.
@@ -362,3 +362,24 @@ DeckMap의 네 링크를 확인했다. 390px에서 네 페이지 모두 main scr
 `git diff --check` 통과. 원본 커밋과 대조한 최종 감사에서 h2/h3 227개 누락 0,
 39개 order 예약 중복 0, M1 네 페이지의 번호·group·order 일치, 외부 출처 19개 누락 0을 확인했다.
 로컬 렌더 17개 판정 통과. 계획·baseline·콘텐츠·검증 기록을 M1b 묶음으로 커밋하며 푸시는 하지 않는다.
+
+
+### M2a — kubectl 기본 조작·JSONPath·Pod (2026-09-13)
+
+기존 `01-basics` URL에는 namespace·명령형 생성·도움말·dry-run·Vim을 남기고,
+`jsonpath`와 `pods`를 새로 활성화했다. 예약한 1~3장/order 1010~1030과
+`architecture`·`pods` 그룹을 적용하고 index·DeckMap·`cka` 3·4장의 손 연습 링크를 갱신했다.
+미개편 2~4장은 M2b·M2c까지 기존 `basics` 그룹에 두므로 과도기 그룹을 명시했다.
+
+- 분할 뒤 196 / 315 / 96줄이다. JSONPath의 목록 시작점·필터·정렬·열·파일 제출과
+  VPA CRD 변형, Pod의 Ready·상태·Events·독립 Pod/소유 controller 조건을 보존했다.
+- Kubernetes 공식 JSONPath·kubectl 출력·Pods·Pod lifecycle·set image·delete 문서를 대조했다.
+  강제 삭제 설명은 API 서버가 노드 종료 확인을 기다리지 않는 조건으로 바로잡았다.
+- 로컬 kubectl v1.36.4에서 반복 `--image` Deployment 뼈대 생성을 확인했다.
+  `kubectl run --dry-run=client`는 discovery 캐시가 없는 로컬 환경에서 `localhost:8080` 연결 실패했다.
+  지정 랩이 없어 Pod 생성·상태·JSONPath 출력은 실제 클러스터에서 실행하지 않았다.
+- `pnpm check` exit 0 — 376페이지 빌드·32,148개 내부 페이지/앵커 링크 통과.
+  preview + Playwright에서 DeckMap의 1→2→3 링크, 세 페이지 현재 항목과 390px
+  main/문서 폭 390/390, console error 0을 확인했다. `git diff --check`도 통과했다.
+
+다음 묶음은 M2b의 Deployment·Job과 command/args·ConfigMap/Secret 이관이다.
