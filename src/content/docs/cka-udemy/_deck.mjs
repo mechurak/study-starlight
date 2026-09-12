@@ -319,10 +319,23 @@ export default {
 			"tone": "warn"
 		},
 		{
-			"label": "7장",
-			"title": "스토리지",
+			"label": "21장",
+			"title": "볼륨과 정적 PV/PVC",
 			"href": "/cka-udemy/07-storage/",
-			"desc": "PV/PVC · StorageClass · 정적/동적 프로비저닝 · 스토리지 quota",
+			"desc": "hostPath · PV/PVC 바인딩 · reclaimPolicy · 실제 mount·읽기/쓰기",
+			"items": [
+				[
+					"cka 13장",
+					"/cka/13-storage/"
+				]
+			],
+			"tone": "zone"
+		},
+		{
+			"label": "22장",
+			"title": "StorageClass와 동적 프로비저닝",
+			"href": "/cka-udemy/storage-class/",
+			"desc": "provisioner · WaitForFirstConsumer · 기본 class · 동적 PV · quota",
 			"items": [
 				[
 					"cka 13장",

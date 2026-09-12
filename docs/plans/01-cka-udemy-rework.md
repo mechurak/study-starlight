@@ -1,7 +1,7 @@
 # 1. CKA 실습 덱을 작업 단위로 개편
 
 상태: M0·M1 완료, M2~M8 실행 중
-지금 위치: M3 Networking 이관 완료. M4 볼륨·정적/동적 스토리지부터 이어 간다.
+지금 위치: M4 Storage 이관 완료. M5 TLS·RBAC·ServiceAccount·admission부터 이어 간다.
 실행 범위: 이번 실행에서 남은 M2~M8을 묶음별 편집·검증·기록·커밋까지 완료한다.
 실행 모델: M0·M1은 Astra 완료. 이번 M2~M8은 Sol Medium.
 작성일: 2026-09-12
@@ -75,7 +75,7 @@ M1에서 실제 slug·순서를 확정하고 이 표에 기록한다. 페이지 
 | `10-troubleshooting.mdx`의 오토스케일러 | Workloads | HPA 설정·검증. VPA는 설치된 CRD를 읽는 보충 사례로 분리 | 8·17 |
 | `05-services-dns.mdx` | Networking | `05-services-dns`의 Service·EndpointSlice / `dns`의 DNS·CoreDNS / `network-environment`의 노드·Pod·Service 대역과 CNI 확인. CNI 설치는 M7의 kubeadm과 연결 | 9·10·15·17 |
 | `06-ingress-netpol.mdx` | Networking | `06-ingress-netpol`의 Ingress·TLS / `gateway`의 Gateway·HTTPRoute / `network-policy`의 NetworkPolicy 허용·차단 | 11·12 |
-| `07-storage.mdx` | Storage | 볼륨·정적 PV/PVC 연결 / StorageClass·동적 프로비저닝·quota | 13 |
+| `07-storage.mdx` | Storage | `07-storage`의 볼륨·정적 PV/PVC 연결 / `storage-class`의 StorageClass·동적 프로비저닝·quota | 13 |
 | `08-security.mdx` | Cluster Architecture | TLS·CSR·kubeconfig / Role·Binding·can-i / ServiceAccount·imagePullSecrets / admission | 14 |
 | `09-cluster-lifecycle.mdx` | Cluster Architecture | kubeadm 설치·클러스터 확인 / drain·업그레이드 / etcd 백업·복구. cri-docker 패키지 절은 랩 환경 보충으로 표시 | 15 |
 | `11-helm.mdx` | Cluster Architecture | repo·install·upgrade·rollback의 한 release 관리 흐름. 이미지 이전 사례는 짧은 보충 | 16 |
@@ -201,7 +201,7 @@ Kubernetes 문서 내 검색은 가능하지만 외부 검색 결과를 열면 �
 
 ### M4. Storage
 
-- [ ] `07-storage`를 볼륨·정적 연결 / 동적 프로비저닝·quota로 나누고 이름만 다른 예제는 통합한다.
+- [x] `07-storage`를 볼륨·정적 연결 / 동적 프로비저닝·quota로 나누고 이름만 다른 예제는 통합한다.
 - 검증: PVC Bound와 Pod의 실제 마운트·읽기/쓰기를 구분한다. 바인딩 대기 조건·reclaimPolicy·quota에 따라 달라지는 판단을 보존한다.
 
 ### M5. 접근 제어
@@ -531,3 +531,30 @@ DeckMap·index·`cka` 9·10·15장과 트러블슈팅의 이동 앵커를 갱신
 
 M3의 15~20장과 `services` 그룹을 모두 활성화했다. 다음 묶음은 M4의 볼륨·정적 PV/PVC와
 StorageClass·동적 프로비저닝·quota 분리다.
+
+
+### M4 — 볼륨·정적/동적 스토리지 (2026-09-13)
+
+기존 `07-storage` URL에는 hostPath와 정적 PV/PVC 연결을 남기고, `storage-class`를
+22장/order 1220으로 분리했다. DeckMap·`cka` 13장·시험 전략의 기본 StorageClass 앵커를
+갱신하고 NetworkPolicy 다음 이동과 보안 페이지 연결을 21→22→23 순서로 맞췄다.
+
+- 분할 뒤 360 / 267줄이다. 정적 페이지는 hostPath와 PV/PVC라는 두 입력이지만 모두 “준비된
+  저장소를 Pod에 실제 mount해 읽고 쓰기”라는 하나의 완료 목표라 함께 유지했다. 350줄을 넘어서
+  h2/h3와 반복을 재검토했으며, 서로 다른 hostPath 권한·NFS·access mode·reclaim·alpha-mysql
+  실패 조건을 삭제하지 않는 편이 정보 보존에 유리하다고 판단했다.
+- StorageClass 페이지에는 기존 class 요청·WaitForFirstConsumer 소비 Pod·no-provisioner class·
+  기본 class/확장 허용, 동적 provisioner 추적과 storage quota를 묶었다. Bound와 실제 mount,
+  정적/동적 생성 주체, 정상 Pending과 provisioner 실패를 분리했다. 원본 외부 출처 누락은 0개다.
+- Kubernetes 공식 Persistent Volumes·Storage Classes·dynamic provisioning·ResourceQuota 문서를
+  대조했다. `no-provisioner`는 PV를 만들지 않고, WaitForFirstConsumer에서 `nodeName`으로
+  스케줄러를 우회하면 PVC가 Pending이며, quota는 실제 파일 사용량이 아니라 PVC 요청량을 센다는
+  경계를 확인했다.
+- YAML 열한 블록을 로컬 YAML 파서로 읽었다. 지정 클러스터와 스토리지 백엔드가 없어 PV/PVC
+  바인딩·NFS helper·동적 provisioner·mount 읽기/쓰기·quota 거부는 실행하지 않았다.
+- `pnpm check` exit 0 — 389페이지 빌드·33,348개 내부 페이지/앵커 링크 통과.
+  preview + Playwright에서 DeckMap의 21·22장 링크, 두 페이지 현재 항목과 390px
+  main/문서 폭 390/390, console error 0을 확인했다. `git diff --check`도 통과했다.
+
+다음 묶음은 M5의 TLS·CSR·kubeconfig, Role·Binding, ServiceAccount·imagePullSecrets,
+admission 요청 검사 분리다.

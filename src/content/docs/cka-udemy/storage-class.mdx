@@ -1,0 +1,266 @@
+---
+title: "22. StorageClass와 동적 프로비저닝"
+description: "StorageClass·provisioner·binding mode를 확인하고 동적 PV 생성과 mount·스토리지 quota를 검증한다"
+deckGroup: storage
+sidebar:
+  order: 1220
+reviewedAt: 2026-09-13
+---
+
+import { LinkCard } from '@astrojs/starlight/components';
+import Thesis from '../../../components/docs/Thesis.astro';
+
+<Thesis>StorageClass는 PV를 직접 만드는 객체가 아니므로 실제 provisioner와 PVC Events, 생성된 PV, 소비 Pod의 마운트를 이어 확인해야 한다.</Thesis>
+
+> 짝이 되는 개념 장: [cka 13. StorageClass](/cka/13-storage/#storageclass--동적-프로비저닝)
+
+이 장의 과제는 기존 StorageClass를 요청하는 PVC와 소비 Pod을 만들거나 새 StorageClass의
+provisioner·binding mode·기본값·확장 허용을 설정하는 것이다.
+
+`WaitForFirstConsumer`의 Pending은 소비 Pod을 기다리는 정상 상태일 수 있다. 반면 external
+provisioner를 기다리는 Pending은 컨트롤러와 백엔드 오류일 수 있으므로 PVC Events로 구분한다.
+
+## StorageClass — Practice Test: Storage Class
+
+원본 풀이: [13-Practice-Test-Storage-Class.md](https://github.com/kodekloudhub/certified-kubernetes-administrator-course/blob/master/docs/08-Storage/13-Practice-Test-Storage-Class.md)
+
+이 랩은 **기존 StorageClass를 요청하는 PVC → 그 PVC를 소비하는 Pod → 새 StorageClass** 순서다.
+리소스 이름이 비슷해도 `local-path`가 어떤 프로비저너를 쓰는지는 이름만 보고 단정하지 않고 실제
+오브젝트를 조회한다.
+
+```bash
+kubectl get storageclass
+kubectl get storageclass local-path -o yaml
+kubectl get pv
+```
+
+### 1. 기존 클래스 요청 — local-pvc
+
+PVC에는 전용 명령형 생성기가 없으므로 요구한 네 값을 YAML에 직접 옮긴다. 특정 PV를 지목하는
+`volumeName`은 넣지 않는다.
+
+```yaml
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: local-pvc
+spec:
+  storageClassName: local-path
+  accessModes:
+  - ReadWriteOnce
+  resources:
+    requests:
+      storage: 500Mi
+```
+
+```bash
+kubectl create -f local-pvc.yaml
+kubectl get pvc local-pvc
+kubectl describe pvc local-pvc
+```
+
+여기서 `Pending`을 곧바로 실패로 판정하지 않는다. 먼저 `local-path`의 `volumeBindingMode`와 PVC
+Events를 확인한다. `WaitForFirstConsumer`라면 이 PVC를 쓰는 Pod이 아직 없어서 기다리는 중이다.
+
+### 2. 소비 Pod 생성 — nginx
+
+`kubectl run`에는 PVC와 마운트 경로를 받는 전용 플래그가 없다. 공식
+[`kubectl run`](https://v1-35.docs.kubernetes.io/docs/reference/kubectl/generated/kubectl_run/)의
+`--dry-run=client -o yaml`로 이름과 이미지를 먼저 만든 뒤 `volumeMounts`와 `volumes`를 추가한다.
+`--overrides`에 JSON을 전부 넣을 수도 있지만 시험장에서는 YAML을 고치는 편이 읽고 검증하기 쉽다.
+
+```bash
+kubectl run nginx --image=nginx:alpine --dry-run=client -o yaml > nginx.yaml
+```
+
+```yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: nginx
+spec:
+  containers:
+  - name: nginx
+    image: nginx:alpine
+    volumeMounts:
+    - name: local-persistent-storage
+      mountPath: /var/www/html
+  volumes:
+  - name: local-persistent-storage
+    persistentVolumeClaim:
+      claimName: local-pvc
+```
+
+`volumeMounts[].name`과 `volumes[].name`은 Pod 안의 연결 고리라 서로 같아야 한다. 실제 PVC를
+고르는 값은 별도의 `persistentVolumeClaim.claimName: local-pvc`다. 뼈대가 만든 라벨이나
+`restartPolicy`는 문제에서 다른 값을 요구하지 않는 한 그대로 둬도 된다.
+
+```bash
+kubectl create -f nginx.yaml
+kubectl wait --for=condition=Ready pod/nginx --timeout=60s
+kubectl get pvc local-pvc
+kubectl describe pod nginx
+```
+
+Pod 생성 뒤 `local-pvc`가 `Bound`, Pod이 `Running`인지 함께 본다. `WaitForFirstConsumer`였다면
+이때 스케줄러가 소비 노드를 고르면서 바인딩이 진행된다.
+
+### 3. 로컬 PV용 클래스 생성 — delayed-volume-sc
+
+공식 [Storage Classes — Local](https://v1-35.docs.kubernetes.io/docs/concepts/storage/storage-classes/#local)의
+예제가 이 문제의 뼈대다. 이름만 문제의 값으로 바꾼다.
+
+| 필드 | 여기서의 의미 |
+|---|---|
+| `provisioner: kubernetes.io/no-provisioner` | 컨트롤러가 PV를 자동 생성하지 않음 — 조건에 맞는 local PV를 관리자가 미리 준비 |
+| `volumeBindingMode: WaitForFirstConsumer` | 소비 Pod의 스케줄 조건을 알 때까지 준비된 PV의 선택·바인딩을 미룸 |
+
+```yaml
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: delayed-volume-sc
+provisioner: kubernetes.io/no-provisioner
+volumeBindingMode: WaitForFirstConsumer
+```
+
+:::caution[함정 — WaitForFirstConsumer의 Pending은 정상이다]
+`volumeBindingMode: WaitForFirstConsumer`인 클래스의 PVC는 **그 PVC를 쓰는 Pod이
+스케줄될 때까지 Pending이 정상**이다. "왜 Pending인가"에 대한 답이
+7장 첫 랩(accessModes 불일치)과 다르다는 것 — 이 대비가 두 랩의 출제 의도다.
+다만 `no-provisioner`는 PV를 만들지 않으므로 Pod을 만든 뒤에도 조건에 맞는 PV가 없으면 계속
+Pending이다. 또한 Pod의 `spec.nodeName`은 스케줄러를 우회하므로 이 모드와 함께 쓰지 않는다.
+노드를 제한해야 하면 `nodeSelector`나 affinity를 쓴다.
+:::
+
+### local-sc — 기본 클래스와 확장 허용까지 설정
+
+요구는 `local-sc` 생성, `no-provisioner`, `WaitForFirstConsumer`, 확장 허용, 기본 클래스 지정이다.
+StorageClass는 전용 `kubectl create storageclass` 생성기가 없으므로
+[공식 Storage Classes 예제](https://kubernetes.io/docs/concepts/storage/storage-classes/)에서 YAML을 가져온다.
+
+```bash
+kubectl get sc
+```
+
+기존 `(default)` 클래스 이름을 기록해 둔다. 아래를 `local-sc.yaml`로 저장한다.
+StorageClass는 namespace가 없으며 **`spec:`도 없이** 설정 필드를 최상위에 둔다.
+
+```yaml
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: local-sc
+  annotations:
+    storageclass.kubernetes.io/is-default-class: "true"
+provisioner: kubernetes.io/no-provisioner
+volumeBindingMode: WaitForFirstConsumer
+allowVolumeExpansion: true
+```
+
+annotation 값 `"true"`는 문자열이고 `allowVolumeExpansion: true`는 불리언이다.
+`default: true` 같은 별도 필드를 만드는 것이 아니다.
+
+```bash
+kubectl apply -f local-sc.yaml
+# 다른 기본 클래스가 있을 때만, 조회한 실제 이름으로 실행
+kubectl annotate sc <기존-기본-클래스> \
+  storageclass.kubernetes.io/is-default-class="false" --overwrite
+kubectl get sc
+kubectl get sc local-sc -o yaml
+```
+
+기본 표시를 가진 다른 클래스가 여러 개면 각각 해제한다. 기존 클래스를 삭제하지 않는다.
+`local-sc (default)`와 `PROVISIONER`, `VOLUMEBINDINGMODE`, `ALLOWVOLUMEEXPANSION`의 세 값을
+확인하면 이 생성 문제는 완료다. 기본 클래스가 여러 개일 때의 선택 규칙과 전환 방법은
+[기본 StorageClass 변경](https://kubernetes.io/docs/tasks/administer-cluster/change-default-storage-class/)에서 확인한다.
+
+`no-provisioner`는 PV를 자동으로 만들지 않으며, `WaitForFirstConsumer`는 소비 Pod의 배치 조건을
+고려할 때까지 바인딩을 늦춘다. `allowVolumeExpansion: true`는 클래스의 확장 허용 설정이고,
+이것만으로 로컬 볼륨의 실제 확장 기능이 생기지는 않는다. 이 문제는 PV·PVC 생성이나 확장 실행을 요구하지 않는다.
+
+기본 클래스를 잘못 해제했다면 기록해 둔 원래 클래스의 annotation을 `"true"`로 복구하고,
+잘못 지정한 클래스는 `"false"`로 바꾼 뒤 `get sc`로 확인한다.
+
+## 동적 프로비저닝은 생성 주체까지 추적한다
+
+동적 프로비저닝은 **StorageClass 오브젝트 자체가 PV를 만드는 것이 아니다.** `provisioner` 필드와 같은
+이름으로 동작하는 컨트롤러가 PVC를 보고 백엔드 볼륨과 PV를 만든다. 특히 NFS에는 Kubernetes 내장
+프로비저너가 없으므로 외부 프로비저너나 CSI 드라이버가 실제로 실행 중이어야 한다.
+
+```bash
+# 1) 클래스 이름·provisioner·binding mode
+kubectl get sc <class> -o yaml
+
+# 2) PVC Events에서 누구를 기다리는지 확인
+kubectl describe pvc <claim>
+
+# 3) 동적으로 생긴 PV와 생성 주체 확인
+kubectl get pv
+kubectl get pv <pv> -o jsonpath='{.metadata.annotations.pv\.kubernetes\.io/provisioned-by}{"\n"}'
+
+# 4) Bound 뒤에도 소비 Pod의 마운트와 읽기·쓰기를 확인
+kubectl describe pod <pod>
+kubectl exec <pod> -- sh -c 'echo dynamic-ok > /data/probe && cat /data/probe'
+```
+
+PVC가 계속 `Pending`이면 다음 순서로 범위를 줄인다.
+
+1. `storageclass not found` — PVC의 `storageClassName` 오타 또는 클래스 없음
+2. `waiting for first consumer` — `WaitForFirstConsumer`의 정상 대기. PVC를 쓰는 Pod을 만든다
+3. `waiting for a volume to be created ... by external provisioner` — provisioner 이름이 맞는지,
+   컨트롤러 Pod이 Running인지, 컨트롤러 로그에 백엔드·권한 오류가 있는지 확인
+4. PVC는 `Bound`인데 Pod이 멈춤 — 프로비저닝이 아니라 노드 attach·mount 층의 문제다
+
+세부 필드와 외부 프로비저너의 경계는 공식
+[Storage Classes](https://v1-35.docs.kubernetes.io/docs/concepts/storage/storage-classes/)에서 확인한다.
+
+## 스토리지 quota 검증
+
+스토리지 quota는 네임스페이스의 PVC **개수와 요청 용량 합**을 admission에서 제한한다.
+
+```yaml
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: storage-quota
+spec:
+  hard:
+    persistentvolumeclaims: "5"
+    requests.storage: 20Gi
+    fast.storageclass.storage.k8s.io/persistentvolumeclaims: "3"
+    fast.storageclass.storage.k8s.io/requests.storage: 10Gi
+```
+
+```bash
+kubectl describe quota storage-quota -n <namespace>   # Used / Hard
+kubectl create -f pvc.yaml -n <namespace>             # 초과 시 즉시 Forbidden
+```
+
+`requests.storage`의 `Used`는 PVC의 `spec.resources.requests.storage` 합이다. 마운트 안에 큰 파일을
+써도 이 값은 늘지 않는다. 즉 quota가 통과했다는 사실은 NFS 공유의 실제 용량 제한이나 여유 공간을
+증명하지 않는다. 클래스별 키를 쓰면 비싼 클래스와 일반 클래스를 따로 제한할 수 있다. 정확한 키는
+공식 [Resource Quotas](https://v1-35.docs.kubernetes.io/docs/concepts/policy/resource-quotas/#quota-for-storage)에서
+확인한다.
+
+## 공식 문서에서 찾을 것
+
+| 검색어 | 가져올 필드·판정 |
+|---|---|
+| `Storage Classes` | [provisioner·reclaimPolicy·volumeBindingMode·allowVolumeExpansion](https://v1-35.docs.kubernetes.io/docs/concepts/storage/storage-classes/) |
+| `Storage Classes Local` | [`no-provisioner`와 `WaitForFirstConsumer`](https://v1-35.docs.kubernetes.io/docs/concepts/storage/storage-classes/#local) |
+| `Change default StorageClass` | [기본 class annotation 전환](https://kubernetes.io/docs/tasks/administer-cluster/change-default-storage-class/) |
+| `Resource Quotas storage` | [전체·class별 PVC 개수와 requests.storage 키](https://kubernetes.io/docs/concepts/policy/resource-quotas/#storage-resource-quota) |
+
+## 완료 판정
+
+- StorageClass의 provisioner·binding mode·기본 annotation·확장 허용이 요구값과 같다.
+- WaitForFirstConsumer라면 소비 Pod 생성 뒤 PVC가 Bound되고, 동적이면 생성 PV의 provisioned-by가 기대한 컨트롤러다.
+- 소비 Pod이 Ready이며 마운트 경로에서 실제 읽기·쓰기가 성공한다.
+- quota의 Used/Hard가 예상과 같고 초과 PVC가 Forbidden으로 거부된다.
+
+<LinkCard
+  title="23. TLS·CSR·kubeconfig"
+  description="인증서와 kubeconfig의 실제 필드를 확인하고 API 접근 결과로 검증한다."
+  href="/cka-udemy/08-security/"
+/>
