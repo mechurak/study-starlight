@@ -46,3 +46,14 @@
 
 이관 중 파일·번호 예약과 원본 절의 처리는 `docs/plans/01-cka-udemy-migration.md`에서 관리한다.
 영구 내용 기준은 이 baseline이며 진행 상태·일시적 순서는 실행 계획에 둔다.
+
+
+## 완성된 기준 예제
+
+Kustomize의 `12-kustomize.mdx` → `kustomize-transformers.mdx` → `kustomize-patches.mdx`를
+필수 흐름의 기준으로, `kustomize-components.mdx`를 선택 기능 보충의 기준으로 삼는다.
+기본 적용은 실행 위치·완전한 공통 입력·완료 판정의 예이고, patch는 방식 차이·삭제 조건을
+축약하면서 보존한 예다. Components는 선택하지 않은 환경과 기능 해제까지 확인하는 예다.
+
+본문의 공통 예제와 원본 랩 변형은 섞어 연속 실행하지 않는다. 기존 파일이 필요하면 그 전제를 먼저
+쓰고, 예제 값을 일반 규칙으로 확대하지 않는다. 축약량은 새로 추가한 재현용 입력까지 포함해 비교한다.

@@ -22,7 +22,6 @@ Patch는 원본을 복사하지 않고 필요한 차이만 적는다. 이 페이
 
 ## Patch로 특정 필드·항목 수정하기
 
-패치는 원본 리소스 전체를 다시 쓰지 않고 필요한 변경만 적는 방법이다.
 **대상 선택 → 변경 위치 확인 → 패치 작성 → 적용할 구성 렌더 검증 → 적용** 순서로 접근한다.
 Kustomize의 `patches`는 strategic merge와 JSON6902를 지원한다.
 ([공식 문서 — Customizing](https://kubernetes.io/docs/tasks/manage-kubernetes-objects/kustomization/#customizing))
@@ -40,9 +39,8 @@ Kustomize에서는 작업 목록을 YAML로 작성할 수 있다.
 
 ### resources와 patches의 path는 파일 역할이 다르다
 
-`resources`는 **배포 대상 정의를 가져오는 목록**, `patches` 항목의 `path`는
-**그 대상에 적용할 수정 내용을 읽는 파일 경로**다. 예를 들어 다음 staging 구성은
-base의 리소스와 새 MySQL Deployment를 모은 뒤, 그중 API Deployment에 이미지 패치를 적용한다.
+staging에서 새 MySQL과 API 이미지 패치 파일을 함께 추가한다면 파일 역할을 먼저 구분한다.
+아래는 **기존 staging 설정에 병합할 필드**다. 실제 랩의 다른 resources·patches는 유지한다.
 
 ```yaml
 resources:
@@ -55,21 +53,10 @@ patches:
     path: api-image-patch.yaml
 ```
 
-`mysql-depl.yaml`에는 독립된 Deployment 정의가 들어간다.
-`api-image-patch.yaml`에는 다음처럼 변경 작업만 들어간다.
-
-```yaml
-- op: replace
-  path: /spec/template/spec/containers/0/image
-  value: caddy
-```
-
-바깥 `path: api-image-patch.yaml`은 **파일 위치**, 안쪽
-`path: /spec/template/spec/containers/0/image`는 **리소스 내부 필드 위치**다.
-파일 경로는 `kustomization.yaml`이 있는 디렉터리를 기준으로 해석한다.
-별도 파일 대신 `patch: |-` 아래에 같은 작업 목록을 넣으면 inline 패치가 된다.
-패치 내용은 새 리소스 정의가 아니므로 `resources`에 넣지 않는다.
-([공식 문서 — Customizing](https://kubernetes.io/docs/tasks/manage-kubernetes-objects/kustomization/#customizing))
+`mysql-depl.yaml`에는 완전한 Deployment, `api-image-patch.yaml`에는 아래 QA 예제의
+`- op: replace`부터 `value: caddy`까지 **작업 목록만** 저장한다. 두 파일은 이 설정과 같은 폴더에 둔다.
+바깥 `path`는 설정 파일 기준의 **파일 위치**, 작업의 `/spec/…/image`는 **리소스 내부 필드 위치**다.
+패치 파일을 `resources`에 넣지 않는다. 파일 대신 같은 내용을 `patch: |-` 아래에 넣으면 inline이다.
 
 ## QA에서 inline JSON6902로 API 이미지 교체
 
@@ -100,14 +87,8 @@ patches:
         value: caddy
 ```
 
-`target`으로 Deployment를 선택하고 `replace`로 존재하는 이미지 필드를 교체한다.
-문제에서 inline JSON6902를 요구했으므로 이 형식으로 작성한다.
-
-```bash
-kubectl kustomize .
-kubectl apply -k .
-kubectl get -k . -o yaml
-```
+`target`은 Deployment를, `replace`는 존재하는 이미지 필드를 고른다.
+[공통 적용 순서](/cka-udemy/12-kustomize/#미리보기와-완료-검증-구분하기)를 QA 경로로 실행한다.
 
 미리보기와 실제 Deployment의 `spec.template.spec.containers`에서 API 이미지가 `caddy`인지
 확인하고 rollout 완료도 확인한다. 다른 컨테이너가 바뀌면 인덱스를, missing path 오류가 나면
@@ -209,13 +190,7 @@ patches:
 
 ### 삭제 결과와 실패 지점 확인
 
-```bash
-cd /root/code/k8s/overlays/QA
-kubectl kustomize .
-kubectl diff -k .
-kubectl apply -k .
-kubectl get -k .
-```
+`k8s/`에서 `kubectl kustomize overlays/QA`로 검사한 뒤 같은 경로로 diff·apply·get을 진행한다.
 
 첫 렌더에서 api-deployment의 memcached만 사라지고 다른 컨테이너는 남았는지,
 라벨 삭제 랩에서는 해당 overlay를 지정해 mongo-deployment의 **Pod template에서만 org가 없어졌는지** 확인한다.

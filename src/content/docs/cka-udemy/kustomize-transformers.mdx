@@ -21,10 +21,6 @@ import Thesis from '../../../components/docs/Thesis.astro';
 
 ## Transformer는 적용 범위부터 고른다
 
-Transformer는 모아 둔 리소스의 이름·라벨·이미지 같은 필드를 일괄 변환하는 기능이다.
-문제에서 먼저 찾을 것은 **무엇을 바꾸는가**와 **어디까지 바꾸는가**다.
-전체 프로젝트이면 루트 설정, db만이면 db 설정, nginx와 monitoring만이면 두 설정을 고른다.
-
 이 랩은 기본 페이지의 base·overlay 예제와 달리 **하위 폴더에도 `kustomization.yaml`이 있는 구조**다.
 루트가 다음처럼 각 하위 설정을 참조하고, db는 다시 sql·nosql의 리소스를 모은다고 가정한다.
 실제 랩의 기존 `resources`를 먼저 읽고, 아래 예제로 통째로 덮어쓰지 않는다.
@@ -52,9 +48,8 @@ resources:
 | 프로젝트 전체 postgres 이미지 교체 | `k8s/kustomization.yaml` | `images`의 `newName: mysql` |
 | nginx 폴더의 nginx 태그 변경 | `k8s/nginx/kustomization.yaml` | `images`의 `newTag: "1.23"` |
 
- **현재 값을 묻는 문제에서는 수정하지 않는다**. 설정을 읽고 렌더된 결과로
-확인한다.  변경을 요구하면 기존 키에 내용을 병합하고, 같은 YAML 키를 두 번
-만들지 않는다. 아래 코드들은 각 파일의 최상위에 들어갈 **관련 필드만 발췌한 것**이다.
+**현재 값 조회라면 수정하지 않는다**. 변경 요구라면 기존 키에 병합하며 같은 키를 두 번 만들지 않는다.
+위 표의 값은 원본 랩의 사례다. 아래 YAML은 각 설정 최상위의 **관련 필드 발췌**다.
 
 ### 전체 라벨 — commonLabels 읽기
 
@@ -91,41 +86,20 @@ labels:
 
 ### db 이름의 접두사 — namePrefix
 
-```yaml
-# k8s/db/kustomization.yaml
-namePrefix: data-
-```
-
-답은 **`data-`**다. db의 `resources`가 sql과 nosql을 모두 참조하면 양쪽에 적용된다.
-예를 들어 `metadata.name: postgres`는 `data-postgres`가 된다.
-루트에 쓰면 다른 서비스의 이름도 바뀌므로 db 범위를 벗어난다.
-접두사는 컨테이너 이미지 이름을 바꾸는 설정이 아니다.
+db 설정에 `namePrefix: data-`가 있고 sql·nosql을 참조하면 양쪽 이름에 붙는다.
+`postgres`는 `data-postgres`가 된다. 이미지 이름은 바뀌지 않는다. 루트에 쓰면 db 밖에도 적용된다.
 
 ### monitoring 네임스페이스 — namespace
 
-```yaml
-# k8s/monitoring/kustomization.yaml
-namespace: logging
-```
-
-답은 **`logging`**이다. monitoring에서 모은 Deployment·Service 같은 네임스페이스 소속
-리소스에 적용된다. ClusterRole 같은 클러스터 범위 리소스를 네임스페이스 소속으로 바꾸지는 않는다.
-또한 이 필드만으로 Namespace 오브젝트가 생성되지는 않는다.
-적용을 요구받았다면 `kubectl get namespace logging`으로 존재 여부를 확인하고,
-필요한 Namespace 생성은 문제의 요구에 맞춰 처리한다.
+monitoring 설정의 `namespace: logging`은 모아 둔 namespaced 리소스에 적용된다.
+ClusterRole을 namespaced 리소스로 바꾸거나 Namespace를 생성하지는 않는다.
+적용 요구라면 `kubectl get namespace logging`으로 존재를 확인하고 요구에 맞춰 생성한다.
 
 ### 두 그룹에만 annotation — commonAnnotations
 
-```yaml
-# k8s/nginx/kustomization.yaml과
-# k8s/monitoring/kustomization.yaml 각각에 추가
-commonAnnotations:
-  owner: bob@gmail.com
-```
-
-루트에 넣으면 db·message-broker까지 영향을 받는다.
-두 하위 설정에 각각 추가하고, 전체 렌더 결과의 `metadata.annotations.owner`를 확인한다.
-nginx·monitoring에 값이 생겼는지와 함께 다른 그룹에는 이번 변경이 들어가지 않았는지도 본다.
+nginx·monitoring 설정 각각에 `commonAnnotations: { owner: bob@gmail.com }`을 추가한다.
+루트에 넣으면 db·message-broker까지 영향을 받는다. 전체 렌더의 `metadata.annotations.owner`에서
+두 그룹에만 값이 생기고 나머지는 그대로인지 확인한다.
 
 ## 이미지 변환 — newName과 newTag 구분하기
 
@@ -183,14 +157,6 @@ kubectl kustomize .
 
 하위 결과는 맞고 루트 결과가 틀리면 루트의 `resources`가 하위 설정을 거치는지,
 루트에 같은 필드를 바꾸는 변환이 있는지 확인한다.
-적용까지 요구한 문제에서는 아래 순서로 이어 간다.
-
-```bash
-kubectl diff -k .
-kubectl apply -k .
-kubectl get -k .
-```
-
 이름·namespace 변환은 적용 대상의 식별자를 바꾼다. 이전 이름이나 namespace에 이미 있던
 리소스가 자동 이동·삭제되는 것은 아니므로, 변경 전후 대상을 구분해 요구 범위만 처리한다.
 

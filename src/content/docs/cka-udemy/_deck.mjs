@@ -210,10 +210,10 @@ export default {
 			"tone": "bad"
 		},
 		{
-			"label": "31~33장",
+			"label": "31~34장",
 			"title": "Kustomize",
 			"href": "/cka-udemy/12-kustomize/",
-			"desc": "resources·base/overlay 적용 → 범위별 변환 → 특정 대상 patch",
+			"desc": "환경별 적용·범위별 변환·특정 대상 patch와 선택 기능 보충",
 			"items": [
 				[
 					"범위별 변환",
@@ -222,6 +222,10 @@ export default {
 				[
 					"특정 대상 수정·삭제",
 					"/cka-udemy/kustomize-patches/"
+				],
+				[
+					"선택 기능 (학습 보충)",
+					"/cka-udemy/kustomize-components/"
 				],
 				[
 					"cka 16장",

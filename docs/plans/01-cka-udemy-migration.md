@@ -75,10 +75,10 @@ h2와 h3를 모두 기록한다. 목적 제목은 원제목을 기본으로 하�
 | ↳ aws-user가 사용하는 컨텍스트 이름 필터링 | 이동 | `jsonpath` — 해당 작업의 aws-user가 사용하는 컨텍스트 이름 필터링 |
 | ↳ VPA 관련 CRD 이름을 파일로 제출하기 | 이동 | `jsonpath` — 해당 작업의 VPA 관련 CRD 이름을 파일로 제출하기 |
 | ↳ 제출 파일 확인과 실수 복구 | 이동 | `jsonpath` — 해당 작업의 제출 파일 확인과 실수 복구 |
-| 시험장에서 공식 문서 찾기 | 통합 | `작업별 목적 페이지 / exam-search` — 해당 작업의 문서 검색·완료 판정 |
-| ↳ 시험 중 찾을 곳과 학습용 링크 구분 | 이동 | `작업별 목적 페이지 / exam-search` — 해당 작업의 시험 중 찾을 곳과 학습용 링크 구분 |
+| 시험장에서 공식 문서 찾기 | 통합 | `pods / 01-basics / jsonpath / exam-search` — 해당 작업의 문서 검색·완료 판정 |
+| ↳ 시험 중 찾을 곳과 학습용 링크 구분 | 이동 | `pods / 01-basics / jsonpath / exam-search` — 해당 작업의 시험 중 찾을 곳과 학습용 링크 구분 |
 | ↳ Vim으로 YAML을 고치는 짧은 연습 | 유지 | `01-basics` — 해당 작업의 Vim으로 YAML을 고치는 짧은 연습 |
-| 이 장에서 남길 것 | 통합 | `작업별 목적 페이지 / exam-search` — 해당 작업의 문서 검색·완료 판정 |
+| 이 장에서 남길 것 | 통합 | `pods / 01-basics / jsonpath / exam-search` — 해당 작업의 문서 검색·완료 판정 |
 
 ### 02-workloads.mdx
 
@@ -92,8 +92,8 @@ h2와 h3를 모두 기록한다. 목적 제목은 원제목을 기본으로 하�
 | ↳ nginx-deploy — apply로 생성과 rolling update를 모두 수행 | 유지 | `02-workloads` — 해당 작업의 nginx-deploy — apply로 생성과 rolling update를 모두 수행 |
 | ↳ 실패한 롤아웃은 새 ReplicaSet부터 내려간다 | 유지 | `02-workloads` — 해당 작업의 실패한 롤아웃은 새 ReplicaSet부터 내려간다 |
 | Job — 완료·실패·재실행 진단 | 이동 | `jobs` — 해당 작업의 Job — 완료·실패·재실행 진단 |
-| 시험장에서 공식 문서 찾기 | 통합 | `작업별 목적 페이지 / exam-search` — 해당 작업의 문서 검색·완료 판정 |
-| 이 장에서 남길 것 | 통합 | `작업별 목적 페이지 / exam-search` — 해당 작업의 문서 검색·완료 판정 |
+| 시험장에서 공식 문서 찾기 | 통합 | `02-workloads / jobs / exam-search` — 해당 작업의 문서 검색·완료 판정 |
+| 이 장에서 남길 것 | 통합 | `02-workloads / jobs / exam-search` — 해당 작업의 문서 검색·완료 판정 |
 
 ### 03-pod-config.mdx
 
@@ -111,8 +111,8 @@ h2와 h3를 모두 기록한다. 목적 제목은 원제목을 기본으로 하�
 | ↳ logging-deployment — 네이티브 로그 사이드카 | 이동 | `init-sidecar` — 해당 작업의 logging-deployment — 네이티브 로그 사이드카 |
 | init 컨테이너 — Practice Test: Init-Containers | 이동 | `init-sidecar` — 해당 작업의 init 컨테이너 — Practice Test: Init-Containers |
 | ↳ orange — init command 오타의 진단·수정·복구 | 이동 | `init-sidecar` — 해당 작업의 orange — init command 오타의 진단·수정·복구 |
-| 시험장에서 공식 문서 찾기 | 통합 | `작업별 목적 페이지 / exam-search` — 해당 작업의 문서 검색·완료 판정 |
-| 이 장에서 남길 것 | 통합 | `작업별 목적 페이지 / exam-search` — 해당 작업의 문서 검색·완료 판정 |
+| 시험장에서 공식 문서 찾기 | 통합 | `03-pod-config / configmap-secret / security-context / init-sidecar / exam-search` — 해당 작업의 문서 검색·완료 판정 |
+| 이 장에서 남길 것 | 통합 | `03-pod-config / configmap-secret / security-context / init-sidecar / exam-search` — 해당 작업의 문서 검색·완료 판정 |
 
 ### 04-scheduling.mdx
 
@@ -129,8 +129,8 @@ h2와 h3를 모두 기록한다. 목적 제목은 원제목을 기본으로 하�
 | ↳ 업데이트와 롤백은 전략까지 확인한다 | 이동 | `daemonset-static-pod` — 해당 작업의 업데이트와 롤백은 전략까지 확인한다 |
 | 스태틱 Pod — Practice Test: Static Pods | 이동 | `daemonset-static-pod` — 해당 작업의 스태틱 Pod — Practice Test: Static Pods |
 | ↳ nginx-critical — 대상 노드의 경로부터 확인한다 | 이동 | `daemonset-static-pod` — 해당 작업의 nginx-critical — 대상 노드의 경로부터 확인한다 |
-| 시험장에서 공식 문서 찾기 | 통합 | `작업별 목적 페이지 / exam-search` — 해당 작업의 문서 검색·완료 판정 |
-| 이 장에서 남길 것 | 통합 | `작업별 목적 페이지 / exam-search` — 해당 작업의 문서 검색·완료 판정 |
+| 시험장에서 공식 문서 찾기 | 통합 | `04-scheduling / resource-limits / daemonset-static-pod / exam-search` — 해당 작업의 문서 검색·완료 판정 |
+| 이 장에서 남길 것 | 통합 | `04-scheduling / resource-limits / daemonset-static-pod / exam-search` — 해당 작업의 문서 검색·완료 판정 |
 
 ### 05-services-dns.mdx
 
@@ -151,8 +151,8 @@ h2와 h3를 모두 기록한다. 목적 제목은 원제목을 기본으로 하�
 | ↳ 짧은 이름이 되는 범위 — search 도메인은 통째로 붙는다 | 이동 | `dns` — 해당 작업의 짧은 이름이 되는 범위 — search 도메인은 통째로 붙는다 |
 | ↳ nginx-resolver — Service DNS와 Pod IP를 따로 증명한다 | 이동 | `dns` — 해당 작업의 nginx-resolver — Service DNS와 Pod IP를 따로 증명한다 |
 | Service → DNS → 외부 경로를 한 겹씩 검증하기 | 이동 | `dns` — 해당 작업의 Service → DNS → 외부 경로를 한 겹씩 검증하기 |
-| 시험장에서 공식 문서 찾기 | 통합 | `작업별 목적 페이지 / exam-search` — 해당 작업의 문서 검색·완료 판정 |
-| 이 장에서 남길 것 | 통합 | `작업별 목적 페이지 / exam-search` — 해당 작업의 문서 검색·완료 판정 |
+| 시험장에서 공식 문서 찾기 | 통합 | `05-services-dns / network-environment / dns / exam-search` — 해당 작업의 문서 검색·완료 판정 |
+| 이 장에서 남길 것 | 통합 | `05-services-dns / network-environment / dns / exam-search` — 해당 작업의 문서 검색·완료 판정 |
 
 ### 06-ingress-netpol.mdx
 
@@ -176,8 +176,8 @@ h2와 h3를 모두 기록한다. 목적 제목은 원제목을 기본으로 하�
 | ↳ 랩 정답 — 업무 트래픽은 제한하고 UI ingress는 열기 | 이동 | `network-policy` — 해당 작업의 랩 정답 — 업무 트래픽은 제한하고 UI ingress는 열기 |
 | ↳ 후보 세 개 중 가장 좁은 허용 정책을 고른다 | 이동 | `network-policy` — 해당 작업의 후보 세 개 중 가장 좁은 허용 정책을 고른다 |
 | ↳ 적용 결과를 세 방향으로 증명하기 | 이동 | `network-policy` — 해당 작업의 적용 결과를 세 방향으로 증명하기 |
-| 시험장에서 공식 문서 찾기 | 통합 | `작업별 목적 페이지 / exam-search` — 해당 작업의 문서 검색·완료 판정 |
-| 이 장에서 남길 것 | 통합 | `작업별 목적 페이지 / exam-search` — 해당 작업의 문서 검색·완료 판정 |
+| 시험장에서 공식 문서 찾기 | 통합 | `06-ingress-netpol / gateway / network-policy / exam-search` — 해당 작업의 문서 검색·완료 판정 |
+| 이 장에서 남길 것 | 통합 | `06-ingress-netpol / gateway / network-policy / exam-search` — 해당 작업의 문서 검색·완료 판정 |
 
 ### 07-storage.mdx
 
@@ -200,8 +200,8 @@ h2와 h3를 모두 기록한다. 목적 제목은 원제목을 기본으로 하�
 | ↳ 정적 PV — Bound 뒤에 실제 마운트까지 | 유지 | `07-storage` — 해당 작업의 정적 PV — Bound 뒤에 실제 마운트까지 |
 | ↳ 동적 프로비저닝 — 생성 주체까지 추적 | 이동 | `storage-class` — 해당 작업의 동적 프로비저닝 — 생성 주체까지 추적 |
 | 스토리지 quota 검증 | 이동 | `storage-class` — 해당 작업의 스토리지 quota 검증 |
-| 시험장에서 공식 문서 찾기 | 통합 | `작업별 목적 페이지 / exam-search` — 해당 작업의 문서 검색·완료 판정 |
-| 이 장에서 남길 것 | 통합 | `작업별 목적 페이지 / exam-search` — 해당 작업의 문서 검색·완료 판정 |
+| 시험장에서 공식 문서 찾기 | 통합 | `07-storage / storage-class / exam-search` — 해당 작업의 문서 검색·완료 판정 |
+| 이 장에서 남길 것 | 통합 | `07-storage / storage-class / exam-search` — 해당 작업의 문서 검색·완료 판정 |
 
 ### 08-security.mdx
 
@@ -224,8 +224,8 @@ h2와 h3를 모두 기록한다. 목적 제목은 원제목을 기본으로 하�
 | ↳ admission 플러그인 켜고 끄기 — Lab: Admission Controllers (2025 신규) | 이동 | `admission` — 해당 작업의 admission 플러그인 켜고 끄기 — Lab: Admission Controllers (2025 신규) |
 | ↳ admission webhook 등록 — Lab: Validating and Mutating Admission Controllers (2025 신규) | 이동 | `admission` — 해당 작업의 admission webhook 등록 — Lab: Validating and Mutating Admission Controllers (2025 신규) |
 | TLS부터 저장까지 한 요청으로 검증하기 | 유지 | `08-security` — 해당 작업의 TLS부터 저장까지 한 요청으로 검증하기 |
-| 시험장에서 공식 문서 찾기 | 통합 | `작업별 목적 페이지 / exam-search` — 해당 작업의 문서 검색·완료 판정 |
-| 이 장에서 남길 것 | 통합 | `작업별 목적 페이지 / exam-search` — 해당 작업의 문서 검색·완료 판정 |
+| 시험장에서 공식 문서 찾기 | 통합 | `08-security / rbac / service-account / admission / exam-search` — 해당 작업의 문서 검색·완료 판정 |
+| 이 장에서 남길 것 | 통합 | `08-security / rbac / service-account / admission / exam-search` — 해당 작업의 문서 검색·완료 판정 |
 
 ### 09-cluster-lifecycle.mdx
 
@@ -249,8 +249,8 @@ h2와 h3를 모두 기록한다. 목적 제목은 원제목을 기본으로 하�
 | ↳ 백업만 요구할 때 — 저장 노드·경로·파일 검증 | 이동 | `etcd-backup-restore` — 해당 작업의 백업만 요구할 때 — 저장 노드·경로·파일 검증 |
 | ↳ 복구 절차 — 쓰기를 멈추고 새 data-dir로 전환 | 이동 | `etcd-backup-restore` — 해당 작업의 복구 절차 — 쓰기를 멈추고 새 data-dir로 전환 |
 | 스택 vs 외부 etcd — Practice Test: Backup and Restore Methods 2 | 이동 | `etcd-backup-restore` — 해당 작업의 스택 vs 외부 etcd — Practice Test: Backup and Restore Methods 2 |
-| 시험장에서 공식 문서 찾기 | 통합 | `작업별 목적 페이지 / exam-search` — 해당 작업의 문서 검색·완료 판정 |
-| 이 장에서 남길 것 | 통합 | `작업별 목적 페이지 / exam-search` — 해당 작업의 문서 검색·완료 판정 |
+| 시험장에서 공식 문서 찾기 | 통합 | `09-cluster-lifecycle / cluster-upgrade / etcd-backup-restore / exam-search` — 해당 작업의 문서 검색·완료 판정 |
+| 이 장에서 남길 것 | 통합 | `09-cluster-lifecycle / cluster-upgrade / etcd-backup-restore / exam-search` — 해당 작업의 문서 검색·완료 판정 |
 
 ### 10-troubleshooting.mdx
 
@@ -286,8 +286,8 @@ h2와 h3를 모두 기록한다. 목적 제목은 원제목을 기본으로 하�
 | ↳ Test 2 — kube-proxy 로그에서 누락된 설정 파일을 찾는다 | 이동 | `network-failure` — 해당 작업의 Test 2 — kube-proxy 로그에서 누락된 설정 파일을 찾는다 |
 | ↳ 실행 옵션과 ConfigMap의 파일 경로를 대조한다 | 이동 | `network-failure` — 해당 작업의 실행 옵션과 ConfigMap의 파일 경로를 대조한다 |
 | ↳ DaemonSet의 틀린 인자만 수정하고 앱까지 검증한다 | 이동 | `network-failure` — 해당 작업의 DaemonSet의 틀린 인자만 수정하고 앱까지 검증한다 |
-| 시험장에서 공식 문서 찾기 | 통합 | `작업별 목적 페이지 / exam-search` — 해당 작업의 문서 검색·완료 판정 |
-| 이 장에서 남길 것 | 통합 | `작업별 목적 페이지 / exam-search` — 해당 작업의 문서 검색·완료 판정 |
+| 시험장에서 공식 문서 찾기 | 통합 | `10-troubleshooting / autoscaling / vpa / control-plane-failure / worker-failure / network-failure / exam-search` — 해당 작업의 문서 검색·완료 판정 |
+| 이 장에서 남길 것 | 통합 | `10-troubleshooting / autoscaling / vpa / control-plane-failure / worker-failure / network-failure / exam-search` — 해당 작업의 문서 검색·완료 판정 |
 
 ### 11-helm.mdx
 
@@ -302,47 +302,48 @@ h2와 h3를 모두 기록한다. 목적 제목은 원제목을 기본으로 하�
 | ↳ kk-mock1 — podinfo 차트 6.11.2로 업그레이드 | 유지 | `11-helm` — 해당 작업의 kk-mock1 — podinfo 차트 6.11.2로 업그레이드 |
 | 리비전 확인과 롤백 — history에서 정상 번호를 고른다 | 유지 | `11-helm` — 해당 작업의 리비전 확인과 롤백 — history에서 정상 번호를 고른다 |
 | 실패 분기 — 이미지가 안 당겨질 때 | 유지 | `11-helm` — 해당 작업의 실패 분기 — 이미지가 안 당겨질 때 |
-| 시험장에서 공식 문서 찾기 | 통합 | `작업별 목적 페이지 / exam-search` — 해당 작업의 문서 검색·완료 판정 |
-| 이 장에서 남길 것 | 통합 | `작업별 목적 페이지 / exam-search` — 해당 작업의 문서 검색·완료 판정 |
+| 시험장에서 공식 문서 찾기 | 통합 | `11-helm / exam-search` — 해당 작업의 문서 검색·완료 판정 |
+| 이 장에서 남길 것 | 통합 | `11-helm / exam-search` — 해당 작업의 문서 검색·완료 판정 |
 
 ### 12-kustomize.mdx
 
 | 원본 절 | 처리 | 목적 파일·절 |
 |---|---|---|
-| 여러 폴더의 리소스를 하나로 묶기 | 유지 | `12-kustomize` — 해당 작업의 여러 폴더의 리소스를 하나로 묶기 |
-| ↳ staging에만 MySQL Deployment 추가 | 유지 | `12-kustomize` — 해당 작업의 staging에만 MySQL Deployment 추가 |
-| Transformer는 적용 범위부터 고른다 | 이동 | `kustomize-transformers` — 해당 작업의 Transformer는 적용 범위부터 고른다 |
-| ↳ 전체 라벨 — commonLabels 읽기 | 이동 | `kustomize-transformers` — 해당 작업의 전체 라벨 — commonLabels 읽기 |
-| ↳ db 이름의 접두사 — namePrefix | 이동 | `kustomize-transformers` — 해당 작업의 db 이름의 접두사 — namePrefix |
-| ↳ monitoring 네임스페이스 — namespace | 이동 | `kustomize-transformers` — 해당 작업의 monitoring 네임스페이스 — namespace |
-| ↳ 두 그룹에만 annotation — commonAnnotations | 이동 | `kustomize-transformers` — 해당 작업의 두 그룹에만 annotation — commonAnnotations |
-| 이미지 변환 — newName과 newTag 구분하기 | 이동 | `kustomize-transformers` — 해당 작업의 이미지 변환 — newName과 newTag 구분하기 |
-| ↳ 전체 postgres를 mysql로 교체 | 이동 | `kustomize-transformers` — 해당 작업의 전체 postgres를 mysql로 교체 |
-| ↳ nginx 폴더의 nginx 태그만 변경 | 이동 | `kustomize-transformers` — 해당 작업의 nginx 폴더의 nginx 태그만 변경 |
-| ↳ 하위 결과와 전체 결과를 모두 확인 | 이동 | `kustomize-transformers` — 해당 작업의 하위 결과와 전체 결과를 모두 확인 |
-| Patch로 특정 필드·항목 수정하기 | 이동 | `kustomize-patches` — 해당 작업의 Patch로 특정 필드·항목 수정하기 |
-| ↳ resources와 patches의 path는 파일 역할이 다르다 | 이동 | `kustomize-patches` — 해당 작업의 resources와 patches의 path는 파일 역할이 다르다 |
-| ↳ QA에서 inline JSON6902로 API 이미지 교체 | 이동 | `kustomize-patches` — 해당 작업의 QA에서 inline JSON6902로 API 이미지 교체 |
-| ↳ Strategic merge — memcached 컨테이너 삭제 | 이동 | `kustomize-patches` — 해당 작업의 Strategic merge — memcached 컨테이너 삭제 |
-| ↳ Inline JSON6902 — Pod template의 org 라벨 삭제 | 이동 | `kustomize-patches` — 해당 작업의 Inline JSON6902 — Pod template의 org 라벨 삭제 |
-| ↳ patch 뒤의 \|-는 여러 줄 문자열 | 이동 | `kustomize-patches` — 해당 작업의 patch 뒤의 \|-는 여러 줄 문자열 |
-| ↳ 삭제 결과와 실패 지점 확인 | 이동 | `kustomize-patches` — 해당 작업의 삭제 결과와 실패 지점 확인 |
-| Components — 선택한 환경에만 기능 묶음 추가하기 | 학습 보충 | `kustomize-components` — 해당 작업의 Components — 선택한 환경에만 기능 묶음 추가하기 |
-| ↳ Component 파일 만들기 | 학습 보충 | `kustomize-components` — 해당 작업의 Component 파일 만들기 |
-| ↳ Overlay에서 components로 선택하기 | 학습 보충 | `kustomize-components` — 해당 작업의 Overlay에서 components로 선택하기 |
-| ↳ 선택·미선택 환경 함께 검증하기 | 학습 보충 | `kustomize-components` — 해당 작업의 선택·미선택 환경 함께 검증하기 |
-| ↳ 실패하면 선언·참조·패치 대상을 확인하기 | 학습 보충 | `kustomize-components` — 해당 작업의 실패하면 선언·참조·패치 대상을 확인하기 |
-| 미리보기와 완료 검증 구분하기 | 유지 | `12-kustomize` — 해당 작업의 미리보기와 완료 검증 구분하기 |
-| ↳ 현재 디렉터리와 overlay 경로 구분 | 유지 | `12-kustomize` — 해당 작업의 현재 디렉터리와 overlay 경로 구분 |
-| ↳ 별도 CLI의 결과를 적용하기 | 유지 | `12-kustomize` — 해당 작업의 별도 CLI의 결과를 적용하기 |
-| ↳ 실패하면 경로와 입력 형식부터 확인하기 | 유지 | `12-kustomize` — 해당 작업의 실패하면 경로와 입력 형식부터 확인하기 |
-| kind와 apiVersion이 기억나지 않을 때 | 유지 | `12-kustomize` — 해당 작업의 kind와 apiVersion이 기억나지 않을 때 |
-| ↳ api-resources에 나오지 않는 이유 | 유지 | `12-kustomize` — 해당 작업의 api-resources에 나오지 않는 이유 |
-| ↳ 생략해도 실행되는 것과 채점 통과는 다르다 | 유지 | `12-kustomize` — 해당 작업의 생략해도 실행되는 것과 채점 통과는 다르다 |
-| ↳ 별도 CLI가 있으면 기본 파일 생성하기 | 유지 | `12-kustomize` — 해당 작업의 별도 CLI가 있으면 기본 파일 생성하기 |
-| 시험장에서 공식 문서와 도구 확인하기 | 통합 | `작업별 목적 페이지 / exam-search` — 해당 작업의 문서 검색·완료 판정 |
-| ↳ 이번 환경별 문제에서 문서를 활용하는 순서 | 이동 | `작업별 목적 페이지 / exam-search` — 해당 작업의 이번 환경별 문제에서 문서를 활용하는 순서 |
-| 이 장에서 남길 것 | 통합 | `작업별 목적 페이지 / exam-search` — 해당 작업의 문서 검색·완료 판정 |
+| 여러 폴더의 리소스를 하나로 묶기 | 유지 | `12-kustomize` — resources로 파일을 모으기 |
+| ↳ staging에만 MySQL Deployment 추가 | 유지 | `12-kustomize` — staging에만 MySQL Deployment 추가 |
+| Transformer는 적용 범위부터 고른다 | 이동 | `kustomize-transformers` — Transformer는 적용 범위부터 고른다 |
+| ↳ 전체 라벨 — commonLabels 읽기 | 이동 | `kustomize-transformers` — 전체 라벨 — commonLabels 읽기 |
+| ↳ db 이름의 접두사 — namePrefix | 이동 | `kustomize-transformers` — db 이름의 접두사 — namePrefix |
+| ↳ monitoring 네임스페이스 — namespace | 이동 | `kustomize-transformers` — monitoring 네임스페이스 — namespace |
+| ↳ 두 그룹에만 annotation — commonAnnotations | 이동 | `kustomize-transformers` — 두 그룹에만 annotation — commonAnnotations |
+| 이미지 변환 — newName과 newTag 구분하기 | 이동 | `kustomize-transformers` — 이미지 변환 — newName과 newTag 구분하기 |
+| ↳ 전체 postgres를 mysql로 교체 | 이동 | `kustomize-transformers` — 전체 postgres를 mysql로 교체 |
+| ↳ nginx 폴더의 nginx 태그만 변경 | 이동 | `kustomize-transformers` — nginx 폴더의 nginx 태그만 변경 |
+| ↳ 하위 결과와 전체 결과를 모두 확인 | 이동 | `kustomize-transformers` — 하위 결과와 전체 결과를 모두 확인 |
+| Patch로 특정 필드·항목 수정하기 | 이동 | `kustomize-patches` — Patch로 특정 필드·항목 수정하기 |
+| ↳ resources와 patches의 path는 파일 역할이 다르다 | 이동 | `kustomize-patches` — resources와 patches의 path는 파일 역할이 다르다 |
+| ↳ QA에서 inline JSON6902로 API 이미지 교체 | 이동 | `kustomize-patches` — QA에서 inline JSON6902로 API 이미지 교체 |
+| ↳ Strategic merge — memcached 컨테이너 삭제 | 이동 | `kustomize-patches` — Strategic merge — memcached 컨테이너 삭제 |
+| ↳ Inline JSON6902 — Pod template의 org 라벨 삭제 | 이동 | `kustomize-patches` — Inline JSON6902 — Pod template의 org 라벨 삭제 |
+| ↳ patch 뒤의 \|-는 여러 줄 문자열 | 이동 | `kustomize-patches` — patch 뒤의 \|-는 여러 줄 문자열 |
+| ↳ 삭제 결과와 실패 지점 확인 | 이동 | `kustomize-patches` — 삭제 결과와 실패 지점 확인 |
+| Components — 선택한 환경에만 기능 묶음 추가하기 | 학습 보충 | `kustomize-components` — 기능 묶음 만들기 |
+| ↳ Component 파일 만들기 | 학습 보충 | `kustomize-components` — 기능 묶음 만들기 |
+| ↳ Overlay에서 components로 선택하기 | 학습 보충 | `kustomize-components` — 필요한 환경에서만 선택하기 |
+| ↳ 선택·미선택 환경 함께 검증하기 | 학습 보충 | `kustomize-components` — 선택·미선택 결과 비교하기 |
+| ↳ 실패하면 선언·참조·패치 대상을 확인하기 | 학습 보충 | `kustomize-components` — 실패와 기능 해제 |
+| 미리보기와 완료 검증 구분하기 | 유지 | `12-kustomize` — 미리보기와 완료 검증 구분하기 |
+| ↳ 현재 디렉터리와 overlay 경로 구분 | 유지 | `12-kustomize` — 현재 디렉터리와 overlay 경로 구분 |
+| ↳ 별도 CLI의 결과를 적용하기 | 유지 | `12-kustomize` — 현재 디렉터리와 overlay 경로 구분 |
+| ↳ 실패하면 경로와 입력 형식부터 확인하기 | 유지 | `12-kustomize` — 경로·입력 형식과 복구 |
+| kind와 apiVersion이 기억나지 않을 때 | 유지 | `12-kustomize` — kind와 apiVersion이 기억나지 않을 때 |
+| ↳ api-resources에 나오지 않는 이유 | 유지 | `12-kustomize` — kind와 apiVersion이 기억나지 않을 때 |
+| ↳ 생략해도 실행되는 것과 채점 통과는 다르다 | 유지 | `12-kustomize` — kind와 apiVersion이 기억나지 않을 때 |
+| ↳ 별도 CLI가 있으면 기본 파일 생성하기 | 유지 | `12-kustomize` — kind와 apiVersion이 기억나지 않을 때 |
+| 시험장에서 공식 문서와 도구 확인하기 | 통합 | `12-kustomize / kustomize-transformers / kustomize-patches / kustomize-components` — 시험장에서 문서와 도구 확인하기 / 각 페이지 공식 예제 안내 |
+| ↳ 이번 환경별 문제에서 문서를 활용하는 순서 | 이동 | `12-kustomize / kustomize-patches` — staging에만 MySQL Deployment 추가 / 공식 예제에서 가져올 것과 따로 익힐 것 |
+| 이 장에서 남길 것 | 통합 | `12-kustomize / kustomize-transformers / kustomize-patches / kustomize-components` — 본문의 작업별 조건·검증에 통합 (말미 재요약 없음) |
+
 
 ## 경계와 반드시 남길 정보
 
@@ -393,3 +394,25 @@ h2와 h3를 모두 기록한다. 목적 제목은 원제목을 기본으로 하�
 
 위 공백은 누락을 숨기지 않기 위한 표시다. M2~M8은 기존 사례의 이관·개념 연결을 먼저 완료한다.
 새 HA 클러스터나 대형 operator 랩을 만드는 것은 이번 범위에 포함하지 않는다.
+
+
+## M1 정보 보존 검토 (2026-09-13)
+
+기존 `12-kustomize` URL은 유지하고 들어오는 index·DeckMap을 새 페이지로 연결했다.
+저장소 안에 이동된 옛 앵커를 가리키는 링크는 없었다. 외부 북마크의 모든 옛 앵커 호환은 보장하지 않는다.
+위 12-kustomize 표는 실제 목적 제목으로 갱신했다. M2~M8 원본 표는 아직 예약 상태다.
+
+| 판단 | 시범에서 확인한 결과 |
+|---|---|
+| 분할 | 기본 적용 252줄, 변환 174줄, patch 223줄, components 174줄. 각 페이지가 한 작업 목표를 맡음 |
+| 축약 | 864 → 823줄. 반복 요약·apply 절차·표와 같은 답을 반복하는 YAML을 통합. 공통 base의 완전한 Deployment를 추가한 분량 포함 |
+| 공유 | 기본 적용·QA patch·debug Component는 같은 base/api-depl.yaml·api-deployment·api를 사용. 변환의 그룹 구조와 mongo 라벨 삭제는 다른 랩 전제를 명시 |
+| 보존 | 원본 외부 출처 URL 집합의 누락 0. resources 와일드카드·디렉터리 연결, 셸/설정 상대 경로, staging만 추가·기존 base 유지 조건 보존 |
+| 변환 | commonLabels/labels selector 차이·불변성, 이름/namespace 변경 후 기존 리소스 잔존, newName 태그 유지·DB 마이그레이션 아님, 범위 밖 비변경 보존 |
+| patch | 파일 path/필드 path, 방식/inline의 독립성, 배열 인덱스, name 병합·명시적 삭제, org 위치·selector 제약, JSON Pointer escape·블록 문자열 보존 |
+| 선택 기능 | v1alpha1/Component, resources/components 구분, 부모 base 의존·중복 방지, 선택·미선택 비교, value/valueFrom 충돌, 해제 후 실제 ConfigMap 잔존·delete -k 금지 보존 |
+| 문서 제약 | 내장/별도 CLI, create·api-resources·explain 한계, 문서에 없는 두 줄·삭제 지시자·components, 랩 채점 관찰의 한계와 시험/학습 출처 구분 보존 |
+| 개념 덱 연결 | cka 16장의 base/overlay·변환·patch·실행·복구와 대조. generator·replicas·해시·Helm 비교는 개념 덱에 남겨 재복제하지 않음 |
+
+단순 줄 수보다 명령의 전제·입력 파일·변경 범위와 완료 판정을 유지했는지를 우선한다.
+각 페이지는 읽을 수 있는 본문이며, 전체를 하나의 실습 스크립트처럼 연속 적용하지 않는다.
