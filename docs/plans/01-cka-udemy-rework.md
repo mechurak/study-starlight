@@ -1,7 +1,7 @@
 # 1. CKA 실습 덱을 작업 단위로 개편
 
 상태: M0·M1 완료, M2~M8 실행 중
-지금 위치: M6 Troubleshooting 이관 완료. M7a 클러스터 설치·업그레이드·etcd부터 이어 간다.
+지금 위치: M7 클러스터 운영·Helm 이관 완료. M8 시험 검색 색인과 전체 마감을 이어 간다.
 실행 범위: 이번 실행에서 남은 M2~M8을 묶음별 편집·검증·기록·커밋까지 완료한다.
 실행 모델: M0·M1은 Astra 완료. 이번 M2~M8은 Sol Medium.
 작성일: 2026-09-12
@@ -77,8 +77,8 @@ M1에서 실제 slug·순서를 확정하고 이 표에 기록한다. 페이지 
 | `06-ingress-netpol.mdx` | Networking | `06-ingress-netpol`의 Ingress·TLS / `gateway`의 Gateway·HTTPRoute / `network-policy`의 NetworkPolicy 허용·차단 | 11·12 |
 | `07-storage.mdx` | Storage | `07-storage`의 볼륨·정적 PV/PVC 연결 / `storage-class`의 StorageClass·동적 프로비저닝·quota | 13 |
 | `08-security.mdx` | Cluster Architecture | `08-security`의 TLS·CSR·kubeconfig / `rbac`의 Role·Binding·can-i / `service-account`의 ServiceAccount·imagePullSecrets / `admission`의 요청 검사 | 14 |
-| `09-cluster-lifecycle.mdx` | Cluster Architecture | kubeadm 설치·클러스터 확인 / drain·업그레이드 / etcd 백업·복구. cri-docker 패키지 절은 랩 환경 보충으로 표시 | 15 |
-| `11-helm.mdx` | Cluster Architecture | repo·install·upgrade·rollback의 한 release 관리 흐름. 이미지 이전 사례는 짧은 보충 | 16 |
+| `09-cluster-lifecycle.mdx` | Cluster Architecture | `09-cluster-lifecycle`의 kubeadm 설치·클러스터 확인 / `cluster-upgrade`의 drain·업그레이드 / `etcd-backup-restore`의 etcd 백업·복구. cri-docker 패키지 절은 랩 환경 보충으로 표시 | 15 |
+| `11-helm.mdx` | Cluster Architecture | `11-helm`의 repo·install·upgrade·rollback release 관리 흐름. 이미지 이전 사례는 짧은 보충 | 16 |
 | `12-kustomize.mdx` | Cluster Architecture | resources·base/overlay·적용 / 범위별 변환 / patch / components 보충 | 16 |
 | `10-troubleshooting.mdx`의 나머지 | Troubleshooting | `10-troubleshooting`의 metrics·앱 상태·로그 / `control-plane-failure` / `worker-failure` / `network-failure`. Service·DNS 정상 구성은 Networking을 참조 | 18 |
 | 기존 검색 표·명령 요약 | 시험 대비 | 작업 → 첫 명령 → 검색어 → 해당 실습 페이지의 짧은 색인 | 19 |
@@ -218,8 +218,8 @@ Kubernetes 문서 내 검색은 가능하지만 외부 검색 결과를 열면 �
 
 ### M7. 클러스터 운영과 Helm
 
-- [ ] M7a: `09-cluster-lifecycle`을 설치 / drain·업그레이드 / etcd로 나눈다. `05-services-dns`의 CNI 설치 설명과 중복을 정리한다.
-- [ ] M7b: `11-helm`을 release 관리 흐름으로 축약하고 repo/chart/release/app 버전의 차이를 필요한 지점에 설명한다.
+- [x] M7a: `09-cluster-lifecycle`을 설치 / drain·업그레이드 / etcd로 나눈다. `05-services-dns`의 CNI 설치 설명과 중복을 정리한다.
+- [x] M7b: `11-helm`을 release 관리 흐름으로 축약하고 repo/chart/release/app 버전의 차이를 필요한 지점에 설명한다.
 - 검증: kubeadm·etcd는 실행 세션이 버전·실행 노드·백업·복구 후 성공 조건을 직접 검토한다. Helm은 release 상태와 실제 workload 정상 동작을 모두 확인하도록 쓴다.
 
 ### M8. 전체 탐색·누락 검토와 마감
@@ -607,3 +607,28 @@ MySQL 이동 앵커를 새 목적지로 갱신했다.
   확인했다. `git diff --check`도 통과했다.
 
 다음 묶음은 M7a의 kubeadm 설치·확인, drain·업그레이드, etcd 백업·복구 분리다.
+
+
+### M7 — 클러스터 운영과 Helm (2026-09-13)
+
+기존 `09-cluster-lifecycle` URL에는 노드 사전 조건·kubeadm init/join·CNI와 end-to-end 설치
+검증을 남기고, `cluster-upgrade`·`etcd-backup-restore`를 28·29장으로 분리했다.
+`11-helm`은 30장으로 갱신하고 네 페이지를 `rbac` 그룹에 연결해 과도기
+`cluster-lifecycle` 그룹을 제거했다. DeckMap과 `cka` 15장 링크도 27~30장 순서로 맞췄다.
+
+- 분할·축약 뒤 289 / 211 / 266 / 315줄이다. kubeadm의 커널·런타임·패키지·init/join,
+  CNI CIDR과 NodePort 요청, drain의 DaemonSet·단독 Pod, control plane `upgrade apply`와
+  worker `upgrade node`, 패키지/Node 버전, etcd endpoint·TLS·snapshot status·stacked/external
+  전환과 복구 후 리소스 검증을 보존했다. 원본 외부 출처 누락은 0개다.
+- cri-dockerd 설치는 제공된 deb를 쓰는 랩 환경 보충으로 표시했다. CNI 설치는 27장의
+  pod CIDR·Ready·통신 완료에만 두고, 런타임 endpoint와 CNI 경로 탐색은 17장을 연결했다.
+  Helm의 Bitnami 이미지 이전은 당시 랩 환경 보충으로 줄이고 repo/chart/release,
+  CHART VERSION/APP VERSION, release/workload 두 검증 층을 본 흐름에 남겼다.
+- 현재 공식 kubeadm v1.35 업그레이드·etcd 운영 문서와 Helm 명령 레퍼런스를 대조했다.
+  etcd 복원은 현행 `etcdutl --data-dir … snapshot restore …` 형태로 맞췄다. 지정 클러스터와
+  Helm 랩이 없어 init/join/CNI·업그레이드·snapshot/restore·release 동작은 실행하지 않았다.
+- `pnpm check` exit 0 — 397페이지 빌드·34,259개 내부 페이지/앵커 링크 통과. dev 서버를
+  새 topic 기준으로 재시작한 뒤 Playwright에서 DeckMap의 27~30장 링크, 네 페이지 현재 항목과
+  390px main/문서 폭 390/390을 확인했다. `git diff --check`도 통과했다.
+
+다음 묶음은 M8의 작업별 시험 검색 색인, index·baseline·이관 계약 감사와 전체 최종 검증이다.

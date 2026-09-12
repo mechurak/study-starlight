@@ -1,15 +1,16 @@
 ---
-title: "11. Helm 실습 — repo · upgrade · rollback"
+title: "30. Helm release 관리"
 description: "Helm 설치 확인, search hub/repo와 버전 구분, repo add·update, install·upgrade·history·rollback, release·워크로드 이중 검증, bitnami 이미지 이전 함정"
-deckGroup: cluster-lifecycle
+deckGroup: rbac
 sidebar:
-  order: 110
+  order: 1300
+reviewedAt: 2026-09-13
 ---
 
 import { LinkCard } from '@astrojs/starlight/components';
 import Thesis from '../../../components/docs/Thesis.astro';
 
-<Thesis>Helm 실습은 repo 갱신 → install·upgrade → release·워크로드 검증 → history에서 정상 revision을 골라 rollback하는 한 흐름이다</Thesis>
+<Thesis>Helm 실습은 repo 갱신 → install·upgrade → release·워크로드 검증 → history에서 정상 revision을 골라 rollback하는 한 흐름이다.</Thesis>
 
 > 짝이 되는 개념 장: [cka 16. Helm과 Kustomize](/cka/16-helm-kustomize/)
 
@@ -258,44 +259,32 @@ kubectl get deploy,pods -l app.kubernetes.io/instance=dazzling-web
 개념과 값 처리 옵션은 [cka 16장 — 업그레이드와 롤백](/cka/16-helm-kustomize/#업그레이드와-롤백)에
 정리돼 있다.
 
-## 실패 분기 — 이미지가 안 당겨질 때
+## 이미지 이전 실패 — 랩 환경 보충
 
-이 랩에서 실제로 겪은 상황: `helm install`은 성공했는데 Pod이 `Init:ImagePullBackOff`에
-머문다. Helm의 문제가 아니라 이미지 풀 문제이므로 진단 도구도 `kubectl`이다.
+`helm status`는 deployed인데 Pod이 `ImagePullBackOff`면 release 생성과 image pull을
+구분한다. `kubectl describe pod`의 Events에서 429, manifest 없음, init container 실패 중
+어느 경우인지 확인하고 `helm show values`로 해당 이미지 값의 키를 찾는다.
+
+이 랩에서는 Bitnami 이미지 배포 정책 변경
+([bitnami/containers 공지](https://github.com/bitnami/containers/issues/83267)) 때문에
+legacy 저장소 override가 필요했던 사례가 있었다. 이는 일반 Helm 절차가 아니라 당시 랩 환경의
+보충 사례다. release를 지웠다 다시 만들기보다 요구된 값을 `helm upgrade --set`으로 수정하고,
+revision 증가와 실제 Pod Ready를 다시 확인한다.
 
 ```bash
+kubectl describe pod <pod>
+helm show values bitnami/apache | less
+helm upgrade amaze-surf bitnami/apache --set image.repository=<문제에서-확인한-저장소>
+helm status amaze-surf
 kubectl get pods
-kubectl describe pod <amaze-surf-apache-xxx>   # 맨 아래 Events의 에러 메시지로 분기
 ```
 
-| Events 메시지 | 원인 | 대응 |
-|---|---|---|
-| `toomanyrequests` · 429 | Docker Hub 풀 rate limit — 공유 랩에서 흔하다 | 기다렸다 재시도되게 두거나 랩 리셋 |
-| `manifest not found` · `repository does not exist` | 차트 기본 이미지가 레지스트리에서 사라짐 | 이미지 값을 대체 저장소로 override |
+## 완료 기준
 
-뒤쪽 원인이 bitnami 차트의 고질 사례다. 2025년 8월 말 Broadcom이 Docker Hub의 무료
-`bitnami/*` 이미지 배포를 중단하면서 기존 이미지가 `bitnamilegacy/*`로 옮겨졌고
-([bitnami/containers 공지](https://github.com/bitnami/containers/issues/83267)),
-차트 기본값이 가리키던 이미지가 없는 경우가 생겼다. 수정은 삭제·재설치가 아니라
-**release를 유지한 채 값만 바꾸는 `helm upgrade`다.**
-
-```bash
-helm upgrade amaze-surf bitnami/apache \
-  --set image.repository=bitnamilegacy/apache \
-  --set global.security.allowInsecureImages=true   # 기본 외 이미지 사용을 차트에 허용
-```
-
-`Init:` 접두사가 붙어 있으면 init 컨테이너의 이미지가 먼저 걸린 것이다. describe에서
-실패한 이미지 이름을 확인하고, 그 이미지에 해당하는 값(키 이름은 `helm show values
-bitnami/apache`로 찾는다)을 같은 방식으로 override한다. 수정 뒤에는 앞 절의
-두 층 검증을 반복한다 — `helm list`의 REVISION이 올라가고 Pod이 Running이면 끝이다.
-
-:::caution[함정 — 진단 층을 섞지 않는다]
-Pod이 안 뜬다고 `helm uninstall` 후 재설치부터 하지 않는다. release 층(`helm status`)이
-정상이면 남은 문제는 Kubernetes 워크로드 층이고, 진입점은 언제나
-`kubectl describe`의 Events다. 원인이 값 수준(이미지·레플리카)으로 좁혀졌을 때만
-`helm upgrade --set`으로 그 값을 고친다.
-:::
+- `helm repo update` 뒤 목표 chart와 CHART VERSION·APP VERSION을 구분해 선택한다.
+- install·upgrade 뒤 release가 deployed이고 해당 workload가 Ready다.
+- `helm history`에서 선택한 정상 revision으로 rollback한 뒤 새 revision과 workload를 확인한다.
+- release가 정상인데 Pod이 실패하면 Events로 Kubernetes 층의 원인을 확정한 뒤 values만 최소 수정한다.
 
 ## 시험장에서 공식 문서 찾기
 
@@ -320,7 +309,7 @@ Pod이 안 뜬다고 `helm uninstall` 후 재설치부터 하지 않는다. rele
 - 이미지 풀 실패는 Helm이 아니라 `kubectl describe`의 Events로 진단하고, 수정은 재설치가 아니라 `helm upgrade --set`이다
 
 <LinkCard
-  title="다시 개요로"
-  description="장별 실습 목록과 제외 목록 — 시험 직전에는 함정 aside만 훑는다."
-  href="/cka-udemy/"
+  title="31. Kustomize 묶기와 환경별 적용"
+  description="공통 base와 overlay를 렌더하고 diff 뒤 적용한다."
+  href="/cka-udemy/12-kustomize/"
 />

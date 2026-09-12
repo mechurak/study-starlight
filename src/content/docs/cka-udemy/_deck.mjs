@@ -41,10 +41,6 @@ export default {
 			"label": "Cluster Architecture"
 		},
 		{
-			"id": "cluster-lifecycle",
-			"label": "클러스터 운영"
-		},
-		{
 			"id": "troubleshooting",
 			"label": "Troubleshooting"
 		}
@@ -401,10 +397,10 @@ export default {
 			"tone": "zone"
 		},
 		{
-			"label": "9장",
-			"title": "클러스터 라이프사이클",
+			"label": "27장",
+			"title": "kubeadm 설치와 CNI",
 			"href": "/cka-udemy/09-cluster-lifecycle/",
-			"desc": "kubeadm 설치 검증 · drain · 업그레이드 · etcd 백업/복구",
+			"desc": "노드 사전 조건 · init/join · CNI·CoreDNS · Service·NodePort 검증",
 			"items": [
 				[
 					"cka 15장",
@@ -414,10 +410,36 @@ export default {
 			"tone": "bad"
 		},
 		{
-			"label": "11장",
-			"title": "Helm",
+			"label": "28장",
+			"title": "노드 drain과 클러스터 업그레이드",
+			"href": "/cka-udemy/cluster-upgrade/",
+			"desc": "drain·uncordon · 패키지 버전 · upgrade apply/node · Ready·schedulable",
+			"items": [
+				[
+					"cka 15장",
+					"/cka/15-cluster-lifecycle/"
+				]
+			],
+			"tone": "bad"
+		},
+		{
+			"label": "29장",
+			"title": "etcd 백업과 복구",
+			"href": "/cka-udemy/etcd-backup-restore/",
+			"desc": "endpoint·인증서 · snapshot status · 새 data-dir · stacked/external 전환",
+			"items": [
+				[
+					"cka 15장",
+					"/cka/15-cluster-lifecycle/"
+				]
+			],
+			"tone": "bad"
+		},
+		{
+			"label": "30장",
+			"title": "Helm release 관리",
 			"href": "/cka-udemy/11-helm/",
-			"desc": "설치 확인 · repo/search · chart 버전 upgrade · history/rollback · 이미지 함정",
+			"desc": "repo·search · chart/app 버전 · install/upgrade · history/rollback · 두 층 검증",
 			"items": [
 				[
 					"cka 16장",
