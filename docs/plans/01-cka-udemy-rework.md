@@ -1,7 +1,7 @@
 # 1. CKA 실습 덱을 작업 단위로 개편
 
 상태: M0·M1 완료, M2~M8 실행 중
-지금 위치: M2 기초·Workloads 이관 완료. M3a Service·DNS·네트워크 환경부터 이어 간다.
+지금 위치: M3a Service·DNS·네트워크 환경 이관 완료. M3b Ingress·Gateway·NetworkPolicy부터 이어 간다.
 실행 범위: 이번 실행에서 남은 M2~M8을 묶음별 편집·검증·기록·커밋까지 완료한다.
 실행 모델: M0·M1은 Astra 완료. 이번 M2~M8은 Sol Medium.
 작성일: 2026-09-12
@@ -73,7 +73,7 @@ M1에서 실제 slug·순서를 확정하고 이 표에 기록한다. 페이지 
 | `03-pod-config.mdx` | Workloads | command·args 수정 / ConfigMap·Secret 주입 / init·sidecar 구성 / securityContext로 실행 권한 설정 | 4·6 |
 | `04-scheduling.mdx` | Workloads | `04-scheduling`의 nodeName·selector·taint·affinity 배치 / `resource-limits`의 requests·limits·quota / `daemonset-static-pod`의 DaemonSet·static Pod 관리 | 7·6·5·4 |
 | `10-troubleshooting.mdx`의 오토스케일러 | Workloads | HPA 설정·검증. VPA는 설치된 CRD를 읽는 보충 사례로 분리 | 8·17 |
-| `05-services-dns.mdx` | Networking | Service·EndpointSlice / DNS·CoreDNS / 노드·Pod·Service 대역과 CNI 확인. CNI 설치는 M7의 kubeadm과 연결 | 9·10·15 |
+| `05-services-dns.mdx` | Networking | `05-services-dns`의 Service·EndpointSlice / `dns`의 DNS·CoreDNS / `network-environment`의 노드·Pod·Service 대역과 CNI 확인. CNI 설치는 M7의 kubeadm과 연결 | 9·10·15·17 |
 | `06-ingress-netpol.mdx` | Networking | Ingress·TLS / Gateway·HTTPRoute / NetworkPolicy 허용·차단 | 11·12 |
 | `07-storage.mdx` | Storage | 볼륨·정적 PV/PVC 연결 / StorageClass·동적 프로비저닝·quota | 13 |
 | `08-security.mdx` | Cluster Architecture | TLS·CSR·kubeconfig / Role·Binding·can-i / ServiceAccount·imagePullSecrets / admission | 14 |
@@ -195,7 +195,7 @@ Kubernetes 문서 내 검색은 가능하지만 외부 검색 결과를 열면 �
 
 ### M3. Networking
 
-- [ ] M3a: `05-services-dns`에서 Service·DNS·네트워크 환경을 분리한다. CNI 설치와 M7의 연결 위치를 기록한다.
+- [x] M3a: `05-services-dns`에서 Service·DNS·네트워크 환경을 분리한다. CNI 설치와 M7의 연결 위치를 기록한다.
 - [ ] M3b: `06-ingress-netpol`을 Ingress·Gateway·NetworkPolicy로 분리한다.
 - 검증: Service selector와 EndpointSlice, DNS 해석, 외부 HTTP 요청, NetworkPolicy 허용·차단 등 작업별 성공 증거가 있다. CNI·컨트롤러 설치 전제를 숨기지 않는다.
 
@@ -481,3 +481,28 @@ DaemonSet 전략 링크를 갱신했다.
 
 M2의 1~14장과 order 1010~1140을 모두 활성화했다. 다음 묶음은 M3a의 Service·DNS·네트워크
 환경 분리이며, CNI 설치는 M7 kubeadm과 연결하되 독립 전체 설치 실습으로 확대하지 않는다.
+
+
+### M3a — Service·DNS·네트워크 환경 (2026-09-13)
+
+기존 `05-services-dns` URL에는 Service 생성·selector·port·EndpointSlice 검증을 남기고,
+`dns` 16장/order 1160과 `network-environment` 17장/order 1170을 만들었다. 새 `services`
+그룹을 활성화하고 미개편 Ingress 페이지를 위한 `services-dns` 그룹은 과도기로 표시했다.
+DeckMap·index·`cka` 9·10·15장과 트러블슈팅의 이동 앵커를 갱신했다.
+
+- 분할 뒤 168 / 242 / 291줄이다. Service의 Pod 라벨·selector·targetPort·EndpointSlice와
+  NodePort 실제 응답, Corefile의 ConfigMap→volume→mount·argument 사슬, namespace/FQDN·출력
+  리다이렉트·Pod DNS와 실제 reachability 차이, 노드·Pod·Service CIDR의 설정 원본,
+  runtime endpoint·CNI 설정/바이너리 경로, Calico의 문제 지정 버전·CIDR과 완료 판정을 보존했다.
+  원본의 중복 문장 두 줄은 하나로 합쳤고 외부 출처 누락은 0개다.
+- Kubernetes 공식 Service·EndpointSlice·DNS·DNS 디버깅·CNI·kubelet 파일 문서와 Calico 3.31
+  operator 가이드를 대조했다. Endpoints 대신 EndpointSlice를 판정 원본으로 두고, CNI 바이너리
+  설치와 실제 conflist 선택을 구분하며, Calico는 문제의 Quick Reference가 지정한 버전·CIDR을
+  따르는 부분 랩임을 유지했다.
+- Service YAML 블록을 로컬 YAML 파서로 읽었다. 지정 클러스터가 없어 expose·EndpointSlice·DNS
+  조회, IP 대역·CNI 파일 확인, Calico 설치와 외부 HTTP 요청은 실행하지 않았다.
+- `pnpm check` exit 0 — 386페이지 빌드·33,049개 내부 페이지/앵커 링크 통과.
+  preview + Playwright에서 DeckMap의 15~17장 링크, 세 페이지 현재 항목과 390px
+  main/문서 폭 390/390, console error 0을 확인했다. `git diff --check`도 통과했다.
+
+다음 묶음은 M3b의 Ingress·TLS, Gateway·HTTPRoute, NetworkPolicy 허용·차단 분리다.

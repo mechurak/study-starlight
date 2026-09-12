@@ -29,8 +29,12 @@ export default {
 			"label": "Workloads와 스케줄링"
 		},
 		{
-			"id": "services-dns",
+			"id": "services",
 			"label": "네트워킹"
+		},
+		{
+			"id": "services-dns",
+			"label": "네트워킹 (개편 전)"
 		},
 		{
 			"id": "storage",
@@ -237,18 +241,44 @@ export default {
 			"tone": "ok"
 		},
 		{
-			"label": "5장",
-			"title": "Service와 DNS",
+			"label": "15장",
+			"title": "Service와 EndpointSlice",
 			"href": "/cka-udemy/05-services-dns/",
-			"desc": "EndpointSlice · Service · CoreDNS · Calico CNI 설치 · 계층별 검증",
+			"desc": "selector · port/targetPort · EndpointSlice · ClusterIP · NodePort",
 			"items": [
 				[
 					"cka 9장",
 					"/cka/09-services/"
-				],
+				]
+			],
+			"tone": "warn"
+		},
+		{
+			"label": "16장",
+			"title": "DNS와 CoreDNS",
+			"href": "/cka-udemy/dns/",
+			"desc": "kube-dns · Corefile · FQDN · namespace · nslookup · 실제 연결",
+			"items": [
 				[
 					"cka 10장",
 					"/cka/10-dns/"
+				]
+			],
+			"tone": "warn"
+		},
+		{
+			"label": "17장",
+			"title": "네트워크 환경과 CNI 확인",
+			"href": "/cka-udemy/network-environment/",
+			"desc": "인터페이스 · 세 IP 대역 · 런타임 socket · CNI 경로 · Calico 설치",
+			"items": [
+				[
+					"cka 15장",
+					"/cka/15-cluster-lifecycle/"
+				],
+				[
+					"cka 17장",
+					"/cka/17-extensions/"
 				]
 			],
 			"tone": "warn"

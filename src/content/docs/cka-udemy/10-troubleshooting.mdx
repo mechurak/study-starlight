@@ -566,7 +566,7 @@ k -n beta describe svc mysql-service
 
 Pod 라벨과 Service selector를 비교한 뒤, `describe`의 `TargetPort`를 아키텍처와 대조한다.
 `get svc -o wide`에는 `targetPort`가 나오지 않는다. 각 열의 의미와 `expose` 옵션은
-[5장 Service 조회·생성](/cka-udemy/05-services-dns/#첫-조회--pod-라벨과-service-selector를-나란히-본다)에 있다.
+[15장 Service 조회·생성](/cka-udemy/05-services-dns/#첫-조회--pod-라벨과-service-selector를-나란히-본다)에 있다.
 네임스페이스는 아래 각 사례에 맞춰 바꾼다.
 
 ### 이름 오류 — alpha의 mysql을 mysql-service로 교체한다
@@ -628,7 +628,7 @@ k -n beta get endpointslices \
 숫자 `targetPort`가 틀리면 접속에 실패할 수 있다.** 주소 등록은 MySQL이 그 포트에서 실제로
 응답한다는 증거가 아니다. 마지막에는 문제에서 제공한 앱·테스트 또는 MySQL 클라이언트로 연결을
 재검증한다. 일반 HTTP용 `curl`로 MySQL 응답을 검사하지 않는다.
-더 넓은 연결 문제는 [5장의 계층별 검증 절](/cka-udemy/05-services-dns/#service--dns--외부-경로를-한-겹씩-검증하기)로 이어간다.
+더 넓은 연결 문제는 [16장의 계층별 검증 절](/cka-udemy/dns/#service--dns--외부-경로를-한-겹씩-검증하기)로 이어간다.
 
 ## 네트워크 장애 — Practice Test: Troubleshoot Network
 
@@ -813,7 +813,7 @@ kubectl -n triton get pods
 
 새 kube-proxy가 `1/1 Running`을 유지하고 파일 오류가 사라졌는지 확인한 뒤 App 탭에서
 초록색 페이지까지 검증한다. 여전히 실패하면 Service selector·port·targetPort, EndpointSlice,
-앱 로그로 이어간다. 구체적인 명령은 [5장 계층별 연결 검증](/cka-udemy/05-services-dns/#service--dns--외부-경로를-한-겹씩-검증하기)에 있다.
+앱 로그로 이어간다. 구체적인 명령은 [16장 계층별 연결 검증](/cka-udemy/dns/#service--dns--외부-경로를-한-겹씩-검증하기)에 있다.
 
 ## 시험장에서 공식 문서 찾기
 

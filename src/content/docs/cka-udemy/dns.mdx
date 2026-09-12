@@ -1,0 +1,242 @@
+---
+title: "16. DNS와 CoreDNS"
+description: "CoreDNS의 Corefile 전달 경로와 Service 이름 규칙을 확인하고 이름 해석과 실제 연결을 구분한다"
+deckGroup: services
+sidebar:
+  order: 1160
+reviewedAt: 2026-09-13
+---
+
+import { LinkCard } from '@astrojs/starlight/components';
+import Thesis from '../../../components/docs/Thesis.astro';
+
+<Thesis>클러스터 DNS는 kube-dns Service·EndpointSlice·Corefile·Pod resolver를 차례로 확인하고, nslookup 뒤 실제 요청까지 성공해야 연결이 증명된다.</Thesis>
+
+> 짝이 되는 개념 장: [cka 10. 클러스터 DNS](/cka/10-dns/)
+
+이 장의 과제는 CoreDNS 설정이 어디서 들어오는지 찾고, 같은 namespace·다른 namespace·FQDN 이름을
+구분해 조회하는 것이다. Service DNS는 바뀌는 Pod IP 대신 안정적인 이름을 제공한다.
+
+`nslookup` 성공은 이름을 IP로 바꿨다는 뜻일 뿐 애플리케이션 연결 성공은 아니다. kube-dns Service와
+EndpointSlice, 대상 Service의 EndpointSlice, FQDN 조회, 실제 포트 요청을 순서대로 검증한다.
+
+## CoreDNS — Practice Test: CoreDNS in Kubernetes
+
+원본 풀이: [21-Practice-Test-CoreDNS-in-Kubernetes.md](https://github.com/kodekloudhub/certified-kubernetes-administrator-course/blob/master/docs/09-Networking/21-Practice-Test-CoreDNS-in-Kubernetes.md)
+
+| 과제 | 답의 위치 |
+|---|---|
+| DNS 서버 주소 | `kube-dns` Service의 ClusterIP (보통 `10.96.0.10`) |
+| Corefile 경로 | CoreDNS Deployment의 Args → `/etc/coredns/Corefile` |
+| Corefile은 어떻게 주입되나 | ConfigMap `coredns`로 마운트 |
+| 루트 도메인 | Corefile의 `kubernetes` 뒤 **첫 인자** — `cluster.local` |
+
+### Corefile 전달 경로 — 고리 세 개를 잇는다
+
+*How is the Corefile passed into the CoreDNS POD?* 의 답은 "ConfigMap volume"이지만,
+판단 근거는 한 항목이 아니라 **ConfigMap → 볼륨 → 마운트·인자**로 이어지는 사슬이다.
+
+```bash
+kubectl -n kube-system get cm coredns -o yaml     # ① data.Corefile 키에 Corefile 본문
+kubectl -n kube-system describe deploy coredns    # ②③은 이 출력 안에 있다
+```
+
+- ② `Volumes:` — `config-volume`의 소스가 ConfigMap `coredns`
+- ③ 컨테이너의 `Mounts: /etc/coredns from config-volume (ro)` +
+  `Args: -conf /etc/coredns/Corefile`
+
+`Volumes:`만 보면 "ConfigMap이 붙어 있다"까지고, ③까지 확인해야 그 파일을 CoreDNS
+프로세스가 실제로 읽는다는 게 증명된다. 같은 이유로 Corefile 수정은 Pod 안이 아니라
+`kubectl -n kube-system edit cm coredns`다 (반영은 kubelet 동기화 주기 이후).
+
+:::tip[Corefile의 forward가 가리키는 resolv.conf는 노드 것이다]
+Corefile의 `forward . /etc/resolv.conf`가 읽는 파일은 CoreDNS Pod이
+`dnsPolicy: Default`로 **노드에서 물려받은** resolv.conf다. 다른 Pod처럼
+`ClusterFirst`면 DNS 질의가 자기 자신으로 되돌아오는 순환이 생기기 때문이다
+(원리는 [cka 10장](/cka/10-dns/)). 그래서 외부 도메인의 업스트림 서버를 물으면
+노드의 `/etc/resolv.conf`(kubelet `resolvConf` 설정이 가리키는 파일)를 본다.
+CoreDNS 이미지에는 셸이 없어 `kubectl exec`로 못 들어간다 — 직접 봐야 하면
+`kubectl debug -it <pod> --image=busybox --target=coredns`로 ephemeral 컨테이너를 붙인다.
+:::
+
+:::caution[함정 — 루트 도메인은 kubernetes 뒤 첫 인자만이다]
+```text
+kubernetes cluster.local in-addr.arpa ip6.arpa {
+```
+
+`kubernetes` 플러그인의 zone 나열에서 루트 도메인은 첫 인자 `cluster.local`이다.
+뒤의 `in-addr.arpa`·`ip6.arpa`는 역방향 조회(IP → 이름, PTR)용 zone이라 답이 아니다.
+kubelet 쪽 원본과 같은 값인지 교차 확인할 수 있다 —
+`grep clusterDomain /var/lib/kubelet/config.yaml`.
+:::
+
+이름 규칙의 공식 근거는
+[DNS for Services and Pods 문서](https://kubernetes.io/docs/concepts/services-networking/dns-pod-service/)다 —
+시험 중 형식이 헷갈릴 때 여기를 연다.
+이름 규칙 문제는 [1장에서 본 규칙](/cka-udemy/01-basics/)의 반복이다 —
+같은 ns면 `web-service`, 다른 ns면 `web-service.payroll`,
+풀 네임은 `web-service.payroll.svc.cluster.local`.
+
+### 짧은 이름이 되는 범위 — search 도메인은 통째로 붙는다
+
+랩은 같은 Service를 여러 이름으로 조회하게 시킨다. 되는 이름과 안 되는 이름의 경계 —
+
+```text
+web-service.payroll.svc.cluster.local   ✓ 완전한 이름 그대로 조회
+web-service.payroll.svc                 ✓ + cluster.local
+web-service.payroll                     ✓ + svc.cluster.local
+web-service.payroll.svc.cluster         ✗ NXDOMAIN
+```
+
+resolver는 `/etc/resolv.conf`의 `search` 목록(`default.svc.cluster.local
+svc.cluster.local cluster.local`)을 **통째로** 뒤에 붙여볼 뿐, `.local`만 이어서
+완성해 주지 않는다. 되는 세 이름은 전부 search 도메인 하나를 붙이면(또는 그대로)
+FQDN이 만들어지는 경우고, `...svc.cluster`는 어떤 조합으로도 FQDN이 안 나오는 데다
+`cluster`라는 zone 자체가 CoreDNS에 없다. search·ndots 동작의 원리는
+[cka 10장](/cka/10-dns/)이 정본이다.
+
+앱이 다른 ns의 DB를 못 찾는 문제의 정답은 대개 **환경 변수의 호스트명에
+네임스페이스를 붙이는 것**이다 (`mysql` → `mysql.payroll`) —
+
+```bash
+kubectl exec hr -- nslookup mysql.payroll > /root/CKA/nslookup.out
+```
+
+:::caution[함정 — 리다이렉트는 Pod 밖에서 일어난다]
+`>`는 kubectl을 실행한 셸이 처리하므로 파일은 Pod 안이 아니라 **노드에** 생긴다 —
+문제의 "store the output on the node"가 정확히 이 동작이다. 반대로 Pod 안에
+저장하라는 문제면 `-- sh -c 'nslookup … > 파일'`로 리다이렉트를 컨테이너 셸에 넘긴다.
+
+출력을 파일로 받을 때는 `-it`를 뺀다. `-t`(TTY 할당)는 대화형 셸용이라 출력 줄 끝에
+`\r`이 섞이고, 입력 없는 단발 명령에는 `-i`(stdin 연결)도 필요 없다.
+**사람이 앉아서 주고받으면 `-it`, 결과만 받아오면 생략**이 기준이다.
+:::
+
+:::caution[함정 — Pod의 DNS 이름]
+Service와 달리 **Pod은 기본적으로 DNS 레코드가 없거나 IP 기반**(`10-244-1-5.<ns>.pod...`)이다.
+"Pod을 이름으로 조회하라"는 보기가 나오면 의심부터 할 것 — 원리는 [cka 10장](/cka/10-dns/).
+:::
+
+### nginx-resolver — Service DNS와 Pod IP를 따로 증명한다
+
+이 유형은 생성보다 **무엇을 검증하라고 했는지 분리하는 것**이 핵심이다. Service 이름 조회는
+Service의 ClusterIP를 확인하고, Pod IP 기반 이름 조회는 `<점 대신 하이픈>.<ns>.pod` 형식의
+레코드를 확인한다. 출력 파일 경로는 문제에서 지정한 노드 경로이므로 리다이렉트는 kubectl 바깥에 둔다.
+
+```bash
+kubectl run nginx-resolver --image=nginx
+kubectl wait --for=condition=Ready pod/nginx-resolver --timeout=90s
+kubectl expose pod nginx-resolver \
+  --name=nginx-resolver-service --port=80 --target-port=80 --type=ClusterIP
+
+mkdir -p /root/CKA
+kubectl run test-nslookup --image=busybox:1.28 --rm -i --restart=Never \
+  -- nslookup nginx-resolver-service > /root/CKA/nginx.svc
+
+POD_IP=$(kubectl get pod nginx-resolver -o jsonpath='{.status.podIP}')
+POD_DNS="${POD_IP//./-}.default.pod"
+kubectl run test-nslookup --image=busybox:1.28 --rm -i --restart=Never \
+  -- nslookup "$POD_DNS" > /root/CKA/nginx.pod
+```
+
+Pod IP 기반 레코드는 DNS 구현이 제공하는 형식이고, 안정적인 애플리케이션 주소로 쓰는 대상은
+Service다. 또한 두 `nslookup`은 모두 **이름 해석**만 증명한다. 문제 문장이 Pod IP의 network
+reachability까지 요구한다면 실제 요청을 한 번 더 보내야 한다.
+
+```bash
+kubectl run test-reachability --image=busybox:1.28 --rm -i --restart=Never \
+  -- wget -qO- "http://$POD_IP"
+
+grep -E 'Name:|Address' /root/CKA/nginx.svc /root/CKA/nginx.pod
+kubectl get svc nginx-resolver-service
+kubectl get endpointslice -l kubernetes.io/service-name=nginx-resolver-service
+```
+
+:::caution[함정 — 풀이의 `nslookup` 두 번은 reachability 검사가 아니다]
+`nslookup 10-244-1-5.default.pod`가 성공해도 패킷이 nginx까지 도달했다는 뜻은 아니다.
+채점 파일에는 요구된 조회 출력을 남기되, 통신 확인은 `wget http://POD_IP`처럼 애플리케이션 포트에
+실제 요청해서 끝낸다. 네임스페이스가 `default`가 아니면 Pod DNS의 가운데도 그 네임스페이스로 바꾼다.
+:::
+
+## Service → DNS → 외부 경로를 한 겹씩 검증하기
+
+Service를 만들었다는 사실만으로 트래픽 경로가 완성되지는 않는다. **백엔드 → Service → DNS →
+외부 진입점** 순서로 통과 지점을 늘리면, 뒤 단계가 실패해도 이미 통과한 층은 원인에서 제외할 수 있다.
+
+1. **셀렉터와 실제 백엔드가 연결됐는지 확인한다.**
+
+   ```bash
+   kubectl describe svc <service> -n <namespace>       # Selector / Port / TargetPort
+   kubectl get pods -n <namespace> -l '<key>=<value>' --show-labels
+   kubectl get endpointslices -n <namespace> \
+     -l kubernetes.io/service-name=<service> -o wide
+   ```
+
+   `EndpointSlice`의 주소가 비었으면 아직 네트워크 경로를 시험할 단계가 아니다. Service 셀렉터와
+   Pod 라벨, Pod `Ready`, `targetPort`를 먼저 맞춘다. 옛 `Endpoints` API는 v1.33부터 deprecated이므로,
+   실습 판정의 단일 원본은 `EndpointSlice`로 잡는다.
+
+2. **같은 디버그 Pod에서 Pod IP와 ClusterIP를 차례로 호출한다.**
+
+   ```bash
+   kubectl run netcheck -n <namespace> --image=busybox:1.36 \
+     --restart=Never --rm -it -- sh
+
+   # 컨테이너 안에서
+   wget -qO- http://<pod-ip>:<target-port>
+   wget -qO- http://<cluster-ip>:<service-port>
+   ```
+
+   Pod IP부터 실패하면 애플리케이션·컨테이너 포트 문제다. Pod IP는 되는데 ClusterIP가 실패하면
+   Service 포트, EndpointSlice, kube-proxy 규칙을 본다.
+
+3. **이름 해석과 실제 HTTP 연결을 분리한다.**
+
+   ```bash
+   nslookup kubernetes.default
+   nslookup <service>.<namespace>.svc.cluster.local
+   wget -qO- http://<service>.<namespace>.svc.cluster.local:<service-port>
+   ```
+
+   첫 조회는 클러스터 DNS 전체의 기준점이고, 둘째는 대상 레코드만 확인한다. `nslookup` 성공은
+   IP를 얻었다는 뜻일 뿐 백엔드 응답까지 증명하지 않으므로 마지막 호출도 성공해야 한다.
+
+4. **NodePort라면 클러스터 밖에서 마지막 한 겹을 확인한다.**
+
+   ```bash
+   kubectl get svc <service> -n <namespace> -o wide     # NODE-PORT 확인
+   kubectl get nodes -o wide                           # 도달 가능한 노드 주소 확인
+
+   # 클러스터 밖의 셸에서
+   curl -fsS http://<reachable-node-ip>:<node-port>
+   ```
+
+   내부 FQDN 호출까지 되는데 외부 요청만 실패하면 앱·셀렉터·DNS를 다시 고치지 않는다. 도달 가능한
+   노드 주소인지, NodePort 범위와 노드 방화벽·보안 그룹이 열렸는지 확인한다.
+   `externalTrafficPolicy: Local`이면 요청을 받은 노드에 Ready 백엔드가 있는지도 함께 본다.
+
+공식 기준은 Kubernetes v1.35의
+[Service](https://v1-35.docs.kubernetes.io/docs/concepts/services-networking/service/),
+[EndpointSlice](https://v1-35.docs.kubernetes.io/docs/concepts/services-networking/endpoint-slices/),
+[DNS 진단](https://v1-35.docs.kubernetes.io/docs/tasks/administer-cluster/dns-debugging-resolution/) 문서다.
+
+## 공식 문서에서 찾을 것
+
+| 검색어 | 가져올 규칙·진단 |
+|---|---|
+| `DNS for Services and Pods` | [Service FQDN, namespace별 짧은 이름, Pod DNS 레코드](https://kubernetes.io/docs/concepts/services-networking/dns-pod-service/) |
+| `Debugging DNS Resolution` | [dnsutils 조회, kube-dns Service·EndpointSlice, coredns ConfigMap](https://kubernetes.io/docs/tasks/administer-cluster/dns-debugging-resolution/) |
+| `Customizing DNS Service` | [CoreDNS Corefile과 Pod dnsPolicy](https://kubernetes.io/docs/tasks/administer-cluster/dns-custom-nameservers/) |
+
+## 완료 판정
+
+- kube-dns Service와 EndpointSlice가 있고 CoreDNS Pod이 Ready다.
+- Corefile의 cluster domain, forward 대상, ConfigMap → volume → mount·argument 연결을 확인했다.
+- 요구한 Service 이름의 조회 출력을 지정된 노드 파일에 저장했다.
+- 이름 조회 뒤 Pod IP·ClusterIP·FQDN 중 요구한 경로의 실제 요청도 성공했다.
+
+<LinkCard
+  title="17. 네트워크 환경과 CNI 확인"
+  description="네트워크 대역·런타임 endpoint·CNI 설정과 바이너리, Calico 설치 결과를 확인한다."
+  href="/cka-udemy/network-environment/"
+/>
