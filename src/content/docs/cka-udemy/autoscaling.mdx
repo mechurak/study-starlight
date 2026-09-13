@@ -1,5 +1,5 @@
 ---
-title: "13. HPA 설정과 검증"
+title: "HPA 설정과 검증"
 description: "제공된 HPA를 CPU·메모리 목표에 맞게 수정하고 metrics·requests·replica 상태를 함께 검증한다"
 deckGroup: pods
 sidebar:
@@ -32,7 +32,7 @@ kubectl get deployment kkapp-deploy \
 
 APIService가 `Available=True`이고 `kubectl top`이 값을 반환해야 resource metric을 읽을 수 있다.
 CPU 목표에는 `requests.cpu`, 메모리 목표에는 `requests.memory`가 필요하다. 설치·수집이 아직
-준비되지 않았다면 [metrics-server 실습](/cka-udemy/10-troubleshooting/#metrics-server--practice-test-monitor-cluster-components)에서
+준비되지 않았다면 [metrics-server 실습](/cka-udemy/troubleshooting/#metrics-server--practice-test-monitor-cluster-components)에서
 선행 조건을 해결한다.
 
 ## webapp-hpa — CPU 50%와 축소 안정화 300초
@@ -144,7 +144,7 @@ kubectl get deployment kkapp-deploy
 부하가 없는 랩에서는 임의의 큰 부하를 만들지 않고 위 조건과 현재·목표 replica를 제출 증거로 남긴다.
 
 <LinkCard
-  title="14. VPA CRD 읽기"
+  title="VPA CRD 읽기"
   description="별도 설치된 VPA의 targetRef·updateMode·recommendation을 확인한다."
   href="/cka-udemy/vpa/"
 />

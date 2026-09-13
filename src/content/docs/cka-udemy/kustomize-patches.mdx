@@ -1,5 +1,5 @@
 ---
-title: "33. Kustomize — 특정 대상 수정과 삭제"
+title: "Kustomize — 특정 대상 수정과 삭제"
 description: "JSON6902 이미지 교체·라벨 삭제와 strategic merge 컨테이너 삭제를 작성하고 검증한다"
 deckGroup: rbac
 sidebar:
@@ -16,7 +16,7 @@ import Thesis from '../../../components/docs/Thesis.astro';
 Patch는 원본을 복사하지 않고 필요한 차이만 적는다. 이 페이지에서는 **대상 하나를 수정·삭제하고
 다른 필드는 보존됐는지 확인한다**.
 
-기본 구조는 [공유 base·overlay](/cka-udemy/12-kustomize/#공통-base와-환경별-진입점)를 사용한다.
+기본 구조는 [공유 base·overlay](/cka-udemy/kustomize/#공통-base와-환경별-진입점)를 사용한다.
 `api-deployment`에는 첫 컨테이너 `api`와 두 번째 `memcached`가 있다.
 원리는 [CKA Kustomize — YAML과 오버레이](/cka/kustomize/#오버레이--generator와-patch)에서 복습한다.
 
@@ -88,7 +88,7 @@ patches:
 ```
 
 `target`은 Deployment를, `replace`는 존재하는 이미지 필드를 고른다.
-[공통 적용 순서](/cka-udemy/12-kustomize/#미리보기와-완료-검증-구분하기)를 QA 경로로 실행한다.
+[공통 적용 순서](/cka-udemy/kustomize/#미리보기와-완료-검증-구분하기)를 QA 경로로 실행한다.
 
 미리보기와 실제 Deployment의 `spec.template.spec.containers`에서 API 이미지가 `caddy`인지
 확인하고 rollout 완료도 확인한다. 다른 컨테이너가 바뀌면 인덱스를, missing path 오류가 나면
@@ -220,4 +220,4 @@ Kubernetes 문서 내부에서 `kustomize` →
 삭제 예제가 없다. `name`과 함께 쓰는 최소 문법을 따로 익힌다. 두 번째 문서는
 `patchMergeKey: name`을 찾아 컨테이너 병합 규칙을 확인하는 데 사용한다.
 
-<LinkCard title="묶기·적용과 공통 완료 검증" href="/cka-udemy/12-kustomize/#미리보기와-완료-검증-구분하기" />
+<LinkCard title="묶기·적용과 공통 완료 검증" href="/cka-udemy/kustomize/#미리보기와-완료-검증-구분하기" />

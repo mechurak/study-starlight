@@ -1,5 +1,5 @@
 ---
-title: "29. etcd 백업과 복구"
+title: "etcd 백업과 복구"
 description: "stacked·external etcd의 endpoint와 인증서를 찾아 스냅샷을 검증하고 새 data-dir로 안전하게 복구한다."
 deckGroup: rbac
 sidebar:
@@ -18,7 +18,7 @@ etcd 백업은 살아 있는 endpoint에서 스냅샷 파일과 메타데이터�
 endpoint·CA·client 인증서는 실제 etcd 실행 설정에서 찾는다. stacked와 external 구성을 구분하고,
 복구 뒤에는 런타임 → API 준비 상태 → 스냅샷 당시 리소스 순으로 확인한다.
 
-> 개념 연결: [CKA etcd 백업과 복구](/cka/etcd-backup/) · [23장 TLS·인증서](/cka-udemy/08-security/)
+> 개념 연결: [CKA etcd 백업과 복구](/cka/etcd-backup/) · [TLS·인증서](/cka-udemy/security/)
 
 ## etcd 백업과 복구 — Practice Test: Backup and Restore Methods
 
@@ -44,7 +44,7 @@ IPv4는 `https://127.0.0.1:2379`처럼 대괄호 없이 쓴다. KodeKloud의 일
 
 ### 서버 매니페스트와 `etcdctl`의 인증서 플래그
 
-[23장](/cka-udemy/08-security/)에서 확인한 인증서 경로를 역할별로 연결하면 다음과 같다.
+[TLS·CSR·kubeconfig](/cka-udemy/security/)에서 확인한 인증서 경로를 역할별로 연결하면 다음과 같다.
 
 | 실행 주체 | 플래그 | 의미 |
 |---|---|---|
@@ -260,7 +260,7 @@ chown -R etcd:etcd /var/lib/etcd-data-new           # 복원 디렉터리 소유
 | static Pod 중지·복귀 | [Create static Pods](https://kubernetes.io/docs/tasks/configure-pod-container/static-pod/#dynamic-addition-and-removal-of-static-pods)의 감시 디렉터리 밖 이동 패턴 |
 
 <LinkCard
-  title="30. Helm release 관리"
+  title="Helm release 관리"
   description="repo·install·upgrade·history·rollback을 release와 workload 두 층에서 검증한다."
-  href="/cka-udemy/11-helm/"
+  href="/cka-udemy/helm/"
 />

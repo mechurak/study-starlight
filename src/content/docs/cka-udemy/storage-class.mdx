@@ -1,5 +1,5 @@
 ---
-title: "22. StorageClass와 동적 프로비저닝"
+title: "StorageClass와 동적 프로비저닝"
 description: "StorageClass·provisioner·binding mode를 확인하고 동적 PV 생성과 mount·스토리지 quota를 검증한다"
 deckGroup: storage
 sidebar:
@@ -127,7 +127,7 @@ volumeBindingMode: WaitForFirstConsumer
 :::caution[함정 — WaitForFirstConsumer의 Pending은 정상이다]
 `volumeBindingMode: WaitForFirstConsumer`인 클래스의 PVC는 **그 PVC를 쓰는 Pod이
 스케줄될 때까지 Pending이 정상**이다. "왜 Pending인가"에 대한 답이
-7장 첫 랩(accessModes 불일치)과 다르다는 것 — 이 대비가 두 랩의 출제 의도다.
+[볼륨과 정적 PV/PVC의 첫 랩](/cka-udemy/storage/)(accessModes 불일치)과 다르다는 것 — 이 대비가 두 랩의 출제 의도다.
 다만 `no-provisioner`는 PV를 만들지 않으므로 Pod을 만든 뒤에도 조건에 맞는 PV가 없으면 계속
 Pending이다. 또한 Pod의 `spec.nodeName`은 스케줄러를 우회하므로 이 모드와 함께 쓰지 않는다.
 노드를 제한해야 하면 `nodeSelector`나 affinity를 쓴다.
@@ -260,7 +260,7 @@ kubectl create -f pvc.yaml -n <namespace>             # 초과 시 즉시 Forbid
 - quota의 Used/Hard가 예상과 같고 초과 PVC가 Forbidden으로 거부된다.
 
 <LinkCard
-  title="23. TLS·CSR·kubeconfig"
+  title="TLS·CSR·kubeconfig"
   description="인증서와 kubeconfig의 실제 필드를 확인하고 API 접근 결과로 검증한다."
-  href="/cka-udemy/08-security/"
+  href="/cka-udemy/security/"
 />

@@ -374,7 +374,7 @@ Mac으로 응시해도 원격 Linux 안에서는 이 단축키를 쓴다. 개인
 `kubectl create -h` → `kubectl create deployment -h`로 생성 옵션을 찾고,
 YAML 필드는 `kubectl explain`으로 찾는다. `--image` 두 번으로 컨테이너 두 개의 뼈대를 만들 수 있지만,
 네이티브 사이드카는 해당 블록을 `initContainers`로 옮겨야 한다.
-[실습 1장 생성 흐름](/cka-udemy/01-basics/#도움말--yaml-뼈대--필요한-필드만-수정)에서 연습한다.
+[실습 생성 흐름](/cka-udemy/basics/#도움말--yaml-뼈대--필요한-필드만-수정)에서 연습한다.
 
 “`apply`로 생성·업데이트”처럼 방법을 명시한 문제는 그 조건도 따른다.
 `create --dry-run=client -o yaml`로 파일만 만든 뒤 `apply`하는 것은 이 조건을 지킨다.
@@ -382,8 +382,8 @@ YAML 필드는 `kubectl explain`으로 찾는다. `--image` 두 번으로 컨테
 
 - [기본 StorageClass](/cka-udemy/storage-class/#local-sc--기본-클래스와-확장-허용까지-설정): annotation의 `"true"`와 확장 필드의 `true` 구분
 - [네이티브 로그 사이드카](/cka-udemy/init-sidecar/#logging-deployment--네이티브-로그-사이드카): `initContainers` + 컨테이너 수준 `restartPolicy: Always`, `touch` 후 `tail -f`
-- [Ingress 생성](/cka-udemy/06-ingress-netpol/#webapp-ingress--hostprefixingressclass를-한-명령으로): `--class` → `ingressClassName`, 경로 끝 `*` → `Prefix`, 마지막에는 `curl`
-- [apply 롤링 업데이트](/cka-udemy/02-workloads/#nginx-deploy--apply로-생성과-rolling-update를-모두-수행): 파일 수정 후 두 번째 `apply`, 새 이미지·Ready 검증
+- [Ingress 생성](/cka-udemy/ingress-netpol/#webapp-ingress--hostprefixingressclass를-한-명령으로): `--class` → `ingressClassName`, 경로 끝 `*` → `Prefix`, 마지막에는 `curl`
+- [apply 롤링 업데이트](/cka-udemy/workloads/#nginx-deploy--apply로-생성과-rolling-update를-모두-수행): 파일 수정 후 두 번째 `apply`, 새 이미지·Ready 검증
 - [CSR와 RBAC](/cka-udemy/rbac/#john-developer--제공된-csr로-인증서-발급과-pod-권한-연결): 실제 CSR 인코딩 → 승인·발급 → Role·Binding → `can-i`
 
 ## 자주 나오는 문제 유형

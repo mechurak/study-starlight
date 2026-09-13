@@ -1,5 +1,5 @@
 ---
-title: "27. kubeadm 설치와 CNI"
+title: "kubeadm 설치와 CNI"
 description: "노드 사전 조건을 맞추고 kubeadm init·join과 CNI를 적용해 내부·외부 연결까지 검증한다."
 deckGroup: rbac
 sidebar:
@@ -18,7 +18,7 @@ CoreDNS, 샘플 Service, 외부 NodePort 요청까지 한 층씩 통과해야 �
 각 명령을 어느 노드에서 실행하는지 먼저 표시한다. 버전·저장소·CNI URL은 문제 지시를 따르고,
 Pod CIDR과 CNI 설정을 대조한 뒤 노드 Ready와 실제 통신으로 완료를 판정한다.
 
-> 개념 연결: [CKA kubeadm — 클러스터 설치와 노드 조인](/cka/cluster-setup/) · [17장 네트워크 환경](/cka-udemy/network-environment/)
+> 개념 연결: [CKA kubeadm — 클러스터 설치와 노드 조인](/cka/cluster-setup/) · [네트워크 환경](/cka-udemy/network-environment/)
 
 ## 로컬 런타임 패키지 설치 — cri-docker (랩 환경 보충)
 
@@ -283,7 +283,7 @@ cri-dockerd 패키지 절은 제공된 `.deb`를 다루는 랩 환경 보충이�
 단계나 시험 환경의 기본 런타임이라고 확대하지 않는다.
 
 <LinkCard
-  title="28. 노드 drain과 클러스터 업그레이드"
+  title="노드 drain과 클러스터 업그레이드"
   description="한 노드씩 비우고 control plane과 worker를 올바른 절차로 업그레이드한다."
   href="/cka-udemy/cluster-upgrade/"
 />

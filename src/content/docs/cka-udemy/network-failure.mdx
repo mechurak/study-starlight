@@ -1,5 +1,5 @@
 ---
-title: "38. Service와 네트워크 장애"
+title: "Service와 네트워크 장애"
 description: "애플리케이션 연결 실패를 Service·EndpointSlice·노드·CNI·kube-proxy 층으로 좁혀 복구한다."
 deckGroup: troubleshooting
 sidebar:
@@ -33,7 +33,7 @@ k -n beta describe svc mysql-service
 
 Pod 라벨과 Service selector를 비교한 뒤, `describe`의 `TargetPort`를 아키텍처와 대조한다.
 `get svc -o wide`에는 `targetPort`가 나오지 않는다. 각 열의 의미와 `expose` 옵션은
-[15장 Service 조회·생성](/cka-udemy/05-services-dns/#첫-조회--pod-라벨과-service-selector를-나란히-본다)에 있다.
+[Service 조회·생성](/cka-udemy/services-dns/#첫-조회--pod-라벨과-service-selector를-나란히-본다)에 있다.
 네임스페이스는 아래 각 사례에 맞춰 바꾼다.
 
 ### 이름 오류 — alpha의 mysql을 mysql-service로 교체한다
@@ -95,7 +95,7 @@ k -n beta get endpointslices \
 숫자 `targetPort`가 틀리면 접속에 실패할 수 있다.** 주소 등록은 MySQL이 그 포트에서 실제로
 응답한다는 증거가 아니다. 마지막에는 문제에서 제공한 앱·테스트 또는 MySQL 클라이언트로 연결을
 재검증한다. 일반 HTTP용 `curl`로 MySQL 응답을 검사하지 않는다.
-더 넓은 연결 문제는 [16장의 계층별 검증 절](/cka-udemy/dns/#service--dns--외부-경로를-한-겹씩-검증하기)로 이어간다.
+더 넓은 연결 문제는 [계층별 검증 절](/cka-udemy/dns/#service--dns--외부-경로를-한-겹씩-검증하기)로 이어간다.
 
 ## 네트워크 장애 — Practice Test: Troubleshoot Network
 
@@ -269,7 +269,7 @@ kubectl -n kube-system edit ds kube-proxy
 
 Pod만 삭제하면 잘못된 템플릿으로 다시 생성되므로 관리 원본인 DaemonSet을 고친다.
 `RollingUpdate`이면 변경 후 자동 교체된다. `OnDelete`이면 템플릿 수정 후 해당 Pod를 삭제해야
-새 설정을 사용한다. 전략별 절차는 [12장 DaemonSet과 static Pod](/cka-udemy/daemonset-static-pod/#업데이트와-롤백은-전략까지-확인한다)에서 확인한다.
+새 설정을 사용한다. 전략별 절차는 [DaemonSet과 static Pod](/cka-udemy/daemonset-static-pod/#업데이트와-롤백은-전략까지-확인한다)에서 확인한다.
 
 ```bash
 kubectl -n kube-system rollout status ds/kube-proxy --timeout=180s
@@ -280,7 +280,7 @@ kubectl -n triton get pods
 
 새 kube-proxy가 `1/1 Running`을 유지하고 파일 오류가 사라졌는지 확인한 뒤 App 탭에서
 초록색 페이지까지 검증한다. 여전히 실패하면 Service selector·port·targetPort, EndpointSlice,
-앱 로그로 이어간다. 구체적인 명령은 [16장 계층별 연결 검증](/cka-udemy/dns/#service--dns--외부-경로를-한-겹씩-검증하기)에 있다.
+앱 로그로 이어간다. 구체적인 명령은 [계층별 연결 검증](/cka-udemy/dns/#service--dns--외부-경로를-한-겹씩-검증하기)에 있다.
 
 ## 완료 기준
 
@@ -297,11 +297,11 @@ kubectl -n triton get pods
 | Pod 네트워크 | [Troubleshooting CNI plugin-related errors](https://kubernetes.io/docs/tasks/administer-cluster/migrating-from-dockershim/troubleshooting-cni-plugin-related-errors/)의 CNI 초기화·설정 진단 |
 | 노드 컴포넌트 | [Troubleshooting Clusters](https://kubernetes.io/docs/tasks/debug/debug-cluster/)의 kubelet·kube-proxy 로그 진입점 |
 
-원인 수정 뒤에도 정상 구성 자체를 다시 확인해야 하면 [15장 Service와 EndpointSlice](/cka-udemy/05-services-dns/)와
-[16장 DNS·CoreDNS](/cka-udemy/dns/)의 기능 검증 절차를 사용한다.
+원인 수정 뒤에도 정상 구성 자체를 다시 확인해야 하면 [Service와 EndpointSlice](/cka-udemy/services-dns/)와
+[DNS·CoreDNS](/cka-udemy/dns/)의 기능 검증 절차를 사용한다.
 
 <LinkCard
-  title="39. 작업별 명령·문서 검색 색인"
+  title="작업별 명령·문서 검색 색인"
   description="증상을 작업으로 바꾸고 첫 명령과 공식 문서 검색어를 고른다."
   href="/cka-udemy/exam-search/"
 />

@@ -1,5 +1,5 @@
 ---
-title: "10. Pod 배치 조건"
+title: "Pod 배치 조건"
 description: "nodeName·selector·taint·toleration·nodeAffinity를 조합하고 Events로 배치 결과를 판정한다"
 deckGroup: pods
 sidebar:
@@ -124,7 +124,7 @@ kubectl get events --field-selector involvedObject.name=placement-check \
 :::tip[Pending에서는 로그보다 Events]
 아직 노드가 정해지지 않은 Pod에는 실행된 컨테이너가 없다. `nodeName`이 채워진 뒤
 `ContainerCreating`이나 `CrashLoopBackOff`로 실패하면
-[로그 진단](/cka-udemy/10-troubleshooting/#증상에-맞는-로그-진입점을-고른다)으로 넘긴다.
+[로그 진단](/cka-udemy/troubleshooting/#증상에-맞는-로그-진입점을-고른다)으로 넘긴다.
 :::
 
 ## nodeAffinity — Practice Test: Node Affinity
@@ -177,7 +177,7 @@ kubectl wait --for=condition=Ready pod/placement-check --timeout=90s
 - Deployment 문제라면 개별 Pod이 아니라 Pod 템플릿에 조건이 남아 있다.
 
 <LinkCard
-  title="11. 리소스 제한과 quota"
+  title="리소스 제한과 quota"
   description="requests·limits를 설정하고 LimitRange 주입과 ResourceQuota 거부를 증명한다."
   href="/cka-udemy/resource-limits/"
 />

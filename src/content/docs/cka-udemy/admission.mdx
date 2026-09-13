@@ -1,5 +1,5 @@
 ---
-title: "26. Admission 요청 검사"
+title: "Admission 요청 검사"
 description: "내장 admission 플러그인과 동적 webhook을 구분하고 실제 요청의 거부·변형을 확인한다."
 deckGroup: rbac
 sidebar:
@@ -55,7 +55,7 @@ ps -ef | grep kube-apiserver | grep admission-plugins
 스태틱 Pod라 매니페스트를 저장하는 순간 API 서버가 재시작된다 —
 **몇십 초 kubectl이 안 먹는 게 정상**이다. 플래그에 오타가 있으면 아예 안 올라오는데,
 그때는 kubectl이 아니라 `crictl ps -a`와 컨테이너 로그로 본다
-([36장 컨트롤 플레인 복구](/cka-udemy/control-plane-failure/)의 진단 순서).
+([컨트롤 플레인 복구](/cka-udemy/control-plane-failure/)의 진단 순서).
 검증은 매니페스트 grep이 아니라 `ps -ef` 쪽으로 — 매니페스트는 "설정한 값"이고
 프로세스가 "실제 적용된 값"이다.
 :::
@@ -140,7 +140,7 @@ webhook 호출 자체가 실패하면 API 서버 로그와 Service EndpointSlice
 | 동적 webhook | [Dynamic Admission Control](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/)의 clientConfig, rules, admissionReviewVersions, sideEffects, failurePolicy |
 
 <LinkCard
-  title="27. 클러스터 설치와 CNI"
+  title="클러스터 설치와 CNI"
   description="kubeadm으로 클러스터를 만들고 네트워크 준비 상태를 검증한다."
-  href="/cka-udemy/09-cluster-lifecycle/"
+  href="/cka-udemy/cluster-lifecycle/"
 />

@@ -1,0 +1,50 @@
+{
+  "01-basics": {
+    "target": "/cka-udemy/basics/",
+    "anchors": {}
+  },
+  "02-workloads": {
+    "target": "/cka-udemy/workloads/",
+    "anchors": {}
+  },
+  "03-pod-config": {
+    "target": "/cka-udemy/pod-config/",
+    "anchors": {}
+  },
+  "04-scheduling": {
+    "target": "/cka-udemy/scheduling/",
+    "anchors": {}
+  },
+  "05-services-dns": {
+    "target": "/cka-udemy/services-dns/",
+    "anchors": {}
+  },
+  "06-ingress-netpol": {
+    "target": "/cka-udemy/ingress-netpol/",
+    "anchors": {}
+  },
+  "07-storage": {
+    "target": "/cka-udemy/storage/",
+    "anchors": {}
+  },
+  "08-security": {
+    "target": "/cka-udemy/security/",
+    "anchors": {}
+  },
+  "09-cluster-lifecycle": {
+    "target": "/cka-udemy/cluster-lifecycle/",
+    "anchors": {}
+  },
+  "10-troubleshooting": {
+    "target": "/cka-udemy/troubleshooting/",
+    "anchors": {}
+  },
+  "11-helm": {
+    "target": "/cka-udemy/helm/",
+    "anchors": {}
+  },
+  "12-kustomize": {
+    "target": "/cka-udemy/kustomize/",
+    "anchors": {}
+  }
+}

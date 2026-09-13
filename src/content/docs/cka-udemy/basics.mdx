@@ -1,5 +1,5 @@
 ---
-title: "1. kubectl 기본 조작"
+title: "kubectl 기본 조작"
 description: "namespace를 명시하고 명령형 생성기·도움말·Vim으로 요구한 리소스와 YAML을 만든다"
 deckGroup: architecture
 sidebar:
@@ -18,8 +18,8 @@ client dry-run으로 YAML 뼈대를 만든다. 조회와 선언형 작업의 원
 [CKA kubectl — 손 속도가 점수다](/cka/kubectl/)에서 복습한다.
 
 `k`는 시험 환경의 `kubectl` 별칭이다. 여기서는 전체 명령을 익히기 위해 `kubectl`을 주로 쓴다.
-Pod 자체의 생성·상태 판정은 [3장 — Pod 생성과 상태 확인](/cka-udemy/pods/),
-출력 파일 문제는 [2장 — JSONPath 추출과 정렬](/cka-udemy/jsonpath/)로 분리한다.
+Pod 자체의 생성·상태 판정은 [Pod 생성과 상태 확인](/cka-udemy/pods/),
+출력 파일 문제는 [JSONPath 추출과 정렬](/cka-udemy/jsonpath/)로 분리한다.
 
 ## 네임스페이스 — Practice Test: Namespaces
 
@@ -190,7 +190,7 @@ kubectl create --dry-run=client -f vim-practice.yaml -o yaml
   소유 controller를 확인한다.
 
 <LinkCard
-  title="2. JSONPath 추출과 정렬"
+  title="JSONPath 추출과 정렬"
   description="원본 구조에서 필드 경로를 찾고 요구한 표나 파일을 만든다."
   href="/cka-udemy/jsonpath/"
 />

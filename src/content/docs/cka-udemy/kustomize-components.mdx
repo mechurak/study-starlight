@@ -1,5 +1,5 @@
 ---
-title: "34. Kustomize — 선택 기능 조합 (학습 보충)"
+title: "Kustomize — 선택 기능 조합 (학습 보충)"
 description: "공유 base에 debug Component를 선택한 환경만 연결하고 선택·미선택 결과와 해제 후 잔존 리소스를 확인한다"
 deckGroup: rbac
 sidebar:
@@ -16,7 +16,7 @@ import Thesis from '../../../components/docs/Thesis.astro';
 한 묶음으로 두어 필요한 환경만 선택하게 한다. 이 페이지에서는 **dev·staging에만 debug 설정을
 추가하고 prod에는 들어가지 않았는지 확인한다**.
 
-공통 구조는 [기본 페이지의 base·overlay](/cka-udemy/12-kustomize/#공통-base와-환경별-진입점),
+공통 구조는 [기본 페이지의 base·overlay](/cka-udemy/kustomize/#공통-base와-환경별-진입점),
 패치 원리는 [특정 대상 수정](/cka-udemy/kustomize-patches/),
 base·overlay 개념은 [CKA Kustomize — YAML과 오버레이](/cka/kustomize/#kustomize)을 참조한다.
 이 내용은 **학습 보충**이며 components 문법의 필수 시험 출제를 뜻하지 않는다.
@@ -138,7 +138,7 @@ dev·staging에는 `debug-config`와 `api` 컨테이너의 `LOG_LEVEL` 참조가
 prod에는 둘 다 없어야 하며, 모든 환경에서 기존 Deployment가 한 번씩만 나와야 한다.
 `Component` 자체는 결과 YAML의 Kubernetes 리소스로 출력되지 않는다.
 
-실제 적용 요구가 dev라면 [공통 적용·완료 검증](/cka-udemy/12-kustomize/#미리보기와-완료-검증-구분하기)의
+실제 적용 요구가 dev라면 [공통 적용·완료 검증](/cka-udemy/kustomize/#미리보기와-완료-검증-구분하기)의
 경로를 `overlays/dev`로 바꾼다. 최종 YAML의 namespace와 이름을 사용해 ConfigMap의 값,
 Deployment의 `configMapKeyRef`, rollout 완료를 함께 확인한다. 기본 예제에서는
 `kubectl rollout status deployment/api-deployment -n <namespace>`다.
@@ -171,4 +171,4 @@ Kubernetes의 [Kustomize 본문](https://kubernetes.io/docs/tasks/manage-kuberne
 이 Component 선언·선택 예제가 없다. `v1alpha1`·`kind: Component`·overlay의 `components`를 함께 익힌다.
 GitHub를 일반 시험 열람 자료로 간주하지 않으며 문제의 Quick Reference가 제공되면 그 경로를 확인한다.
 
-<LinkCard title="35. metrics와 애플리케이션 로그" href="/cka-udemy/10-troubleshooting/" />
+<LinkCard title="metrics와 애플리케이션 로그" href="/cka-udemy/troubleshooting/" />

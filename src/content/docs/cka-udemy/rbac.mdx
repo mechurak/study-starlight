@@ -1,5 +1,5 @@
 ---
-title: "24. RBAC 권한 부여와 검증"
+title: "RBAC 권한 부여와 검증"
 description: "Role·ClusterRole과 Binding을 구성하고 허용·거부 및 실제 인증서 사용자의 권한을 검증한다."
 deckGroup: rbac
 sidebar:
@@ -275,7 +275,7 @@ VERBS 컬럼이 그대로 나온다. `escalate`·`bind`(Role 권한 상승 제�
 `--user=michelle`의 User는 API 오브젝트가 아니다 — `kubectl get users` 같은 명령은 없고,
 사용자를 "만드는" 단계도 없다. 인증 단계가 요청에서 꺼낸 신원(클라이언트 인증서의 CN,
 토큰의 클레임)을 binding의 `subjects`(`kind: User`)의 `name` 문자열과 비교할 뿐이다.
-사용자 생성에 해당하는 작업이 [23장의 CSR 승인](/cka-udemy/08-security/#csr-승인--practice-test-certificates-api)이다.
+사용자 생성에 해당하는 작업이 [CSR 승인](/cka-udemy/security/#csr-승인--practice-test-certificates-api)이다.
 Group도 같은 문자열이고(인증서의 O 필드 — `system:masters`가 이것), subject 세 종류 중
 **ServiceAccount만 진짜 리소스**라 `--serviceaccount=네임스페이스:이름` 형식으로 지정한다.
 :::
@@ -300,7 +300,7 @@ Group도 같은 문자열이고(인증서의 O 필드 — `system:masters`가 �
 | 권한 판정 | [Authorization overview](https://kubernetes.io/docs/reference/access-authn-authz/authorization/#checking-api-access)의 `kubectl auth can-i`와 impersonation 주의점 |
 
 <LinkCard
-  title="25. ServiceAccount와 imagePullSecrets"
+  title="ServiceAccount와 imagePullSecrets"
   description="Pod 신원과 프라이빗 레지스트리 자격증명을 연결한다."
   href="/cka-udemy/service-account/"
 />

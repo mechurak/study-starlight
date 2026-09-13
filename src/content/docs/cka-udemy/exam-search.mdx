@@ -1,5 +1,5 @@
 ---
-title: "39. 작업별 명령·문서 검색 색인"
+title: "작업별 명령·문서 검색 색인"
 description: "시험 작업을 첫 관찰 명령과 공식 문서 검색어, 해당 CKA 실습 페이지로 연결하는 짧은 색인"
 deckGroup: exam-strategy
 sidebar:
@@ -26,16 +26,16 @@ Kubernetes 버전으로 바꾸고, KodeKloud·GitHub 예제와 학습 보충은 
 
 | 작업·실습 | 첫 명령 | 공식 문서 검색어 |
 |---|---|---|
-| [kubectl 기본 조작](/cka-udemy/01-basics/) | `kubectl create --help` | `kubectl Cheat Sheet` |
+| [kubectl 기본 조작](/cka-udemy/basics/) | `kubectl create --help` | `kubectl Cheat Sheet` |
 | [JSONPath 추출·정렬](/cka-udemy/jsonpath/) | `kubectl get <resource> -o json` | `JSONPath Support` |
 | [Pod 생성·상태](/cka-udemy/pods/) | `kubectl get pods -o wide` | `Pod Lifecycle` |
-| [Deployment rollout·rollback](/cka-udemy/02-workloads/) | `kubectl rollout status deploy/<name>` | `Deployments rolling back` |
+| [Deployment rollout·rollback](/cka-udemy/workloads/) | `kubectl rollout status deploy/<name>` | `Deployments rolling back` |
 | [Job 완료·실패](/cka-udemy/jobs/) | `kubectl get jobs` | `Jobs terminal conditions` |
-| [command·args](/cka-udemy/03-pod-config/) | `kubectl get pod <name> -o yaml` | `Define Command and Arguments` |
+| [command·args](/cka-udemy/pod-config/) | `kubectl get pod <name> -o yaml` | `Define Command and Arguments` |
 | [ConfigMap·Secret 주입](/cka-udemy/configmap-secret/) | `kubectl create configmap --help` | `Configure Pod ConfigMap` |
 | [init·sidecar](/cka-udemy/init-sidecar/) | `kubectl logs <pod> -c <container>` | `Sidecar Containers` |
 | [securityContext](/cka-udemy/security-context/) | `kubectl exec <pod> -- id` | `Security Context` |
-| [Pod 배치](/cka-udemy/04-scheduling/) | `kubectl describe pod <name>` | `Assign Pods to Nodes` |
+| [Pod 배치](/cka-udemy/scheduling/) | `kubectl describe pod <name>` | `Assign Pods to Nodes` |
 | [resources·quota](/cka-udemy/resource-limits/) | `kubectl describe pod <name>` | `Resource Management for Pods` |
 | [DaemonSet·static Pod](/cka-udemy/daemonset-static-pod/) | `kubectl get daemonsets -A` | `DaemonSet rolling update` |
 | [HPA](/cka-udemy/autoscaling/) | `kubectl get hpa` | `Horizontal Pod Autoscaling` |
@@ -45,28 +45,28 @@ Kubernetes 버전으로 바꾸고, KodeKloud·GitHub 예제와 학습 보충은 
 
 | 작업·실습 | 첫 명령 | 공식 문서 검색어 |
 |---|---|---|
-| [Service·EndpointSlice](/cka-udemy/05-services-dns/) | `kubectl get svc,endpointslices` | `Service EndpointSlice` |
+| [Service·EndpointSlice](/cka-udemy/services-dns/) | `kubectl get svc,endpointslices` | `Service EndpointSlice` |
 | [DNS·CoreDNS](/cka-udemy/dns/) | `kubectl get pods -n kube-system -l k8s-app=kube-dns` | `Debugging DNS Resolution` |
 | [네트워크 환경·CNI](/cka-udemy/network-environment/) | `kubectl get nodes -o wide` | `Container Runtimes CNI` |
-| [Ingress·TLS](/cka-udemy/06-ingress-netpol/) | `kubectl get ingress,ingressclass` | `Ingress TLS` |
+| [Ingress·TLS](/cka-udemy/ingress-netpol/) | `kubectl get ingress,ingressclass` | `Ingress TLS` |
 | [Gateway·HTTPRoute](/cka-udemy/gateway/) | `kubectl api-resources` | `Gateway API HTTPRoute` |
 | [NetworkPolicy](/cka-udemy/network-policy/) | `kubectl get networkpolicy -A` | `Network Policies` |
-| [볼륨·정적 PV/PVC](/cka-udemy/07-storage/) | `kubectl get pv,pvc` | `Persistent Volumes` |
+| [볼륨·정적 PV/PVC](/cka-udemy/storage/) | `kubectl get pv,pvc` | `Persistent Volumes` |
 | [StorageClass·동적 PV](/cka-udemy/storage-class/) | `kubectl get storageclass` | `Storage Classes WaitForFirstConsumer` |
 
 ## 접근 제어와 클러스터 운영
 
 | 작업·실습 | 첫 명령 | 공식 문서 검색어 |
 |---|---|---|
-| [TLS·CSR·kubeconfig](/cka-udemy/08-security/) | `kubectl auth whoami` | `Issue Certificate Kubernetes API Client` |
+| [TLS·CSR·kubeconfig](/cka-udemy/security/) | `kubectl auth whoami` | `Issue Certificate Kubernetes API Client` |
 | [RBAC](/cka-udemy/rbac/) | `kubectl auth can-i <verb> <resource>` | `Using RBAC Authorization` |
 | [ServiceAccount·imagePullSecrets](/cka-udemy/service-account/) | `kubectl get pod <name> -o yaml` | `Service Accounts` |
 | [Admission](/cka-udemy/admission/) | `kubectl get --raw='/readyz?verbose'` | `Admission Controllers` |
-| [kubeadm 설치·CNI](/cka-udemy/09-cluster-lifecycle/) | `kubeadm init --help` | `Creating cluster kubeadm` |
+| [kubeadm 설치·CNI](/cka-udemy/cluster-lifecycle/) | `kubeadm init --help` | `Creating cluster kubeadm` |
 | [drain·업그레이드](/cka-udemy/cluster-upgrade/) | `kubectl get nodes` | `Upgrading kubeadm clusters` |
 | [etcd 백업·복구](/cka-udemy/etcd-backup-restore/) | `etcdctl version` | `Operating etcd clusters Kubernetes` |
-| [Helm release](/cka-udemy/11-helm/) | `helm list -A` | `helm upgrade version` |
-| [Kustomize 적용](/cka-udemy/12-kustomize/) | `kubectl kustomize <dir>` | `Declarative Management Kustomize` |
+| [Helm release](/cka-udemy/helm/) | `helm list -A` | `helm upgrade version` |
+| [Kustomize 적용](/cka-udemy/kustomize/) | `kubectl kustomize <dir>` | `Declarative Management Kustomize` |
 | [Kustomize 변환](/cka-udemy/kustomize-transformers/) | `kubectl kustomize <root>` | `Kustomize images labels namespace` |
 | [Kustomize patch](/cka-udemy/kustomize-patches/) | `kubectl kustomize <overlay>` | `Kustomize patches` |
 | [Kustomize Components 보충](/cka-udemy/kustomize-components/) | `kustomize build <overlay>` | 문제의 Quick Reference 또는 로컬 `kustomize --help` |
@@ -75,7 +75,7 @@ Kubernetes 버전으로 바꾸고, KodeKloud·GitHub 예제와 학습 보충은 
 
 | 작업·실습 | 첫 명령 | 공식 문서 검색어 |
 |---|---|---|
-| [metrics·앱 로그](/cka-udemy/10-troubleshooting/) | `kubectl get pods -A -o wide` | `Debug Pods` |
+| [metrics·앱 로그](/cka-udemy/troubleshooting/) | `kubectl get pods -A -o wide` | `Debug Pods` |
 | [컨트롤 플레인 복구](/cka-udemy/control-plane-failure/) | `kubectl get pods -n kube-system` | `Troubleshooting Clusters crictl` |
 | [워커 노드 복구](/cka-udemy/worker-failure/) | `kubectl get nodes` | `Troubleshooting Clusters worker nodes` |
 | [Service·네트워크 장애](/cka-udemy/network-failure/) | `kubectl get svc,endpointslices` | `Debug Services` |

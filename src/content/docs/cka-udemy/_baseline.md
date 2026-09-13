@@ -57,10 +57,10 @@
 
 ## 최종 구조를 유지하는 법
 
-- 제목·파일명·URL에 새 페이지 번호를 붙이지 않는다. 학습 순서는 `deckGroup`·`sidebar.order`로
-  관리하며, 중간 삽입 때 주변 페이지를 다시 번호 매기지 않는다. 기존 표시 번호 1~39와
-  `sidebar.order` 1010~1390은 이전 개편 결과이며 새 페이지의 번호 규칙이 아니다.
-  기존 번호 제거는 별도 개편에서 처리하고, 페이지 추가·삭제 시 관련 `_deck.mjs`·LinkCard·작업 색인을 갱신한다.
+- 제목·파일명·URL에 페이지 번호를 붙이지 않는다. 학습 순서는 `deckGroup`·`sidebar.order`로
+  관리한다. 페이지 추가·삭제 시 관련 `_deck.mjs`·LinkCard·작업 색인을 갱신한다.
+- 기존 번호 주소는 `src/data/cka-udemy-legacy-routes.json`과
+  `src/pages/cka-udemy/[legacy].astro`가 새 주소로 연결하며, 절 북마크를 유지한다.
 - `exam-search.mdx`는 상세 풀이를 복제하지 않는다. 작업·첫 관찰 명령·공식 검색어·목적
   페이지만 연결하고, 성공 조건과 실패 분기는 각 실습 페이지를 정본으로 둔다.
 - 커리큘럼 상위 개념만 있고 독립 실습이 없는 HA·CSI 설치·operator 종합 설치 등의 공백은
@@ -73,7 +73,7 @@
 
 ## 완성된 기준 예제
 
-Kustomize의 `12-kustomize.mdx` → `kustomize-transformers.mdx` → `kustomize-patches.mdx`를
+Kustomize의 `kustomize.mdx` → `kustomize-transformers.mdx` → `kustomize-patches.mdx`를
 필수 흐름의 기준으로, `kustomize-components.mdx`를 선택 기능 보충의 기준으로 삼는다.
 기본 적용은 실행 위치·완전한 공통 입력·완료 판정의 예이고, patch는 방식 차이·삭제 조건을
 축약하면서 보존한 예다. Components는 선택하지 않은 환경과 기능 해제까지 확인하는 예다.

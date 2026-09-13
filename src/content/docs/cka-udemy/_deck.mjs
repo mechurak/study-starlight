@@ -51,9 +51,9 @@ export default {
 	],
 	"map": [
 		{
-			"label": "1장",
+			"label": "기초",
 			"title": "kubectl 기본 조작",
-			"href": "/cka-udemy/01-basics/",
+			"href": "/cka-udemy/basics/",
 			"desc": "namespace · 명령형 생성기 · 도움말 · Vim",
 			"items": [
 				[
@@ -64,7 +64,7 @@ export default {
 			"tone": "key"
 		},
 		{
-			"label": "2장",
+			"label": "기초",
 			"title": "JSONPath 추출과 정렬",
 			"href": "/cka-udemy/jsonpath/",
 			"desc": "필드 추출 · 조건 필터 · 정렬 · custom-columns · 파일 제출",
@@ -77,7 +77,7 @@ export default {
 			"tone": "key"
 		},
 		{
-			"label": "3장",
+			"label": "Workloads와 스케줄링",
 			"title": "Pod 생성과 상태 확인",
 			"href": "/cka-udemy/pods/",
 			"desc": "Pod 생성 · 노드 · 컨테이너 상태 · Events · Ready",
@@ -90,9 +90,9 @@ export default {
 			"tone": "key"
 		},
 		{
-			"label": "4장",
+			"label": "Workloads와 스케줄링",
 			"title": "Deployment rollout과 rollback",
-			"href": "/cka-udemy/02-workloads/",
+			"href": "/cka-udemy/workloads/",
 			"desc": "ReplicaSet · Deployment 생성 · rollout · 실패 진단 · rollback",
 			"items": [
 				[
@@ -103,7 +103,7 @@ export default {
 			"tone": "key"
 		},
 		{
-			"label": "5장",
+			"label": "Workloads와 스케줄링",
 			"title": "Job 완료와 실패",
 			"href": "/cka-udemy/jobs/",
 			"desc": "terminal condition · 소유 Pod · 로그 · 실패 후 재실행",
@@ -116,9 +116,9 @@ export default {
 			"tone": "key"
 		},
 		{
-			"label": "6장",
+			"label": "Workloads와 스케줄링",
 			"title": "command와 args 수정",
-			"href": "/cka-udemy/03-pod-config/",
+			"href": "/cka-udemy/pod-config/",
 			"desc": "Pod 소유자 · command/args · sh -c · 실행 결과",
 			"items": [
 				[
@@ -129,7 +129,7 @@ export default {
 			"tone": "ok"
 		},
 		{
-			"label": "7장",
+			"label": "Workloads와 스케줄링",
 			"title": "ConfigMap과 Secret 주입",
 			"href": "/cka-udemy/configmap-secret/",
 			"desc": "env · envFrom · volume · 변경 반영 · 읽기 전용 Secret",
@@ -142,7 +142,7 @@ export default {
 			"tone": "ok"
 		},
 		{
-			"label": "8장",
+			"label": "Workloads와 스케줄링",
 			"title": "init과 sidecar 구성",
 			"href": "/cka-udemy/init-sidecar/",
 			"desc": "공유 volume · Downward API · 네이티브 sidecar · init 복구",
@@ -155,7 +155,7 @@ export default {
 			"tone": "ok"
 		},
 		{
-			"label": "9장",
+			"label": "Workloads와 스케줄링",
 			"title": "securityContext 실행 권한",
 			"href": "/cka-udemy/security-context/",
 			"desc": "runAsUser 우선순위 · 컨테이너 capability · 실행 검증",
@@ -168,9 +168,9 @@ export default {
 			"tone": "ok"
 		},
 		{
-			"label": "10장",
+			"label": "Workloads와 스케줄링",
 			"title": "Pod 배치 조건",
-			"href": "/cka-udemy/04-scheduling/",
+			"href": "/cka-udemy/scheduling/",
 			"desc": "nodeName · selector · taint/toleration · nodeAffinity · Pending Events",
 			"items": [
 				[
@@ -181,7 +181,7 @@ export default {
 			"tone": "ok"
 		},
 		{
-			"label": "11장",
+			"label": "Workloads와 스케줄링",
 			"title": "리소스 제한과 quota",
 			"href": "/cka-udemy/resource-limits/",
 			"desc": "requests/limits · OOMKilled · LimitRange · ResourceQuota",
@@ -194,7 +194,7 @@ export default {
 			"tone": "ok"
 		},
 		{
-			"label": "12장",
+			"label": "Workloads와 스케줄링",
 			"title": "DaemonSet과 static Pod",
 			"href": "/cka-udemy/daemonset-static-pod/",
 			"desc": "노드별 Pod · updateStrategy · rollback · staticPodPath · mirror Pod",
@@ -211,7 +211,7 @@ export default {
 			"tone": "ok"
 		},
 		{
-			"label": "13장",
+			"label": "Workloads와 스케줄링",
 			"title": "HPA 설정과 검증",
 			"href": "/cka-udemy/autoscaling/",
 			"desc": "metrics API · resource requests · CPU/memory Utilization · replica 판정",
@@ -224,7 +224,7 @@ export default {
 			"tone": "ok"
 		},
 		{
-			"label": "14장",
+			"label": "Workloads와 스케줄링",
 			"title": "VPA CRD 읽기",
 			"href": "/cka-udemy/vpa/",
 			"desc": "별도 CRD · targetRef · Recreate · recommendation · RequestsOnly",
@@ -241,9 +241,9 @@ export default {
 			"tone": "ok"
 		},
 		{
-			"label": "15장",
+			"label": "네트워킹",
 			"title": "Service와 EndpointSlice",
-			"href": "/cka-udemy/05-services-dns/",
+			"href": "/cka-udemy/services-dns/",
 			"desc": "selector · port/targetPort · EndpointSlice · ClusterIP · NodePort",
 			"items": [
 				[
@@ -254,7 +254,7 @@ export default {
 			"tone": "warn"
 		},
 		{
-			"label": "16장",
+			"label": "네트워킹",
 			"title": "DNS와 CoreDNS",
 			"href": "/cka-udemy/dns/",
 			"desc": "kube-dns · Corefile · FQDN · namespace · nslookup · 실제 연결",
@@ -267,7 +267,7 @@ export default {
 			"tone": "warn"
 		},
 		{
-			"label": "17장",
+			"label": "네트워킹",
 			"title": "네트워크 환경과 CNI 확인",
 			"href": "/cka-udemy/network-environment/",
 			"desc": "인터페이스 · 세 IP 대역 · 런타임 socket · CNI 경로 · Calico 설치",
@@ -284,9 +284,9 @@ export default {
 			"tone": "warn"
 		},
 		{
-			"label": "18장",
+			"label": "네트워킹",
 			"title": "Ingress와 TLS",
-			"href": "/cka-udemy/06-ingress-netpol/",
+			"href": "/cka-udemy/ingress-netpol/",
 			"desc": "IngressClass · host/path · controller · TLS · 외부 HTTP/HTTPS",
 			"items": [
 				[
@@ -297,7 +297,7 @@ export default {
 			"tone": "warn"
 		},
 		{
-			"label": "19장",
+			"label": "네트워킹",
 			"title": "Gateway와 HTTPRoute",
 			"href": "/cka-udemy/gateway/",
 			"desc": "CRD와 구현체 · listener · parentRefs · attachment 조건 · 실제 요청",
@@ -310,7 +310,7 @@ export default {
 			"tone": "warn"
 		},
 		{
-			"label": "20장",
+			"label": "네트워킹",
 			"title": "NetworkPolicy 허용과 차단",
 			"href": "/cka-udemy/network-policy/",
 			"desc": "pod/namespace selector · ingress/egress · DNS · 허용/차단 검증",
@@ -323,9 +323,9 @@ export default {
 			"tone": "warn"
 		},
 		{
-			"label": "21장",
+			"label": "스토리지",
 			"title": "볼륨과 정적 PV/PVC",
-			"href": "/cka-udemy/07-storage/",
+			"href": "/cka-udemy/storage/",
 			"desc": "hostPath · PV/PVC 바인딩 · reclaimPolicy · 실제 mount·읽기/쓰기",
 			"items": [
 				[
@@ -336,7 +336,7 @@ export default {
 			"tone": "zone"
 		},
 		{
-			"label": "22장",
+			"label": "스토리지",
 			"title": "StorageClass와 동적 프로비저닝",
 			"href": "/cka-udemy/storage-class/",
 			"desc": "provisioner · WaitForFirstConsumer · 기본 class · 동적 PV · quota",
@@ -349,9 +349,9 @@ export default {
 			"tone": "zone"
 		},
 		{
-			"label": "23장",
+			"label": "Cluster Architecture",
 			"title": "TLS·CSR·kubeconfig",
-			"href": "/cka-udemy/08-security/",
+			"href": "/cka-udemy/security/",
 			"desc": "인증서 역할 · CSR 승인·발급 · kubeconfig · 실제 인증 · API 요청 흐름",
 			"items": [
 				[
@@ -362,7 +362,7 @@ export default {
 			"tone": "zone"
 		},
 		{
-			"label": "24장",
+			"label": "Cluster Architecture",
 			"title": "RBAC 권한 부여와 검증",
 			"href": "/cka-udemy/rbac/",
 			"desc": "Role·ClusterRole · Binding · can-i 허용·거부 · 인증과 인가 구분",
@@ -375,7 +375,7 @@ export default {
 			"tone": "zone"
 		},
 		{
-			"label": "25장",
+			"label": "Cluster Architecture",
 			"title": "ServiceAccount와 imagePullSecrets",
 			"href": "/cka-udemy/service-account/",
 			"desc": "Pod 신원 · projected token · 레지스트리 Secret · 실제 image pull",
@@ -388,7 +388,7 @@ export default {
 			"tone": "zone"
 		},
 		{
-			"label": "26장",
+			"label": "Cluster Architecture",
 			"title": "Admission 요청 검사",
 			"href": "/cka-udemy/admission/",
 			"desc": "내장 플러그인 · validating/mutating webhook · 거부·변형 검증",
@@ -401,9 +401,9 @@ export default {
 			"tone": "zone"
 		},
 		{
-			"label": "27장",
+			"label": "Cluster Architecture",
 			"title": "kubeadm 설치와 CNI",
-			"href": "/cka-udemy/09-cluster-lifecycle/",
+			"href": "/cka-udemy/cluster-lifecycle/",
 			"desc": "노드 사전 조건 · init/join · CNI·CoreDNS · Service·NodePort 검증",
 			"items": [
 				[
@@ -414,7 +414,7 @@ export default {
 			"tone": "bad"
 		},
 		{
-			"label": "28장",
+			"label": "Cluster Architecture",
 			"title": "노드 drain과 클러스터 업그레이드",
 			"href": "/cka-udemy/cluster-upgrade/",
 			"desc": "drain·uncordon · 패키지 버전 · upgrade apply/node · Ready·schedulable",
@@ -427,7 +427,7 @@ export default {
 			"tone": "bad"
 		},
 		{
-			"label": "29장",
+			"label": "Cluster Architecture",
 			"title": "etcd 백업과 복구",
 			"href": "/cka-udemy/etcd-backup-restore/",
 			"desc": "endpoint·인증서 · snapshot status · 새 data-dir · stacked/external 전환",
@@ -440,9 +440,9 @@ export default {
 			"tone": "bad"
 		},
 		{
-			"label": "30장",
+			"label": "Cluster Architecture",
 			"title": "Helm release 관리",
-			"href": "/cka-udemy/11-helm/",
+			"href": "/cka-udemy/helm/",
 			"desc": "repo·search · chart/app 버전 · install/upgrade · history/rollback · 두 층 검증",
 			"items": [
 				[
@@ -453,9 +453,9 @@ export default {
 			"tone": "bad"
 		},
 		{
-			"label": "31~34장",
+			"label": "Cluster Architecture",
 			"title": "Kustomize",
-			"href": "/cka-udemy/12-kustomize/",
+			"href": "/cka-udemy/kustomize/",
 			"desc": "환경별 적용·범위별 변환·특정 대상 patch와 선택 기능 보충",
 			"items": [
 				[
@@ -478,9 +478,9 @@ export default {
 			"tone": "bad"
 		},
 		{
-			"label": "35장",
+			"label": "Troubleshooting",
 			"title": "metrics와 애플리케이션 로그",
-			"href": "/cka-udemy/10-troubleshooting/",
+			"href": "/cka-udemy/troubleshooting/",
 			"desc": "metrics-server · top 단위 · Pod 상태 · Events · 현재/이전 로그",
 			"items": [
 				[
@@ -495,7 +495,7 @@ export default {
 			"tone": "bad"
 		},
 		{
-			"label": "36장",
+			"label": "Troubleshooting",
 			"title": "컨트롤 플레인 복구",
 			"href": "/cka-udemy/control-plane-failure/",
 			"desc": "Pod 생성·배정 · static Pod 명령·kubeconfig·hostPath · 원래 workload",
@@ -508,7 +508,7 @@ export default {
 			"tone": "bad"
 		},
 		{
-			"label": "37장",
+			"label": "Troubleshooting",
 			"title": "워커 노드 복구",
 			"href": "/cka-udemy/worker-failure/",
 			"desc": "kubelet 서비스 · config/kubeconfig · CA · API 서버 주소 · Node Ready",
@@ -521,7 +521,7 @@ export default {
 			"tone": "bad"
 		},
 		{
-			"label": "38장",
+			"label": "Troubleshooting",
 			"title": "Service와 네트워크 장애",
 			"href": "/cka-udemy/network-failure/",
 			"desc": "Service·EndpointSlice · CNI 초기화 · kube-proxy 설정 · 실제 앱 요청",
@@ -538,7 +538,7 @@ export default {
 			"tone": "bad"
 		},
 		{
-			"label": "39장",
+			"label": "시험 대비",
 			"title": "작업별 명령·문서 검색 색인",
 			"href": "/cka-udemy/exam-search/",
 			"desc": "작업 → 첫 관찰 명령 → 공식 문서 검색어 → 완료 판정",

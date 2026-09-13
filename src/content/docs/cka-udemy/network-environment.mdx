@@ -1,5 +1,5 @@
 ---
-title: "17. 네트워크 환경과 CNI 확인"
+title: "네트워크 환경과 CNI 확인"
 description: "노드·Pod·Service 대역과 런타임·CNI 경로를 찾고 제공 문서로 Calico 설치 결과를 검증한다"
 deckGroup: services
 sidebar:
@@ -24,9 +24,9 @@ Calico 설치 사례는 문제에서 제공한 Quick Reference를 따라가는 �
 
 원본 풀이: [09-Practice-Test-Explore-Env.md](https://github.com/kodekloudhub/certified-kubernetes-administrator-course/blob/master/docs/09-Networking/09-Practice-Test-Explore-Env.md)
 
-노드의 네트워크 인터페이스를 읽는 연습 — 시험보다 [18장 트러블슈팅](/cka/troubleshooting/)의 재료다.
+노드의 네트워크 인터페이스를 읽는 연습 — 시험보다 [CKA 트러블슈팅](/cka/troubleshooting/)의 재료다.
 이 랩은 원문대로 `netstat`을 쓰지만, 현재 Ubuntu에서는 같은 확인을 `ss`로 한다.
-두 도구의 일반적인 읽기법은 [server 7장](/server/07-network/)에 있다.
+두 도구의 일반적인 읽기법은 [서버 네트워크](/server/07-network/)에 있다.
 
 ```bash
 # "What is the Internal IP address of the controlplane node in this cluster?"
@@ -285,7 +285,7 @@ kube-proxy 설정은 `kube-system`의 `kube-proxy` ConfigMap에 있지만, `mode
 - 지정 랩이 없다면 설치 명령을 임의 실행하지 않고 현재 환경 조회까지만 수행한다.
 
 <LinkCard
-  title="18. Ingress와 TLS"
+  title="Ingress와 TLS"
   description="Ingress 리소스와 컨트롤러를 확인하고 내부·외부 HTTP 경로를 검증한다."
-  href="/cka-udemy/06-ingress-netpol/"
+  href="/cka-udemy/ingress-netpol/"
 />

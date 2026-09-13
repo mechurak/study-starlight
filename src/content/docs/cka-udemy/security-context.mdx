@@ -1,5 +1,5 @@
 ---
-title: "9. securityContext 실행 권한"
+title: "securityContext 실행 권한"
 description: "Pod·컨테이너 수준의 runAsUser 우선순위와 Linux capability 위치를 설정하고 실행 결과를 확인한다"
 deckGroup: pods
 sidebar:
@@ -16,7 +16,7 @@ import Thesis from '../../../components/docs/Thesis.astro';
 이 페이지에서는 **필드 위치 선택 → 최소 권한 설정 → 컨테이너 내부 실행 결과 확인**을 연습한다.
 Pod 보안의 큰 그림은 [CKA Pod — 배포의 최소 단위](/cka/pods/#securitycontext)에서 복습한다.
 
-기존 Pod이면 [6장의 소유자·재생성 판단](/cka-udemy/03-pod-config/)을 먼저 적용한다.
+기존 Pod이면 [소유자·재생성 판단](/cka-udemy/pod-config/)을 먼저 적용한다.
 Pod 수준 값은 여러 컨테이너의 기본값이고 컨테이너 수준 값이 같은 필드를 덮어쓴다.
 
 ## securityContext — Practice Test: Security Contexts
@@ -67,7 +67,7 @@ Events와 namespace 정책을 읽는다. 오류를 피하려고 privileged를 �
 문제가 요구한 capability만 컨테이너 수준에 추가한다.
 
 <LinkCard
-  title="10. Pod 배치"
+  title="Pod 배치"
   description="nodeName·selector·taint·affinity 조건을 읽고 원하는 노드에 배치됐는지 확인한다."
-  href="/cka-udemy/04-scheduling/"
+  href="/cka-udemy/scheduling/"
 />

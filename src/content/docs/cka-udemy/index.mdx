@@ -19,13 +19,13 @@ import DeckMap from '../../../components/docs/DeckMap.astro';
 할 일을 파악하고, 본문의 명령과 공식 문서 검색 경로를 따라간 뒤 완료 기준으로 기능을 판정한다.
 특정 랩 환경·설치된 CRD·선택 기능 사례는 필수 범위처럼 보이지 않도록 학습 보충으로 표시했다.
 
-<LinkButton href="/cka-udemy/01-basics/" icon="right-arrow">첫 장부터 읽기</LinkButton>
+<LinkButton href="/cka-udemy/basics/" icon="right-arrow">첫 장부터 읽기</LinkButton>
 <LinkButton href="/cka-udemy/exam-search/" icon="magnifier">작업으로 찾기</LinkButton>
 
 ## 이 덱을 읽는 법
 
-처음 학습할 때는 DeckMap의 1→39장 순서로 읽는다. 문제를 풀다가 찾을 때는
-[39장 작업 색인](/cka-udemy/exam-search/)에서 문제의 동사와 리소스에 맞는 첫 명령을 고른다.
+처음 학습할 때는 구성도에 놓인 순서로 읽는다. 문제를 풀다가 찾을 때는
+[작업 색인](/cka-udemy/exam-search/)에서 문제의 동사와 리소스에 맞는 첫 명령을 고른다.
 각 실습 페이지에서는 다음 네 단계만 확인하면 된다.
 
 1. **목표 파악** — 첫 두 문단에서 수정할 대상과 성공 조건을 찾는다.
@@ -62,11 +62,11 @@ import DeckMap from '../../../components/docs/DeckMap.astro';
 | 실습 | 제외 이유 |
 |---|---|
 | Core Concepts Introduction | 원본이 빈 껍데기 — 풀이 요약이 없다 |
-| Control Plane Failure | 원본은 빈 껍데기. 실제 오류 사례와 공식 진단 순서는 [36장](/cka-udemy/control-plane-failure/)에 보강했다 |
-| Worker Node Failure | 원본은 빈 껍데기. kubelet 오류 사례와 공식 진단 순서는 [37장](/cka-udemy/worker-failure/)에 보강했다 |
-| CNI weave | Weave는 단종됐고 현 시험 환경에 없다. 다만 런타임 엔드포인트·CNI 디렉터리를 확인하는 두 문항은 [17장](/cka-udemy/network-environment/)에 살려 뒀다 |
+| Control Plane Failure | 원본은 빈 껍데기. 실제 오류 사례와 공식 진단 순서는 [컨트롤 플레인 복구](/cka-udemy/control-plane-failure/)에 보강했다 |
+| Worker Node Failure | 원본은 빈 껍데기. kubelet 오류 사례와 공식 진단 순서는 [워커 노드 복구](/cka-udemy/worker-failure/)에 보강했다 |
+| CNI weave | Weave는 단종됐고 현 시험 환경에 없다. 다만 런타임 엔드포인트·CNI 디렉터리를 확인하는 두 문항은 [네트워크 환경과 CNI 확인](/cka-udemy/network-environment/)에 살려 뒀다 |
 | Networking weave | 위와 같다 |
-| Deploy Network Solution | 풀이가 "weave를 설치하라" 한 줄이다. 현행 과정의 대체 랩(Install Calico CNI)은 [17장](/cka-udemy/network-environment/#calico-설치--lab-install-calico-cni-2025-신규)에 있다 |
+| Deploy Network Solution | 풀이가 "weave를 설치하라" 한 줄이다. 현행 과정의 대체 랩(Install Calico CNI)은 [네트워크 환경과 CNI 확인](/cka-udemy/network-environment/#calico-설치--lab-install-calico-cni-2025-신규)에 있다 |
 | Multiple Schedulers | 현 커리큘럼(v1.35)에 없는 항목이다 |
 
 ## 실습이 아직 없는 커리큘럼 범위
@@ -75,20 +75,20 @@ import DeckMap from '../../../components/docs/DeckMap.astro';
 
 | 범위 | 현재 연결 |
 |---|---|
-| HA control plane 전체 구축 | [CKA kubeadm — 클러스터 설치와 노드 조인](/cka/cluster-setup/). 29장의 stacked/external etcd 구분은 일부 사례일 뿐이다 |
+| HA control plane 전체 구축 | [CKA kubeadm — 클러스터 설치와 노드 조인](/cka/cluster-setup/). [etcd 백업과 복구](/cka-udemy/etcd-backup-restore/)의 stacked/external etcd 구분은 일부 사례일 뿐이다 |
 | CSI 드라이버 설치 | [CKA 스토리지](/cka/storage/)과 [CKA 확장 인터페이스 — CRI·CNI·CSI](/cka/extensions/). PV/PVC·StorageClass 실습만 있다 |
 | 독립 operator 종합 설치 | [CKA 확장 인터페이스 — CRI·CNI·CSI](/cka/extensions/). Calico·VPA는 부분 사례다 |
 | probes 전용 실습 | [CKA Pod — 배포의 최소 단위](/cka/pods/). 현재 Pod·Deployment 페이지에는 상태 확인과 controller 복구만 있다 |
 | LoadBalancer 외부 IP | [CKA Service](/cka/services/). 이 덱의 실제 외부 요청은 NodePort·Ingress 중심이다 |
-| Helm/Kustomize로 클러스터 컴포넌트 설치 | 30~34장은 release·manifest 적용 연습이며 별도 컴포넌트 설치 랩은 없다 |
+| Helm/Kustomize로 클러스터 컴포넌트 설치 | [Helm](/cka-udemy/helm/)·[Kustomize](/cka-udemy/kustomize/)는 release·manifest 적용 연습이며 별도 컴포넌트 설치 랩은 없다 |
 
 :::tip[시험 직전에는]
 이 덱을 처음부터 다시 읽지 말고, 각 장의 **함정 aside만** 훑은 뒤
-[39장 작업 색인](/cka-udemy/exam-search/)과 [CKA 시험 전략과 치트시트](/cka/exam-strategy/)로 넘어간다.
+[작업 색인](/cka-udemy/exam-search/)과 [CKA 시험 전략과 치트시트](/cka/exam-strategy/)로 넘어간다.
 :::
 
 <LinkCard
-  title="1. kubectl 기본 조작"
+  title="kubectl 기본 조작"
   description="namespace와 생성 방식을 고르고 도움말·dry-run·Vim으로 요구한 리소스를 만든다."
-  href="/cka-udemy/01-basics/"
+  href="/cka-udemy/basics/"
 />

@@ -1,5 +1,5 @@
 ---
-title: "12. DaemonSet과 static Pod"
+title: "DaemonSet과 static Pod"
 description: "DaemonSet rollout과 static Pod 파일을 각각의 원본에서 수정하고 노드별 실행 결과를 검증한다"
 deckGroup: pods
 sidebar:
@@ -146,7 +146,7 @@ DaemonSet은 selector가 가리키는 Pod 수와 노드 분포를 함께 보고,
 않고 `NODE` 열을 확인한다. 요구한 이미지나 명령도 `kubectl get pod -o yaml`로 마지막에 대조한다.
 
 <LinkCard
-  title="13. HPA 설정과 검증"
+  title="HPA 설정과 검증"
   description="metrics와 requests를 확인하고 CPU·메모리 목표에 따른 replica 상태를 검증한다."
   href="/cka-udemy/autoscaling/"
 />

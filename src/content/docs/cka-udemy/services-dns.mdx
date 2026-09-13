@@ -1,5 +1,5 @@
 ---
-title: "15. Service와 EndpointSlice"
+title: "Service와 EndpointSlice"
 description: "Service의 selector·port·targetPort를 맞추고 EndpointSlice와 실제 요청으로 백엔드 연결을 검증한다"
 deckGroup: services
 sidebar:
@@ -33,7 +33,7 @@ import Thesis from '../../../components/docs/Thesis.astro';
 
 Service 생성 문제 — *Create a new service to access the web application using the
 service-definition-1.yaml file.* — 는 정의 파일의 빈칸(셀렉터·포트)을 채워 `create -f` 하거나,
-[1장의 `expose` 한 줄](/cka-udemy/01-basics/)로 끝낸다.
+[`expose` 한 줄](/cka-udemy/basics/)로 끝낸다.
 
 :::tip[엔드포인트가 답의 근거다]
 "Service가 몇 개의 Pod으로 트래픽을 보내는가"는 전부 Endpoints 개수를 묻는 문제다.
@@ -94,7 +94,7 @@ Pod 이름이 다르면 `pod mysql` 부분을 조회 결과로 바꾼다. `--sel
 문제에서 매니페스트 파일 작성을 요구하면 그 요구도 충족한다.
 
 이름이 잘못된 Service 교체와 기존 `targetPort` 수정은
-[38장 MySQL 연결 실패 사례](/cka-udemy/network-failure/#애플리케이션-연결-실패--mysql-service-진단)에서 다룬다.
+[MySQL 연결 실패 사례](/cka-udemy/network-failure/#애플리케이션-연결-실패--mysql-service-진단)에서 다룬다.
 
 ### messaging — 클러스터 내부에 6379 공개
 
@@ -162,7 +162,7 @@ curl http://NODE_IP:30082
 - ClusterIP 요청이 성공하며 NodePort 문제는 클러스터 밖의 실제 HTTP 응답까지 성공한다.
 
 <LinkCard
-  title="16. DNS와 CoreDNS"
+  title="DNS와 CoreDNS"
   description="Corefile 전달 경로와 Service 이름 규칙을 확인하고 DNS와 실제 연결을 나눠 검증한다."
   href="/cka-udemy/dns/"
 />
