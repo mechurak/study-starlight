@@ -18,7 +18,7 @@ src/content/docs/
     _deck.mjs                 #   이 덱의 메타데이터·그룹·DeckMap
     _baseline.md              #   기준 버전·서술 규칙·범위 경계
     index.mdx                 #   덱 개요 페이지
-    00-intro.mdx …            #   본문 페이지 — 소속 그룹·순서를 frontmatter에 둠
+    intro.mdx …               #   번호 없는 본문 페이지 — 소속 그룹·순서는 frontmatter
 src/components/               # layout / docs / demos 역할별 컴포넌트
 src/styles/custom.css         # 폰트·본문 폭·검색 UI 전역 커스텀
 docs/                         # 작성·검증·배포·Starlight 운영 문서
@@ -53,7 +53,8 @@ pnpm preview
 
 ## 새 페이지 추가
 
-1. 대상 덱의 `_baseline.md`를 읽고 `.mdx`를 만든다.
+1. 대상 덱의 `_baseline.md`를 읽고 `service-account.mdx`처럼 개념·작업 이름으로 `.mdx`를 만든다.
+   제목·파일명·URL에는 페이지 번호를 붙이지 않는다.
 2. `title`·`description`과 함께 `_deck.mjs`에 있는 `deckGroup`, 덱 안에서 겹치지 않는
    `sidebar.order`를 frontmatter에 적는다. 보통 10 단위를 써서 중간 삽입 여유를 둔다.
 3. 새 본문에는 `<Thesis>`를 두고, `_deck.mjs`의 `termIntro`가 `required`면 glossary·wrapup을
@@ -62,6 +63,10 @@ pnpm preview
    파생 사이드바를 다시 읽도록 서버를 재시작한다.
 
 페이지 slug·그룹·순서는 그 페이지가 소유한다. 새 장 하나 때문에 전역 파일을 고칠 필요가 없다.
+기존 번호 페이지를 일괄 변경하는 것은 별도 개편에서 다룬다. 페이지 추가·분할·순서 변경은
+`pnpm check`와 메타데이터 확인으로 마치며, 브라우저는 구체적인 화면 동작·레이아웃 확인이
+필요할 때만 쓴다. 지침·계획 문서만 바꾼 경우에는 diff와 참조 경로 확인으로 충분하다.
+자세한 범위는 [검증 지침](docs/verification.md)을 따른다.
 
 ## 새 덱 추가
 

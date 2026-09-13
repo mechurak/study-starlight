@@ -92,8 +92,9 @@ import SourceFigure from '../../../components/docs/SourceFigure.astro';
 />
 ```
 
-외부 이미지를 추가하거나 바꾸면 `pnpm check`에 더해 브라우저에서 **이미지 로드 · 출처 링크 ·
-대체 텍스트 · 모바일 넘침 · 다크 모드 배경**을 확인한다.
+외부 이미지는 파일·크기·출처 링크·대체 텍스트를 확인하고 `pnpm check`를 실행한다.
+배경 대비나 반응형 배치처럼 정적 이미지 확인만으로 판단할 수 없는 문제가 있을 때만
+해당 이미지가 있는 대표 페이지를 브라우저에서 확인한다. 검증 범위는 [검증 지침](verification.md)을 따른다.
 
 ## 프론트매터
 
@@ -101,7 +102,7 @@ import SourceFigure from '../../../components/docs/SourceFigure.astro';
 사이드바·랜딩 분량·검색 대상에 자동으로 들어가며, 중앙 목록 파일을 따로 고치지 않는다.
 
 ```yaml
-title: "3. 요청 경로"
+title: "요청 경로"
 description: 요청이 각 구성 요소를 지나는 순서
 deckGroup: architecture
 sidebar:
@@ -110,7 +111,12 @@ sidebar:
 
 - `deckGroup`은 같은 폴더의 `_deck.mjs`에 선언한 `groups[].id` 중 하나다.
 - `sidebar.order`는 덱 전체에서 겹치지 않는 숫자다. 사이에 장을 끼워 넣기 쉽도록 보통 10 단위로 둔다.
-- 사이드바 라벨은 `title`에서 오므로 장 번호를 제목에 유지한다.
+- 사이드바 라벨은 `title`에서 온다. 제목·파일명·URL에는 페이지 순서 번호를 붙이지 않는다.
+  예: `ServiceAccount — Pod의 신원`, `service-account.mdx`, `/cka/service-account/`.
+- 본문 참조·LinkCard·DeckMap에는 페이지 이름과 링크를 쓰고, 요약 절 제목은 `요약`으로 둔다.
+  `sidebar.order`는 내부 정렬값이며 표시 번호나 파일명과 맞출 필요가 없다.
+- 기존 번호 페이지의 일괄 이름 변경은 별도 개편 범위에서 한다. 해당 개편에서는 들어오는 링크와
+  옛 URL·절 북마크의 연결도 함께 처리한다. 새 페이지 때문에 주변 페이지를 다시 번호 매기지 않는다.
 - 덱 `index.mdx`에는 `deckGroup`과 `sidebar`가 필요 없다.
 
 새 본문 페이지에는 `<Thesis>`를 둔다. `legacyThesis: true`는 이 규칙을 도입하기 전에 생긴 페이지를
