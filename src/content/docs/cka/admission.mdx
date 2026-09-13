@@ -1,0 +1,146 @@
+---
+title: "Admission — 요청 내용 검사"
+description: "Admission은 인증과 인가를 통과한 변경 요청의 내용을 수정하거나 검증한다."
+deckGroup: cluster-architecture
+sidebar:
+  order: 154
+---
+
+import { Badge } from '@astrojs/starlight/components';
+import Thesis from '../../../components/docs/Thesis.astro';
+
+<Thesis>Admission은 인증과 인가를 통과한 변경 요청의 내용을 수정하거나 검증한다.</Thesis>
+
+Pod 생성 권한이 있는 사용자도 정책에 맞지 않는 Pod을 제출할 수 있다. 권한 다음에 내용을 검사하는 Admission의 역할과 API 서버 설정, 외부 webhook을 살펴본다.
+
+## admission 컨트롤러
+
+인가를 통과한 뒤 **내용을 검사하거나 고치는** 단계다.
+
+왜 따로 있는가 — **인가(RBAC)는 요청의 내용을 보지 않기 때문**이다.
+RBAC의 관할은 "누가 · 어떤 동사를 · 어떤 리소스에"까지다. dev에게 Pod 생성 권한이
+있으면 `latest` 태그든, 미승인 레지스트리 이미지든, limit 없는 Pod든 **전부 통과**한다.
+"생성은 허용하되, **이런 내용이면 고치거나 거부한다**"는 규칙을 걸 자리가 admission이다.
+
+```d2 layout=elk pad=40 title="Mutating과 Validating 어드미션 단계와 각 단계의 대표 플러그인"
+direction: down
+
+classes: {
+  mut: { style: { fill: "#ede9fe"; stroke: "#7c3aed"; font-color: "#4c1d95" } }
+  val: { style: { fill: "#fef3c7"; stroke: "#d97706"; font-color: "#78350f" } }
+  bad: { style: { fill: "#fee2e2"; stroke: "#dc2626"; font-color: "#7f1d1d" } }
+  mute: { style: { fill: "#f1f5f9"; stroke: "#94a3b8"; font-color: "#334155" } }
+}
+
+z: 인가 통과 { class: mute }
+mu: Mutating\n요청을 고친다 { class: mut }
+va: Validating\n거부하거나 통과시킨다 { class: val }
+e: etcd { shape: cylinder; class: mute }
+m1: DefaultStorageClass\nServiceAccount 주입 { class: mut }
+v1: ResourceQuota · PodSecurity\nLimitRanger { class: val }
+x: 거부 { class: bad }
+
+z -> mu
+mu -> va
+va -> e
+mu -> m1: { style.stroke-dash: 3 }
+va -> v1: { style.stroke-dash: 3 }
+va -> x: 위반
+```
+
+| 종류 | 하는 일 | 예 |
+|---|---|---|
+| **Mutating** | 요청을 **고친다** | `DefaultStorageClass`, `ServiceAccount` 주입 |
+| **Validating** | **거부하거나 통과**시킨다 | `ResourceQuota`, `PodSecurity`, `LimitRanger` |
+
+Mutating이 먼저 돌고 Validating이 고쳐진 결과를 검사한다.
+**스케줄링과는 무관하다** — admission은 etcd 저장 **전**의 관문이라,
+여기서 거부된 Pod는 스케줄러가 본 적도 없다.
+
+## 켜고 끄기 — kube-apiserver 플래그
+
+admission 컨트롤러는 별도 설치물이 아니라 **API 서버 안에 내장**돼 있고,
+플래그로 켜고 끈다. kubeadm 클러스터라면 static Pod 매니페스트를 고친다.
+
+```bash
+# 활성 목록 확인
+sudo grep admission-plugins /etc/kubernetes/manifests/kube-apiserver.yaml
+
+# command에 추가 — 기본 셋에 더하거나 뺀다
+- --enable-admission-plugins=NodeRestriction,ImagePolicyWebhook
+- --disable-admission-plugins=DefaultStorageClass
+```
+
+**중요한 내장 플러그인**
+
+- `NamespaceLifecycle` — 없는 네임스페이스로의 생성을 거부하고, `kube-system` 같은
+  시스템 네임스페이스의 삭제를 막는다 (옛 `NamespaceExists`·`NamespaceAutoProvision`을 대체)
+- `LimitRanger` / `ResourceQuota` — [설정과 리소스](/cka/config/)
+- `PodSecurity` — [스케줄링](/cka/scheduling/)
+- `DefaultStorageClass` — PVC에 기본 클래스를 채운다 (mutating의 대표 예)
+- `NodeRestriction` — kubelet이 **자기 노드의 리소스만** 만지게 제한한다
+- `MutatingAdmissionWebhook` / `ValidatingAdmissionWebhook` — 외부 정책 엔진 연동 (아래)
+
+## 세부 설정 — AdmissionConfiguration 파일
+
+일부 플러그인은 켜는 것만으로 끝나지 않고 **세부 설정 파일이 따로** 필요하다.
+대표가 `ImagePolicyWebhook` — Pod 생성·수정 요청에서 **컨테이너 이미지 이름을 뽑아
+외부 webhook 서버에 물어보고**, 응답대로 통과시키거나 거부한다.
+"미승인 레지스트리 이미지를 클러스터에 아예 못 들어오게" 하는 관문의 구현이다.
+
+```yaml
+# 예: /etc/kubernetes/admission/admission-config.yaml
+apiVersion: apiserver.config.k8s.io/v1
+kind: AdmissionConfiguration
+plugins:
+  - name: ImagePolicyWebhook
+    configuration:
+      imagePolicy:
+        kubeConfigFile: /etc/kubernetes/admission/imagepolicy.kubeconfig  # webhook 서버 주소·인증서
+        defaultAllow: false   # webhook이 응답 없을 때 — false면 전부 거부
+```
+
+이 파일을 API 서버 플래그 `--admission-control-config-file=<경로>`로 넘긴다.
+
+:::caution[함정 — kubectl로는 안 보인다]
+`kubectl api-resources`에 `AdmissionConfiguration`이 **없는 게 정상**이다.
+이것은 etcd에 저장되는 API 오브젝트가 아니라 **API 서버가 기동할 때 디스크에서 읽는
+설정 파일의 형식**이고, `apiVersion`은 파일 파싱용 스키마 표시일 뿐이다 —
+[설정과 리소스](/cka/config/)의 `EncryptionConfiguration`, kubelet의 `KubeletConfiguration`과 같은 부류다.
+따라서 `kubectl explain`도 안 되고, 스키마는 kubernetes.io에서
+**ImagePolicyWebhook을 검색**해 찾는다. 그리고 API 서버는 static Pod라서
+설정 파일 경로를 **hostPath 볼륨으로 마운트까지** 해 줘야 읽는다 — 빼먹기 쉽다.
+:::
+
+## 외부 webhook — 직접 만드는 admission
+
+내장 플러그인에 없는 규칙은 webhook 리소스 두 종으로 건다. 이쪽은 설정 파일이 아니라
+**진짜 API 리소스**라(`admissionregistration.k8s.io` 그룹) kubectl로 만들고 조회한다.
+
+<Badge text="시험 비중 낮음" variant="note" /> webhook 서버를 직접 구현하는 데까지 갈 필요는 없다.
+이런 리소스가 있다는 것, **정책 엔진이 여기에 붙는다**는 것, 그리고 아래 함정이
+"갑자기 아무것도 안 만들어진다" 유형의 트러블슈팅에서 쓸모 있다는 점을 챙긴다.
+표에 나오는 OPA는 Open Policy Agent — Kyverno와 함께 **정책을 코드로 쓰게 해 주는** 도구다.
+
+| 리소스 | 시점 | 쓰임 |
+|---|---|---|
+| `MutatingWebhookConfiguration` | validating보다 먼저 | 사이드카 주입, 라벨·기본값 추가 |
+| `ValidatingWebhookConfiguration` | 저장 직전 마지막 검사 | 정책 위반 거부 (OPA Gatekeeper, Kyverno) |
+
+API 서버는 등록된 `rules`에 걸리는 요청마다 **AdmissionReview** JSON을
+webhook 서버(대개 클러스터 안의 Service)로 보내고,
+응답의 `allowed: true/false`대로 통과 여부를 정한다.
+
+:::caution[함정]
+외부 webhook이 응답하지 않으면
+`failurePolicy: Fail`일 때 **해당 리소스 생성이 전부 막힌다.**
+"갑자기 아무것도 안 만들어진다"의 원인이 될 수 있다.
+`ImagePolicyWebhook`의 `defaultAllow: false`도 같은 성격이다 —
+**정책 서버의 장애가 클러스터 전체의 생성 장애**가 된다.
+:::
+
+## 요약
+
+- Admission은 인증과 인가를 통과한 변경 요청의 내용을 수정하거나 검증한다.
+- Mutating 단계는 내용을 고치고 Validating 단계는 허용 여부를 판단한다.
+- AdmissionConfiguration은 API 서버가 읽는 설정 파일이며 API 리소스가 아니다.

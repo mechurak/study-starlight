@@ -1,0 +1,239 @@
+---
+title: "사용자 인증과 CSR"
+description: "사용자 인증은 자격증명에서 신원을 확인하는 과정이며, CSR API로 클라이언트 인증서 발급을 요청할 수 있다."
+deckGroup: cluster-architecture
+sidebar:
+  order: 151
+---
+
+import { Steps, Card, CardGrid } from '@astrojs/starlight/components';
+import Thesis from '../../../components/docs/Thesis.astro';
+
+<Thesis>사용자 인증은 자격증명에서 신원을 확인하는 과정이며, CSR API로 클라이언트 인증서 발급을 요청할 수 있다.</Thesis>
+
+사람이 kubectl로 접속할 때 API 서버는 누구인지 어떻게 알아낼까? 인증 방식부터 인증서 발급과 kubeconfig 등록까지 따라간다. Pod의 신원은 [ServiceAccount](/cka/service-account/)에서 다룬다.
+
+## 사람과 워크로드의 인증
+
+API 서버를 부르는 쪽은 **두 부류**다 — 노트북 앞의 사람과, 클러스터 안에서 도는 워크로드다.
+사람은 수가 적고 조직의 계정 체계가 이미 있는 반면, Pod은 수시로 생겼다 사라지고 자격증명을
+자동으로 받아야 한다. 그래서 Kubernetes는 **사람은 클러스터 밖의 신원(인증서·OIDC)에 맡기고,
+Pod은 클러스터 안의 오브젝트(ServiceAccount)로** 관리한다.
+
+## 인증 방식들
+
+<CardGrid>
+<Card title="클라이언트 인증서" icon="padlock">
+사람(관리자)용.
+kubeadm의 `admin.conf`가 이것이다.
+</Card>
+<Card title="ServiceAccount 토큰" icon="document">
+Pod 안의 워크로드용. JWT(JSON Web Token).
+</Card>
+<Card title="OIDC" icon="external">
+OIDC(OpenID Connect).
+사람 · 조직 SSO(Single Sign-On·통합 로그인). 실무 표준.
+</Card>
+<Card title="Webhook" icon="link">
+외부 시스템에 위임.
+EKS의 IAM 연동 등.
+</Card>
+</CardGrid>
+
+뒤의 둘은 **실무의 표준이지만 시험에서 직접 설정할 일은 거의 없다** — 어떤 문제를 푸는 방식인지만 알아두면 된다.
+OIDC는 사내 IdP(Identity Provider·신원 공급자)가 발급한 토큰을 API 서버가 검증하게 하는 방식으로,
+사람마다 인증서를 발급·폐기하는 수고를 없앤다. Webhook은 그 판정 자체를 외부 서비스에 물어보는 방식이고,
+EKS가 AWS IAM 계정을 클러스터 사용자로 인식시키는 것이 이 경우다.
+
+Bootstrap 토큰은 노드 조인 전용이다 (`kubeadm join` 때).
+새 노드는 아직 아무 자격증명이 없으니 CSR을 제출할 신원조차 없다 —
+**"CSR을 낼 수 있을 만큼만" 권한이 있는 임시 토큰**이 이 자리를 메운다.
+`kubeadm token create`로 만들고 기본 24시간이면 만료된다 ([클러스터 설치](/cka/cluster-setup/)).
+
+**중요: Kubernetes에는 "User" 오브젝트가 없다.**
+
+```d2 layout=elk pad=40 title="클라이언트 인증서의 CN·O 필드가 사용자와 그룹이 되고 User 오브젝트는 없다는 점"
+direction: down
+
+classes: {
+  key: { style: { fill: "#dbeafe"; stroke: "#2563eb"; font-color: "#1e3a8a" } }
+  bad: { style: { fill: "#fee2e2"; stroke: "#dc2626"; font-color: "#7f1d1d" } }
+  mute: { style: { fill: "#f1f5f9"; stroke: "#94a3b8"; font-color: "#334155" } }
+}
+
+crt: 클라이언트 인증서 { class: mute }
+cn: CN 필드\n= 사용자 이름 { class: key }
+o: O 필드\n= 그룹 { class: key }
+api: API 서버가 문자열로 인식 { class: mute }
+no: kubectl get users { class: mute }
+x: User 오브젝트 부재 { class: bad }
+
+crt -> cn
+crt -> o
+cn -> api
+o -> api
+no -> x: 그런 명령은 없다 ❌ { style.stroke-dash: 3 }
+```
+
+- `kubectl get users` 같은 것은 존재하지 않는다
+- 사용자는 **인증서의 CN 필드**나 **OIDC 토큰의 클레임**에서 문자열로 나온다
+- 그룹은 인증서의 **O(Organization) 필드**에서 나온다
+
+이 페이지에서는 사용자 인증 방법 중 **클라이언트 인증서 발급**을 따라간다.
+
+## 인증서와 키를 구분하기
+
+TLS에서 인증서는 **공개 키가 든 신분증**이고, 개인 키는 그 신분증의 주인임을
+증명하는 **비밀**이다. 인증서에는 공개 키 하나만 있는 것이 아니라 주체와 발급자,
+유효기간, SAN(Subject Alternative Name), CA의 서명도 든다.
+
+| 파일 | 역할 | 비밀 여부 |
+|---|---|---|
+| `apiserver.crt` | API 서버가 클라이언트에게 제시하는 인증서 | 비밀 키 아님 |
+| `apiserver.key` | 인증서의 공개 키와 짝인 API 서버 개인 키 | 비밀 |
+| `ca.crt` | CA 공개 키로 인증서 서명을 검증하는 신뢰 기준 | 비밀 키 아님 |
+| `ca.key` | 새 인증서에 CA 서명을 만드는 개인 키 | 극비 |
+
+`kubectl` 은 API 서버가 낸 `apiserver.crt`를 믿고 싶어도 그대로 믿지 않는다. 자신의
+`ca.crt`로 **서명을 검증**하고, 접속한 DNS나 IP가 SAN에 있는지와 유효기간을 확인한다.
+API 서버는 TLS 핸드셰이크에서 `apiserver.key`를 보내지 않고, **그 키를 가지고 있다는
+사실만 증명**한다.
+
+클라이언트 인증도 같다. API 서버가 kubelet에 접속할 때는
+`apiserver-kubelet-client.crt`를 보내고, 로컬의 `apiserver-kubelet-client.key`로 TLS
+핸드셰이크에 서명한다. kubelet은 인증서 안의 공개 키로 서명을 검증한다.
+`--kubelet-client-key`는 **로컬에서 쓸 개인 키 파일의 경로**를 지정할 뿐이며,
+개인 키 자체는 kubelet에 전송하지 않는다. 이 키가 유출되면 다른 주체가 API 서버로
+위장할 수 있으므로 화면·로그·저장소에 노출하지 않는다.
+
+`.crt`·`.key`·`.pub`는 내용을 알아보기 쉽게 붙인 **파일명 관례**다. 반면
+PEM(Privacy-Enhanced Mail)과 DER(Distinguished Encoding Rules)은 **저장 형식**이다.
+PEM은 Base64 텍스트라서 첫 줄로 내용을 알 수 있고, DER은 같은 데이터를 바이너리로
+저장한다. 따라서 `.crt`도 PEM이거나 DER일 수 있고, `.pem`에도 인증서나 키가 들어갈 수 있다.
+
+```text
+-----BEGIN CERTIFICATE-----         # 인증서
+-----BEGIN PRIVATE KEY-----         # 개인 키
+-----BEGIN RSA PRIVATE KEY-----     # RSA 개인 키
+-----BEGIN PUBLIC KEY-----          # 공개 키
+-----BEGIN CERTIFICATE REQUEST----- # CSR
+```
+
+확장자만 보고 단정하지 말고 `openssl`로 내용을 확인한다. 개인 키는 화면이나 로그에
+출력하지 않는다.
+
+```bash
+openssl x509 -in /etc/kubernetes/pki/apiserver.crt -noout -subject -issuer -dates
+openssl pkey -in /etc/kubernetes/pki/apiserver.key -check -noout
+```
+
+## 사용자 인증서 만들기 (CSR API)
+
+클라이언트 인증서로 접속하려면, 누군가는 그 인증서에 **클러스터 CA(Certificate Authority·인증 기관)의
+키로 서명**해야 한다. 그 키는 컨트롤 플레인 노드의 `/etc/kubernetes/pki/`에 있고, 아무나 만질 수 없다.
+CSR(CertificateSigningRequest) API는 **"서명해 달라"는 요청을 API 오브젝트로 만들어**,
+권한 있는 사람이 `approve`하고 해당 signer가 요청을 처리하면 인증서를 발급하는 창구다 — CA 키를 넘겨줄 필요가 없어진다.
+
+CSR 오브젝트의 YAML은 외우지 말고, 시험 중에는 공식
+[Certificate Signing Requests](https://kubernetes.io/docs/reference/access-authn-authz/certificate-signing-requests/)
+페이지를 열어 뼈대를 복사한 뒤 `request` 필드만 채우는 게 정석이다.
+
+<Steps>
+
+1. **키와 CSR 생성** — `CN`이 사용자, `O`가 그룹이다
+
+   ```bash
+   openssl genrsa -out dev.key 2048
+   openssl req -new -key dev.key -out dev.csr -subj "/CN=dev/O=developers"
+   #                                                  ^사용자    ^그룹
+   ```
+
+2. **Kubernetes CSR 오브젝트로 제출**
+
+   ```bash
+   cat <<EOF | kubectl apply -f -
+   apiVersion: certificates.k8s.io/v1
+   kind: CertificateSigningRequest
+   metadata:
+     name: dev
+   spec:
+     request: $(cat dev.csr | base64 | tr -d '\n')
+     signerName: kubernetes.io/kube-apiserver-client
+     expirationSeconds: 86400
+     usages: ["client auth"]
+   EOF
+   ```
+
+3. **승인**
+
+   ```bash
+   kubectl get csr
+   kubectl certificate approve dev
+   kubectl certificate deny dev            # 거부할 때
+   ```
+
+4. **서명된 인증서 꺼내기**
+
+   ```bash
+   kubectl get csr dev -o jsonpath='{.status.certificate}' | base64 -d > dev.crt
+   ```
+
+</Steps>
+
+`signerName`은 **어떤 서명자와 발급 정책을 사용할지**를 고르는 필드다. 사람·앱이 API 서버에 접속할 인증서는
+`kubernetes.io/kube-apiserver-client`가 정답이고, kubelet용(`...kubelet-serving`,
+`...kube-apiserver-client-kubelet`)은 노드 자동 갱신에 쓰인다 — 이름을 틀리면 아무도 서명하지 않아
+CSR이 `Pending`에서 멈춘다. `expirationSeconds`는 발급될 인증서의 수명 요청이다(위 예는 24시간).
+
+```d2 pad=40 title="CSR 제출부터 승인·서명·kubeconfig 등록까지의 사용자 인증서 발급 절차"
+shape: sequence_diagram
+
+u: 사용자
+k: kubectl
+api: kube-apiserver
+ca: 클러스터 CA
+
+u -> u: openssl 로 key + csr 생성\n(CN=dev, O=developers)
+u -> api: CertificateSigningRequest 제출
+api.n1: "status: Pending"
+k -> api: kubectl certificate\napprove dev
+api -> ca: 서명 요청
+ca -> api: 서명된 인증서 { style.stroke-dash: 3 }
+api -> u: status.certificate (base64) { style.stroke-dash: 3 }
+u -> u: kubeconfig 에 등록
+u.n1: 여기까지는 인증만 · 권한은 아직 0
+```
+
+## kubeconfig에 등록하기
+
+```bash
+kubectl config set-credentials dev \
+  --client-certificate=dev.crt \
+  --client-key=dev.key \
+  --embed-certs=true
+
+kubectl config set-context dev-ctx \
+  --cluster=kubernetes \
+  --user=dev \
+  --namespace=dev
+
+kubectl config use-context dev-ctx
+kubectl auth whoami            # 내가 누구로 인식되는지
+```
+
+:::tip[시험]
+CSR 생성·승인은 **출제 빈도가 높다.**
+`kubectl get csr` → `kubectl certificate approve` 흐름과
+**CN이 사용자 이름, O가 그룹**이라는 것만 확실히 하면 된다.
+:::
+
+:::caution[함정]
+인증서를 발급받는 것만으로 **원하는 작업 권한이 생기지는 않는다.**
+인증(누구인가)과 인가(무엇을 할 수 있는가)는 별개다. RoleBinding을 따로 만들어야 한다.
+:::
+
+## 요약
+
+- 사용자 인증은 자격증명에서 신원을 확인하는 과정이며, CSR API로 클라이언트 인증서 발급을 요청할 수 있다.
+- 인증서의 CN은 사용자 이름, O는 그룹으로 인식된다.
+- CSR 승인 후 발급된 인증서를 kubeconfig에 연결하고, 작업 권한은 [RBAC](/cka/rbac/)으로 확인한다.

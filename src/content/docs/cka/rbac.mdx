@@ -1,0 +1,523 @@
+---
+title: "RBAC — 역할과 권한 연결"
+description: "Role은 허용할 작업을 정의하고, Binding은 그 권한을 사용자·그룹·ServiceAccount에 연결한다."
+deckGroup: cluster-architecture
+sidebar:
+  order: 153
+---
+
+import { Steps, Card, CardGrid, Badge } from '@astrojs/starlight/components';
+import Thesis from '../../../components/docs/Thesis.astro';
+
+<Thesis>Role은 허용할 작업을 정의하고, Binding은 그 권한을 사용자·그룹·ServiceAccount에 연결한다.</Thesis>
+
+신원이 확인되어도 모든 작업을 허용할 수는 없다. RBAC(Role-Based Access Control, 역할 기반 접근 제어)은 누가 어느 범위에서 무엇을 할 수 있는지 정한다. 이 페이지에서는 권한 정의부터 연결과 검산까지 다룬다.
+
+## RBAC의 네 리소스
+
+인가를 "이 사람에게 이 권한"으로 하나씩 붙이면, 사람이 늘 때마다 권한 목록을 통째로 복사해야 하고
+정책이 바뀌면 전부를 찾아 고쳐야 한다. RBAC은
+**역할에 권한을 정의해 두고, 주체를 그 역할에 묶는** 방식이다.
+권한 정의는 한 곳에 모이고, 사람이 늘어나는 일은 **묶기 하나를 더하는 일**이 된다.
+
+**핵심 구조는 하나다 — 주체 → 바인딩 → 역할 → 리소스.**
+
+```d2 layout=elk pad=40 title="주체·바인딩·권한 정의 세 층과 Role·ClusterRole 조합"
+direction: down
+
+classes: {
+  subj: { style: { fill: "#dbeafe"; stroke: "#2563eb"; font-color: "#1e3a8a" } }
+  bind: { style: { fill: "#fef3c7"; stroke: "#d97706"; font-color: "#78350f" } }
+  role: { style: { fill: "#dcfce7"; stroke: "#16a34a"; font-color: "#14532d" } }
+  mute: { style: { fill: "#f1f5f9"; stroke: "#94a3b8"; font-color: "#334155" } }
+}
+
+subj: 주체 (subjects) {
+  u: User\n인증서 CN { class: subj }
+  g: Group\n인증서 O { class: subj }
+  s: ServiceAccount { class: subj }
+}
+
+bindg: 연결 (Binding) {
+  rb: RoleBinding\n네임스페이스 안 { class: bind }
+  crb: ClusterRoleBinding\n클러스터 전체 { class: bind }
+}
+
+roleg: 권한 정의 (Role) {
+  r: Role\n네임스페이스 안 { class: role }
+  cr: ClusterRole\n클러스터 전체 { class: role }
+}
+
+res: 리소스 + 동사\npods · get,list,watch { class: mute }
+
+subj.u -> bindg.rb
+subj.g -> bindg.rb
+subj.s -> bindg.rb
+subj.u -> bindg.crb
+bindg.rb -> roleg.r: roleRef
+bindg.rb -> roleg.cr: roleRef
+bindg.crb -> roleg.cr: roleRef
+roleg.r -> res
+roleg.cr -> res
+```
+
+**권한을 정의한다** — `Role`(네임스페이스 안) · `ClusterRole`(클러스터 전체)\
+**권한을 부여한다** — `RoleBinding`(네임스페이스 안) · `ClusterRoleBinding`(클러스터 전체)
+
+- RBAC은 **누적(additive)** 이다. **거부 규칙이 없다**
+- 어느 규칙에도 안 걸리면 **기본 거부**
+
+NetworkPolicy와 같은 철학이다 — **"막는다"가 아니라 "허용하지 않는다"**.
+
+### Role
+
+```yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: pod-reader
+  namespace: dev
+rules:
+  - apiGroups: [""]                 # "" = core 그룹 (Pod, Service, ConfigMap …)
+    resources: ["pods", "pods/log"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["apps"]
+    resources: ["deployments"]
+    verbs: ["get", "list", "update", "patch"]
+  - apiGroups: [""]
+    resources: ["secrets"]
+    resourceNames: ["db-secret"]    # 특정 이름만
+    verbs: ["get"]
+```
+
+```bash
+kubectl create role pod-reader --verb=get,list,watch --resource=pods -n dev
+kubectl create role pod-reader --verb=get --resource=pods --resource-name=web -n dev
+```
+
+`resourceNames`는 **지정한 이름의 오브젝트로 권한을 좁힌다** — 위 예는 `dev` 네임스페이스의
+Secret 중 `db-secret`만 읽게 한다. `get`으로 이름을 지정하는 요청과 전체 목록 요청은 다르므로,
+이 규칙만으로 `kubectl get secrets`를 실행하면 403이다.
+`list`·`watch`에도 이름 제한을 적용할 수 있지만, 허용된 동사와 함께
+`metadata.name` 필드 셀렉터가 필요하다. 자세한 조건은
+[공식 RBAC 문서](https://kubernetes.io/docs/reference/access-authn-authz/rbac/#referring-to-resources)에서 확인한다.
+
+### verbs와 apiGroups
+
+**주요 verb**
+
+| verb | HTTP |
+|---|---|
+| `get` | GET (단일) |
+| `list` | GET (목록) |
+| `watch` | GET (스트림) |
+| `create` | POST |
+| `update` | PUT |
+| `patch` | PATCH |
+| `delete` | DELETE |
+| `deletecollection` | DELETE (다수) |
+| `*` | 전부 |
+
+**apiGroups**
+
+| 값 | 리소스 |
+|---|---|
+| `""` | Pod, Service, ConfigMap, Secret, Node, PV… |
+| `"apps"` | Deployment, ReplicaSet, StatefulSet, DaemonSet |
+| `"batch"` | Job, CronJob |
+| `"networking.k8s.io"` | Ingress, NetworkPolicy |
+| `"rbac.authorization.k8s.io"` | Role, RoleBinding |
+| `"storage.k8s.io"` | StorageClass, CSIDriver |
+
+```bash
+kubectl api-resources                    # APIVERSION 열에서 그룹을 확인
+kubectl api-resources --api-group=apps
+```
+
+### 하위 리소스를 잊지 말 것
+
+일부 동작은 **별도의 하위 리소스**로 취급된다.
+
+```d2 layout=elk pad=40 title="pods 권한만으로는 kubectl logs·exec가 안 되고 하위 리소스가 따로 필요한 관계"
+direction: down
+
+classes: {
+  ok: { style: { fill: "#dcfce7"; stroke: "#16a34a"; font-color: "#14532d" } }
+  bad: { style: { fill: "#fee2e2"; stroke: "#dc2626"; font-color: "#7f1d1d" } }
+  key: { style: { fill: "#dbeafe"; stroke: "#2563eb"; font-color: "#1e3a8a" } }
+}
+
+p: pods 에 get·list 권한
+fine: kubectl get pods ✅ { class: ok }
+l: kubectl logs { class: bad }
+need1: pods/log 가 따로 필요 { class: key }
+e: kubectl exec { class: bad }
+need2: pods/exec · verb 는 create { class: key }
+
+p -> fine
+p -> l: 이것만으로는 안 된다 ❌ { style.stroke-dash: 3 }
+l -> need1
+p -> e: 안 된다 ❌ { style.stroke-dash: 3 }
+e -> need2
+```
+
+| 하고 싶은 것 | 필요한 리소스 |
+|---|---|
+| `kubectl logs` | **`pods/log`** |
+| `kubectl exec` | **`pods/exec`** (verb는 `create`) |
+| `kubectl port-forward` | `pods/portforward` |
+| `kubectl scale deploy` | `deployments/scale` |
+| Pod 상태 갱신 | `pods/status` |
+
+:::caution[함정]
+**`pods`에 `get` 권한이 있어도 `kubectl logs`는 403이다.**
+`pods/log`가 따로 필요하다. 실무·시험 모두에서 자주 걸린다.
+:::
+
+```yaml
+- apiGroups: [""]
+  resources: ["pods/exec"]
+  verbs: ["create"]           # exec은 create 동사다
+```
+
+### RoleBinding
+
+```yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: dev-can-read-pods
+  namespace: dev
+subjects:
+  - kind: User                             # 인증서의 CN
+    name: dev
+    apiGroup: rbac.authorization.k8s.io
+  - kind: Group                            # 인증서의 O
+    name: developers
+    apiGroup: rbac.authorization.k8s.io
+  - kind: ServiceAccount                   # SA는 apiGroup을 쓰지 않는다
+    name: deploy-bot
+    namespace: dev
+roleRef:
+  kind: Role                               # Role 또는 ClusterRole
+  name: pod-reader
+  apiGroup: rbac.authorization.k8s.io
+```
+
+```bash
+kubectl create rolebinding dev-can-read-pods --role=pod-reader --user=dev -n dev
+kubectl create rolebinding sa-binding --role=pod-reader --serviceaccount=dev:deploy-bot -n dev
+```
+
+:::caution[함정]
+**`roleRef`는 생성 후 변경할 수 없다.**
+바꾸려면 바인딩을 지우고 다시 만들어야 한다.
+:::
+
+### ClusterRole과 ClusterRoleBinding
+
+Role은 네임스페이스 안의 리소스만 가리킬 수 있다. 그런데 Node·PV·StorageClass처럼
+**네임스페이스가 아예 없는 리소스**가 있고, "모든 네임스페이스에서 Pod을 볼 수 있는 사람"도 필요하다.
+Role로는 표현할 수 없는 이 범위를 맡는 것이 ClusterRole이다.
+
+```bash
+kubectl create clusterrole node-reader --verb=get,list,watch --resource=nodes
+kubectl create clusterrolebinding ops-nodes --clusterrole=node-reader --user=ops
+```
+
+**ClusterRole이 필요한 경우**
+
+<CardGrid>
+<Card title="클러스터 스코프 리소스" icon="server">
+Node, PersistentVolume, StorageClass,
+Namespace, ClusterRole — 네임스페이스가 없는 것들.
+</Card>
+<Card title="여러 네임스페이스 재사용" icon="random">
+같은 권한 정의를 여러 곳에서
+RoleBinding으로 붙여 쓴다.
+</Card>
+<Card title="비(非)리소스 URL" icon="link">
+`/healthz`, `/metrics` 같은
+리소스가 아닌 경로.
+</Card>
+</CardGrid>
+
+```yaml
+rules:
+  - nonResourceURLs: ["/healthz", "/metrics"]
+    verbs: ["get"]
+```
+
+`nonResourceURLs`는 **API 오브젝트가 아닌 경로**를 다룬다. `/healthz`·`/metrics`·`/version`처럼
+API 서버가 그냥 응답하는 엔드포인트에는 apiGroup도 resource도 없어서, 보통의 `rules`로는
+가리킬 수 없기 때문이다. 모니터링 시스템에 권한을 줄 때 쓰이며,
+**깊게 팔 필요는 없다 — ClusterRole에서만 쓸 수 있다는 것만 기억한다.**
+
+### 조합 — 이 그림이 전부다
+
+```d2 layout=elk pad=40 title="roleRef와 바인딩 종류 조합에 따라 권한이 미치는 범위"
+direction: down
+
+classes: {
+  ok: { style: { fill: "#dcfce7"; stroke: "#16a34a"; font-color: "#14532d" } }
+  star: { style: { fill: "#dbeafe"; stroke: "#2563eb"; font-color: "#1e3a8a" } }
+  bad: { style: { fill: "#fee2e2"; stroke: "#dc2626"; font-color: "#7f1d1d" } }
+  mute: { style: { fill: "#f1f5f9"; stroke: "#94a3b8"; font-color: "#334155" } }
+}
+
+q1: roleRef 가 무엇인가 { shape: diamond; class: mute }
+q2: 바인딩 종류 { shape: diamond; class: mute }
+q3: 바인딩 종류 { shape: diamond; class: mute }
+a1: 그 네임스페이스\n안에서만 ✅ { class: ok }
+a2: 불가능 · 허용되지 않는다 ❌ { class: bad }
+a3: 그 네임스페이스 안에서만\n★ 권한 정의를 재사용 ✅ { class: star }
+a4: 모든 네임스페이스\n+ 클러스터 스코프 ✅ { class: ok }
+
+q1 -> q2: Role
+q1 -> q3: ClusterRole
+q2 -> a1: RoleBinding
+q2 -> a2: ClusterRoleBinding
+q3 -> a3: RoleBinding
+q3 -> a4: ClusterRoleBinding
+```
+
+| roleRef | 바인딩 종류 | 결과 |
+|---|---|---|
+| `Role` | `RoleBinding` | **그 네임스페이스 안에서만** |
+| `ClusterRole` | `RoleBinding` | **그 네임스페이스 안에서만** (권한 정의를 재사용) |
+| `ClusterRole` | `ClusterRoleBinding` | **모든 네임스페이스 + 클러스터 스코프** |
+| `Role` | `ClusterRoleBinding` | **불가능** — 허용되지 않는다 |
+
+**세 번째 줄(파란 칸)이 핵심이다.** ClusterRole을 RoleBinding으로 묶으면
+**권한 범위는 그 네임스페이스로 좁혀진다.**
+
+:::tip[시험]
+"여러 네임스페이스에서 같은 권한"은
+ClusterRole 하나 + 각 네임스페이스에 RoleBinding으로 푼다.
+Role을 네임스페이스마다 복사하는 것보다 빠르고 정확하다.
+:::
+
+### 내장 ClusterRole
+
+"읽기 전용 권한"이나 "네임스페이스 안에서 다 할 수 있는 권한"은 어느 클러스터에나 필요하다.
+그래서 Kubernetes가 **미리 만들어 둔 ClusterRole**이 있다 — 시험에서도 Role을 새로 쓰는 것보다
+이걸 RoleBinding으로 붙이는 쪽이 빠를 때가 많다.
+
+```bash
+kubectl get clusterroles
+kubectl describe clusterrole view
+```
+
+```d2 layout=elk pad=40 title="cluster-admin·admin·edit·view 기본 ClusterRole의 권한 크기 순서"
+direction: down
+
+classes: {
+  top: { style: { fill: "#fee2e2"; stroke: "#dc2626"; font-color: "#7f1d1d" } }
+  mid: { style: { fill: "#fef3c7"; stroke: "#d97706"; font-color: "#78350f" } }
+  low: { style: { fill: "#dcfce7"; stroke: "#16a34a"; font-color: "#14532d" } }
+}
+
+ca: cluster-admin\n전부 · * on * { class: top }
+ad: admin\n네임스페이스 안의 거의 전부 { class: mid }
+ed: edit\n대부분 읽기·쓰기\nRBAC 은 못 만짐 { class: mid }
+vi: view\n읽기 전용\nSecret 은 못 봄 { class: low }
+
+ca -> ad
+ad -> ed
+ed -> vi
+```
+
+| 이름 | 권한 |
+|---|---|
+| **`cluster-admin`** | 전부. `*` on `*` |
+| **`admin`** | 네임스페이스 안의 거의 전부 (ResourceQuota·Namespace 자체는 제외) |
+| **`edit`** | 대부분의 리소스 읽기·쓰기. **RBAC은 못 만진다** |
+| **`view`** | 읽기 전용. **Secret은 못 본다** |
+
+```bash
+kubectl create clusterrolebinding me-admin --clusterrole=cluster-admin --user=alice
+kubectl create rolebinding dev-edit --clusterrole=edit --user=bob -n dev
+```
+
+`system:` 접두사가 붙은 것들은 컴포넌트용이다 (`system:node`, `system:kube-scheduler` …).
+**수정하지 말 것.** kubelet·스케줄러·컨트롤러 매니저가 이 역할로 API 서버를 부르므로,
+잘못 건드리면 클러스터 자체가 멈춘다.
+게다가 API 서버는 기동할 때 기본 역할에서 **빠진 권한을 도로 채워 넣는다** —
+지운 규칙은 살아 돌아오고 더한 규칙은 그대로 남아, 의도와 다른 상태가 되기 쉽다.
+
+### 집계 ClusterRole<Badge text="시험 비중 낮음" variant="note" />
+
+CRD(CustomResourceDefinition)로 새 리소스를 들여오면, `view` 권한을 가진 사람들은 그것을 못 본다 —
+`view`의 규칙에 그 리소스가 없기 때문이다. 그렇다고 내장 역할을 직접 고치는 것은 위험하다(바로 위).
+**집계(aggregation)가 그 사이를 메운다.** 라벨이 붙은 ClusterRole을 만들어 두면
+API 서버가 그 규칙을 내장 역할 안으로 **자동으로 합쳐 준다.**
+
+```yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: monitoring
+  labels:
+    rbac.authorization.k8s.io/aggregate-to-view: "true"    # view에 자동 합쳐진다
+rules:
+  - apiGroups: ["monitoring.coreos.com"]
+    resources: ["prometheuses"]
+    verbs: ["get", "list", "watch"]
+```
+
+```d2 layout=elk pad=40 title="aggregationRule이 라벨 붙은 ClusterRole을 수집해 view에 자동 반영되는 흐름"
+direction: down
+
+classes: {
+  key: { style: { fill: "#dbeafe"; stroke: "#2563eb"; font-color: "#1e3a8a" } }
+  ok: { style: { fill: "#dcfce7"; stroke: "#16a34a"; font-color: "#14532d" } }
+  mute: { style: { fill: "#f1f5f9"; stroke: "#94a3b8"; font-color: "#334155" } }
+}
+
+new: "새 ClusterRole\n라벨: aggregate-to-view=true" { class: key }
+agg: view 의 aggregationRule 이\n이 라벨을 수집 { class: mute }
+view: ClusterRole view\n규칙이 자동으로 합쳐진다 { class: mute }
+users: 기존 view 사용자 전원에게\n즉시 반영 ✅ { class: ok }
+
+new -> agg
+agg -> view
+view -> users
+```
+
+- 라벨을 붙이면 **기존 `view`/`edit`/`admin`에 규칙이 자동으로 합쳐진다**
+- CRD를 설치할 때 기본 역할에 권한을 얹는 표준 방법이다
+- `admin`/`edit`/`view`의 `aggregationRule`이 이 라벨을 수집한다
+
+```bash
+kubectl get clusterrole view -o yaml | grep -A5 aggregationRule
+```
+
+`aggregationRule`이 있는 ClusterRole의 `rules`는 **컨트롤러가 채우는 자리**다 — 손으로 적어도 덮어써진다.
+직접 만들 일은 드물지만, `view`의 `rules`가 왜 저절로 늘어나는지를 설명해 주는 장치라
+**이름과 동작 방향만 알아두면 된다.**
+
+## 권한 확인하기
+
+RBAC은 **여러 바인딩의 합**이라, YAML을 눈으로 읽어서는 "그래서 이 사람이 지금 무엇을 할 수 있는가"가
+잘 안 보인다. `kubectl auth can-i`는 그 계산을 **API 서버에게 직접 물어보는** 명령이다 —
+실제 인가 판정과 같은 코드가 답하므로, 내 해석이 아니라 클러스터의 결론이 나온다.
+impersonation(가장·`--as`)까지 쓰면 로그인하지 않고도 남의 관점에서 확인할 수 있다.
+
+```bash
+kubectl auth can-i create deployments -n dev
+kubectl auth can-i delete pods --all-namespaces
+kubectl auth can-i '*' '*'                         # 클러스터 관리자인가
+
+# 남의 권한을 대신 확인 (impersonation)
+kubectl auth can-i list secrets -n dev --as=dev
+kubectl auth can-i get pods --as=system:serviceaccount:dev:deploy-bot -n dev
+
+# 내가 가진 권한 전부
+kubectl auth can-i --list -n dev
+kubectl auth whoami
+```
+
+:::tip[시험]
+RBAC 문제의 **검산은 반드시 `auth can-i --as`** 로 한다.
+"만들었다"와 "동작한다"는 다르다. SA 표기는
+**`system:serviceaccount:네임스페이스:이름`** 형식이다 — 이 문자열을 외워둘 것.
+:::
+
+## 실제로 실행해보기
+
+```bash
+# impersonation으로 테스트 (kubeconfig 전환 없이)
+kubectl --as=dev get pods -n dev
+kubectl --as=dev --as-group=developers get pods -n dev
+
+# SA 토큰으로 Pod 안에서
+kubectl run tmp --image=curlimages/curl --rm -it --restart=Never \
+  --overrides='{"spec":{"serviceAccountName":"deploy-bot"}}' -- sh
+  TOKEN=$(cat /var/run/secrets/kubernetes.io/serviceaccount/token)
+  curl -s --cacert /var/run/secrets/kubernetes.io/serviceaccount/ca.crt \
+    -H "Authorization: Bearer $TOKEN" \
+    https://kubernetes.default.svc/api/v1/namespaces/dev/pods
+```
+
+:::caution[함정]
+`--as` 로 남을 흉내내려면
+**본인에게 impersonate 권한이 있어야** 한다.
+`cluster-admin`이면 문제없지만, 제한된 계정으로는 안 된다.
+:::
+
+
+## RBAC 진단 순서
+
+<Steps>
+
+1. **에러 메시지를 정확히 읽는다** — 필요한 정보가 다 있다
+
+   ```
+   Error from server (Forbidden): pods is forbidden:
+     User "dev" cannot list resource "pods" in API group "" in the namespace "prod"
+   ```
+
+2. **실제로 안 되는지 확인**
+
+   ```bash
+   kubectl auth can-i list pods -n prod --as=dev
+   ```
+
+3. **바인딩이 있는지**
+
+   ```bash
+   kubectl get rolebinding,clusterrolebinding -A -o wide | grep dev
+   ```
+
+4. **역할의 내용 확인**
+
+   ```bash
+   kubectl describe role pod-reader -n prod
+   kubectl describe clusterrole view
+   ```
+
+</Steps>
+
+```d2 layout=elk pad=40 title="403이 났을 때 바인딩 위치·apiGroup·하위 리소스·주체 표기를 차례로 확인하는 진단표"
+direction: down
+
+classes: {
+  bad: { style: { fill: "#fee2e2"; stroke: "#dc2626"; font-color: "#7f1d1d" } }
+  mute: { style: { fill: "#f1f5f9"; stroke: "#94a3b8"; font-color: "#334155" } }
+}
+
+s: 403 이 났다 { shape: diamond; class: mute }
+c1: 바인딩이 대상\n네임스페이스에 있는가 { shape: diamond; class: mute }
+f1: RoleBinding 은 대상 네임스페이스에\n있어야 한다 { class: bad }
+c2: apiGroup 이 맞는가 { shape: diamond; class: mute }
+f2: apps vs 빈 문자열\nDeployment 는 apps { class: bad }
+c3: 하위 리소스가\n필요한 동작인가 { shape: diamond; class: mute }
+f3: pods/log · pods/exec 를 추가 { class: bad }
+c4: 주체 표기가 맞는가 { shape: diamond; class: mute }
+f4: "system:serviceaccount:ns:name" { class: bad }
+f5: roleRef 를 고치려 했는가\n→ 변경 불가 · 지우고 다시 { class: bad }
+
+s -> c1
+c1 -> f1: 없다
+c1 -> c2: 있다
+c2 -> f2: 틀렸다
+c2 -> c3: 맞다
+c3 -> f3: 그렇다
+c3 -> c4: 아니다
+c4 -> f4: SA 인데 형식이 틀림
+c4 -> f5: 맞다
+```
+
+| 흔한 원인 | 확인 |
+|---|---|
+| 바인딩의 **네임스페이스가 다르다** | RoleBinding은 대상 네임스페이스에 있어야 한다 |
+| **apiGroup 오타** | `apps` vs `""` — Deployment는 `apps` |
+| **하위 리소스 누락** | `pods/log`, `pods/exec` |
+| **SA 이름 형식** | `system:serviceaccount:ns:name` |
+| `roleRef`를 고치려 했다 | 변경 불가 — 지우고 다시 |
+
+## 요약
+
+- Role은 허용할 작업을 정의하고, Binding은 그 권한을 사용자·그룹·ServiceAccount에 연결한다.
+- ClusterRole을 RoleBinding으로 연결하면 그 네임스페이스에서 권한이 적용된다.
+- apiGroups·verbs·하위 리소스를 확인하고 `auth can-i --as`로 검산한다.

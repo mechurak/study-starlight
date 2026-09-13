@@ -1,0 +1,249 @@
+---
+title: "etcd 백업과 복구"
+description: "etcd 스냅샷으로 선언된 상태를 보관하고, 복구한 데이터 디렉터리를 etcd에 연결한다."
+deckGroup: cluster-architecture
+sidebar:
+  order: 164
+---
+
+import { Steps } from '@astrojs/starlight/components';
+import Thesis from '../../../components/docs/Thesis.astro';
+
+<Thesis>etcd 스냅샷으로 선언된 상태를 보관하고, 복구한 데이터 디렉터리를 etcd에 연결한다.</Thesis>
+
+API 서버에 저장한 리소스는 etcd에 남는다. 이 페이지에서는 인증서를 준비해 스냅샷을 만들고, 장애 때 새 데이터 디렉터리로 복구하는 과정을 다룬다.
+
+## etcd 백업과 복구
+
+**클러스터에서 백업할 것은 사실상 etcd 하나뿐이다.**
+[아키텍처](/cka/architecture/)에서 본 대로 선언된 상태(spec)는 전부 etcd에 저장되고,
+나머지 컴포넌트는 그 상태를 읽어 움직이는 **상태 없는 프로세스**다.
+apiserver나 scheduler가 죽으면 다시 띄우면 그만이지만,
+**etcd 데이터를 잃으면 Deployment도 Secret도 RBAC도 전부 사라진다** — 복구할 원본이 없다.
+
+그래서 백업은 "혹시 모르니"가 아니라 **클러스터를 되살릴 수 있는 유일한 수단**이고,
+시험에서도 이 장에서 가장 자주 나오는 작업이다.
+
+## etcd cluster와 endpoint
+
+문제의 *ETCD cluster*는 여러 etcd 멤버가 함께 제공하는 **하나의 논리적 저장소**를 뜻한다.
+[아키텍처](/cka/architecture/)의 운영 구성은 보통 3·5개 멤버지만, 단일 컨트롤 플레인 실습처럼
+멤버가 하나뿐이어도 관례상 etcd cluster라고 부른다.
+
+*At what address can you reach the ETCD cluster from the controlplane node?*는 그 저장소에
+클라이언트로 접속할 **endpoint URL**을 묻는다. etcd 매니페스트의 `--listen-client-urls`에서
+확인하며, 같은 노드에서 실행하는 `etcdctl`은 보통 다음 주소를 쓴다.
+
+```text
+https://127.0.0.1:2379
+```
+
+- `127.0.0.1`: control plane 노드 자기 자신
+- `2379`: API 서버·`etcdctl` 같은 **클라이언트가 접속하는 포트**
+- `2380`: etcd 멤버끼리 Raft 통신에 쓰는 **peer 포트** — 이 문제의 답이 아니다
+
+IPv4 endpoint는 `https://127.0.0.1:2379`처럼 쓴다. 예전 풀이에 보이는
+`https://[127.0.0.1]:2379`의 대괄호는 필요 없다. 대괄호는 주소 안에 `:`가 있는 IPv6 literal과
+포트를 구분할 때만 쓴다: `https://[::1]:2379`.
+
+## TLS 플래그 — 누가 누구를 검증하는가
+
+서버 설정과 클라이언트 명령은 같은 인증서 파일을 서로 다른 이름의 플래그로 가리킬 수 있다.
+이름을 외우기보다 **플래그를 실행하는 쪽의 관점**으로 읽는다.
+
+| 관점 | 플래그 | 역할 |
+|---|---|---|
+| etcd 서버 매니페스트 | `--cert-file` | 서버가 접속한 클라이언트에게 제시하는 서버 인증서 |
+| etcd 서버 매니페스트 | `--key-file` | 서버 인증서의 개인 키 |
+| etcd 서버 매니페스트 | `--trusted-ca-file` | `--client-cert-auth=true`일 때 서버가 클라이언트 인증서를 검증할 신뢰 CA |
+| kube-apiserver 클라이언트 | `--etcd-cafile` | API 서버가 etcd의 서버 인증서를 검증할 신뢰 CA |
+| kube-apiserver 클라이언트 | `--etcd-certfile` · `--etcd-keyfile` | API 서버가 etcd에 자기 신원을 증명할 인증서와 개인 키 |
+| `etcdctl` 클라이언트 | `--cacert` | 클라이언트가 etcd 서버 인증서를 검증할 신뢰 CA |
+| `etcdctl` 클라이언트 | `--cert` · `--key` | 클라이언트가 etcd 서버에 자기 신원을 증명할 인증서와 개인 키 |
+
+따라서 *Where is the ETCD server certificate file located?*의 답은 매니페스트의
+`--cert-file` 값이다. `--trusted-ca-file`은 서버 인증서가 아니라 **검증 기준인 CA 인증서**다.
+서버 인증은 etcd의 `--cert-file` → API 서버의 `--etcd-cafile` 순으로, 클라이언트
+인증은 API 서버의 `--etcd-certfile` → etcd의 `--trusted-ca-file` 순으로 제시·검증한다.
+각 플래그의 검증 방향은 etcd 공식
+[Transport security model](https://etcd.io/docs/v3.6/op-guide/security/)에서도 확인할 수 있다.
+
+## `ETCDCTL_API=3` — v3 명령 체계 선택
+
+`ETCDCTL_API=3`은 etcd 서버 버전을 바꾸지 않는다. `etcdctl` 프로세스가 v3 API의
+`snapshot save` 같은 명령 체계를 사용하도록 선택하는 환경변수다. etcdctl 3.3 이하는 v2가
+기본이라 필요했고, **3.4부터 v3가 기본**이라 현재 환경에서는 생략해도 된다. 버전이 불확실한
+실습과 공식 답안에서는 v3 사용을 명시하려고 계속 붙인다. 이 변경점은 etcd 공식
+[3.3에서 3.4 업그레이드 문서](https://etcd.io/docs/v3.6/upgrades/upgrade_3_4/#make-etcdctl_api3-etcdctl-default)에 명시되어 있다.
+
+```bash
+# 이 etcdctl 실행 한 번에만 적용한다
+ETCDCTL_API=3 etcdctl version
+
+# 현재 셸의 뒤이은 명령에도 적용한다
+export ETCDCTL_API=3
+```
+
+`sudo`로 실행할 때는 셸에서 미리 `export`한 값이 보존되지 않을 수 있으므로
+`sudo ETCDCTL_API=3 etcdctl ...`처럼 같은 명령에 붙이는 편이 확실하다.
+
+## etcd 접근 준비
+
+```bash
+kubectl get pods -n kube-system -l component=etcd
+sudo cat /etc/kubernetes/manifests/etcd.yaml | grep -E 'listen-client-urls|cert-file|key-file|trusted-ca-file|data-dir'
+```
+
+```bash
+# 인증서 경로를 확인했으면 이렇게 쓴다
+sudo ETCDCTL_API=3 etcdctl \
+  --endpoints=https://127.0.0.1:2379 \
+  --cacert=/etc/kubernetes/pki/etcd/ca.crt \
+  --cert=/etc/kubernetes/pki/etcd/server.crt \
+  --key=/etc/kubernetes/pki/etcd/server.key \
+  member list
+```
+
+:::tip[시험]
+인증서 경로를 **추측하지 말고
+`/etc/kubernetes/manifests/etcd.yaml`에서 읽어라.**
+문제마다 경로가 다를 수 있다. `grep` 한 번이면 된다.
+:::
+
+## etcd 백업
+
+인증서 3종을 붙인 긴 `etcdctl` 명령은 손으로 치다 틀리기 쉽다 — 시험 중에는 공식
+[Operating etcd clusters for Kubernetes](https://kubernetes.io/docs/tasks/administer-cluster/configure-upgrade-etcd/)
+페이지의 백업·복구 절에서 명령을 복사해 경로만 바꾸는 게 정석이다.
+
+<Steps>
+
+1. **경로를 매니페스트에서 읽는다** — 추측하지 않는다
+
+   ```bash
+   sudo grep -E 'cert-file|key-file|trusted-ca-file|data-dir' \
+     /etc/kubernetes/manifests/etcd.yaml
+   ```
+
+2. **`snapshot save`** — 살아 있는 etcd에 접속하므로 **인증서가 필요하다**
+
+   ```bash
+   sudo ETCDCTL_API=3 etcdctl \
+     --endpoints=https://127.0.0.1:2379 \
+     --cacert=/etc/kubernetes/pki/etcd/ca.crt \
+     --cert=/etc/kubernetes/pki/etcd/server.crt \
+     --key=/etc/kubernetes/pki/etcd/server.key \
+     snapshot save /opt/etcd-backup.db
+   ```
+
+3. **확인** — `snapshot status`는 파일만 읽으므로 **인증서가 필요 없다**
+
+   ```bash
+   sudo ETCDCTL_API=3 etcdctl --write-out=table snapshot status /opt/etcd-backup.db
+   # 또는 최신 etcd에서는
+   sudo etcdutl --write-out=table snapshot status /opt/etcd-backup.db
+   ```
+
+</Steps>
+
+- **`snapshot save`에는 인증서가 필요**하다 (살아 있는 etcd에 접속하므로)
+- **`snapshot status`에는 필요 없다** (파일만 읽는다)
+- 최신 etcd에서는 파일 조작용 명령이 **`etcdutl`** 로 분리되었다
+
+:::caution[함정]
+`etcdctl`이 없다는 에러가 나면
+`apt install etcd-client` 하거나, etcd Pod 안에서 `kubectl exec`로 실행한다.
+:::
+
+## etcd 복구
+
+복구는 **파일을 푸는 일과, etcd Pod이 그 파일을 보게 하는 일** 둘로 나뉜다.
+
+```d2 layout=elk pad=40 title="etcd 스냅샷을 새 데이터 디렉터리로 복원하고 매니페스트 경로를 바꾸는 절차"
+direction: down
+
+classes: {
+  ok: { style: { fill: "#dcfce7"; stroke: "#16a34a"; font-color: "#14532d" } }
+  bad: { style: { fill: "#fee2e2"; stroke: "#dc2626"; font-color: "#7f1d1d" } }
+  key: { style: { fill: "#dbeafe"; stroke: "#2563eb"; font-color: "#1e3a8a" } }
+  mute: { style: { fill: "#f1f5f9"; stroke: "#94a3b8"; font-color: "#334155" } }
+}
+
+snap: /opt/etcd-backup.db { shape: cylinder; class: mute }
+new: 새 데이터 디렉터리\n/var/lib/etcd-restore { class: mute }
+old: 기존 /var/lib/etcd\n건드리지 않는다 { class: mute }
+x: 여기로 restore 하면\n디렉터리가 비어 있지 않다며 실패 ❌ { class: bad }
+m: etcd.yaml 의\nhostPath.path 를 새 경로로 { class: key }
+kl: kubelet 이 변경을 감지\netcd Pod 재생성 { class: mute }
+fine: 1~2분 후 API 서버 복귀 ✅ { class: ok }
+
+snap -> new: snapshot restore\n--data-dir=/var/lib/etcd-restore
+old -> x: { style.stroke-dash: 3 }
+new -> m
+m -> kl
+kl -> fine
+```
+
+<Steps>
+
+1. **스냅샷을 새 디렉터리로 복원** — 기존 데이터 디렉터리를 덮지 않는다
+
+   ```bash
+   sudo ETCDCTL_API=3 etcdctl snapshot restore /opt/etcd-backup.db \
+     --data-dir=/var/lib/etcd-restore
+   # 최신 etcd:
+   sudo etcdutl snapshot restore /opt/etcd-backup.db --data-dir=/var/lib/etcd-restore
+   ```
+
+2. **etcd 스태틱 Pod이 새 디렉터리를 보게 한다**
+
+   ```bash
+   sudo vim /etc/kubernetes/manifests/etcd.yaml
+   ```
+
+   ```yaml
+       volumes:
+         - name: etcd-data
+           hostPath:
+             path: /var/lib/etcd-restore     # ← 여기를 바꾼다
+             type: DirectoryOrCreate
+   ```
+
+3. **기다렸다가 확인** — kubelet이 파일 변경을 감지해 etcd Pod을 자동으로 다시 만든다.
+   API 서버도 잠시 끊겼다가 돌아온다. 1~2분 기다린다
+
+   ```bash
+   kubectl get pods -n kube-system      # 돌아왔는지 확인
+   kubectl get nodes
+   ```
+
+</Steps>
+
+## 복구에서 자주 틀리는 지점
+
+:::caution[함정 1]
+`--data-dir`을 **기존 `/var/lib/etcd`로 지정**하면
+"디렉터리가 비어 있지 않다"며 실패한다. **새 디렉터리**로 복원하는 것이 정석이다.
+:::
+
+:::caution[함정 2]
+`hostPath.path`만 바꾸고
+**`volumeMounts`의 `mountPath`는 그대로 둬야** 한다.
+컨테이너 안 경로(`/var/lib/etcd`)는 `--data-dir` 인자와 맞아야 하기 때문이다.
+:::
+
+:::caution[함정 3]
+복원한 디렉터리의 **소유권**이 맞아야 한다.
+안 뜨면 `crictl logs`로 permission 에러를 확인하고 `chown` 한다.
+:::
+
+:::tip[시험]
+복구 후 **`kubectl get pods -A`가 백업 시점의 상태를 보여주면 성공**이다.
+바로 안 뜨면 `sudo crictl ps -a | grep etcd` 로 컨테이너 상태를 본다.
+:::
+
+## 요약
+
+- etcd 스냅샷으로 선언된 상태를 보관하고, 복구한 데이터 디렉터리를 etcd에 연결한다.
+- 백업 전 endpoint와 CA·클라이언트 인증서·키를 확인한다.
+- 복구 후 static Pod 매니페스트의 볼륨 경로와 API 서버 복귀를 확인한다.

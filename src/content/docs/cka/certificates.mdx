@@ -1,0 +1,74 @@
+---
+title: "클러스터 인증서 관리"
+description: "클러스터 인증서는 만료 전에 확인·갱신하고, 사용하는 컴포넌트가 새 인증서를 읽도록 해야 한다."
+deckGroup: cluster-architecture
+sidebar:
+  order: 163
+---
+
+import Thesis from '../../../components/docs/Thesis.astro';
+
+<Thesis>클러스터 인증서는 만료 전에 확인·갱신하고, 사용하는 컴포넌트가 새 인증서를 읽도록 해야 한다.</Thesis>
+
+클러스터 내부 통신도 인증서에 의존한다. 만료일 조회부터 kubeadm 갱신, 컴포넌트 재시작과 kubeconfig 반영까지 확인한다. 인증서와 개인 키의 차이는 [사용자 인증](/cka/user-authentication/#인증서와-키를-구분하기)에서 설명한다.
+
+## 인증서 관리
+
+클러스터 안의 모든 대화는 **양쪽이 서로 인증서를 내미는 mTLS로** 이뤄진다
+(mutual TLS·상호 TLS) — kubelet이 apiserver를 부를 때도, apiserver가 etcd를 읽을 때도 그렇다.
+그 인증서에 만료일이 있으니, **인증서가 만료되면 루프 전체가 한꺼번에 멈춘다.**
+증상은 "갑자기 `kubectl`이 전부 안 된다"로 나타나 원인을 짐작하기 어렵다.
+
+```bash
+sudo kubeadm certs check-expiration
+# CERTIFICATE              EXPIRES                RESIDUAL TIME
+# admin.conf               Aug 04, 2027           364d
+# apiserver                Aug 04, 2027           364d
+# apiserver-etcd-client    Aug 04, 2027           364d
+# ...
+# CERTIFICATE AUTHORITY    EXPIRES                RESIDUAL TIME
+# ca                       Aug 02, 2035           9y
+```
+
+```bash
+sudo kubeadm certs renew all                    # 전부 갱신
+sudo kubeadm certs renew apiserver              # 하나만
+```
+
+- 클라이언트 인증서는 **1년**, CA(Certificate Authority·인증 기관 — 다른 인증서에 서명하는 루트)는 **10년** 유효하다
+- **`kubeadm upgrade`를 하면 인증서가 자동 갱신된다** — 매년 업그레이드하면 신경 쓸 일이 없다
+- 갱신 후 컨트롤 플레인 스태틱 Pod을 **재시작**해야 반영된다
+
+```d2 layout=elk pad=40 title="kubeadm certs renew 이후 스태틱 Pod 재시작과 kubeconfig 재복사가 모두 필요한 이유"
+direction: down
+
+classes: {
+  ok: { style: { fill: "#dcfce7"; stroke: "#16a34a"; font-color: "#14532d" } }
+  warn: { style: { fill: "#fef3c7"; stroke: "#d97706"; font-color: "#78350f" } }
+  mute: { style: { fill: "#f1f5f9"; stroke: "#94a3b8"; font-color: "#334155" } }
+}
+
+r: kubeadm certs renew all { class: mute }
+f: /etc/kubernetes/pki/ 갱신\nadmin.conf 도 갱신 { class: mute }
+rs: 스태틱 Pod 재시작\n매니페스트를 잠시 옮겼다 되돌린다 { class: mute }
+cp: ~/.kube/config 를 다시 복사\n★ 빠뜨리면 kubectl 이 계속 x509 에러 { class: warn }
+fine: 반영 완료 ✅ { class: ok }
+
+r -> f
+f -> rs
+f -> cp
+rs -> fine
+cp -> fine
+```
+
+:::caution[함정]
+인증서가 만료되면 `kubectl`이
+`x509: certificate has expired` 로 전부 죽는다.
+**`$HOME/.kube/config`도 다시 복사**해야 한다 (`admin.conf`가 갱신되므로).
+:::
+
+## 요약
+
+- 클러스터 인증서는 만료 전에 확인·갱신하고, 사용하는 컴포넌트가 새 인증서를 읽도록 해야 한다.
+- `kubeadm certs check-expiration`으로 만료일을 확인한다.
+- 갱신한 파일과 컴포넌트가 실제로 사용하는 인증서가 일치하는지 확인한다.

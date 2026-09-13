@@ -14,7 +14,7 @@ import Thesis from '../../../components/docs/Thesis.astro';
 
 같은 Pod의 컨테이너도 파일시스템은 자동으로 공유하지 않는다. 이 페이지에서는 `emptyDir`로
 기록자와 로그 출력자를 연결하고, 먼저 끝나야 하는 init과 계속 실행할 네이티브 sidecar를 구분한다.
-멀티 컨테이너와 수명 주기는 [cka 4장 — 컨테이너 여러 개 쓰기](/cka/04-pods/#컨테이너-여러-개-쓰기)에서 복습한다.
+멀티 컨테이너와 수명 주기는 [CKA Pod — 배포의 최소 단위](/cka/pods/#컨테이너-여러-개-쓰기)에서 복습한다.
 
 Deployment 예제는 Pod을 직접 고치지 않고 `spec.template`을 수정해 rollout한다.
 orange 사례만 controller가 없는 실패한 독립 Pod을 확인한 뒤 수정본으로 재생성한다.
@@ -31,7 +31,7 @@ orange 사례만 controller가 없는 실패한 독립 Pod을 확인한 뒤 수�
 
 사이드카로 로그를 나르는 구성(앱 컨테이너 + 로그 에이전트)이 단골 문제다.
 요즘 시험 기준의 **네이티브 사이드카**(initContainers + `restartPolicy: Always`, v1.33 GA)는
-[cka 4장 컨테이너 여러 개 쓰기](/cka/04-pods/)를 볼 것.
+[CKA Pod — 배포의 최소 단위](/cka/pods/)를 볼 것.
 
 ### mc-pod — 노드 이름 주입과 파일 로그 공유
 

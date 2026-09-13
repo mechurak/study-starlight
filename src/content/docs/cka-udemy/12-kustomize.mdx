@@ -16,7 +16,7 @@ import Thesis from '../../../components/docs/Thesis.astro';
 공통 묶음(base)에 환경별 설정(overlay)을 얹어 최종 YAML을 만든다. 이 페이지에서는
 **어떤 파일을 묶고 어느 환경을 적용할지** 결정한다.
 
-원리는 [cka 16장 — Kustomize](/cka/16-helm-kustomize/#kustomize)에서 본다.
+원리는 [CKA Kustomize — YAML과 오버레이](/cka/kustomize/#kustomize)에서 본다.
 이름·이미지를 일괄 변경할 때는 [범위별 변환](/cka-udemy/kustomize-transformers/),
 특정 필드를 수정할 때는 [patch](/cka-udemy/kustomize-patches/),
 선택 기능을 조합할 때는 [components 보충](/cka-udemy/kustomize-components/)으로 이어 간다.
@@ -126,7 +126,7 @@ base는 다른 환경을 알지 못한다. overlay가 base를 참조해야 공�
 
 문서는 [Bases and Overlays](https://kubernetes.io/docs/tasks/manage-kubernetes-objects/kustomization/#bases-and-overlays)의
 `resources: - ../../base` 연결을 찾는다. generator·replicas 단축 설정은
-[cka 16장](/cka/16-helm-kustomize/#오버레이--generator와-patch)에서 별도로 복습한다.
+[CKA Kustomize — YAML과 오버레이](/cka/kustomize/#오버레이--generator와-patch)에서 별도로 복습한다.
 
 ### staging에만 MySQL Deployment 추가
 

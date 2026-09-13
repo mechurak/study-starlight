@@ -18,7 +18,7 @@ kubeconfig로 API 서버가 올바른 신원을 확인했는지 증명하는 작
 인증서 경로는 실행 중인 API 서버 매니페스트에서 찾는다. CSR은 승인과 발급을 구분하고,
 kubeconfig는 단순 조회가 아니라 실제 요청과 `auth whoami`까지 확인해야 끝난다.
 
-> 짝이 되는 개념 장: [cka 14. 인증 · 인가 · RBAC](/cka/14-rbac/)
+> 짝이 되는 개념 장: [CKA API 요청 처리 흐름](/cka/api-access/)
 
 ## 인증서와 kubeconfig
 
@@ -72,7 +72,7 @@ API 서버가 **etcd에 접속하는 클라이언트**로서 쓰는 인증서라
 확장자는 관례일 뿐이니 내용은 PEM의 `-----BEGIN ...-----` 헤더나 `openssl`로 확인한다.
 인증할 때도 `.crt`는 상대에게 보내지만, `.key`는 로컬에 두고 TLS 핸드셰이크에 서명할 때만
 쓴다. 상대는 인증서 안의 공개 키로 서명을 검증하며, **개인 키 자체는 네트워크로 보내지 않는다.**
-인증서·키·CA의 관계와 PEM·DER의 차이는 [cka 14장의 인증서와 키를 구분하기](/cka/14-rbac/#인증서와-키를-구분하기)에서 이어진다.
+인증서·키·CA의 관계와 PEM·DER의 차이는 [CKA 사용자 인증과 CSR](/cka/user-authentication/#인증서와-키를-구분하기)에서 이어진다.
 
 시험 중 공식 문서에서 다시 찾을 때는 [Generate Certificates Manually](https://v1-35.docs.kubernetes.io/docs/tasks/administer-cluster/certificates/#openssl)의
 **View the certificate** 단계에서 전체 출력 명령을, [Troubleshooting kubectl](https://v1-35.docs.kubernetes.io/docs/tasks/debug/debug-cluster/troubleshoot-kubectl/#tls-problems)의
@@ -147,7 +147,7 @@ kubectl delete csr agent-smith
 `signerName: kubernetes.io/kube-apiserver-client`, `usages: [client auth]`를 유지하고,
 문제에서 준 이름과 CSR 내용만 바꾼다. 승인과 거부 명령은 공식 reference 문서의
 [Approval or rejection using kubectl](https://kubernetes.io/docs/reference/access-authn-authz/certificate-signing-requests/#approval-or-rejection-using-kubectl)에서
-확인한다 — [cka 14장](/cka/14-rbac/)에 전체 흐름이 있다.
+확인한다 — [CKA API 요청 처리 흐름](/cka/api-access/)에 전체 흐름이 있다.
 
 :::tip[누가 요청했는지 의심하기]
 `kubectl get csr <name> -o yaml`로 **groups와 usages**를 본다 — *Run the command kubectl get csr agent-smith -o yaml*.

@@ -1,5 +1,5 @@
 ---
-title: "8. 오토스케일링"
+title: "오토스케일링"
 description: "부하에 따라 개수를 바꾼다"
 deckGroup: pods
 sidebar:
@@ -16,7 +16,7 @@ import { Steps, Card, CardGrid, Tabs, TabItem, Badge } from '@astrojs/starlight/
 지금까지 Deployment의 `replicas`는 **사람이 정한 고정값**이었다. 부하는 시간에 따라
 변하는데 선언은 안 변하니, 피크에 맞추면 평시에 낭비고 평시에 맞추면 피크에 죽는다.
 오토스케일러는 **지표를 보고 선언(spec) 자체를 고쳐 쓰는 컨트롤러다** —
-0장의 "선언된 상태 ↔ 실제 상태를 좁히는 루프" 위에,
+[시작하기 전에](/cka/intro/)의 "선언된 상태 ↔ 실제 상태를 좁히는 루프" 위에,
 **선언 쪽을 갱신하는 루프가 하나 더** 얹힌다.
 
 <CardGrid>
@@ -26,7 +26,7 @@ Horizontal Pod Autoscaler.
 </Card>
 <Card title="VPA — Pod 크기" icon="setting">
 Vertical Pod Autoscaler.
-requests/limits를 조정. **별도 설치** — CRD(CustomResourceDefinition — 새 리소스 종류를 추가하는 확장, 17장)로 깔린다.
+requests/limits를 조정. **별도 설치** — CRD(CustomResourceDefinition — 새 리소스 종류를 추가하는 확장, [CRD](/cka/crd/))로 깔린다.
 </Card>
 <Card title="Cluster Autoscaler — 노드 개수" icon="server">
 Pending Pod이 있으면 노드를 늘린다.
@@ -397,7 +397,7 @@ dis -> both: 그 방향으로는 아예 안 움직인다 { style.stroke-dash: 3 
 - 모드(`updateMode`): `Off` — 계산만 하고 **추천값을 status에 적어둔다**(사람이 보고 반영),
   `Initial` — Pod이 **새로 생길 때만** 값을 넣는다, `Auto` — 실행 중인 Pod에도 적용한다
 - 예전에는 적용에 Pod 재생성이 필요했다
-  → **in-place resize(v1.35 GA)** 로 개선되는 중 (4장)
+  → **in-place resize(v1.35 GA)** 로 개선되는 중 ([Pod](/cka/pods/))
 
 </TabItem>
 <TabItem label="Cluster Autoscaler — 노드 개수">
@@ -462,7 +462,7 @@ HPA는 `scale` 서브리소스가 있는 리소스면 무엇이든 대상이 된
 HPA는 대상이 Deployment인지 StatefulSet인지 몰라도 이 창구로 replicas만 바꾸면 된다 —
 그래서 커스텀 리소스(CRD)도 `scale`만 열어두면 HPA로 스케일된다.
 
-## 8장 요약
+## 요약
 
 - **HPA = Pod 개수, VPA = Pod 크기, Cluster Autoscaler = 노드 개수**
 - **metrics-server가 없으면 `kubectl top`도 HPA도 죽는다.** 이것부터 확인

@@ -12,7 +12,7 @@ import Thesis from '../../../components/docs/Thesis.astro';
 
 <Thesis>네트워크 환경 문제는 현재 주소를 추측하는 대신 설정 원본과 런타임 로그를 찾아 대역·소켓·CNI 선택을 증명하는 작업이다.</Thesis>
 
-> 개념 연결: [cka 15. 클러스터 설치](/cka/15-cluster-lifecycle/#cni-설치--이걸-안-하면-노드가-notready), [cka 17. 확장 지점](/cka/17-extensions/#cni--pod-네트워크)
+> 개념 연결: [CKA kubeadm — 클러스터 설치와 노드 조인](/cka/cluster-setup/#cni-설치--이걸-안-하면-노드가-notready), [CKA 확장 인터페이스 — CRI·CNI·CSI](/cka/extensions/#cni--pod-네트워크)
 
 이 장의 과제는 노드의 인터페이스와 포트, 컨테이너 런타임 소켓, CNI 설정·바이너리 위치를 찾는
 것이다. 보이는 IP 몇 개만 보고 전체 CIDR을 추측하지 않고 kubeadm과 컴포넌트 설정 원본을 확인한다.
@@ -24,7 +24,7 @@ Calico 설치 사례는 문제에서 제공한 Quick Reference를 따라가는 �
 
 원본 풀이: [09-Practice-Test-Explore-Env.md](https://github.com/kodekloudhub/certified-kubernetes-administrator-course/blob/master/docs/09-Networking/09-Practice-Test-Explore-Env.md)
 
-노드의 네트워크 인터페이스를 읽는 연습 — 시험보다 [18장 트러블슈팅](/cka/18-troubleshooting/)의 재료다.
+노드의 네트워크 인터페이스를 읽는 연습 — 시험보다 [18장 트러블슈팅](/cka/troubleshooting/)의 재료다.
 이 랩은 원문대로 `netstat`을 쓰지만, 현재 Ubuntu에서는 같은 확인을 `ss`로 한다.
 두 도구의 일반적인 읽기법은 [server 7장](/server/07-network/)에 있다.
 
@@ -147,8 +147,8 @@ kubernetes.io에는 적혀 있지 않다.
 원본 레포에는 이 랩의 풀이 문서가 없다 — 2025년 시험 개편 뒤 추가된 랩이다. 절차의 정본은
 [Calico 공식 문서의 operator 설치 가이드](https://docs.tigera.io/calico/3.31/getting-started/kubernetes/self-managed-onprem/onpremises)다.
 CNI가 없으면 노드가 왜 NotReady로 남는지는
-[cka 15장의 CNI 설치 절](/cka/15-cluster-lifecycle/#cni-설치--이걸-안-하면-노드가-notready),
-NetworkPolicy가 CNI 구현에 달려 있다는 배경은 [cka 12장](/cka/12-networkpolicy/)이 맡는다.
+[CKA kubeadm — 클러스터 설치와 노드 조인](/cka/cluster-setup/#cni-설치--이걸-안-하면-노드가-notready),
+NetworkPolicy가 CNI 구현에 달려 있다는 배경은 [CKA NetworkPolicy와 CNI](/cka/networkpolicy/)이 맡는다.
 
 이 유형은 암기 문제가 아니라 **오픈북 문제**다. Calico 문서는
 [열람 허용 목록](https://docs.linuxfoundation.org/tc-docs/certification/certification-resources-allowed)에

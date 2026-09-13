@@ -12,7 +12,7 @@ import Thesis from '../../../components/docs/Thesis.astro';
 
 <Thesis>Ingress는 라우팅 리소스와 그것을 구현하는 컨트롤러가 모두 있어야 하며, 마지막 판정은 Host·path·TLS를 넣은 외부 요청이다.</Thesis>
 
-> 짝이 되는 개념 장: [cka 11. Ingress와 Gateway API](/cka/11-ingress-gateway/)
+> 짝이 되는 개념 장: [CKA Ingress와 Gateway API](/cka/ingress-gateway/)
 
 이 장의 과제는 기존 Ingress 규칙을 읽거나 만들고, 요구한 host·path·Service backend·TLS가 실제
 컨트롤러 진입점에 반영됐는지 확인하는 것이다. Ingress 객체만 생성해도 컨트롤러가 없으면 트래픽은 흐르지 않는다.
@@ -167,7 +167,7 @@ kubectl get deploy ingress-nginx-controller -n ingress-nginx -o yaml
 **리소스 `spec.defaultBackend` → 컨트롤러 `--default-backend-service` → 내장 404**다.
 
 리소스에 직접 두는 `spec.defaultBackend`의 형태는
-[cka 11장의 기본 백엔드](/cka/11-ingress-gateway/#기본-백엔드와-애노테이션)에 있다.
+[CKA Ingress와 Gateway API](/cka/ingress-gateway/#기본-백엔드와-애노테이션)에 있다.
 `--default-backend-service`는 Ingress API 필드가 아니라 nginx 구현체의 Deployment 인자라는
 점까지, "리소스 문제인지 컨트롤러 문제인지 먼저 가른다"는 이 장의 축과 같은 문제다.
 
@@ -196,7 +196,7 @@ kubectl create serviceaccount ingress-nginx-admission -n ingress-nginx
 
 최신 랩에서 추가된 유형이다 — 이미 동작하는 Ingress에 `spec.tls`만 더해 TLS 종료를 켠다.
 개념(같은 ns의 `kubernetes.io/tls` 타입 Secret, 컨트롤러에서 종료 후 백엔드는 평문)은
-[cka 11장 Ingress TLS](/cka/11-ingress-gateway/#ingress-tls)가 정본이고, 여기서는 확인 사슬만 남긴다.
+[CKA Ingress와 Gateway API](/cka/ingress-gateway/#ingress-tls)가 정본이고, 여기서는 확인 사슬만 남긴다.
 
 ```bash
 # 1. 참조할 Secret이 조건을 갖췄는가 — 타입과 네임스페이스

@@ -15,7 +15,7 @@ import Thesis from '../../../components/docs/Thesis.astro';
 실습의 기본 조작은 명령을 많이 외우는 일이 아니라 **대상 범위와 생성 방식을 틀리지 않는 일**이다.
 이 페이지에서는 namespace를 명시해 리소스를 조회·생성하고, 한 줄로 부족하면 도움말과
 client dry-run으로 YAML 뼈대를 만든다. 조회와 선언형 작업의 원리는
-[cka 3장 — kubectl](/cka/03-kubectl/)에서 복습한다.
+[CKA kubectl — 손 속도가 점수다](/cka/kubectl/)에서 복습한다.
 
 `k`는 시험 환경의 `kubectl` 별칭이다. 여기서는 전체 명령을 익히기 위해 `kubectl`을 주로 쓴다.
 Pod 자체의 생성·상태 판정은 [3장 — Pod 생성과 상태 확인](/cka-udemy/pods/),
@@ -40,7 +40,7 @@ DNS 이름 규칙이 이 랩의 진짜 출제 포인트다 —
   풀 네임 `db-service.dev.svc.cluster.local`
   — *What DNS name should the Blue application use to access the database db-service in the dev namespace?*
 
-원리는 [cka 10장 이름 규칙](/cka/10-dns/)에 있다.
+원리는 [CKA 클러스터 DNS](/cka/dns/)에 있다.
 
 ## 명령형 커맨드 — Practice Test: Imperative Commands
 
@@ -104,7 +104,7 @@ kubectl explain deployment.spec.template.spec.initContainers
 
 StorageClass·CSR처럼 전용 `create` 하위 명령이 없는 리소스는 공식 YAML 예제에서 시작한다.
 옵션으로 모든 필드를 표현하려고 오래 찾기보다 생성기가 만드는 부분과 직접 채울 부분을 구분한다.
-공식 명령을 복사해 수정할 편집 공간은 [시험용 VSCodium 메모](/cka/19-exam-strategy/#vscodium에서-공식-명령을-수정하기)를 참고한다.
+공식 명령을 복사해 수정할 편집 공간은 [시험용 VSCodium 메모](/cka/exam-strategy/#vscodium에서-공식-명령을-수정하기)를 참고한다.
 
 
 ## 시험장에서 공식 문서 찾기
@@ -149,7 +149,7 @@ helm upgrade --help
 
 ### Vim으로 YAML을 고치는 짧은 연습
 
-초기 설정과 키 설명은 [CKA 1장 Vim 최소 세트](/cka/01-exam/#vim-최소-세트)가 정본이다.
+초기 설정과 키 설명은 [CKA CKA 시험 해부](/cka/exam/#vim-최소-세트)가 정본이다.
 연습 전에 Vim에서 `:setlocal expandtab tabstop=2 softtabstop=2 shiftwidth=2 autoindent number`를
 실행한다. 아래 파일은 편집 연습용이며, 클러스터에 리소스를 만들지 않는다.
 

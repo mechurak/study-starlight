@@ -1,5 +1,5 @@
 ---
-title: "7. 스케줄링"
+title: "스케줄링"
 description: "Pod을 어느 노드에 놓을 것인가"
 deckGroup: pods
 sidebar:
@@ -487,12 +487,12 @@ kubectl drain node01 \
 
 - **`cordon`** = 노드에 `unschedulable` 표시 (taint가 붙는다)
 - **`drain`** = cordon + 기존 Pod을 전부 **축출(evict)**
-- 축출은 **PDB**(PodDisruptionBudget — "동시에 죽어도 되는 Pod 수"의 하한 선언, 5장)를 존중한다 — 위반하면 기다린다
+- 축출은 **PDB**(PodDisruptionBudget — "동시에 죽어도 되는 Pod 수"의 하한 선언, [워크로드](/cka/workloads/))를 존중한다 — 위반하면 기다린다
 
 :::tip[시험]
 노드 업그레이드 문제의 정해진 순서다.
 **`drain` → 작업 → `uncordon`.**
-`--ignore-daemonsets`를 빼면 **거의 항상 에러가 난다.** 습관으로 붙일 것. (15장)
+`--ignore-daemonsets`를 빼면 **거의 항상 에러가 난다.** 습관으로 붙일 것. ([노드 유지보수](/cka/node-maintenance/))
 :::
 
 ## 그 밖의 배치 제어
@@ -657,7 +657,7 @@ kubectl label ns dev \
 기존 워크로드를 깨뜨리지 않고 조이는 방향을 예고할 수 있다. 이것이 실무의 이행 순서다.
 
 이 장에서는 배치 이전의 관문이라는 위치만 잡는다 — 요청이 지나는
-admission 파이프라인 전체는 2장, 컨트롤러를 켜고 끄는 방법은 14장이다.
+admission 파이프라인 전체는 [아키텍처](/cka/architecture/), 컨트롤러를 켜고 끄는 방법은 [Admission](/cka/admission/)이다.
 
 ## 스케줄링 실패 진단 순서
 
@@ -684,7 +684,7 @@ r1: "request 여유 부족\ndescribe node 의\nAllocated resources" { class: nor
 r2: "toleration 없음\ndescribe node 의 Taints" { class: norm }
 r3: "라벨 불일치\nget nodes --show-labels" { class: norm }
 r4: "cordon 되어 있다\nkubectl uncordon" { class: norm }
-r5: "PVC 가 Bound 안 됨\n· 13장" { class: norm }
+r5: "PVC 가 Bound 안 됨\n· 스토리지" { class: norm }
 r6: "스케줄러가 죽었거나\nschedulerName 오타" { class: alarm }
 
 e -> r1: "Insufficient\ncpu / memory"
@@ -701,10 +701,10 @@ e -> r6: 메시지가 없다
 | `node(s) had untolerated taint {...}` | toleration 없음 |
 | `node(s) didn't match Pod's node affinity/selector` | 라벨 불일치 |
 | `node(s) were unschedulable` | cordon 되어 있다 |
-| `pod has unbound immediate PersistentVolumeClaims` | PVC가 Bound 안 됨 (13장) |
+| `pod has unbound immediate PersistentVolumeClaims` | PVC가 Bound 안 됨 ([스토리지](/cka/storage/)) |
 | **(메시지 없음)** | 스케줄러가 죽었거나 `schedulerName` 오타 |
 
-## 7장 요약
+## 요약
 
 - 스케줄러는 **Filtering → Scoring → binding(`nodeName` 채우기)**
 - **affinity는 Pod이 노드를 고르고, taint는 노드가 Pod을 밀어낸다.** 방향이 반대다

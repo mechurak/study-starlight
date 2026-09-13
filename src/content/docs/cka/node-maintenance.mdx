@@ -1,0 +1,153 @@
+---
+title: "노드 유지보수"
+description: "노드를 정비할 때는 워크로드를 먼저 비우고, 설정 변경 후 노드와 Pod의 복귀를 확인한다."
+deckGroup: cluster-architecture
+sidebar:
+  order: 161
+---
+
+import { Steps } from '@astrojs/starlight/components';
+import Thesis from '../../../components/docs/Thesis.astro';
+
+<Thesis>노드를 정비할 때는 워크로드를 먼저 비우고, 설정 변경 후 노드와 Pod의 복귀를 확인한다.</Thesis>
+
+운영 중인 노드를 제거하거나 kubelet 설정을 바꾸면 그 위의 Pod도 영향을 받는다. 노드 추가·제거와 설정 변경, 작업 후 건강 점검을 한 흐름으로 살펴본다.
+
+## 노드 추가와 제거
+
+```bash
+# 추가
+kubeadm token create --print-join-command       # 컨트롤 플레인에서
+sudo kubeadm join ...                           # 새 노드에서
+
+# 제거
+kubectl drain node02 --ignore-daemonsets --delete-emptydir-data
+kubectl delete node node02                      # 클러스터에서 뺀다
+
+# 해당 노드에서 (재사용하려면)
+sudo kubeadm reset -f
+sudo rm -rf /etc/cni/net.d /var/lib/cni
+sudo iptables -F && sudo iptables -t nat -F
+```
+
+**두 명령이 하는 일이 다르다.**
+
+```d2 layout=elk pad=40 title="delete node·kubeadm reset·컨트롤 플레인 제거가 각각 실제로 지우는 범위"
+direction: right
+
+classes: {
+  warn: { style: { fill: "#fef3c7"; stroke: "#d97706"; font-color: "#78350f" } }
+  bad: { style: { fill: "#fee2e2"; stroke: "#dc2626"; font-color: "#7f1d1d" } }
+  mute: { style: { fill: "#f1f5f9"; stroke: "#94a3b8"; font-color: "#334155" } }
+}
+
+d: kubectl delete node { class: mute }
+d1: API 오브젝트만 삭제\n노드의 프로세스는 계속 돈다 { class: warn }
+r: kubeadm reset { class: mute }
+r1: 설정·데이터 실제 삭제\n인증서 · 매니페스트 · etcd 멤버 { class: bad }
+c: 컨트롤 플레인 노드 제거 { class: mute }
+c1: etcdctl member remove 도\n같이 해야 한다 { class: bad }
+
+d -> d1
+r -> r1
+c -> c1
+```
+
+- `kubectl delete node`는 **오브젝트만 지운다.** 노드의 프로세스는 계속 돈다
+- **`kubeadm reset`** 이 실제로 설정과 데이터를 지운다
+- 컨트롤 플레인 노드를 뺄 때는 **etcd 멤버에서도 제거**해야 한다 (`etcdctl member remove`)
+
+## kubelet 설정 바꾸기
+
+kubelet은 **클러스터 안의 Pod이 아니라 노드의 systemd 서비스다**([아키텍처](/cka/architecture/)).
+그래서 다른 컴포넌트처럼 매니페스트를 고쳐 반영시키는 게 아니라,
+노드의 설정 파일을 고치고 **systemd 서비스를 직접 재시작**해야 한다.
+"스태틱 Pod을 놔뒀는데 안 뜬다", "노드가 Pod을 자꾸 축출한다" 류의 원인이 여기 있다.
+
+```bash
+# kubelet 설정 파일
+sudo vim /var/lib/kubelet/config.yaml
+sudo systemctl daemon-reload
+sudo systemctl restart kubelet
+sudo systemctl status kubelet
+sudo journalctl -u kubelet -f --no-pager
+```
+
+자주 만지는 항목 —
+
+| 필드 | 의미 |
+|---|---|
+| `staticPodPath` | 스태틱 Pod 디렉터리 |
+| `cgroupDriver` | `systemd` (런타임과 일치해야) |
+| `maxPods` | 노드당 Pod 상한 (기본 110) |
+| `evictionHard` | 축출 임계값 (`memory.available`, `nodefs.available`) |
+| `clusterDNS` / `clusterDomain` | Pod에 넣을 DNS 설정 |
+| `authentication` / `authorization` | kubelet API 접근 제어 |
+
+kubeadm 클러스터에서는 이 설정이 `kube-system`의
+`kubelet-config` ConfigMap에도 있다. 노드 파일이 실제로 쓰이는 것이다.
+
+둘이 있는 이유는 역할이 달라서다 — ConfigMap 쪽은 **새로 조인하는 노드와
+`kubeadm upgrade node`가 참고하는 원본**이고, 노드의 `/var/lib/kubelet/config.yaml`은
+**지금 이 kubelet이 읽는 실물**이다. 그래서 노드 파일만 고치면 그 노드에만 적용되고,
+ConfigMap만 고치면 이미 떠 있는 kubelet은 꿈쩍도 하지 않는다.
+지금 동작을 바꾸려면 **노드 파일을 고치고 kubelet을 재시작한다.**
+
+## 클러스터 건강 점검 루틴
+
+문제를 만났을 때 제일 비싼 실수는 **짐작한 곳부터 파는 것**이다.
+아래 순서는 바깥층(노드)에서 안쪽(컨트롤 플레인 → 시스템 서비스 → 데이터)으로
+한 층씩 좁혀 가며 **루프가 끊긴 층을 먼저 확정**하려는 것이다.
+
+<Steps>
+
+1. **노드**
+
+   ```bash
+   kubectl get nodes -o wide
+   kubectl describe node <노드> | grep -A10 Conditions
+   ```
+
+2. **컨트롤 플레인 컴포넌트**
+
+   ```bash
+   kubectl get pods -n kube-system
+   kubectl get componentstatuses           # deprecated지만 시험에 나올 수 있다
+   ```
+
+   `componentstatuses`(줄여서 `cs`)는 scheduler·controller-manager·etcd의 health 엔드포인트를
+   찔러 보는 옛 명령이다. **deprecated이고 결과가 부정확할 때가 있으니**,
+   판단은 위의 `kubectl get pods -n kube-system` 쪽을 믿는다. 이름만 알아두면 된다
+
+3. **시스템 서비스** — 노드에서
+
+   ```bash
+   sudo systemctl status kubelet containerd
+   sudo crictl ps -a | grep -E 'apiserver|etcd|scheduler|controller'
+   ```
+
+4. **인증서와 etcd**
+
+   ```bash
+   sudo kubeadm certs check-expiration
+   sudo etcdctl endpoint health --cluster ...
+   ```
+
+5. **이벤트**
+
+   ```bash
+   kubectl get events -A --sort-by=.lastTimestamp | tail -30
+   ```
+
+</Steps>
+
+:::tip[시험]
+트러블슈팅 문제를 만나면 이 순서로 훑는 것이 가장 빠르다.
+**"어느 층에서 끊겼는지"** 를 먼저 확정한 뒤 그 층을 파고든다. ([트러블슈팅](/cka/troubleshooting/))
+:::
+
+## 요약
+
+- 노드를 정비할 때는 워크로드를 먼저 비우고, 설정 변경 후 노드와 Pod의 복귀를 확인한다.
+- 노드 API 오브젝트 삭제와 노드 로컬 초기화는 다른 작업이다.
+- kubelet 설정을 바꾼 뒤 로그와 Node Ready, 워크로드 상태를 함께 확인한다.

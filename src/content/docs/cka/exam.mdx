@@ -1,5 +1,5 @@
 ---
-title: "1. CKA 시험 해부"
+title: "CKA 시험 해부"
 description: "무엇이 나오고, 어떻게 채점되는가"
 deckGroup: intro
 sidebar:
@@ -47,11 +47,11 @@ classes: {
   note: { style: { fill: "#dcfce7"; stroke: "#16a34a"; font-color: "#14532d" } }
 }
 
-t: "Troubleshooting\n30%\n18장" { class: big }
-c: "Cluster Architecture\n25%\n14~17장" { class: big }
-n: "Servicing and Networking\n20%\n9~12장" { class: mid }
-w: "Workloads and Scheduling\n15%\n4~8장" { class: mid }
-s: "Storage\n10%\n13장" { class: small }
+t: "Troubleshooting\n30%\n트러블슈팅" { class: big }
+c: "Cluster Architecture\n25%\n" { class: big }
+n: "Servicing and Networking\n20%\n" { class: mid }
+w: "Workloads and Scheduling\n15%\n" { class: mid }
+s: "Storage\n10%\n스토리지" { class: small }
 sum: "T + C = 55%\n여기가 승부처다" { class: note }
 
 t -- c
@@ -64,11 +64,11 @@ sum -- c: { style.stroke-dash: 3 }
 
 | 비중 | 도메인 | 이 덱의 장 |
 |---|---|---|
-| **30%** | Troubleshooting | 18장 |
-| **25%** | Cluster Architecture, Installation and Configuration | 14~17장 |
-| **20%** | Servicing and Networking | 9~12장 |
-| **15%** | Workloads and Scheduling | 4~8장 |
-| **10%** | Storage | 13장 |
+| **30%** | Troubleshooting | [트러블슈팅](/cka/troubleshooting/) |
+| **25%** | Cluster Architecture, Installation and Configuration |  |
+| **20%** | Servicing and Networking |  |
+| **15%** | Workloads and Scheduling |  |
+| **10%** | Storage | [스토리지](/cka/storage/) |
 
 - **트러블슈팅 + 클러스터 아키텍처 = 55%.** 여기가 승부처다
 - 그런데 많은 사람이 **Pod/Deployment(15% 쪽)에 시간을 제일 많이 쓴다.** 배분이 틀렸다
@@ -79,13 +79,13 @@ sum -- c: { style.stroke-dash: 3 }
 <Tabs>
 <TabItem label="Cluster Architecture 25%">
 
-- RBAC(Role-Based Access Control — 역할 기반 접근 제어) 관리 (14장)
+- RBAC(Role-Based Access Control — 역할 기반 접근 제어) 관리 ([RBAC](/cka/rbac/))
 - 클러스터 설치를 위한 인프라 준비
 - **kubeadm으로 클러스터 생성·관리**
 - **클러스터 라이프사이클(업그레이드) 관리**
 - 고가용성 컨트롤 플레인 구성
 - **Helm·Kustomize로 컴포넌트 설치**
-- 확장 인터페이스 이해 — CNI(Container Network Interface)·CSI(Container Storage Interface)·CRI(Container Runtime Interface) (17장)
+- 확장 인터페이스 이해 — CNI(Container Network Interface)·CSI(Container Storage Interface)·CRI(Container Runtime Interface) ([확장](/cka/extensions/))
 - **CRD 이해, 오퍼레이터 설치·구성**
 
 </TabItem>
@@ -140,11 +140,11 @@ classes: {
 }
 
 new: 최근 개정에서 강조된 것 { class: key }
-g: "Gateway API\nIngress 만 알면 안 된다 ·\n11장" { class: mute }
-h: "Helm / Kustomize\n설치·값 오버라이드 ·\n16장" { class: mute }
-c: "CRD와 오퍼레이터\n설치하고 상태 확인 ·\n17장" { class: mute }
-a: "워크로드 오토스케일링\nHPA + metrics-server ·\n8장" { class: mute }
-l: "컨테이너 출력 스트림\n로그 전반 ·\n18장" { class: mute }
+g: "Gateway API\nIngress 만 알면 안 된다 ·\nIngress와 Gateway" { class: mute }
+h: "Helm / Kustomize\n설치·값 오버라이드 ·\nHelm과 Kustomize" { class: mute }
+c: "CRD와 오퍼레이터\n설치하고 상태 확인 ·\n확장" { class: mute }
+a: "워크로드 오토스케일링\nHPA + metrics-server ·\n오토스케일링" { class: mute }
+l: "컨테이너 출력 스트림\n로그 전반 ·\n트러블슈팅" { class: mute }
 old: 오래된 자료의 함정 { class: bad }
 
 new -> g
@@ -155,11 +155,11 @@ new -> l
 old -> new: "Docker ·\nPodSecurityPolicy 를 다루고\nGateway API 가 없다 ❌" { style.stroke-dash: 3 }
 ```
 
-- **Gateway API** — Ingress만 알면 안 된다. CRD(CustomResourceDefinition — 새 리소스 종류를 추가하는 확장) 기반이라 설치부터 다르다 (11장)
-- **Helm / Kustomize** — "컴포넌트 설치" 맥락. 차트 작성이 아니라 **설치·값 오버라이드** (16장)
-- **CRD와 오퍼레이터** — 직접 만들진 않지만 **읽고 설치하고 상태를 확인**할 줄 알아야 (17장)
-- **워크로드 오토스케일링** — HPA(Horizontal Pod Autoscaler — 부하에 따라 Pod 수를 자동 조절). metrics-server가 없으면 아무것도 안 된다 (8장)
-- **컨테이너 출력 스트림** — 로그. `kubectl logs` 옵션 전부 + 노드의 로그 파일 위치 (18장)
+- **Gateway API** — Ingress만 알면 안 된다. CRD(CustomResourceDefinition — 새 리소스 종류를 추가하는 확장) 기반이라 설치부터 다르다 ([Ingress와 Gateway](/cka/ingress-gateway/))
+- **Helm / Kustomize** — "컴포넌트 설치" 맥락. 차트 작성이 아니라 **설치·값 오버라이드** ([Helm과 Kustomize](/cka/helm/))
+- **CRD와 오퍼레이터** — 직접 만들진 않지만 **읽고 설치하고 상태를 확인**할 줄 알아야 ([CRD](/cka/crd/))
+- **워크로드 오토스케일링** — HPA(Horizontal Pod Autoscaler — 부하에 따라 Pod 수를 자동 조절). metrics-server가 없으면 아무것도 안 된다 ([오토스케일링](/cka/autoscaling/))
+- **컨테이너 출력 스트림** — 로그. `kubectl logs` 옵션 전부 + 노드의 로그 파일 위치 ([트러블슈팅](/cka/troubleshooting/))
 
 :::caution[함정]
 오래된 학습 자료는 Docker·PodSecurityPolicy 같은
@@ -182,7 +182,7 @@ old -> new: "Docker ·\nPodSecurityPolicy 를 다루고\nGateway API 가 없다 
 :::tip[시험]
 `k` alias는 이미 있지만
 **`export do='--dry-run=client -o yaml'`** 같은 개인 단축은 직접 만들어야 한다.
-시험 시작 5초를 여기에 쓰면 나중에 몇 분을 번다. (19장에 전체 세트)
+시험 시작 5초를 여기에 쓰면 나중에 몇 분을 번다. ([시험 전략](/cka/exam-strategy/)에 전체 세트)
 :::
 
 ### 터미널에서 알아둘 조작
@@ -438,7 +438,7 @@ score -> part
 :::tip[시험]
 그래서 전략은 명확하다.
 **명령형(imperative) 명령으로 만들 수 있는 건 전부 명령형으로** 만들고,
-안 되는 것만 `--dry-run=client -o yaml`로 뽑아 고친다. (3장·19장)
+안 되는 것만 `--dry-run=client -o yaml`로 뽑아 고친다. ([kubectl](/cka/kubectl/)·[시험 전략](/cka/exam-strategy/))
 :::
 
 ## 시간 배분이 진짜 시험이다
@@ -473,17 +473,17 @@ score -> part
 
 | 시기 | 할 일 |
 |---|---|
-| **1~2주차** | 아키텍처·kubectl·Pod·워크로드 (2~6장). kind로 손에 익히기 |
-| **3~4주차** | 스케줄링·Service·DNS·Ingress·NetworkPolicy (7~12장) |
-| **5주차** | 스토리지·RBAC (13~14장). 여기는 문제 유형이 좁으니 확실히 |
-| **6~7주차** | **클러스터 라이프사이클 (15장)** — killercoda에서 업그레이드·etcd 10회 이상 반복 |
-| **8주차** | 트러블슈팅(18장) 집중 + killer.sh 1세션 |
-| **시험 직전** | killer.sh 2세션, 틀린 것만 복습, 치트시트 손에 붙이기 (19장) |
+| **1~2주차** | 아키텍처·kubectl·Pod·워크로드. kind로 손에 익히기 |
+| **3~4주차** | 스케줄링·Service·DNS·Ingress·NetworkPolicy |
+| **5주차** | 스토리지·RBAC. 여기는 문제 유형이 좁으니 확실히 |
+| **6~7주차** | **클러스터 라이프사이클 ([클러스터 업그레이드](/cka/cluster-upgrade/))** — killercoda에서 업그레이드·etcd 10회 이상 반복 |
+| **8주차** | 트러블슈팅([트러블슈팅](/cka/troubleshooting/)) 집중 + killer.sh 1세션 |
+| **시험 직전** | killer.sh 2세션, 틀린 것만 복습, 치트시트 손에 붙이기 ([시험 전략](/cka/exam-strategy/)) |
 
-**15장(라이프사이클)에 가장 많은 시간을 써야 한다.**
+**[클러스터 업그레이드](/cka/cluster-upgrade/)(라이프사이클)에 가장 많은 시간을 써야 한다.**
 평소에 안 하는 작업이라 반복 말고는 방법이 없다.
 
-## 1장 요약
+## 요약
 
 - 2시간 / 15~20문제 / **66% 합격** / 순서 무관 / 클러스터 여러 개
 - **컨텍스트 전환을 안 하면 맞아도 0점** — 가장 비싼 실수
@@ -493,7 +493,7 @@ score -> part
 - 노드에서 나올 때 **`exit`**, vim은 **`expandtab`**
 
 <LinkCard
-  title="2. 클러스터 아키텍처"
+  title="클러스터 아키텍처"
   description="다음 장부터 본론이다. 클러스터가 실제로 어떻게 생겼는지부터."
-  href="/cka/02-architecture/"
+  href="/cka/architecture/"
 />

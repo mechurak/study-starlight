@@ -1,0 +1,206 @@
+{
+  "20-wrapup": {
+    "target": "/cka/wrapup/",
+    "anchors": {
+      "장별로-남길-한-줄": "/cka/wrapup/#개념별로-남길-한-줄"
+    }
+  },
+  "00-intro": {
+    "target": "/cka/intro/",
+    "anchors": {
+      "0장-요약": "/cka/intro/#요약"
+    }
+  },
+  "17-extensions": {
+    "target": "/cka/extensions/",
+    "anchors": {
+      "kubernetes는-껍데기다": "/cka/extensions/#kubernetes는-껍데기다",
+      "세-가지-플러그인-인터페이스": "/cka/extensions/#세-가지-플러그인-인터페이스",
+      "cri--컨테이너-런타임": "/cka/extensions/#cri--컨테이너-런타임",
+      "cni--pod-네트워크": "/cka/extensions/#cni--pod-네트워크",
+      "csi--스토리지": "/cka/extensions/#csi--스토리지",
+      "그-밖의-확장-지점": "/cka/extensions/#그-밖의-확장-지점",
+      "crd--새로운-리소스-만들기": "/cka/crd/#crd--새로운-리소스-만들기",
+      "crd를-만들면-무슨-일이-생기나": "/cka/crd/#crd를-만들면-무슨-일이-생기나",
+      "crd-다룰-때-주의점": "/cka/crd/#crd-다룰-때-주의점",
+      "오퍼레이터--crd--컨트롤러": "/cka/operator/#오퍼레이터--crd--컨트롤러",
+      "오퍼레이터-설치와-확인": "/cka/operator/#오퍼레이터-설치와-확인",
+      "17장-요약": "/cka/extensions/#요약",
+      "crd와-오퍼레이터": "/cka/crd/"
+    }
+  },
+  "04-pods": {
+    "target": "/cka/pods/",
+    "anchors": {
+      "4장-요약": "/cka/pods/#요약"
+    }
+  },
+  "18-troubleshooting": {
+    "target": "/cka/troubleshooting/",
+    "anchors": {
+      "18장-요약": "/cka/troubleshooting/#요약"
+    }
+  },
+  "05-workloads": {
+    "target": "/cka/workloads/",
+    "anchors": {
+      "5장-요약": "/cka/workloads/#요약"
+    }
+  },
+  "07-scheduling": {
+    "target": "/cka/scheduling/",
+    "anchors": {
+      "7장-요약": "/cka/scheduling/#요약"
+    }
+  },
+  "10-dns": {
+    "target": "/cka/dns/",
+    "anchors": {
+      "10장-요약": "/cka/dns/#요약"
+    }
+  },
+  "14-rbac": {
+    "target": "/cka/api-access/",
+    "anchors": {
+      "요청이-통과해야-하는-세-관문": "/cka/api-access/#요청이-통과해야-하는-세-관문",
+      "인증--사용자와-serviceaccount": "/cka/user-authentication/",
+      "인증-방식들": "/cka/user-authentication/#인증-방식들",
+      "인증서와-키를-구분하기": "/cka/user-authentication/#인증서와-키를-구분하기",
+      "사용자-인증서-만들기-csr-api": "/cka/user-authentication/#사용자-인증서-만들기-csr-api",
+      "kubeconfig에-등록하기": "/cka/user-authentication/#kubeconfig에-등록하기",
+      "serviceaccount--pod의-신원": "/cka/service-account/",
+      "sa-토큰의-현재-방식": "/cka/service-account/#토큰은-어떻게-pod에-들어오는가",
+      "rbac의-네-리소스": "/cka/rbac/#rbac의-네-리소스",
+      "role": "/cka/rbac/#role",
+      "verbs와-apigroups": "/cka/rbac/#verbs와-apigroups",
+      "하위-리소스를-잊지-말-것": "/cka/rbac/#하위-리소스를-잊지-말-것",
+      "rolebinding": "/cka/rbac/#rolebinding",
+      "clusterrole과-clusterrolebinding": "/cka/rbac/#clusterrole과-clusterrolebinding",
+      "조합--이-그림이-전부다": "/cka/rbac/#조합--이-그림이-전부다",
+      "내장-clusterrole": "/cka/rbac/#내장-clusterrole",
+      "집계-clusterrole": "/cka/rbac/#집계-clusterrole",
+      "권한-확인하기": "/cka/rbac/#권한-확인하기",
+      "실제로-실행해보기": "/cka/rbac/#실제로-실행해보기",
+      "rbac-진단-순서": "/cka/rbac/#rbac-진단-순서",
+      "admission-컨트롤러": "/cka/admission/#admission-컨트롤러",
+      "켜고-끄기--kube-apiserver-플래그": "/cka/admission/#켜고-끄기--kube-apiserver-플래그",
+      "세부-설정--admissionconfiguration-파일": "/cka/admission/#세부-설정--admissionconfiguration-파일",
+      "외부-webhook--직접-만드는-admission": "/cka/admission/#외부-webhook--직접-만드는-admission",
+      "14장-요약": "/cka/api-access/#요약"
+    }
+  },
+  "03-kubectl": {
+    "target": "/cka/kubectl/",
+    "anchors": {
+      "3장-요약": "/cka/kubectl/#요약"
+    }
+  },
+  "08-autoscaling": {
+    "target": "/cka/autoscaling/",
+    "anchors": {
+      "8장-요약": "/cka/autoscaling/#요약"
+    }
+  },
+  "16-helm-kustomize": {
+    "target": "/cka/helm/",
+    "anchors": {
+      "helm": "/cka/helm/#helm",
+      "helm의-구성-요소": "/cka/helm/#helm의-구성-요소",
+      "helm-기본-명령": "/cka/helm/#helm-기본-명령",
+      "값-오버라이드--실무의-핵심": "/cka/helm/#값-오버라이드--실무의-핵심",
+      "업그레이드와-롤백": "/cka/helm/#업그레이드와-롤백",
+      "kustomize": "/cka/kustomize/#kustomize",
+      "kustomize--템플릿-없는-커스터마이징": "/cka/kustomize/#kustomize--템플릿-없는-커스터마이징",
+      "오버레이--이름네임스페이스이미지-바꾸기": "/cka/kustomize/#오버레이--이름네임스페이스이미지-바꾸기",
+      "오버레이--generator와-patch": "/cka/kustomize/#오버레이--generator와-patch",
+      "kustomize-실행": "/cka/kustomize/#kustomize-실행",
+      "generator의-해시-접미사": "/cka/kustomize/#generator의-해시-접미사",
+      "언제-무엇을-쓰나": "/cka/kustomize/#언제-무엇을-쓰나",
+      "16장-요약": "/cka/helm/#요약",
+      "왜-커리큘럼에-있나": "/cka/kustomize/#helm과-비교하기"
+    }
+  },
+  "12-networkpolicy": {
+    "target": "/cka/networkpolicy/",
+    "anchors": {
+      "12장-요약": "/cka/networkpolicy/#요약"
+    }
+  },
+  "09-services": {
+    "target": "/cka/services/",
+    "anchors": {
+      "9장-요약": "/cka/services/#요약"
+    }
+  },
+  "13-storage": {
+    "target": "/cka/storage/",
+    "anchors": {
+      "13장-요약": "/cka/storage/#요약"
+    }
+  },
+  "11-ingress-gateway": {
+    "target": "/cka/ingress-gateway/",
+    "anchors": {
+      "11장-요약": "/cka/ingress-gateway/#요약"
+    }
+  },
+  "06-config": {
+    "target": "/cka/config/",
+    "anchors": {
+      "6장-요약": "/cka/config/#요약"
+    }
+  },
+  "15-cluster-lifecycle": {
+    "target": "/cka/cluster-setup/",
+    "anchors": {
+      "클러스터-설치": "/cka/cluster-setup/#클러스터-설치",
+      "클러스터가-만들어지는-전체-흐름": "/cka/cluster-setup/#클러스터가-만들어지는-전체-흐름",
+      "노드-준비--kubeadm-이전에-해야-할-것": "/cka/cluster-setup/#노드-준비--kubeadm-이전에-해야-할-것",
+      "컨테이너-런타임과-kubeadm-설치": "/cka/cluster-setup/#컨테이너-런타임과-kubeadm-설치",
+      "kubeadm-init": "/cka/cluster-setup/#kubeadm-init",
+      "init이-만들어놓는-것--파일의-지도": "/cka/cluster-setup/#init이-만들어놓는-것--파일의-지도",
+      "cni-설치--이걸-안-하면-노드가-notready": "/cka/cluster-setup/#cni-설치--이걸-안-하면-노드가-notready",
+      "워커-노드-조인": "/cka/cluster-setup/#워커-노드-조인",
+      "노드-추가와-제거": "/cka/node-maintenance/#노드-추가와-제거",
+      "kubelet-설정-바꾸기": "/cka/node-maintenance/#kubelet-설정-바꾸기",
+      "클러스터-건강-점검-루틴": "/cka/node-maintenance/#클러스터-건강-점검-루틴",
+      "버전-스큐-규칙--업그레이드-순서의-근거": "/cka/cluster-upgrade/#버전-스큐-규칙--업그레이드-순서의-근거",
+      "업그레이드--노드-유형별-절차": "/cka/cluster-upgrade/#업그레이드--노드-유형별-절차",
+      "업그레이드-순서-요약--이것만-외우면-된다": "/cka/cluster-upgrade/#업그레이드-순서-요약--이것만-외우면-된다",
+      "인증서-관리": "/cka/certificates/#인증서-관리",
+      "etcd-백업과-복구": "/cka/etcd-backup/#etcd-백업과-복구",
+      "etcd-cluster와-endpoint": "/cka/etcd-backup/#etcd-cluster와-endpoint",
+      "tls-플래그--누가-누구를-검증하는가": "/cka/etcd-backup/#tls-플래그--누가-누구를-검증하는가",
+      "etcdctl_api3--v3-명령-체계-선택": "/cka/etcd-backup/#etcdctl_api3--v3-명령-체계-선택",
+      "etcd-접근-준비": "/cka/etcd-backup/#etcd-접근-준비",
+      "etcd-백업": "/cka/etcd-backup/#etcd-백업",
+      "etcd-복구": "/cka/etcd-backup/#etcd-복구",
+      "복구에서-자주-틀리는-지점": "/cka/etcd-backup/#복구에서-자주-틀리는-지점",
+      "ha-컨트롤-플레인--두-가지-토폴로지": "/cka/high-availability/#ha-컨트롤-플레인--두-가지-토폴로지",
+      "ha를-장애-전중후로-검증하기": "/cka/high-availability/#ha를-장애-전중후로-검증하기",
+      "etcd-멤버-관리": "/cka/high-availability/#etcd-멤버-관리",
+      "15장-요약": "/cka/cluster-setup/#요약",
+      "이-장이-시험의-승부처다": "/cka/cluster-setup/",
+      "업그레이드와-인증서": "/cka/cluster-upgrade/",
+      "ha와-클러스터-운영": "/cka/high-availability/"
+    }
+  },
+  "02-architecture": {
+    "target": "/cka/architecture/",
+    "anchors": {
+      "2장-요약": "/cka/architecture/#요약"
+    }
+  },
+  "19-exam-strategy": {
+    "target": "/cka/exam-strategy/",
+    "anchors": {
+      "19장-요약": "/cka/exam-strategy/#요약"
+    }
+  },
+  "01-exam": {
+    "target": "/cka/exam/",
+    "anchors": {
+      "1장-요약": "/cka/exam/#요약"
+    }
+  }
+}

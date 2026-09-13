@@ -1,5 +1,5 @@
 ---
-title: "2. 클러스터 아키텍처"
+title: "클러스터 아키텍처"
 description: "무엇이 어디서 돌고 있는가"
 deckGroup: architecture
 sidebar:
@@ -90,17 +90,17 @@ API 서버가 다른 컴포넌트를 호출하지 않는다.
 
 :::tip[시험]
 트러블슈팅 문제에서 `kubectl`이 아예 응답을 안 하면
-API 서버부터 본다. `crictl ps` 로 컨테이너 단에서 확인 (18장).
+API 서버부터 본다. `crictl ps` 로 컨테이너 단에서 확인 ([트러블슈팅](/cka/troubleshooting/)).
 :::
 
 ### etcd — 유일한 저장소
 
-0장의 루프는 "선언된 상태(spec)"가 **어딘가에 남아 있어야** 돌 수 있다.
+[시작하기 전에](/cka/intro/)의 루프는 "선언된 상태(spec)"가 **어딘가에 남아 있어야** 돌 수 있다.
 API 서버가 stateless일 수 있는 것도, 그 상태를 전부 맡아 주는 저장소가 따로 있기 때문이다 — 그게 etcd다.
 
 - **분산 key-value 저장소.** 클러스터의 모든 오브젝트가 여기 있다
 - Raft 합의 알고리즘 → **홀수 노드(3, 5)로 구성**한다. 과반이 살아야 쓰기가 된다
-- `etcd`만 백업하면 **클러스터 전체를 복구**할 수 있다 (PV(PersistentVolume — 13장) 안의 데이터는 제외)
+- `etcd`만 백업하면 **클러스터 전체를 복구**할 수 있다 (PV(PersistentVolume — [스토리지](/cka/storage/)) 안의 데이터는 제외)
 - API 서버 외에는 **아무도 etcd에 직접 접근하지 않는다**
 
 Raft는 여러 노드가 **같은 기록을 갖도록 합의하는 알고리즘**이다. 짝수(2, 4)로 구성하면
@@ -116,7 +116,7 @@ Raft는 여러 노드가 **같은 기록을 갖도록 합의하는 알고리즘*
 
 :::tip[시험]
 etcd 백업/복구는 **거의 확실히 나온다.**
-15장에서 명령 전체를 다룬다. 지금은 "여기에 전부 들어 있다"만 기억하면 된다.
+[클러스터 설치](/cka/cluster-setup/)에서 명령 전체를 다룬다. 지금은 "여기에 전부 들어 있다"만 기억하면 된다.
 :::
 
 ### kube-scheduler — 자리를 정할 뿐이다
@@ -159,12 +159,12 @@ f -> x: "리소스 부족 · taint\nnodeSelector 불일치 …" { style.stroke-d
 :::caution[함정]
 스케줄러가 죽으면 **새 Pod이 영원히 Pending**이다.
 그런데 `spec.nodeName`을 직접 쓴 Pod은 스케줄러 없이도 뜬다.
-"스케줄러 고장" 문제의 확인 방법이 이것이다. (7장)
+"스케줄러 고장" 문제의 확인 방법이 이것이다. ([스케줄링](/cka/scheduling/))
 :::
 
 ### kube-controller-manager — 루프들의 모음
 
-0장의 축 — "**선언된 상태와 실제 상태의 차이를 줄이는 루프**" — 가 실제로 도는 곳이 여기다.
+[시작하기 전에](/cka/intro/)의 축 — "**선언된 상태와 실제 상태의 차이를 줄이는 루프**" — 가 실제로 도는 곳이 여기다.
 리소스 종류마다 전담 루프(컨트롤러)가 있고, 그 루프들을 한 프로세스에 담은 것이 컨트롤러 매니저다.
 
 ```d2 layout=elk pad=40 title="kube-controller-manager 프로세스 하나가 Deployment·ReplicaSet·Node·Job·EndpointSlice·ServiceAccount·PV/PVC 컨트롤러 루프를 함께 돌린다"
@@ -224,7 +224,7 @@ l1 -> loop
 - 컨테이너 런타임(CRI, Container Runtime Interface — 아래 절)에게 컨테이너 생성·삭제를 지시한다
 - 컨테이너 상태·노드 상태를 **API 서버에 보고**한다 (이게 끊기면 노드가 `NotReady`)
 - **probe(liveness/readiness/startup)를 실행하는 주체**도 kubelet이다
-  (컨테이너가 살아 있는지·트래픽 받을 준비가 됐는지 묻는 헬스체크 — 4장)
+  (컨테이너가 살아 있는지·트래픽 받을 준비가 됐는지 묻는 헬스체크 — [Pod](/cka/pods/))
 
 :::caution[함정]
 kubelet은 클러스터 안의 Pod이 **아니다.**
@@ -234,7 +234,7 @@ kubelet은 클러스터 안의 Pod이 **아니다.**
 
 ### kube-proxy — Service를 노드의 규칙으로 번역한다
 
-Service의 ClusterIP는 **어느 인터페이스에도 붙어 있지 않은 가상 IP다** (Service 자체는 9장).
+Service의 ClusterIP는 **어느 인터페이스에도 붙어 있지 않은 가상 IP다** (Service 자체는 [Service](/cka/services/)).
 이 주소로 온 패킷을 실제 Pod IP로 바꿔 줄 무언가가 노드마다 필요하다 — 그 번역 규칙을 심는 것이 kube-proxy다.
 
 ```d2 layout=elk pad=40 title="kube-proxy가 Service와 EndpointSlice를 watch 해 노드 커널에 규칙만 심고, 실제 패킷은 커널이 DNAT 해 대상 Pod로 보낸다"
@@ -259,8 +259,8 @@ k -> p: DNAT
 kp -> k: 트래픽은 여기를 통과하지 않는다 { style.stroke-dash: 3 }
 ```
 
-- 노드마다 하나씩. 보통 **DaemonSet**(모든 노드에 Pod을 하나씩 두는 워크로드 — 5장)으로 돈다
-- Service와 EndpointSlice(Service 셀렉터에 걸린 실제 Pod IP 목록 — 9장)를 지켜보다가
+- 노드마다 하나씩. 보통 **DaemonSet**(모든 노드에 Pod을 하나씩 두는 워크로드 — [워크로드](/cka/workloads/))으로 돈다
+- Service와 EndpointSlice(Service 셀렉터에 걸린 실제 Pod IP 목록 — [Service](/cka/services/))를 지켜보다가
   **노드의 패킷 규칙**을 갱신한다
 - 모드: `iptables`(기본) / `ipvs` / `nftables`
 - **트래픽이 kube-proxy를 통과하지 않는다.** 규칙만 심고 빠진다 — 커널이 처리한다
@@ -271,7 +271,7 @@ kp -> k: 트래픽은 여기를 통과하지 않는다 { style.stroke-dash: 3 }
 :::caution[함정]
 kube-proxy가 죽어도 **기존 연결은 유지**되고
 **Pod-to-Pod 직접 통신도 멀쩡**하다. 깨지는 건 **Service(ClusterIP) 경유**뿐이다.
-"IP로는 되는데 서비스 이름으로는 안 된다"의 후보 중 하나. (9장)
+"IP로는 되는데 서비스 이름으로는 안 된다"의 후보 중 하나. ([Service](/cka/services/))
 :::
 
 ### 컨테이너 런타임 (CRI)
@@ -415,7 +415,7 @@ v -> s
 admission이다. 요청을 고쳐 주는 **Mutating**과 검사만 하는 **Validating** 둘로 나뉜다.
 
 **이 순서를 알면 에러 코드로 원인을 짚을 수 있다.**
-`401` = 인증, `403` = RBAC, 그 외 거부 = admission (14장에서 자세히).
+`401` = 인증, `403` = RBAC, 그 외 거부 = admission ([Admission](/cka/admission/)에서 자세히).
 
 ### 저장된 다음 — 컨트롤러들의 릴레이
 
@@ -534,7 +534,7 @@ classes: {
   warn: { style: { fill: "#fee2e2"; stroke: "#dc2626"; font-color: "#7f1d1d" } }
 }
 
-net: "네트워크 격리가 아니다 ⚠️\n다른 네임스페이스와 통신은 그대로 된다\n막으려면 NetworkPolicy · 12장" { class: warn }
+net: "네트워크 격리가 아니다 ⚠️\n다른 네임스페이스와 통신은 그대로 된다\n막으려면 NetworkPolicy · NetworkPolicy" { class: warn }
 
 nsg: 네임스페이스 안 — 이름의 유효 범위 {
   grid-columns: 2
@@ -659,7 +659,7 @@ kubectl get pod web-abc-123 -o jsonpath='{.metadata.ownerReferences[0].kind}'
 ## 노드와 파일 시스템
 
 `kubectl`이 보여주는 노드의 상태와, `kubectl`이 안 될 때 직접 뒤져야 하는
-노드 위의 파일들. 트러블슈팅(18장)의 기초 체력이다.
+노드 위의 파일들. 트러블슈팅([트러블슈팅](/cka/troubleshooting/))의 기초 체력이다.
 
 ### 노드 살펴보기
 
@@ -674,14 +674,14 @@ kubectl get node node01 -o yaml
 | 항목 | 의미 |
 |---|---|
 | **Conditions** | `Ready`, `MemoryPressure`, `DiskPressure`, `PIDPressure` |
-| **Taints** | 이 노드가 밀어내는 조건 (7장) |
+| **Taints** | 이 노드가 밀어내는 조건 ([스케줄링](/cka/scheduling/)) |
 | **Capacity / Allocatable** | 전체 자원 / 실제 배정 가능한 자원 |
 | **Allocated resources** | 현재 요청(request) 합계 — **사용량이 아니다** |
 | **Non-terminated Pods** | 이 노드의 Pod 목록 |
 
 :::caution[함정]
 `Allocated resources`는 **request의 합**이지 실제 사용량이 아니다.
-"CPU 100% 할당됨"인데 실제 CPU는 놀고 있을 수 있다. 실제 사용량은 `kubectl top`. (8장·18장)
+"CPU 100% 할당됨"인데 실제 CPU는 놀고 있을 수 있다. 실제 사용량은 `kubectl top`. ([오토스케일링](/cka/autoscaling/)·[트러블슈팅](/cka/troubleshooting/))
 :::
 
 ### 파일이 어디 있는지 — 트러블슈팅의 지도
@@ -712,7 +712,7 @@ kubectl get node node01 -o yaml
 컨트롤 플레인이 고장나면 `kubectl`이 안 되고, 문서도 이 경로를 딱 집어주지 않는다.
 :::
 
-## 2장 요약
+## 요약
 
 - **컨트롤 플레인(결정) + 노드(실행)**. 모든 화살표는 **API 서버를 향한다**
 - **etcd에 전부 들어 있다** — 백업 하나로 클러스터를 되살린다

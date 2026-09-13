@@ -1,5 +1,5 @@
 ---
-title: "11. Ingress와 Gateway API"
+title: "Ingress와 Gateway API"
 description: "HTTP 트래픽을 클러스터 안으로"
 deckGroup: services
 sidebar:
@@ -47,7 +47,7 @@ Gateway API가 최근 추가된 항목이니 특히 챙길 것.
 
 ## Ingress = 리소스 + 컨트롤러
 
-0장의 축으로 보면 — Deployment는 선언만 하면 내장 컨트롤러가 실제 상태로 만들어 주지만,
+[시작하기 전에](/cka/intro/)의 축으로 보면 — Deployment는 선언만 하면 내장 컨트롤러가 실제 상태로 만들어 주지만,
 **Ingress를 조정하는 컨트롤러는 쿠버네티스에 내장되어 있지 않다.** 직접 하나 골라 설치해야
 "선언 → 실제 상태" 루프가 돌기 시작한다. 이 장의 함정 대부분이 여기서 나온다.
 
@@ -330,7 +330,7 @@ HTTP뿐 아니라 gRPC·TCP·TLS를
 </Card>
 </CardGrid>
 
-**Gateway API는 CRD(CustomResourceDefinition — 쿠버네티스에 새 리소스 종류를 추가하는 확장, 17장)로 제공된다.**
+**Gateway API는 CRD(CustomResourceDefinition — 쿠버네티스에 새 리소스 종류를 추가하는 확장, [CRD](/cka/crd/))로 제공된다.**
 클러스터에 기본 탑재가 아니다 —
 직접 설치해야 한다. 이 점이 Ingress와 가장 큰 실무적 차이다.
 
@@ -657,7 +657,7 @@ kubectl describe httproute shop -n shop          # ★ parents[].conditions
 **Gateway API는 `status.conditions`에 답이 다 있다.**
 여기서 **데이터 플레인**(data plane)은 실제 트래픽이 지나가는 프록시 — nginx 같은 구현체 — 를 말한다.
 Gateway·HTTPRoute는 선언일 뿐이고, 그 선언이 프록시 설정에 반영됐는지를 conditions가 알려준다 —
-0장의 "선언과 실제 상태의 간극"을 리소스가 스스로 보고하는 셈이다.
+[시작하기 전에](/cka/intro/)의 "선언과 실제 상태의 간극"을 리소스가 스스로 보고하는 셈이다.
 
 ```d2 layout=elk pad=40 title="status.conditions 의 Accepted · Programmed · ResolvedRefs 가 각각 설정 오류 · 데이터 플레인 미반영 · 백엔드 참조 실패를 가리키는 진단표"
 direction: right
@@ -686,7 +686,7 @@ c -> fine: 전부 True
 | `Programmed: False` | 설정은 맞지만 데이터 플레인에 반영되지 않았다 |
 | `ResolvedRefs: False` | **백엔드 Service를 못 찾는다** 또는 ReferenceGrant 없음 |
 
-## 11장 요약
+## 요약
 
 - **Ingress 리소스는 규칙일 뿐**, 일은 **Ingress 컨트롤러 Pod**이 한다
 - `pathType`은 **필수**이고 `Prefix`는 **경로 요소 단위**다

@@ -15,7 +15,7 @@ import Thesis from '../../../components/docs/Thesis.astro';
 Pod 생성 명령이 성공해도 이미지 pull이나 컨테이너 시작은 실패할 수 있다.
 이 페이지에서는 Pod을 만들고 **오브젝트 존재 → 배치된 노드 → 컨테이너 상태와 Ready** 순서로
 완료를 판정한다. Pod의 수명 주기와 controller의 역할은
-[cka 4장 — Pod](/cka/04-pods/)에서 복습한다.
+[CKA Pod — 배포의 최소 단위](/cka/pods/)에서 복습한다.
 
 손으로 익힐 흐름은 `kubectl run` → `kubectl get -o wide` →
 `kubectl describe` → 필요한 최소 수정이다. 문제의 namespace가 있으면 모든 명령에

@@ -12,7 +12,7 @@ import Thesis from '../../../components/docs/Thesis.astro';
 
 <Thesis>DaemonSet은 API의 Pod 템플릿이 원본이고 static Pod은 각 노드의 매니페스트 파일이 원본이므로, 같은 노드별 워크로드라도 수정·삭제 경로가 다르다.</Thesis>
 
-> 짝이 되는 개념 장: [cka 5. Workloads](/cka/05-workloads/#daemonset--노드마다-하나씩), [cka 4. Pod](/cka/04-pods/#스태틱-pod-만들기--시험-단골)
+> 짝이 되는 개념 장: [CKA 워크로드 컨트롤러](/cka/workloads/#daemonset--노드마다-하나씩), [CKA Pod — 배포의 최소 단위](/cka/pods/#스태틱-pod-만들기--시험-단골)
 
 이 장의 과제는 노드마다 필요한 워크로드를 만들고 실제 배치를 확인하는 것이다. DaemonSet은 API
 서버에 저장된 컨트롤러가 대상 노드마다 Pod을 관리한다. static Pod은 해당 노드의 kubelet이 로컬

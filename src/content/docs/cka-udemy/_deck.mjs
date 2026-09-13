@@ -57,8 +57,8 @@ export default {
 			"desc": "namespace · 명령형 생성기 · 도움말 · Vim",
 			"items": [
 				[
-					"cka 3장",
-					"/cka/03-kubectl/"
+					"CKA kubectl — 손 속도가 점수다",
+					"/cka/kubectl/"
 				]
 			],
 			"tone": "key"
@@ -70,8 +70,8 @@ export default {
 			"desc": "필드 추출 · 조건 필터 · 정렬 · custom-columns · 파일 제출",
 			"items": [
 				[
-					"cka 3장",
-					"/cka/03-kubectl/"
+					"CKA kubectl — 손 속도가 점수다",
+					"/cka/kubectl/"
 				]
 			],
 			"tone": "key"
@@ -83,8 +83,8 @@ export default {
 			"desc": "Pod 생성 · 노드 · 컨테이너 상태 · Events · Ready",
 			"items": [
 				[
-					"cka 4장",
-					"/cka/04-pods/"
+					"CKA Pod — 배포의 최소 단위",
+					"/cka/pods/"
 				]
 			],
 			"tone": "key"
@@ -96,8 +96,8 @@ export default {
 			"desc": "ReplicaSet · Deployment 생성 · rollout · 실패 진단 · rollback",
 			"items": [
 				[
-					"cka 5장",
-					"/cka/05-workloads/"
+					"CKA 워크로드 컨트롤러",
+					"/cka/workloads/"
 				]
 			],
 			"tone": "key"
@@ -109,8 +109,8 @@ export default {
 			"desc": "terminal condition · 소유 Pod · 로그 · 실패 후 재실행",
 			"items": [
 				[
-					"cka 5장",
-					"/cka/05-workloads/"
+					"CKA 워크로드 컨트롤러",
+					"/cka/workloads/"
 				]
 			],
 			"tone": "key"
@@ -122,8 +122,8 @@ export default {
 			"desc": "Pod 소유자 · command/args · sh -c · 실행 결과",
 			"items": [
 				[
-					"cka 4장",
-					"/cka/04-pods/"
+					"CKA Pod — 배포의 최소 단위",
+					"/cka/pods/"
 				]
 			],
 			"tone": "ok"
@@ -135,8 +135,8 @@ export default {
 			"desc": "env · envFrom · volume · 변경 반영 · 읽기 전용 Secret",
 			"items": [
 				[
-					"cka 6장",
-					"/cka/06-config/"
+					"CKA 설정과 리소스",
+					"/cka/config/"
 				]
 			],
 			"tone": "ok"
@@ -148,8 +148,8 @@ export default {
 			"desc": "공유 volume · Downward API · 네이티브 sidecar · init 복구",
 			"items": [
 				[
-					"cka 4장",
-					"/cka/04-pods/"
+					"CKA Pod — 배포의 최소 단위",
+					"/cka/pods/"
 				]
 			],
 			"tone": "ok"
@@ -161,8 +161,8 @@ export default {
 			"desc": "runAsUser 우선순위 · 컨테이너 capability · 실행 검증",
 			"items": [
 				[
-					"cka 4장",
-					"/cka/04-pods/"
+					"CKA Pod — 배포의 최소 단위",
+					"/cka/pods/"
 				]
 			],
 			"tone": "ok"
@@ -174,8 +174,8 @@ export default {
 			"desc": "nodeName · selector · taint/toleration · nodeAffinity · Pending Events",
 			"items": [
 				[
-					"cka 7장",
-					"/cka/07-scheduling/"
+					"CKA 스케줄링",
+					"/cka/scheduling/"
 				]
 			],
 			"tone": "ok"
@@ -187,8 +187,8 @@ export default {
 			"desc": "requests/limits · OOMKilled · LimitRange · ResourceQuota",
 			"items": [
 				[
-					"cka 6장",
-					"/cka/06-config/"
+					"CKA 설정과 리소스",
+					"/cka/config/"
 				]
 			],
 			"tone": "ok"
@@ -200,12 +200,12 @@ export default {
 			"desc": "노드별 Pod · updateStrategy · rollback · staticPodPath · mirror Pod",
 			"items": [
 				[
-					"cka 5장",
-					"/cka/05-workloads/"
+					"CKA 워크로드 컨트롤러",
+					"/cka/workloads/"
 				],
 				[
-					"cka 4장",
-					"/cka/04-pods/"
+					"CKA Pod — 배포의 최소 단위",
+					"/cka/pods/"
 				]
 			],
 			"tone": "ok"
@@ -217,8 +217,8 @@ export default {
 			"desc": "metrics API · resource requests · CPU/memory Utilization · replica 판정",
 			"items": [
 				[
-					"cka 8장",
-					"/cka/08-autoscaling/"
+					"CKA 오토스케일링",
+					"/cka/autoscaling/"
 				]
 			],
 			"tone": "ok"
@@ -230,12 +230,12 @@ export default {
 			"desc": "별도 CRD · targetRef · Recreate · recommendation · RequestsOnly",
 			"items": [
 				[
-					"cka 8장",
-					"/cka/08-autoscaling/"
+					"CKA 오토스케일링",
+					"/cka/autoscaling/"
 				],
 				[
-					"cka 17장",
-					"/cka/17-extensions/"
+					"CKA 확장 인터페이스 — CRI·CNI·CSI",
+					"/cka/extensions/"
 				]
 			],
 			"tone": "ok"
@@ -247,8 +247,8 @@ export default {
 			"desc": "selector · port/targetPort · EndpointSlice · ClusterIP · NodePort",
 			"items": [
 				[
-					"cka 9장",
-					"/cka/09-services/"
+					"CKA Service",
+					"/cka/services/"
 				]
 			],
 			"tone": "warn"
@@ -260,8 +260,8 @@ export default {
 			"desc": "kube-dns · Corefile · FQDN · namespace · nslookup · 실제 연결",
 			"items": [
 				[
-					"cka 10장",
-					"/cka/10-dns/"
+					"CKA 클러스터 DNS",
+					"/cka/dns/"
 				]
 			],
 			"tone": "warn"
@@ -273,12 +273,12 @@ export default {
 			"desc": "인터페이스 · 세 IP 대역 · 런타임 socket · CNI 경로 · Calico 설치",
 			"items": [
 				[
-					"cka 15장",
-					"/cka/15-cluster-lifecycle/"
+					"CKA kubeadm — 클러스터 설치와 노드 조인",
+					"/cka/cluster-setup/"
 				],
 				[
-					"cka 17장",
-					"/cka/17-extensions/"
+					"CKA 확장 인터페이스 — CRI·CNI·CSI",
+					"/cka/extensions/"
 				]
 			],
 			"tone": "warn"
@@ -290,8 +290,8 @@ export default {
 			"desc": "IngressClass · host/path · controller · TLS · 외부 HTTP/HTTPS",
 			"items": [
 				[
-					"cka 11장",
-					"/cka/11-ingress-gateway/"
+					"CKA Ingress와 Gateway API",
+					"/cka/ingress-gateway/"
 				]
 			],
 			"tone": "warn"
@@ -303,8 +303,8 @@ export default {
 			"desc": "CRD와 구현체 · listener · parentRefs · attachment 조건 · 실제 요청",
 			"items": [
 				[
-					"cka 11장",
-					"/cka/11-ingress-gateway/"
+					"CKA Ingress와 Gateway API",
+					"/cka/ingress-gateway/"
 				]
 			],
 			"tone": "warn"
@@ -316,8 +316,8 @@ export default {
 			"desc": "pod/namespace selector · ingress/egress · DNS · 허용/차단 검증",
 			"items": [
 				[
-					"cka 12장",
-					"/cka/12-networkpolicy/"
+					"CKA NetworkPolicy와 CNI",
+					"/cka/networkpolicy/"
 				]
 			],
 			"tone": "warn"
@@ -329,8 +329,8 @@ export default {
 			"desc": "hostPath · PV/PVC 바인딩 · reclaimPolicy · 실제 mount·읽기/쓰기",
 			"items": [
 				[
-					"cka 13장",
-					"/cka/13-storage/"
+					"CKA 스토리지",
+					"/cka/storage/"
 				]
 			],
 			"tone": "zone"
@@ -342,8 +342,8 @@ export default {
 			"desc": "provisioner · WaitForFirstConsumer · 기본 class · 동적 PV · quota",
 			"items": [
 				[
-					"cka 13장",
-					"/cka/13-storage/"
+					"CKA 스토리지",
+					"/cka/storage/"
 				]
 			],
 			"tone": "zone"
@@ -355,8 +355,8 @@ export default {
 			"desc": "인증서 역할 · CSR 승인·발급 · kubeconfig · 실제 인증 · API 요청 흐름",
 			"items": [
 				[
-					"cka 14장",
-					"/cka/14-rbac/"
+					"CKA API 요청 처리 흐름",
+					"/cka/api-access/"
 				]
 			],
 			"tone": "zone"
@@ -368,8 +368,8 @@ export default {
 			"desc": "Role·ClusterRole · Binding · can-i 허용·거부 · 인증과 인가 구분",
 			"items": [
 				[
-					"cka 14장",
-					"/cka/14-rbac/"
+					"CKA API 요청 처리 흐름",
+					"/cka/api-access/"
 				]
 			],
 			"tone": "zone"
@@ -381,8 +381,8 @@ export default {
 			"desc": "Pod 신원 · projected token · 레지스트리 Secret · 실제 image pull",
 			"items": [
 				[
-					"cka 14장",
-					"/cka/14-rbac/"
+					"CKA API 요청 처리 흐름",
+					"/cka/api-access/"
 				]
 			],
 			"tone": "zone"
@@ -394,8 +394,8 @@ export default {
 			"desc": "내장 플러그인 · validating/mutating webhook · 거부·변형 검증",
 			"items": [
 				[
-					"cka 14장",
-					"/cka/14-rbac/"
+					"CKA API 요청 처리 흐름",
+					"/cka/api-access/"
 				]
 			],
 			"tone": "zone"
@@ -407,8 +407,8 @@ export default {
 			"desc": "노드 사전 조건 · init/join · CNI·CoreDNS · Service·NodePort 검증",
 			"items": [
 				[
-					"cka 15장",
-					"/cka/15-cluster-lifecycle/"
+					"CKA kubeadm — 클러스터 설치와 노드 조인",
+					"/cka/cluster-setup/"
 				]
 			],
 			"tone": "bad"
@@ -420,8 +420,8 @@ export default {
 			"desc": "drain·uncordon · 패키지 버전 · upgrade apply/node · Ready·schedulable",
 			"items": [
 				[
-					"cka 15장",
-					"/cka/15-cluster-lifecycle/"
+					"CKA kubeadm — 클러스터 설치와 노드 조인",
+					"/cka/cluster-setup/"
 				]
 			],
 			"tone": "bad"
@@ -433,8 +433,8 @@ export default {
 			"desc": "endpoint·인증서 · snapshot status · 새 data-dir · stacked/external 전환",
 			"items": [
 				[
-					"cka 15장",
-					"/cka/15-cluster-lifecycle/"
+					"CKA kubeadm — 클러스터 설치와 노드 조인",
+					"/cka/cluster-setup/"
 				]
 			],
 			"tone": "bad"
@@ -446,8 +446,8 @@ export default {
 			"desc": "repo·search · chart/app 버전 · install/upgrade · history/rollback · 두 층 검증",
 			"items": [
 				[
-					"cka 16장",
-					"/cka/16-helm-kustomize/"
+					"CKA Helm — 패키지 설치와 릴리스 관리",
+					"/cka/helm/"
 				]
 			],
 			"tone": "bad"
@@ -471,8 +471,8 @@ export default {
 					"/cka-udemy/kustomize-components/"
 				],
 				[
-					"cka 16장",
-					"/cka/16-helm-kustomize/"
+					"CKA Helm — 패키지 설치와 릴리스 관리",
+					"/cka/helm/"
 				]
 			],
 			"tone": "bad"
@@ -484,12 +484,12 @@ export default {
 			"desc": "metrics-server · top 단위 · Pod 상태 · Events · 현재/이전 로그",
 			"items": [
 				[
-					"cka 8장",
-					"/cka/08-autoscaling/"
+					"CKA 오토스케일링",
+					"/cka/autoscaling/"
 				],
 				[
-					"cka 18장",
-					"/cka/18-troubleshooting/"
+					"CKA 트러블슈팅",
+					"/cka/troubleshooting/"
 				]
 			],
 			"tone": "bad"
@@ -501,8 +501,8 @@ export default {
 			"desc": "Pod 생성·배정 · static Pod 명령·kubeconfig·hostPath · 원래 workload",
 			"items": [
 				[
-					"cka 18장",
-					"/cka/18-troubleshooting/"
+					"CKA 트러블슈팅",
+					"/cka/troubleshooting/"
 				]
 			],
 			"tone": "bad"
@@ -514,8 +514,8 @@ export default {
 			"desc": "kubelet 서비스 · config/kubeconfig · CA · API 서버 주소 · Node Ready",
 			"items": [
 				[
-					"cka 18장",
-					"/cka/18-troubleshooting/"
+					"CKA 트러블슈팅",
+					"/cka/troubleshooting/"
 				]
 			],
 			"tone": "bad"
@@ -527,12 +527,12 @@ export default {
 			"desc": "Service·EndpointSlice · CNI 초기화 · kube-proxy 설정 · 실제 앱 요청",
 			"items": [
 				[
-					"cka 9장",
-					"/cka/09-services/"
+					"CKA Service",
+					"/cka/services/"
 				],
 				[
-					"cka 18장",
-					"/cka/18-troubleshooting/"
+					"CKA 트러블슈팅",
+					"/cka/troubleshooting/"
 				]
 			],
 			"tone": "bad"
@@ -544,8 +544,8 @@ export default {
 			"desc": "작업 → 첫 관찰 명령 → 공식 문서 검색어 → 완료 판정",
 			"items": [
 				[
-					"cka 19장",
-					"/cka/19-exam-strategy/"
+					"CKA 시험 전략과 치트시트",
+					"/cka/exam-strategy/"
 				]
 			],
 			"tone": "key"

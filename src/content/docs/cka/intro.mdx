@@ -1,5 +1,5 @@
 ---
-title: "0. 시작하기 전에"
+title: "시작하기 전에"
 description: "이 덱을 어떻게 읽을 것인가"
 deckGroup: intro
 sidebar:
@@ -69,16 +69,16 @@ etcd 백업·복구, kubeadm(클러스터 설치·업그레이드 도구) 업그
 
 ## 덱의 구성 — 커리큘럼 도메인에 맞춰 정렬했다
 
-| 장 | 주제 | CKA 도메인 |
-|---|---|---|
-| 1 | 시험 자체 | — |
-| 2~3 | 아키텍처 · kubectl | 기초 |
-| 4~8 | Pod · 워크로드 · 설정 · 스케줄링 · 오토스케일링 | Workloads and Scheduling (15%) |
-| 9~12 | Service · DNS · Ingress/Gateway · NetworkPolicy | Servicing and Networking (20%) |
-| 13 | 스토리지 | Storage (10%) |
-| 14~17 | RBAC · 클러스터 라이프사이클 · Helm/Kustomize · 확장 | Cluster Architecture (25%) |
-| 18 | 트러블슈팅 | Troubleshooting (30%) |
-| 19~20 | 시험 전략 · 마무리 | — |
+| 주제 | CKA 도메인 |
+|---|---|
+| [시험 안내](/cka/exam/) | — |
+| [아키텍처](/cka/architecture/) · [kubectl](/cka/kubectl/) | 기초 |
+| Pod · 워크로드 · 설정 · 스케줄링 · 오토스케일링 | Workloads and Scheduling (15%) |
+| Service · DNS · Ingress/Gateway · NetworkPolicy | Servicing and Networking (20%) |
+| [스토리지](/cka/storage/) | Storage (10%) |
+| API 접근과 권한 · 클러스터 구축과 운영 · Helm/Kustomize · 확장 | Cluster Architecture (25%) |
+| [트러블슈팅](/cka/troubleshooting/) | Troubleshooting (30%) |
+| [시험 전략](/cka/exam-strategy/) · [마무리](/cka/wrapup/) | — |
 
 **배점 순서와 학습 순서는 다르다.**
 
@@ -90,12 +90,12 @@ classes: {
   mute: { style: { fill: "#f1f5f9"; stroke: "#94a3b8"; font-color: "#334155" } }
 }
 
-b: "기초\n2~3장" { class: mute }
-w: "워크로드\n4~8장" { class: mute }
-n: "네트워크\n9~12장" { class: mute }
-s: "스토리지\n13장" { class: mute }
-c: "클러스터\n14~17장" { class: mute }
-t: "트러블슈팅\n18장 · 30%" { class: key }
+b: "기초" { class: mute }
+w: "워크로드" { class: mute }
+n: "네트워크" { class: mute }
+s: "스토리지" { class: mute }
+c: "클러스터" { class: mute }
+t: "트러블슈팅 · 30%" { class: key }
 
 b -> w
 w -> n
@@ -208,7 +208,7 @@ kind는 `kubeadm upgrade` 연습에 부적합하다.
 버전이 올라가도 **이 덱의 개념 부분은 거의 그대로**다.
 바뀌는 건 주로 API 버전 표기와 새로 GA(General Availability — 정식 승격)된 기능 몇 개다.
 
-## 0장 요약
+## 요약
 
 - CKA는 **실기**다 — 개념 모델과 손 속도가 **둘 다** 필요하다
 - 덱은 커리큘럼 5개 도메인 순서로 배치했고, 트러블슈팅(30%)이 마지막인 건 **앞의 전부가 재료**라서다
@@ -216,7 +216,7 @@ kind는 `kubeadm upgrade` 연습에 부적합하다.
 - 읽기만 하면 안 된다. [kind 환경](/lab-environment/01-kind/) + killercoda를 옆에 띄워두고 볼 것
 
 <LinkCard
-  title="1. CKA 시험 해부"
+  title="CKA 시험 해부"
   description="무엇이 나오는지 모르면 무엇을 공부할지도 못 정한다. 시험 자체를 먼저 해부한다."
-  href="/cka/01-exam/"
+  href="/cka/exam/"
 />

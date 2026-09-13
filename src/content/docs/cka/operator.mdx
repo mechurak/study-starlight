@@ -1,0 +1,127 @@
+---
+title: "Operator — 사용자 정의 리소스의 조정 루프"
+description: "Operator는 사용자 정의 리소스를 읽고 실제 상태를 선언에 맞추는 컨트롤러다."
+deckGroup: cluster-architecture
+sidebar:
+  order: 182
+---
+
+import { Steps } from '@astrojs/starlight/components';
+import Thesis from '../../../components/docs/Thesis.astro';
+
+<Thesis>Operator는 사용자 정의 리소스를 읽고 실제 상태를 선언에 맞추는 컨트롤러다.</Thesis>
+
+[CRD](/cka/crd/)를 등록하면 선언을 저장할 수 있지만, 그 선언에 따라 백업이나 복구가 실행되지는 않는다. 그 일을 맡는 Operator의 동작과 설치·진단 방법을 살펴본다.
+
+## 오퍼레이터 — CRD + 컨트롤러
+
+Deployment·StatefulSet은 "Pod을 몇 개 띄운다"까지만 안다. 그런데 Postgres 클러스터는
+초기화 순서, 페일오버 시 승격 대상, 백업 시점, 버전 업그레이드 절차가 전부 다르고,
+그건 **사람이 문서를 보고 손으로 하던 일**이다. 그 절차를 컨트롤러로 옮겨
+"선언 → 루프가 맞춰 준다"는 Kubernetes 방식 안으로 끌어들인 것이 오퍼레이터다.
+
+**운영자의 지식을 코드로 옮긴 컨트롤러.**\
+"이 상태여야 한다"를 CR(Custom Resource — CRD가 정의한 종류의 실제 오브젝트)로 선언하면,
+오퍼레이터가 그 상태를 만들고 유지한다. CRD가 클래스라면 CR은 인스턴스다.
+
+```d2 layout=elk pad=40 title="사용자가 CR 을 만들고 오퍼레이터 Pod 이 watch 로 받아 리소스를 만들고 status.conditions 를 갱신하면 사용자가 describe 로 읽는 순환"
+direction: right
+
+classes: {
+  key: { style: { fill: "#dbeafe"; stroke: "#2563eb"; font-color: "#1e3a8a" } }
+  mute: { style: { fill: "#f1f5f9"; stroke: "#94a3b8"; font-color: "#334155" } }
+}
+
+u: 사용자 { class: mute }
+api: kube-apiserver { class: mute }
+op: Operator Pod\ncert-manager { class: key }
+
+u -> api: CR 생성\nkind: Certificate
+api -> op: watch
+op -> api: Secret · Ingress 등 생성
+op -> api: status.conditions 갱신
+api -> u: describe 로 읽는다
+```
+
+| 오퍼레이터 | CR 예 |
+|---|---|
+| cert-manager | `Certificate`, `Issuer` |
+| Prometheus Operator | `Prometheus`, `ServiceMonitor`, `PrometheusRule` |
+| CloudNativePG | `Cluster` (Postgres 클러스터) |
+| Istio | `VirtualService`, `Gateway` |
+
+## 오퍼레이터 설치와 확인
+
+```bash
+# 대개 Helm 또는 매니페스트 하나로 설치된다
+helm install cert-manager jetstack/cert-manager \
+  --namespace cert-manager --create-namespace --set crds.enabled=true
+```
+
+**설치 확인은 3단계다.**
+
+<Steps>
+
+1. **CRD가 등록됐는가**
+
+   ```bash
+   kubectl get crd | grep cert-manager
+   ```
+
+2. **컨트롤러가 도는가**
+
+   ```bash
+   kubectl get pods -n cert-manager
+   ```
+
+3. **권한이 있는가**
+
+   ```bash
+   kubectl get clusterrole,clusterrolebinding | grep cert-manager
+   ```
+
+</Steps>
+
+**CR을 만들었는데 아무 일도 안 일어날 때**
+
+```d2 layout=elk pad=40 title="CR 에 반응이 없을 때 describe 의 status.conditions 와 Events, 오퍼레이터 로그, 오퍼레이터 Pod 생존 순으로 내려가는 진단 순서"
+direction: down
+
+classes: {
+  key: { style: { fill: "#dbeafe"; stroke: "#2563eb"; font-color: "#1e3a8a" } }
+  mute: { style: { fill: "#f1f5f9"; stroke: "#94a3b8"; font-color: "#334155" } }
+}
+
+s: CR 을 만들었는데 반응이 없다 { class: mute }
+c1: ① describe 의 status.conditions 와 Events { class: key }
+c2: ② 오퍼레이터 로그 { class: mute }
+c3: ③ 오퍼레이터 Pod 이 살아 있는가 { class: mute }
+c4: Pod 로그 · RBAC 확인 { class: mute }
+cmd1: kubectl describe certificate my-cert { class: mute }
+cmd2: kubectl logs -n cert-manager deploy/cert-manager --tail=100 { class: mute }
+
+s -> c1
+c1 -> c2: 단서가 없다
+c2 -> c3: 단서가 없다
+c3 -> c4: 죽었다
+c1 -> cmd1: { style.stroke-dash: 3 }
+c2 -> cmd2: { style.stroke-dash: 3 }
+```
+
+```bash
+kubectl describe certificate my-cert          # ★ status.conditions 와 Events
+kubectl logs -n cert-manager deploy/cert-manager --tail=100
+kubectl get events -n <ns> --sort-by=.lastTimestamp
+```
+
+:::tip[시험]
+커리큘럼은 "CRD 이해, 오퍼레이터 설치·구성"이다.
+**만드는 게 아니라 설치하고 상태를 읽는 것**이 대상이다.
+`kubectl get crd` · `kubectl explain` · `describe`로 접근하는 습관이면 충분하다.
+:::
+
+## 요약
+
+- Operator는 사용자 정의 리소스를 읽고 실제 상태를 선언에 맞추는 컨트롤러다.
+- 설치 후 CRD·컨트롤러 Pod·RBAC을 함께 확인한다.
+- CR이 반응하지 않으면 conditions와 Operator 로그에서 조정 실패 원인을 찾는다.

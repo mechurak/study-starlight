@@ -1,5 +1,5 @@
 ---
-title: "6. 설정과 리소스"
+title: "설정과 리소스"
 description: "ConfigMap · Secret · requests/limits"
 deckGroup: pods
 sidebar:
@@ -335,7 +335,7 @@ kubectl create secret tls web-tls --cert=./tls.crt --key=./tls.key
 | `Opaque` | 임의의 값 (기본) |
 | `kubernetes.io/dockerconfigjson` | 프라이빗 레지스트리 인증 |
 | `kubernetes.io/tls` | TLS 인증서 (Ingress에서 쓴다) |
-| `kubernetes.io/service-account-token` | SA 토큰 (14장) |
+| `kubernetes.io/service-account-token` | SA 토큰 ([ServiceAccount](/cka/service-account/)) |
 
 ### base64는 암호화가 아니다
 
@@ -359,7 +359,7 @@ classes: {
 s: Secret { class: mute }
 b: base64 인코딩 { class: mute }
 x: 보호 아님 { class: bad }
-p1: "① RBAC\nSecret 을 읽을 수 있는 주체 제한 · 14장" { class: key }
+p1: "① RBAC\nSecret 을 읽을 수 있는 주체 제한 · API 접근과 권한" { class: key }
 p2: "② EncryptionConfiguration\netcd 저장 시 암호화" { class: key }
 ok: "실제 보호 ✅" { class: ok }
 
@@ -372,7 +372,7 @@ p2 -> ok
 ```
 
 - **누구나 디코딩할 수 있다.** 인코딩은 바이너리를 담기 위한 것이지 보호가 아니다
-- 읽을 수 있는 주체를 좁히는 것은 **RBAC**(Role-Based Access Control — 역할 기반 접근 제어, 14장)의 몫이다
+- 읽을 수 있는 주체를 좁히는 것은 **RBAC**(Role-Based Access Control — 역할 기반 접근 제어, [RBAC](/cka/rbac/))의 몫이다
 - 기본 설정에서 **etcd에 평문으로 저장**된다
 - Secret type 목록과 YAML 형식이 헷갈리면 공식
   [Secrets](https://kubernetes.io/docs/concepts/configuration/secret/) 페이지를 연다 — `data`/`stringData` 예시가 다 있다
@@ -429,7 +429,7 @@ kubectl patch sa default -p '{"imagePullSecrets":[{"name":"regcred"}]}'
 컨테이너는 선언이 없으면 노드의 CPU·메모리를 얼마든지 쓸 수 있다. 그러면 두 가지가
 무너진다 — 스케줄러는 Pod이 얼마나 쓸지 모르니 **배치를 판단할 근거가 없고**, 런타임은
 한 컨테이너가 폭주해도 **막을 수단이 없다.** requests/limits는 그 두 판단을 위해 spec에
-적어 두는 선언이다 — 2장 아키텍처에서 스케줄러와 kubelet이 각자 읽어 간다.
+적어 두는 선언이다 — [아키텍처](/cka/architecture/) 아키텍처에서 스케줄러와 kubelet이 각자 읽어 간다.
 
 ### requests와 limits
 
@@ -593,8 +593,8 @@ requests/limits는 Pod 하나 단위의 선언이라, **안 쓴 Pod은 그냥 �
 팀·환경 단위로 나눠 쓰는 클러스터에서 이걸 방치하면 한 네임스페이스가 클러스터 자원을
 다 먹을 수 있다. 그래서 네임스페이스 단위로 거는 장치가 둘 있다 —
 기본값·개별 상한은 **LimitRange**, 총량은 **ResourceQuota**.
-둘 다 **admission**에서 동작한다 — 2장의 "인증 → 인가 → admission → etcd" 중 마지막 관문으로,
-요청이 저장되기 전에 값을 채우거나 거부하는 자리다 (admission 자체는 14장).
+둘 다 **admission**에서 동작한다 — [아키텍처](/cka/architecture/)의 "인증 → 인가 → admission → etcd" 중 마지막 관문으로,
+요청이 저장되기 전에 값을 채우거나 거부하는 자리다 (admission 자체는 [Admission](/cka/admission/)).
 
 ### LimitRange — 네임스페이스의 기본값과 상한
 
@@ -624,7 +624,7 @@ spec:
 - **admission 단계에서 동작**한다 — Pod 생성 시 값을 채우거나 거부한다
 - 이미 떠 있는 Pod에는 **소급 적용되지 않는다**
 - `type`은 무엇을 한 단위로 볼지다 — `Container`는 컨테이너 하나씩,
-  `Pod`은 Pod 안 컨테이너들의 **합**, `PersistentVolumeClaim`은 요청 용량(13장).
+  `Pod`은 Pod 안 컨테이너들의 **합**, `PersistentVolumeClaim`은 요청 용량([스토리지](/cka/storage/)).
   기본값(`default` / `defaultRequest`)을 채워주는 것은 `Container`뿐이다
 
 ### ResourceQuota — 네임스페이스 총량 제한
@@ -691,7 +691,7 @@ requests가 없는 Pod은 생성이 거부된다.**
 그래서 Quota와 LimitRange는 **짝으로** 쓴다 — LimitRange가 기본값을 채워주기 때문이다.
 :::
 
-## 6장 요약
+## 요약
 
 - ConfigMap/Secret 주입은 셋: **개별 env / envFrom / 볼륨**
 - **자동 갱신은 볼륨 마운트만.** `subPath`는 안 된다. 실무 표준은 `rollout restart`

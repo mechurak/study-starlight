@@ -1,5 +1,5 @@
 ---
-title: "9. Service"
+title: "Service"
 description: "변하는 Pod 앞의 고정된 주소"
 deckGroup: services
 sidebar:
@@ -25,8 +25,8 @@ Service는 **고정된 이름과 IP**를 주고,
 
 ## Service의 정체 — 가상 IP와 커널 규칙
 
-답부터 말하면 **노드마다 도는 kube-proxy가 커널에 심어 둔 규칙**이다 (2장의 노드 컴포넌트).
-0장의 축이 여기에도 그대로 적용된다 — Service·EndpointSlice라는 **선언**을 kube-proxy가
+답부터 말하면 **노드마다 도는 kube-proxy가 커널에 심어 둔 규칙**이다 ([아키텍처](/cka/architecture/)의 노드 컴포넌트).
+[시작하기 전에](/cka/intro/)의 축이 여기에도 그대로 적용된다 — Service·EndpointSlice라는 **선언**을 kube-proxy가
 watch하고 있다가, 커널의 NAT 규칙이라는 **실제 상태를 선언에 맞게** 계속 고쳐 놓는 루프다.
 
 ```d2 pad=40 title="kube-proxy 가 규칙만 심고 실제 트래픽은 노드 커널이 직접 DNAT 해서 kube-proxy 를 통과하지 않는 순서"
@@ -85,7 +85,7 @@ Pod 네트워크의 몫이다. Service 하나가 동작하려면 서로 다른 �
 
 두 대역이 **겹치면 안 되는** 이유가 여기 있다 — 커널 입장에서 "번역해야 할 가상 주소"와
 "그대로 배달할 진짜 주소"가 대역으로 구분되어야 하기 때문이다. CNI가 IP를 어떻게 주고
-누가 실행하는지는 [17장 CNI 절](/cka/17-extensions/#cni--pod-네트워크)에서 본다.
+누가 실행하는지는 [확장 CNI 절](/cka/extensions/#cni--pod-네트워크)에서 본다.
 Cilium처럼 kube-proxy의 역할까지 eBPF로 흡수해 kube-proxy 없이 도는 CNI도 있지만,
 시험 환경은 표준 구성(kube-proxy DaemonSet + CNI)이다.
 
@@ -262,7 +262,7 @@ kubectl get endpointslices -l kubernetes.io/service-name=web-svc
 kubectl describe svc web-svc        # Endpoints 줄을 본다
 ```
 
-- 엔드포인트 컨트롤러(kube-controller-manager 안의 제어 루프 중 하나 — 2장)가
+- 엔드포인트 컨트롤러(kube-controller-manager 안의 제어 루프 중 하나 — [아키텍처](/cka/architecture/))가
   **셀렉터에 맞고 Ready인 Pod의 IP**를 여기에 채운다
 - **`ENDPOINTS`가 비어 있으면 Service는 아무 데도 못 보낸다**
 
@@ -550,7 +550,7 @@ ch -> p3
 
 **쓰는 곳**
 
-- StatefulSet의 Pod별 안정적 DNS (5장)
+- StatefulSet의 Pod별 안정적 DNS ([워크로드](/cka/workloads/))
 - 클라이언트 측 로드밸런싱 (gRPC 등)
 - 각 인스턴스를 구분해야 하는 클러스터형 소프트웨어 (Kafka, Cassandra…)
 
@@ -751,9 +751,9 @@ a1: "앱 문제\n포트를 안 열었거나\n죽었다" { class: bad }
 q2: "ClusterIP 로\n되는가" { shape: diamond; class: mute }
 a2: "엔드포인트가 비었거나\nkube-proxy 문제" { class: bad }
 q3: "이름으로\n되는가" { shape: diamond; class: mute }
-a3: "DNS 문제 ·\nCoreDNS · 10장" { class: bad }
+a3: "DNS 문제 ·\nCoreDNS · DNS" { class: bad }
 q4: "다른 네임스페이스\n· 외부에서는" { shape: diamond; class: mute }
-a4: "FQDN 필요 또는\nNetworkPolicy · 12장" { class: bad }
+a4: "FQDN 필요 또는\nNetworkPolicy · NetworkPolicy" { class: bad }
 a5: "NodePort · LB 설정 또는\n방화벽" { class: bad }
 fine: 정상 ✅ { class: ok }
 
@@ -772,8 +772,8 @@ q4 -> fine: 전부 된다
 |---|---|
 | Pod IP 직접도 안 된다 | **앱 문제** — 포트를 안 열었거나 죽었다 |
 | Pod IP는 되는데 ClusterIP가 안 된다 | **엔드포인트 비어 있음** 또는 **kube-proxy 문제** |
-| ClusterIP는 되는데 이름이 안 된다 | **DNS 문제** — CoreDNS를 본다 (10장) |
-| 다른 네임스페이스에서만 안 된다 | **FQDN(Fully Qualified Domain Name — 네임스페이스까지 붙인 완전한 이름, 10장) 필요** 또는 **NetworkPolicy** (12장) |
+| ClusterIP는 되는데 이름이 안 된다 | **DNS 문제** — CoreDNS를 본다 ([DNS](/cka/dns/)) |
+| 다른 네임스페이스에서만 안 된다 | **FQDN(Fully Qualified Domain Name — 네임스페이스까지 붙인 완전한 이름, [DNS](/cka/dns/)) 필요** 또는 **NetworkPolicy** ([NetworkPolicy](/cka/networkpolicy/)) |
 | 외부에서만 안 된다 | **NodePort/LB 설정** 또는 방화벽 |
 
 :::tip[시험]
@@ -781,7 +781,7 @@ q4 -> fine: 전부 된다
 안쪽에서 바깥으로 한 겹씩 벗기며 **어디서 끊기는지**만 찾으면 된다.
 :::
 
-## 9장 요약
+## 요약
 
 - Service는 프로세스가 아니라 **커널에 심긴 규칙**이다. **ping은 안 된다**
 - kube-proxy는 **번역**(가상 IP → Pod IP), CNI는 **배달**(그 Pod IP까지) — Service는 두 층의 분업이다

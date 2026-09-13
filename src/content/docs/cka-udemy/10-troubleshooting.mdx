@@ -18,7 +18,7 @@ Pod이 멈춘 단계를 먼저 확인한 뒤 읽을 증거를 고르는 일이�
 metrics-server가 값을 내는지 확인하고 CPU·메모리 단위를 정확히 읽는다. 장애 진단에서는
 Pod의 NODE·Events로 실행 전후를 가른 뒤 현재 로그, 이전 로그, kubelet 로그로 필요한 만큼만 내려간다.
 
-> 개념 연결: [cka 8. 오토스케일링](/cka/08-autoscaling/) · [cka 18. 트러블슈팅](/cka/18-troubleshooting/)
+> 개념 연결: [CKA 오토스케일링](/cka/autoscaling/) · [CKA 트러블슈팅](/cka/troubleshooting/)
 
 ## metrics-server — Practice Test: Monitor Cluster Components
 
@@ -84,7 +84,7 @@ CPU가 `1m`처럼 작은 것은 자연스럽다. probe나 런타임의 백그라
 - 정렬까지 시키면 `kubectl top pod --sort-by=memory`
 
 메트릭이 어디서 와서 어디로 가는지(kubelet → metrics-server → HPA)는
-[cka 8장 메트릭 파이프라인](/cka/08-autoscaling/)에 있다. 실제 CPU·메모리 목표 설정은
+[CKA 오토스케일링](/cka/autoscaling/)에 있다. 실제 CPU·메모리 목표 설정은
 [13장 HPA 설정과 검증](/cka-udemy/autoscaling/)에서 이어 간다.
 
 ## 애플리케이션 로그 — Practice Test: Managing Application Logs

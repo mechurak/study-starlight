@@ -18,7 +18,7 @@ RBAC 작업은 요구 문장을 주체·범위·API 그룹·리소스·동사로
 `--as`와 `auth can-i`는 빠른 인가 검사다. 인증서로 실제 로그인한 증거는 아니므로 CSR 통합
 사례에서는 전용 kubeconfig의 `auth whoami`와 권한 판정을 별도로 확인한다.
 
-> 짝이 되는 개념 장: [cka 14. 인증 · 인가 · RBAC](/cka/14-rbac/)
+> 짝이 되는 개념 장: [CKA RBAC — 역할과 권한 연결](/cka/rbac/)
 
 ## RBAC으로 권한 주기
 
@@ -281,7 +281,7 @@ Group도 같은 문자열이고(인증서의 O 필드 — `system:masters`가 �
 :::
 
 노드·PV·StorageClass처럼 **클러스터 범위 리소스에는 Role이 아니라 ClusterRole**이다 —
-가르는 기준은 [cka 14장](/cka/14-rbac/). rule 여러 개처럼 `kubectl create` 플래그로 표현할 수
+가르는 기준은 [CKA RBAC — 역할과 권한 연결](/cka/rbac/). rule 여러 개처럼 `kubectl create` 플래그로 표현할 수
 없는 걸 넣어야 해서 rules YAML을 직접 써야 하면 공식
 [RBAC 문서](https://kubernetes.io/docs/reference/access-authn-authz/rbac/)의 예시에서 복사하거나,
 `kubectl create role ... --dry-run=client -o yaml`로 뼈대를 뽑아 고치는 쪽이 문서 검색보다 빠르다.

@@ -144,7 +144,7 @@ Keycloak에 등록조차 안 된 소비자라 **scope를 결정할 권한이 없
 앱이 `X-Forwarded-User`를 믿으려면 그 헤더가 **오직 oauth2-proxy를 거쳐야만**
 도달한다는 보장이 필요하다. 앱의 Service가 클러스터 안에서 직접 호출될 수 있으면,
 같은 이름의 헤더를 붙여 **인증을 통째로 우회**할 수 있다.
-NetworkPolicy로 앱 Pod의 인입을 프록시(또는 ingress)로 제한한다 ([CKA 덱 12장](/cka/12-networkpolicy/)).
+NetworkPolicy로 앱 Pod의 인입을 프록시(또는 ingress)로 제한한다 ([CKA NetworkPolicy와 CNI](/cka/networkpolicy/)).
 :::
 
 :::caution[함정 3 — 헤더는 고정 세트다]

@@ -12,7 +12,7 @@ import Thesis from '../../../components/docs/Thesis.astro';
 
 <Thesis>리소스 제한은 YAML을 저장하는 작업이 아니라 새 Pod의 실제 requests·limits와 quota의 Used/Hard, 초과 요청의 거부를 함께 증명하는 작업이다.</Thesis>
 
-> 짝이 되는 개념 장: [cka 6. 설정과 리소스](/cka/06-config/#리소스-관리)
+> 짝이 되는 개념 장: [CKA 설정과 리소스](/cka/config/#리소스-관리)
 
 이 장의 과제는 컨테이너에 CPU·메모리 requests와 limits를 설정하고, 네임스페이스 정책이 실제로
 적용되는지 확인하는 것이다. requests는 스케줄링의 기준이고 limits는 런타임 상한이다. 메모리 상한을
@@ -44,7 +44,7 @@ resources:
 
 일반적인 실습에서는 독립 Pod 스펙을 수정한 뒤 재생성한다. Kubernetes v1.35부터 컨테이너 리소스의
 in-place resize가 GA지만, 문제에서 resize를 요구하거나 클러스터가 지원하는지 확인하지 않았다면
-재생성 경계를 임의로 바꾸지 않는다. 자세한 차이는 [cka 4장](/cka/04-pods/#리소스-in-place-변경-kubernetes-v135-ga)에 있다.
+재생성 경계를 임의로 바꾸지 않는다. 자세한 차이는 [CKA Pod — 배포의 최소 단위](/cka/pods/#리소스-in-place-변경-kubernetes-v135-ga)에 있다.
 
 ### 종료 원인과 스케줄링 실패를 구분한다
 

@@ -38,7 +38,7 @@ export default {
 			"label": "Storage (10%)"
 		},
 		{
-			"id": "rbac",
+			"id": "cluster-architecture",
 			"label": "Cluster Architecture (25%)"
 		},
 		{
@@ -52,62 +52,80 @@ export default {
 	],
 	"map": [
 		{
-			"label": "0~1장",
-			"href": "/cka/00-intro/",
+			"label": "시작",
+			"href": "/cka/intro/",
 			"title": "시험 소개",
 			"tone": "mute",
 			"desc": "이 덱을 읽는 법 · 시험 자체의 해부 (환경 · 채점 · 시간 배분)"
 		},
 		{
-			"label": "2~3장",
-			"href": "/cka/02-architecture/",
+			"label": "기초",
+			"href": "/cka/architecture/",
 			"title": "기초",
 			"tone": "key",
 			"desc": "클러스터 아키텍처 · kubectl"
 		},
 		{
-			"label": "4~8장",
-			"href": "/cka/04-pods/",
+			"label": "워크로드",
+			"href": "/cka/pods/",
 			"title": "Workloads and Scheduling",
 			"badge": "15%",
 			"tone": "warn",
 			"desc": "Pod · 워크로드 · 설정 · 스케줄링 · 오토스케일링"
 		},
 		{
-			"label": "9~12장",
-			"href": "/cka/09-services/",
+			"label": "네트워크",
+			"href": "/cka/services/",
 			"title": "Services and Networking",
 			"badge": "20%",
 			"tone": "warn",
 			"desc": "Service · DNS · Ingress/Gateway · NetworkPolicy"
 		},
 		{
-			"label": "13장",
-			"href": "/cka/13-storage/",
+			"label": "스토리지",
+			"href": "/cka/storage/",
 			"title": "Storage",
 			"badge": "10%",
 			"tone": "mute",
 			"desc": "PV · PVC · StorageClass · 볼륨"
 		},
 		{
-			"label": "14~17장",
-			"href": "/cka/14-rbac/",
+			"label": "클러스터 관리",
+			"href": "/cka/api-access/",
 			"title": "Cluster Architecture",
 			"badge": "25%",
 			"tone": "bad",
-			"desc": "RBAC · 클러스터 라이프사이클 · Helm/Kustomize · 확장"
+			"desc": "API 접근과 권한 · 클러스터 구축과 운영 · 구성 도구 · 확장",
+            "items": [
+                ["API 요청 처리 흐름", "/cka/api-access/"],
+                ["사용자 인증과 CSR", "/cka/user-authentication/"],
+                ["ServiceAccount", "/cka/service-account/"],
+                ["RBAC", "/cka/rbac/"],
+                ["Admission", "/cka/admission/"],
+                ["클러스터 설치", "/cka/cluster-setup/"],
+                ["노드 유지보수", "/cka/node-maintenance/"],
+                ["업그레이드", "/cka/cluster-upgrade/"],
+                ["인증서 관리", "/cka/certificates/"],
+                ["etcd 백업과 복구", "/cka/etcd-backup/"],
+                ["HA와 etcd 멤버", "/cka/high-availability/"],
+                ["Helm", "/cka/helm/"],
+                ["Kustomize", "/cka/kustomize/"],
+                ["CRI·CNI·CSI", "/cka/extensions/"],
+                ["CRD", "/cka/crd/"],
+                ["Operator", "/cka/operator/"]
+            ]
 		},
 		{
-			"label": "18장",
-			"href": "/cka/18-troubleshooting/",
+			"label": "진단",
+			"href": "/cka/troubleshooting/",
 			"title": "Troubleshooting",
 			"badge": "30%",
 			"tone": "bad",
 			"desc": "증상에서 원인으로 — 앞의 전부가 여기서 쓰인다"
 		},
 		{
-			"label": "19~20장",
-			"href": "/cka/19-exam-strategy/",
+			"label": "시험 준비",
+			"href": "/cka/exam-strategy/",
 			"title": "시험 대비",
 			"tone": "mute",
 			"desc": "시험 전략 · 치트시트 · 마무리"

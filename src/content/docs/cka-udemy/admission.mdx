@@ -18,7 +18,7 @@ Admission은 인증과 인가를 통과한 요청의 내용을 저장 직전에 
 이 페이지의 두 실습은 2025년에 추가된 특수 사례다. 일반적인 리소스 작성법을 대체하지 않으며,
 API 서버 플래그를 다루는 내장 플러그인과 등록 리소스를 다루는 webhook을 구분하는 보충 연습이다.
 
-> 짝이 되는 개념 장: [cka 14장의 admission](/cka/14-rbac/#admission-컨트롤러)
+> 짝이 되는 개념 장: [CKA Admission — 요청 내용 검사](/cka/admission/#admission-컨트롤러)
 
 ## Admission으로 요청 내용 검사
 
@@ -26,7 +26,7 @@ API 서버 플래그를 다루는 내장 플러그인과 등록 리소스를 다
 
 소스: 강의 노트 [(2025 Updates) Admission Controllers](https://notes.kodekloud.com/docs/Certified-Kubernetes-Administrator-CKA/Scheduling/2025-Updates-Admission-Controllers/page)
 — 원본 레포에는 이 랩의 풀이 문서가 없다 (2025년 추가 랩).
-개념은 [cka 14장의 admission 절](/cka/14-rbac/#admission-컨트롤러)이 맡는다.
+개념은 [CKA Admission — 요청 내용 검사](/cka/admission/#admission-컨트롤러)이 맡는다.
 
 조회 문제부터 — "어떤 플러그인이 켜져 있나"는 **어디를 보느냐**가 곧 답이다.
 
@@ -69,7 +69,7 @@ ps -ef | grep kube-apiserver | grep admission-plugins
 ### admission webhook 등록 — Lab: Validating and Mutating Admission Controllers (2025 신규)
 
 소스: 강의 노트 [(2025 Updates) Validating and Mutating Admission Controllers](https://notes.kodekloud.com/docs/Certified-Kubernetes-Administrator-CKA/Scheduling/2025-Updates-Validating-and-Mutating-Admission-Controllers/page).
-내장 플러그인이 아니라 **직접 만든 규칙**을 거는 쪽 — [cka 14장의 외부 webhook 절](/cka/14-rbac/#외부-webhook--직접-만드는-admission)이 개념 짝이다.
+내장 플러그인이 아니라 **직접 만든 규칙**을 거는 쪽 — [CKA Admission — 요청 내용 검사](/cka/admission/#외부-webhook--직접-만드는-admission)이 개념 짝이다.
 
 랩의 흐름은 세 단계다. webhook 서버 자체(코드)는 랩이 주고, **배포와 등록**이 문제다.
 
@@ -119,7 +119,7 @@ It does not perform authentication, post-deployment scanning, or image encryptio
 아닌 것 셋은 단계로 가른다 — 인증은 관문 ①의 일, 배포 후 스캔은 생성 시점 관문이 아니며,
 mutating이 아니라 validating이라 내용을 바꾸지도 않는다. 그리고 이쪽 설정은
 webhook 리소스가 아니라 `AdmissionConfiguration` **파일**이다 —
-`kubectl api-resources`에 안 나온다 ([cka 14장](/cka/14-rbac/#세부-설정--admissionconfiguration-파일)).
+`kubectl api-resources`에 안 나온다 ([CKA Admission — 요청 내용 검사](/cka/admission/#세부-설정--admissionconfiguration-파일)).
 :::
 
 ## 완료 기준

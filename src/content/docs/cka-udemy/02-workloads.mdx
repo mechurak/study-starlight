@@ -14,7 +14,7 @@ import Thesis from '../../../components/docs/Thesis.astro';
 
 Deployment는 Pod을 직접 고치는 대신 Pod template의 새 버전을 ReplicaSet으로 rollout한다.
 이 페이지에서는 **생성 → template 변경 → rollout 관찰 → 실패 원인 확인과 rollback**을 한 흐름으로
-연습한다. controller 관계와 전략은 [cka 5장 — 워크로드 컨트롤러](/cka/05-workloads/)에서 복습한다.
+연습한다. controller 관계와 전략은 [CKA 워크로드 컨트롤러](/cka/workloads/)에서 복습한다.
 
 ReplicaSet은 개수를, Deployment는 그 ReplicaSet의 버전과 교체 과정까지 관리한다.
 두 리소스 모두 selector와 Pod template 라벨이 맞아야 한다. 생성 성공과 새 Pod의 Ready,
@@ -49,7 +49,7 @@ kubectl scale rs new-replica-set --replicas 4
 ```
 
 처럼 0으로 줄였다 되돌리거나, Pod을 직접 지워 재생성시킨다.
-이게 Deployment가 존재하는 이유다 — [cka 5장](/cka/05-workloads/).
+이게 Deployment가 존재하는 이유다 — [CKA 워크로드 컨트롤러](/cka/workloads/).
 :::
 
 ## Deployment — Practice Test: Deployments
@@ -113,7 +113,7 @@ Recreate 전략에는 rollingUpdate 파라미터가 있을 수 없다.
 :::tip[관찰 명령]
 롤아웃이 실제로 어떻게 진행되는지는 `kubectl rollout status deploy/frontend`,
 되돌리기는 `kubectl rollout undo deploy/frontend`.
-히스토리 관리와 원리는 [cka 5장 Deployment 절](/cka/05-workloads/)에 있다.
+히스토리 관리와 원리는 [CKA 워크로드 컨트롤러](/cka/workloads/)에 있다.
 시험 중 전략 필드가 헷갈리면 공식
 [Deployments 문서](https://kubernetes.io/docs/concepts/workloads/controllers/deployment/)에서
 `strategy` 예시를 복사해 온다.

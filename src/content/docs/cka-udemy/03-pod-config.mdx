@@ -14,7 +14,7 @@ import Thesis from '../../../components/docs/Thesis.astro';
 
 `command`와 `args`는 컨테이너 이미지의 기본 실행 명령을 바꾼다. 이 페이지에서는
 **누가 Pod을 관리하는지 확인 → 올바른 template 수정 → 새 컨테이너의 명령·상태 확인** 흐름을
-연습한다. 기본 개념은 [cka 4장 — 컨테이너 실행 명령](/cka/04-pods/#command와-args--dockerfile과의-대응)에서 복습한다.
+연습한다. 기본 개념은 [CKA Pod — 배포의 최소 단위](/cka/pods/#command와-args--dockerfile과의-대응)에서 복습한다.
 
 기존 Pod은 `kubectl describe pod <name>`의 **Controlled By**를 먼저 본다.
 Deployment 등이 소유하면 그 workload의 `spec.template`을 고치고 rollout을 확인한다.

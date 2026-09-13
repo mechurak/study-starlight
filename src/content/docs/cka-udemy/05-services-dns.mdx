@@ -12,7 +12,7 @@ import Thesis from '../../../components/docs/Thesis.astro';
 
 <Thesis>Service는 생성 출력이 아니라 selector와 Ready Pod이 만든 EndpointSlice, 그리고 실제 요청 성공으로 완성된다.</Thesis>
 
-> 짝이 되는 개념 장: [cka 9. Service](/cka/09-services/)
+> 짝이 되는 개념 장: [CKA Service](/cka/services/)
 
 이 장의 과제는 Pod 앞에 Service를 만들고 트래픽이 올바른 백엔드까지 가는지 확인하는 것이다.
 `port`는 클라이언트가 접속하는 Service 포트이고, `targetPort`는 Pod가 실제로 듣는 포트다.
@@ -38,7 +38,7 @@ service-definition-1.yaml file.* — 는 정의 파일의 빈칸(셀렉터·포�
 :::tip[엔드포인트가 답의 근거다]
 "Service가 몇 개의 Pod으로 트래픽을 보내는가"는 전부 Endpoints 개수를 묻는 문제다.
 셀렉터와 Pod 라벨이 맞아야 엔드포인트가 생긴다 — 0개면 셀렉터 불일치부터 의심.
-실제 데이터 소스는 EndpointSlice다 ([cka 9장](/cka/09-services/)).
+실제 데이터 소스는 EndpointSlice다 ([CKA Service](/cka/services/)).
 :::
 
 ### 첫 조회 — Pod 라벨과 Service selector를 나란히 본다

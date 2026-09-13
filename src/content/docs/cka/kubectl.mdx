@@ -1,5 +1,5 @@
 ---
-title: "3. kubectl — 손 속도가 점수다"
+title: "kubectl — 손 속도가 점수다"
 description: "같은 결과를 30초 만에 만드는 법"
 deckGroup: architecture
 sidebar:
@@ -13,7 +13,7 @@ import { Steps, Card, CardGrid, Tabs, TabItem } from '@astrojs/starlight/compone
 
 ## kubectl은 무엇인가
 
-2장의 그림에서 모든 화살표는 API 서버를 향했다 — kubectl은 그중 **사람이 쏘는 화살표**다.
+[아키텍처](/cka/architecture/)의 그림에서 모든 화살표는 API 서버를 향했다 — kubectl은 그중 **사람이 쏘는 화살표**다.
 시험의 모든 조작이 이 클라이언트를 거치니, 이 장은 곧 손 속도를 버는 장이다.
 
 ```d2 layout=elk pad=40 title="kubeconfig 가 kubectl 에게 어디로 · 누구로 접속할지 알려주고, 연결 실패는 server 주소, 403 은 user 신원 문제로 이어진다"
@@ -55,7 +55,7 @@ kubectl get pods -v=6      # 실제로 어떤 URL을 호출하는지 보인다
 
 ## kubeconfig와 컨텍스트
 
-API 서버는 아무 요청이나 받지 않는다 — 2장에서 본 첫 관문(인증)을 통과해야 한다.
+API 서버는 아무 요청이나 받지 않는다 — [아키텍처](/cka/architecture/)에서 본 첫 관문(인증)을 통과해야 한다.
 그렇다고 매 명령마다 서버 주소와 인증서를 플래그로 줄 수는 없으니,
 "어디로 · 누구로"를 파일 하나에 묶어 둔다. 그게 kubeconfig다.
 
@@ -107,7 +107,7 @@ ctx -> cur
 
 `certificate-authority`는 CA(Certificate Authority · 인증 기관) 인증서다 —
 "이 API 서버가 진짜인가"를 클라이언트 쪽에서 검증하는 뿌리이고,
-반대로 `client-certificate`는 서버에게 "나는 admin이다"를 증명한다. 인증서 체계 자체는 14장.
+반대로 `client-certificate`는 서버에게 "나는 admin이다"를 증명한다. 인증서 체계 자체는 [사용자 인증](/cka/user-authentication/).
 
 ### 컨텍스트 다루기
 
@@ -226,12 +226,12 @@ kubectl get pod web -o yaml           # 정확히 어떤 값이 들어갔는가
 
 :::tip[시험]
 고장난 것을 볼 때는 **거의 항상 `describe`가 먼저**다.
-Events 한 줄에 답이 있는 경우가 대부분이다. (18장)
+Events 한 줄에 답이 있는 경우가 대부분이다. ([트러블슈팅](/cka/troubleshooting/))
 :::
 
 ## 리소스 만들기
 
-만드는 것은 결국 **spec을 API 서버에 밀어 넣는 일**이다 (2장). 방법은 두 갈래인데,
+만드는 것은 결국 **spec을 API 서버에 밀어 넣는 일**이다 ([아키텍처](/cka/architecture/)). 방법은 두 갈래인데,
 시험에서 갈리는 것은 "무엇을 만드느냐"가 아니라 **몇 초 만에 만드느냐**다 —
 그래서 두 방식의 장단을 알고 섞어 쓰는 것이 이 절의 목적이다.
 
@@ -296,7 +296,7 @@ kubectl create cronjob hello --image=busybox --schedule="*/1 * * * *" -- echo hi
 kubectl create ingress web --rule="example.com/*=web-svc:80"
 ```
 
-**이 목록을 손에 붙이는 것이 곧 시험 시간이다.** 19장에 전체 치트시트가 있다.
+**이 목록을 손에 붙이는 것이 곧 시험 시간이다.** [시험 전략](/cka/exam-strategy/)에 전체 치트시트가 있다.
 막히면 시험 중에도 열 수 있는 공식 [kubectl Quick Reference](https://kubernetes.io/docs/reference/kubectl/quick-reference/)에 같은 목록이 정리되어 있다.
 
 ### dry-run — 명령형으로 YAML을 뽑는다
@@ -405,7 +405,7 @@ kubectl·kubeadm은 `--flag=value`와 `--flag value`를 둘 다 받는다. 하�
 :::caution[함정]
 Pod의 **대부분 필드는 수정할 수 없다.**
 `image`, `tolerations`(추가), `activeDeadlineSeconds` 정도만 가능하고,
-리소스(cpu·메모리)는 v1.35부터 **`--subresource=resize`로 제자리 수정**할 수 있다 (4장).
+리소스(cpu·메모리)는 v1.35부터 **`--subresource=resize`로 제자리 수정**할 수 있다 ([Pod](/cka/pods/)).
 그 외를 고치려면 `--force`로 지우고 다시 만들어야 한다.
 :::
 
@@ -483,7 +483,7 @@ q: 상위 컨트롤러가 있는가 { shape: diamond; class: mute }
 back: "즉시 다시 생긴다 ⚠️\n→ 컨트롤러를 지워야 한다" { class: warn }
 gone: 사라진다 ✅ { class: ok }
 ns: 네임스페이스가 Terminating 에서 안 끝난다 { class: mute }
-fin: finalizer 를 의심한다 · 18장 { class: bad }
+fin: finalizer 를 의심한다 · 트러블슈팅 { class: bad }
 
 d -> q
 q -> back: 있다 · Deployment 등
@@ -497,12 +497,12 @@ ns -> fin
 :::caution[함정]
 Deployment가 관리하는 Pod을 지우면 **즉시 다시 생긴다.**
 "Pod을 지웠는데 계속 있다"면 상위 컨트롤러를 지워야 한다.
-반대로 **네임스페이스가 `Terminating`에서 안 끝나면** finalizer(삭제 전 정리가 끝날 때까지 삭제를 막는 표식 — 18장)를 의심한다.
+반대로 **네임스페이스가 `Terminating`에서 안 끝나면** finalizer(삭제 전 정리가 끝날 때까지 삭제를 막는 표식 — [트러블슈팅](/cka/troubleshooting/))를 의심한다.
 :::
 
 ## 진단 도구
 
-여기부터는 **루프가 어디서 멈췄는지**를 알아내는 도구다 (0장의 축, 커리큘럼의 30%).
+여기부터는 **루프가 어디서 멈췄는지**를 알아내는 도구다 ([시작하기 전에](/cka/intro/)의 축, 커리큘럼의 30%).
 순서가 있다 — 이벤트는 "스케줄링·이미지·볼륨" 같은 **Pod이 뜨기까지의 실패**를,
 로그는 "떴는데 앱이 죽는" **뜬 다음의 실패**를 보여준다. `exec`·`debug`는 그래도 모를 때 안으로 들어가는 것이다.
 
@@ -609,7 +609,7 @@ kubectl events --for pod/web              # 새 전용 명령
 로그보다 이벤트가 먼저인 경우가 많다 (스케줄링·이미지·볼륨 문제는 로그에 안 나온다).
 :::
 
-## 3장 요약
+## 요약
 
 - kubectl은 **kubeconfig로 결정된 주소·신원**으로 API를 호출하는 클라이언트다
 - **context = cluster + user + namespace.** 시험은 컨텍스트 전환에서 갈린다

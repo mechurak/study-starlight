@@ -18,7 +18,7 @@ CoreDNS, 샘플 Service, 외부 NodePort 요청까지 한 층씩 통과해야 �
 각 명령을 어느 노드에서 실행하는지 먼저 표시한다. 버전·저장소·CNI URL은 문제 지시를 따르고,
 Pod CIDR과 CNI 설정을 대조한 뒤 노드 Ready와 실제 통신으로 완료를 판정한다.
 
-> 개념 연결: [cka 15. 클러스터 라이프사이클](/cka/15-cluster-lifecycle/) · [17장 네트워크 환경](/cka-udemy/network-environment/)
+> 개념 연결: [CKA kubeadm — 클러스터 설치와 노드 조인](/cka/cluster-setup/) · [17장 네트워크 환경](/cka-udemy/network-environment/)
 
 ## 로컬 런타임 패키지 설치 — cri-docker (랩 환경 보충)
 
@@ -180,7 +180,7 @@ Docker 연결 오류, socket 상태, 실행 파일 경로 중 실제 오류를 �
    kubectl get nodes           # NotReady → Ready
    ```
 
-   CIDR이 안 맞으면 **Pod은 뜨는데 통신이 안 된다** — [cka 15장 CNI 절](/cka/15-cluster-lifecycle/)의
+   CIDR이 안 맞으면 **Pod은 뜨는데 통신이 안 된다** — [CKA kubeadm — 클러스터 설치와 노드 조인](/cka/cluster-setup/)의
    함정 그대로다. 클러스터 쪽 값이 기억 안 나면 `kubectl cluster-info dump | grep -m1 cluster-cidr`.
 
    CNI 설치 절차는 kubernetes.io가 아니라 **각 프로젝트 문서 소관**이다. 시험 허용 문서에는

@@ -26,7 +26,7 @@ import TermIntro from '../../../components/docs/TermIntro.astro';
 ## 문제 — 인증서 kubeconfig는 회수가 안 된다
 
 CKA에서 배우는 사용자 발급 절차 — CSR 제출, 승인, 인증서 추출, kubeconfig 배포
-([CKA 덱 14장](/cka/14-rbac/)) — 를 사내에서 그대로 쓰면 곧 이런 벽을 만난다.
+([CKA API 요청 처리 흐름](/cka/api-access/)) — 를 사내에서 그대로 쓰면 곧 이런 벽을 만난다.
 
 | 통증 | 왜 |
 |---|---|
@@ -149,7 +149,7 @@ prefix가 없으면 Keycloak의 그룹 이름이 그대로 쿠버네티스 그�
 
 ## kubectl 쪽 — kubelogin
 
-[krew](/cka/03-kubectl/)로 설치하고, kubeconfig의 user를 exec plugin으로 정의한다.
+[krew](/cka/kubectl/)로 설치하고, kubeconfig의 user를 exec plugin으로 정의한다.
 
 ```bash
 kubectl krew install oidc-login
@@ -183,7 +183,7 @@ users:
 ## RBAC 매핑 — 여기부터는 아는 길
 
 인증이 끝나면 사용자는 `oidc:jdoe`, 그룹 `oidc:platform-admin` 같은 문자열이 된다.
-이후는 CKA에서 배운 그대로 — 문자열에 바인딩을 건다 ([CKA 덱 14장](/cka/14-rbac/)).
+이후는 CKA에서 배운 그대로 — 문자열에 바인딩을 건다 ([CKA API 요청 처리 흐름](/cka/api-access/)).
 
 ```yaml
 apiVersion: rbac.authorization.k8s.io/v1

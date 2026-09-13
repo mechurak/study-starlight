@@ -1,5 +1,5 @@
 ---
-title: "20. 마무리"
+title: "마무리"
 description: "지금까지 본 것을 하나로"
 deckGroup: exam-strategy
 sidebar:
@@ -29,10 +29,10 @@ c: 컨트롤러들\nDeployment · ReplicaSet\n· Job … { class: mute }
 d: 스케줄러\nnodeName 결정 { class: mute }
 e: kubelet\n컨테이너 실행 · probe { class: mute }
 f: 실제 상태 · status { class: ok }
-g: Service · DNS ·\nIngress\n9~11장 { class: warn }
-h: PV/PVC · CSI\n13장 { class: warn }
-i: RBAC\n14장 { class: warn }
-j: NetworkPolicy —\nCNI가 집행\n12장 { class: warn }
+g: Service · DNS ·\nIngress { class: warn }
+h: PV/PVC · CSI { class: warn }
+i: RBAC { class: warn }
+j: NetworkPolicy —\nCNI가 집행 { class: warn }
 
 a -> b
 b -> c
@@ -46,29 +46,41 @@ i -> b
 j -> e
 ```
 
-**0장에서 말한 한 문장으로 돌아온다** — 모든 것은 **spec과 status의 차이를 줄이는 루프**다.
+**[시작하기 전에](/cka/intro/)에서 말한 한 문장으로 돌아온다** — 모든 것은 **spec과 status의 차이를 줄이는 루프**다.
 
-## 장별로 남길 한 줄
+## 개념별로 남길 한 줄
 
-| 장 | 한 줄 |
+| 개념 | 한 줄 |
 |---|---|
-| 2 아키텍처 | 모든 화살표는 **API 서버**를 향한다. 컨트롤 플레인은 **스태틱 Pod** |
-| 3 kubectl | **명령형으로 만들고 `$do`로 뽑아 고친다** |
-| 4 Pod | **liveness는 죽이고 readiness는 트래픽만 끊는다** |
-| 5 워크로드 | Deployment → ReplicaSet → Pod. **옛 RS가 롤백의 재료** |
-| 6 설정 | **requests는 스케줄링, limits는 런타임 강제** |
-| 7 스케줄링 | **affinity는 Pod이 고르고, taint는 노드가 밀어낸다** |
-| 8 오토스케일링 | **metrics-server + requests**가 없으면 HPA는 아무것도 못 한다 |
-| 9 Service | 진단의 1번은 **`get endpoints`** |
-| 10 DNS | **`nslookup kubernetes.default`** 가 기준점 |
-| 11 Ingress/Gateway | 규칙은 리소스, 일은 **컨트롤러**가 한다 |
-| 12 NetworkPolicy | **정책이 붙는 순간 기본 거부.** egress면 **DNS를 열어라** |
-| 13 스토리지 | **RWO는 노드 하나.** `Multi-Attach`는 여기서 온다 |
-| 14 RBAC | **401은 인증, 403은 인가.** 검산은 `auth can-i --as` |
-| 15 라이프사이클 | **첫 노드는 `apply`, 나머지는 `node`** |
-| 16 Helm/Kustomize | 남의 것은 **Helm**, 내 것은 **Kustomize** |
-| 17 확장 | **CRD를 만들어도 행동하는 주체는 없다** |
-| 18 트러블슈팅 | **고치기 전에 층을 확정하라** |
+| 아키텍처 | 모든 화살표는 **API 서버**를 향한다. 컨트롤 플레인은 **스태틱 Pod** |
+| kubectl | **명령형으로 만들고 `$do`로 뽑아 고친다** |
+| Pod | **liveness는 죽이고 readiness는 트래픽만 끊는다** |
+| 워크로드 | Deployment → ReplicaSet → Pod. **옛 RS가 롤백의 재료** |
+| 설정 | **requests는 스케줄링, limits는 런타임 강제** |
+| 스케줄링 | **affinity는 Pod이 고르고, taint는 노드가 밀어낸다** |
+| 오토스케일링 | **metrics-server + requests**가 없으면 HPA는 아무것도 못 한다 |
+| Service | 진단의 1번은 **`get endpointslices`** |
+| DNS | **`nslookup kubernetes.default`** 가 기준점 |
+| Ingress/Gateway | 규칙은 리소스, 일은 **컨트롤러**가 한다 |
+| NetworkPolicy | **정책이 붙는 순간 기본 거부.** egress면 **DNS를 열어라** |
+| 스토리지 | **RWO는 노드 하나.** `Multi-Attach`는 여기서 온다 |
+| [API 요청](/cka/api-access/) | 인증 → 인가 → Admission 순서로 실패 지점을 나눈다. |
+| [사용자 인증](/cka/user-authentication/) | CSR 제출 → 승인 → 인증서 추출 → kubeconfig 등록. |
+| [ServiceAccount](/cka/service-account/) | Pod의 신원과 작업 권한은 별개다. 토큰은 수명이 있고 kubelet이 갱신한다. |
+| [RBAC](/cka/rbac/) | Role은 권한, Binding은 연결. 검산은 `auth can-i --as`. |
+| [Admission](/cka/admission/) | 작업 권한을 통과한 요청의 내용을 고치거나 검증한다. |
+| [클러스터 설치](/cka/cluster-setup/) | 런타임 준비 → init → CNI 설치 → join. |
+| [노드 유지보수](/cka/node-maintenance/) | 워크로드를 비우고 정비한 뒤 노드와 Pod 복귀를 확인한다. |
+| [업그레이드](/cka/cluster-upgrade/) | 첫 컨트롤 플레인은 `apply`, 나머지는 `node`. |
+| [인증서 관리](/cka/certificates/) | 만료 확인 → 갱신 → 사용하는 컴포넌트에 반영. |
+| [etcd 백업과 복구](/cka/etcd-backup/) | 스냅샷을 새 data-dir에 복구하고 etcd가 그 경로를 읽게 한다. |
+| [HA](/cka/high-availability/) | 컨트롤 플레인을 다중화하고 etcd 과반수를 유지한다. |
+| [Helm](/cka/helm/) | 차트와 값을 조합하고 릴리스 이력을 관리한다. |
+| [Kustomize](/cka/kustomize/) | 공통 base에 환경별 overlay를 겹친다. |
+| [확장 인터페이스](/cka/extensions/) | CRI는 런타임, CNI는 네트워크, CSI는 스토리지 연결이다. |
+| [CRD](/cka/crd/) | API 종류를 만들지만 선언을 실행하는 컨트롤러는 따로 필요하다. |
+| [Operator](/cka/operator/) | 사용자 정의 리소스의 spec과 실제 상태 차이를 줄인다. |
+| 트러블슈팅 | **고치기 전에 층을 확정하라** |
 
 ## 반복해야 하는 것 — 딱 다섯 가지
 
@@ -103,7 +115,7 @@ localhost → Pod IP → ClusterIP → DNS → 외부.
 
 시험 직전에는 이 페이지들만 훑어도 충분하다.
 
-```d2 layout=elk pad=40 title="시험 직전에 볼 자리 — 각 장의 마지막 요약 절과 19장 치트시트 · 18장 진단 지도 · 15장 업그레이드 순서 · 14장 Role 조합 · 7장 스케줄링 메시지 · 9장 통신 판별"
+```d2 layout=elk pad=40 title="시험 직전에 볼 자리 — 각 장의 마지막 요약 절과 시험 전략 치트시트 · 트러블슈팅 진단 지도 · 클러스터 운영 업그레이드 순서 · API 접근과 권한 Role 조합 · 스케줄링 스케줄링 메시지 · Service 통신 판별"
 direction: right
 classes: {
   ok: { style: { fill: "#dcfce7"; stroke: "#16a34a"; font-color: "#14532d" } }
@@ -115,12 +127,12 @@ classes: {
 }
 d: 시험 직전 { class: key }
 a: 각 장의 마지막 요약 절 { class: mute }
-b: 19장 치트시트\n생성 · 조회 · 진단 · 운영 · etcd { class: mute }
-c: 18장 상태별 진단 지도\nSTATUS 를 보면 다음 명령이 정해진다 { class: mute }
-e: 15장 업그레이드 순서 요약 { class: mute }
-f: 14장 Role/Binding 조합 { class: mute }
-g: 7장 스케줄링 실패 메시지 { class: mute }
-h: 9장 어디서 끊겼는지 판별하기 { class: mute }
+b: 시험 전략 치트시트\n생성 · 조회 · 진단 · 운영 · etcd { class: mute }
+c: 트러블슈팅 상태별 진단 지도\nSTATUS 를 보면 다음 명령이 정해진다 { class: mute }
+e: 클러스터 운영 업그레이드 순서 요약 { class: mute }
+f: API 접근과 권한 Role/Binding 조합 { class: mute }
+g: 스케줄링 스케줄링 실패 메시지 { class: mute }
+h: Service 어디서 끊겼는지 판별하기 { class: mute }
 
 d -> a
 d -> b
@@ -139,13 +151,13 @@ CKA는 **관리자 관점**의 기초다. 그 다음은 관심사에 따라 갈�
 
 | 방향 | 다음 |
 |---|---|
-| **보안** | CKS(Certified Kubernetes Security Specialist) — PSA(Pod Security Admission, 7장), admission webhook, 런타임 보안, 이미지 스캔 |
+| **보안** | CKS(Certified Kubernetes Security Specialist) — PSA(Pod Security Admission, [스케줄링](/cka/scheduling/)), admission webhook, 런타임 보안, 이미지 스캔 |
 | **개발** | CKAD(Certified Kubernetes Application Developer) — 워크로드 설계 관점 (범위가 겹치니 비교적 쉽다) |
 | **플랫폼** | GitOps(ArgoCD), Helm 차트 작성, 오퍼레이터 개발 |
 | **관측성** | Prometheus, Grafana, OpenTelemetry, 로그 파이프라인 |
 | **클라우드** | EKS/GKE 운영 — IRSA(IAM Roles for Service Accounts), 노드그룹, Karpenter, VPC CNI |
 
-**다만 순서를 잘못 잡지 말 것.** 이 덱의 15·18장이 흔들리면
+**다만 순서를 잘못 잡지 말 것.** 이 덱의 클러스터 운영과 트러블슈팅이 흔들리면
 어떤 방향으로 가도 결국 같은 자리로 돌아오게 된다.
 
 ## 마지막으로
@@ -177,7 +189,7 @@ q -> c: 클러스터가 이상하다
 합격을 빈다. 🎉
 
 <LinkCard
-  title="19. 시험 전략과 치트시트"
+  title="시험 전략과 치트시트"
   description="시험 직전에 다시 볼 곳. 생성·조회·진단·운영·etcd 치트시트가 모여 있다."
-  href="/cka/19-exam-strategy/"
+  href="/cka/exam-strategy/"
 />

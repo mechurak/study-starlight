@@ -1,5 +1,5 @@
 ---
-title: "12. NetworkPolicy와 CNI"
+title: "NetworkPolicy와 CNI"
 description: "Pod 사이의 통신을 막는 법"
 deckGroup: services
 sidebar:
@@ -573,7 +573,7 @@ s -> d: 이름 해석부터 실패
 | 특정 네임스페이스만 안 된다 | `namespaceSelector` 라벨 불일치 |
 | 이름 해석부터 실패 | **egress에서 UDP 53 미허용** |
 
-## 12장 요약
+## 요약
 
 - 기본은 **전부 허용**. NetworkPolicy는 좁히는 도구다
 - **정책을 강제하는 것은 CNI**다. 미지원 CNI에서는 조용히 무시된다

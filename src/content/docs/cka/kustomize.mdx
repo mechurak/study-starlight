@@ -1,0 +1,308 @@
+---
+title: "Kustomize — YAML과 오버레이"
+description: "Kustomize는 공통 YAML에 환경별 변경을 겹쳐 최종 매니페스트를 만든다."
+deckGroup: cluster-architecture
+sidebar:
+  order: 171
+---
+
+import { Tabs, TabItem, FileTree } from '@astrojs/starlight/components';
+import Thesis from '../../../components/docs/Thesis.astro';
+
+<Thesis>Kustomize는 공통 YAML에 환경별 변경을 겹쳐 최종 매니페스트를 만든다.</Thesis>
+
+dev와 prod의 매니페스트를 복사해 관리하면 공통 수정이 빠지기 쉽다. base와 overlay로 공통 내용과 차이를 나누고, kubectl로 결과를 확인하고 적용한다. 설치 이력 관리는 [Helm](/cka/helm/)과 비교한다.
+
+## Kustomize
+
+Helm은 재사용 문제를 템플릿으로 풀었는데, 그 대가가 있다 —
+차트의 `templates/`를 열면 **YAML이 아니라 Go 템플릿 코드**라 그냥 읽히지 않고,
+`helm template`을 돌려 봐야 결과를 안다. 남이 배포한 컴포넌트라면 감수할 만하지만,
+**내가 쓴 매니페스트를 dev·prod로 나누는 데 그 대가를 치를 이유는 없다.**
+
+Kustomize는 같은 문제를 반대로 푼다 — 원본 YAML은 **끝까지 평범한 YAML로 두고**,
+바꿀 부분만 따로 적어 위에 얹는다. 그래서 `kubectl apply -f`로 쓰던 파일을
+한 줄도 고치지 않고 그대로 베이스로 삼을 수 있다.
+
+직접 파일을 만들어 보는 흐름은 [Kustomize 묶기·환경별 적용](/cka-udemy/12-kustomize/)에서,
+요구한 필드를 고치고 삭제하는 연습은 [Kustomize patch](/cka-udemy/kustomize-patches/)에서 이어 간다.
+
+### Kustomize — 템플릿 없는 커스터마이징
+
+<FileTree>
+
+- base/
+  - kustomization.yaml
+  - deployment.yaml
+  - service.yaml
+- overlays/
+  - dev/
+    - kustomization.yaml
+    - replica-patch.yaml
+  - **prod/**
+    - kustomization.yaml
+    - replica-patch.yaml
+
+</FileTree>
+
+```yaml
+# base/kustomization.yaml
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - deployment.yaml
+  - service.yaml
+labels:
+  - pairs: { app: web }
+    includeSelectors: true    # 셀렉터에도 넣는다 — 옛 commonLabels와 같은 효과
+```
+
+- **템플릿 언어가 없다.** 전부 유효한 YAML이다
+- 라벨은 `labels`로 단다 — 옛 `commonLabels`는 v5.0.0에서 deprecated.
+  `labels`는 기본으로 셀렉터를 건드리지 않으니, 셀렉터까지 맞추려면 `includeSelectors: true`를 준다
+- 베이스는 그대로 두고 **오버레이가 패치를 얹는다**
+- `kubectl`에 내장되어 있다 — 별도 설치가 필요 없다
+
+`kustomization.yaml`의 필드가 기억나지 않으면, 시험 중에는 공식
+[Declarative Management of Kubernetes Objects Using Kustomize](https://kubernetes.io/docs/tasks/manage-kubernetes-objects/kustomization/)
+페이지를 열어 예제를 복사해 오는 게 정석이다.
+
+```d2 layout=elk pad=40 title="하나의 base를 dev·prod 오버레이가 각각 패치해 apply되는 구조"
+direction: down
+
+classes: {
+  key: { style: { fill: "#dbeafe"; stroke: "#2563eb"; font-color: "#1e3a8a" } }
+  ok: { style: { fill: "#dcfce7"; stroke: "#16a34a"; font-color: "#14532d" } }
+  mute: { style: { fill: "#f1f5f9"; stroke: "#94a3b8"; font-color: "#334155" } }
+}
+
+b: base/\ndeployment.yaml · service.yaml { class: key }
+d: overlays/dev\nreplicas 1 · nginx:latest { class: mute }
+p: overlays/prod\nreplicas 5 · nginx:1.28 · namePrefix prod- { class: mute }
+od: kubectl apply -k overlays/dev { class: ok }
+op: kubectl apply -k overlays/prod { class: ok }
+
+b -> d
+b -> p
+d -> od
+p -> op
+```
+
+### 오버레이 — 이름·네임스페이스·이미지 바꾸기
+
+```yaml
+# overlays/prod/kustomization.yaml
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - ../../base                            # 베이스를 가져온다
+
+namespace: prod                           # 전부 이 네임스페이스로
+namePrefix: prod-                         # 모든 이름 앞에 붙인다
+commonAnnotations: { owner: platform-team }
+
+images:
+  - { name: nginx, newTag: "1.28" }       # 이미지 태그만 교체
+replicas:
+  - { name: web, count: 5 }               # 레플리카 수만 교체
+```
+
+- `images` / `replicas` 는 **패치 파일 없이** 가장 자주 바꾸는 값을 직접 지정하는 단축이다
+- `namePrefix`를 쓰면 **참조하는 Service·볼륨 이름도 함께** 갱신된다
+
+### 오버레이 — generator와 patch
+
+```yaml
+configMapGenerator:
+  - name: app-config
+    literals: ["LOG_LEVEL=warn"]
+secretGenerator:
+  - name: db-secret
+    literals: ["password=prodsecret"]
+
+patches:
+  - path: resource-patch.yaml             # 파일로 패치
+    target: { kind: Deployment, name: web }
+```
+
+- **generator**는 ConfigMap/Secret을 **오버레이에서 새로 만든다** (베이스에 둘 필요가 없다)
+- **`patches`** 는 베이스의 임의 필드를 고친다. `target`으로 대상을 고른다
+
+### Kustomize 실행
+
+```bash
+kubectl kustomize overlays/prod              # 결과를 출력만 (미리보기)
+kubectl diff -k overlays/prod                 # 현재 클러스터와 적용 예정 결과 비교
+kubectl apply -k overlays/prod               # 적용 (delete -k 로 제거)
+kubectl get -k overlays/prod                  # 이 kustomization이 가리키는 최종 리소스 확인
+kustomize build overlays/prod | kubectl apply -f -   # 독립 바이너리를 쓸 때
+```
+
+독립 바이너리 `kustomize`와 `kubectl -k`는 같은 코드지만,
+**kubectl에 박혀 있는 쪽이 대체로 버전이 낮다.** 최신 필드를 썼는데 `kubectl -k`가
+모른다고 하면 그 차이일 수 있다. 시험에서는 `kubectl -k` 하나로 충분하다.
+
+:::caution[함정 — Kustomize에는 릴리스 리비전이 없다]
+Kustomize는 YAML을 렌더할 뿐 Helm처럼 적용 이력을 저장하지 않는다. 잘못 적용했다면
+`rollback` 명령을 찾는 대신 base·overlay를 이전의 정상 내용으로 되돌리고 `kubectl diff -k`로
+확인한 뒤 다시 `kubectl apply -k`한다. `kubectl delete -k`는 전체 리소스를 지우는 명령이지
+이전 버전으로 되돌리는 명령이 아니다.
+:::
+
+**패치 두 가지 방식**
+
+<Tabs>
+<TabItem label="전략적 병합 패치">
+
+바꿀 부분만 **같은 구조로** 쓴다. 읽기 쉽다.
+
+```yaml
+# resource-patch.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata: { name: web }
+spec:
+  template:
+    spec:
+      containers:
+        - name: nginx
+          resources: { limits: { memory: 512Mi } }
+```
+
+</TabItem>
+<TabItem label="JSON 패치 (RFC 6902)">
+
+JSON Patch 표준(RFC 6902) 방식. 경로를 직접 지정한다. 리스트 항목 교체·삭제에 정확하다.
+
+전략적 병합 패치는 리스트를 **합치려** 들기 때문에 "세 번째 항목을 지워라" 같은 요구를
+표현하기 어렵다. `op`(`replace`·`add`·`remove`)와 `path`로 한 지점을 콕 집는 이 방식이
+그 자리를 메운다. 다만 실제로 필요한 경우는 드무니, **먼저 전략적 병합으로 쓰고
+안 될 때 떠올리는 정도**면 된다.
+
+```yaml
+# kustomization.yaml 안에 인라인
+patches:
+  - target: { kind: Deployment, name: web }
+    patch: |
+      - op: replace
+        path: /spec/replicas
+        value: 5
+```
+
+</TabItem>
+</Tabs>
+
+### generator의 해시 접미사
+
+[설정과 리소스](/cka/config/)에서 본 문제 하나가 여기서 풀린다 — **ConfigMap의 내용을 바꿔도 Deployment의
+spec은 그대로**라, 루프가 볼 때 "달라진 것이 없으니" 롤아웃이 일어나지 않는다.
+결국 손으로 재시작을 걸어야 했다. generator는 이 문제를 **이름을 바꿔 버리는 방식**으로 푼다.
+
+```bash
+kubectl kustomize overlays/prod | grep -A2 'kind: ConfigMap'
+# name: prod-app-config-7g5bd8f2mk
+```
+
+**이것이 [설정과 리소스](/cka/config/)의 "ConfigMap을 바꿔도 Pod이 안 바뀐다" 문제를 구조적으로 푼다.**
+
+```d2 layout=elk pad=40 title="configMapGenerator의 이름 해시가 값 변경 시 자동 롤아웃을 일으키는 원리"
+direction: down
+
+classes: {
+  key: { style: { fill: "#dbeafe"; stroke: "#2563eb"; font-color: "#1e3a8a" } }
+  ok: { style: { fill: "#dcfce7"; stroke: "#16a34a"; font-color: "#14532d" } }
+  mute: { style: { fill: "#f1f5f9"; stroke: "#94a3b8"; font-color: "#334155" } }
+}
+
+cm: configMapGenerator\nLOG_LEVEL=warn { class: mute }
+h1: 이름에 내용 해시가 붙는다\napp-config-7g5bd8f2mk { class: key }
+d1: Deployment 의 참조도\n자동으로 갱신된다 { class: mute }
+chg: 값을 debug 로 바꾼다 { class: mute }
+h2: 새 해시\napp-config-2k9xf4m1qp { class: key }
+d2: Deployment 템플릿이 바뀐다\n→ 자동 롤아웃 ✅ { class: ok }
+
+cm -> h1 -> d1
+chg -> h2 -> d2
+```
+
+- `configMapGenerator`/`secretGenerator`가 만든 이름에는 **내용 해시**가 붙는다
+- 그리고 **Deployment 안의 ConfigMap 참조 이름도 자동으로 갱신**된다
+- 결과: **ConfigMap이 바뀌면 Deployment가 자동으로 롤아웃된다**
+
+```yaml
+generatorOptions:
+  disableNameSuffixHash: true      # 해시를 끄고 싶다면
+```
+
+## Helm과 비교하기
+
+```d2 layout=elk pad=40 title="Helm의 차트·값·릴리스와 Kustomize의 베이스·오버레이 흐름 대비"
+direction: down
+
+classes: {
+  helm: { style: { fill: "#dbeafe"; stroke: "#2563eb"; font-color: "#1e3a8a" } }
+  kust: { style: { fill: "#dcfce7"; stroke: "#16a34a"; font-color: "#14532d" } }
+  mute: { style: { fill: "#f1f5f9"; stroke: "#94a3b8"; font-color: "#334155" } }
+}
+
+h: Helm —\n템플릿 + 값 주입 {
+  ch: Chart\nGo 템플릿 { class: helm }
+  val: Values 주입 { class: helm }
+  rel: Release\n상태를 추적한다 { class: helm }
+  ch -> val -> rel
+}
+
+k: Kustomize —\n베이스 + 오버레이 {
+  base: base/\n평범한 YAML { class: kust }
+  ovr: overlays/prod\n패치를 얹는다 { class: kust }
+  out: 최종 YAML\n상태 추적 없음 { class: kust }
+  base -> ovr -> out
+}
+
+bin: helm { class: mute }
+kub: kubectl -k { class: mute }
+
+h.rel -> bin: 별도 바이너리 { style.stroke-dash: 3 }
+k.out -> kub: kubectl 에 내장 { style.stroke-dash: 3 }
+```
+
+| | Helm | Kustomize |
+|---|---|---|
+| 방식 | **템플릿 + 값 주입** | **베이스 YAML + 오버레이 패치** |
+| 배포 형태 | 패키지(차트) 저장소 | 그냥 디렉터리 |
+| 상태 관리 | **릴리스**를 추적한다 | 없음 (kubectl apply와 동일) |
+| 설치 | 별도 바이너리 | **kubectl에 내장** (`-k`) |
+
+
+## 언제 무엇을 쓰나
+
+```d2 layout=elk pad=40 title="남이 만든 것은 Helm, 내 앱은 Kustomize라는 선택 기준과 둘의 조합"
+direction: down
+
+classes: {
+  helm: { style: { fill: "#dbeafe"; stroke: "#2563eb"; font-color: "#1e3a8a" } }
+  kust: { style: { fill: "#dcfce7"; stroke: "#16a34a"; font-color: "#14532d" } }
+  mute: { style: { fill: "#f1f5f9"; stroke: "#94a3b8"; font-color: "#334155" } }
+}
+
+q: 누가 만든 것인가 { shape: diamond; class: mute }
+h: Helm\n설정 표면이 넓고\n버전 관리·롤백이 필요하다 { class: helm }
+k: Kustomize\n환경별 변형\nYAML 을 그대로 읽고 싶다 { class: kust }
+both: 배타적이지 않다 { class: mute }
+
+q -> h: 남이 만든 것\nIngress 컨트롤러 · Prometheus · CNI
+q -> k: 내가 만든 앱
+both -> q: helm template 결과를\nKustomize 로 패치하는 조합도 흔하다 { style.stroke-dash: 3 }
+```
+
+```bash
+helm template prom prometheus/kube-prometheus-stack > base/all.yaml
+# → 이후 Kustomize 오버레이로 환경별 변형
+```
+
+## 요약
+
+- Kustomize는 공통 YAML에 환경별 변경을 겹쳐 최종 매니페스트를 만든다.
+- `kubectl kustomize`로 최종 YAML을 확인한 뒤 `kubectl apply -k`로 적용한다.
+- generator의 해시 접미사는 설정 변경을 참조 이름에 반영한다.

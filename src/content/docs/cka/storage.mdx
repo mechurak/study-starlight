@@ -1,5 +1,5 @@
 ---
-title: "13. 스토리지"
+title: "스토리지"
 description: "컨테이너가 죽어도 남는 데이터"
 deckGroup: storage
 sidebar:
@@ -263,7 +263,7 @@ spec:
 
 ### 바인딩 규칙
 
-이 바인딩도 0장의 축 — **선언된 상태(spec)와 실제 상태(status)의 차이를 줄이는 루프** — 위에 있다.
+이 바인딩도 [시작하기 전에](/cka/intro/)의 축 — **선언된 상태(spec)와 실제 상태(status)의 차이를 줄이는 루프** — 위에 있다.
 PVC의 spec이 "이런 저장소가 필요하다"는 선언이고, 컨트롤러는 그 선언을 만족하는 PV가
 나타날 때까지 계속 재시도한다. 그래서 지금 조건에 맞는 PV가 없어 `Pending`이어도,
 나중에 PV가 생기면 **알아서 묶인다**.
@@ -694,7 +694,7 @@ kubectl get pods -n kube-system | grep csi
 드라이버의 gRPC 호출로 번역한다 — 여기서도 축은 같다. **선언(PVC)과 실제(볼륨)의 차이를 줄이는 루프**가
 드라이버 바깥의 sidecar에 들어 있는 셈이다.
 
-CSI는 커리큘럼의 "확장 인터페이스(CNI, CSI, CRI) 이해" 항목이다. 17장에서 함께 정리한다.
+CSI는 커리큘럼의 "확장 인터페이스(CNI, CSI, CRI) 이해" 항목이다. [확장](/cka/extensions/)에서 함께 정리한다.
 
 <Badge text="시험 비중 낮음" variant="note" /> 다만 드라이버를 직접 배포하거나 sidecar 구성을
 손보는 수준까지 팔 필요는 없다 — 층이 어떻게 나뉘는지와 `kubectl get csidrivers`로
@@ -705,7 +705,7 @@ CSI는 커리큘럼의 "확장 인터페이스(CNI, CSI, CRI) 이해" 항목이�
 여기까지의 볼륨은 "**데이터를 어디에 둘 것인가**"였다. 그런데 볼륨 메커니즘은 설정을 넣는 데도 쓰인다 —
 설정 파일이나 인증서를 이미지에 구워 넣으면 값이 바뀔 때마다 이미지를 다시 만들어야 하고,
 환경 변수로 넣으면 파일을 기대하는 프로그램에는 쓸 수 없다.
-아래 볼륨 타입들은 **API 오브젝트의 내용을 컨테이너 안의 파일로** 보여 준다 (6장의 ConfigMap·Secret이 재료다).
+아래 볼륨 타입들은 **API 오브젝트의 내용을 컨테이너 안의 파일로** 보여 준다 ([설정과 리소스](/cka/config/)의 ConfigMap·Secret이 재료다).
 
 ```yaml
 volumes:
@@ -740,7 +740,7 @@ volumes:
 
 `projected`는 **여러 소스를 한 디렉터리로 합치는** 볼륨이다. ConfigMap·Secret·downwardAPI를
 따로 마운트하면 마운트 지점이 여러 개가 되는데, 이걸 하나로 모아 준다.
-`serviceAccountToken` 소스는 여기에만 있고, **현재 SA(ServiceAccount) 토큰의 표준 주입 방식**이다 (14장).
+`serviceAccountToken` 소스는 여기에만 있고, **현재 SA(ServiceAccount) 토큰의 표준 주입 방식**이다 ([ServiceAccount](/cka/service-account/)).
 `expirationSeconds`로 수명이 붙고 kubelet이 만료 전에 갈아 끼우며, `audience`는
 "이 토큰은 이 대상에게만 유효하다"는 표시라 토큰이 새어도 다른 곳에 못 쓰인다.
 
@@ -911,7 +911,7 @@ PV·PVC·Pod 세 YAML을 손으로 처음부터 치는 건 낭비다 — 시험 
 
 </Steps>
 
-## 13장 요약
+## 요약
 
 - **emptyDir**은 Pod과 함께 죽고, **컨테이너 재시작에는 살아남는다**
 - **PV(관리자) / PVC(개발자)** 분리 덕분에 매니페스트가 환경에 독립적이다

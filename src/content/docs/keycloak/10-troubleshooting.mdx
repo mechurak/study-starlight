@@ -116,7 +116,7 @@ kubectl 쪽 401은 **API 서버 로그**(`kube-apiserver` Pod)에 원인이 문�
 | `oidc: verify token: … expired` | 토큰 만료 — kubelogin refresh·캐시 문제 | 보통 자동 갱신된다. 안 되면 `kubectl oidc-login clean` 후 다시 로그인 |
 | `oidc: verify token: … audience` | `aud` ≠ 설정된 client ID | AuthenticationConfiguration의 `audiences`와 client ID 대조 ([6장](/keycloak/06-k8s-oidc/)) |
 | `oidc: fetch keys` / issuer 접속 실패 | API 서버에서 Keycloak 도달 불가 · CA 불신뢰 | 컨트롤플레인 노드에서 issuer curl, `certificateAuthority` 확인 ([6장](/keycloak/06-k8s-oidc/)) |
-| 인증은 되는데 `Forbidden` (403) | **인증은 성공, 인가 실패** — 401과 다른 문제다 | `kubectl auth can-i` + 그룹 prefix 확인. [CKA 덱 14장](/cka/14-rbac/)의 영역 |
+| 인증은 되는데 `Forbidden` (403) | **인증은 성공, 인가 실패** — 401과 다른 문제다 | `kubectl auth can-i` + 그룹 prefix 확인. [CKA API 요청 처리 흐름](/cka/api-access/)의 영역 |
 
 :::tip[403 진단 한 줄]
 바인딩의 그룹 이름은 **prefix까지 포함한 문자열**이다 — 토큰의 `groups`가
@@ -128,7 +128,7 @@ prefix를 빼먹은 바인딩이 403의 단골 원인이다.
 
 이 장의 표는 Keycloak 층의 문제를 다룬다. 증상이 어느 표에도 안 걸리면
 **한 층 아래**가 원인일 수 있다 — Service의 EndpointSlice가 비었거나, DNS가 안 풀리거나,
-NetworkPolicy가 막고 있거나. 그 진단은 [CKA 덱 18장](/cka/18-troubleshooting/)의 영역이고,
+NetworkPolicy가 막고 있거나. 그 진단은 [CKA 트러블슈팅](/cka/troubleshooting/)의 영역이고,
 경계를 넘나드는 감각 자체가 온프렘 관리자의 몫이다.
 
 ## 참고 자료

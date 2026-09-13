@@ -1,5 +1,5 @@
 ---
-title: "10. 클러스터 DNS"
+title: "클러스터 DNS"
 description: "이름이 IP가 되는 과정"
 deckGroup: services
 sidebar:
@@ -11,7 +11,7 @@ import { Steps, Card, CardGrid, Tabs, TabItem, Badge } from '@astrojs/starlight/
 
 > 이름이 IP가 되는 과정
 
-Pod은 서로를 IP가 아니라 `web-svc` 같은 **이름**으로 부른다 (9장).
+Pod은 서로를 IP가 아니라 `web-svc` 같은 **이름**으로 부른다 ([Service](/cka/services/)).
 그 이름을 IP로 바꿔 주는 것이 없으면 클러스터 안의 모든 이름 호출이 실패한다 —
 그 일을 하는 것이 **CoreDNS**다.
 
@@ -56,7 +56,7 @@ c1 -> f
 - 앞에 **`kube-dns`라는 Service**가 있다 (이름이 옛날 그대로다)
 - 그 ClusterIP가 **모든 Pod의 네임서버**로 들어간다
 - 레코드는 어디서 얻나 — CoreDNS도 다른 컴포넌트처럼 **kube-apiserver를 watch한다**
-  (0장의 루프). Service가 생기면 DNS 레코드가 따라 생기고, 별도의 등록 절차가 없는 이유다
+  ([시작하기 전에](/cka/intro/)의 루프). Service가 생기면 DNS 레코드가 따라 생기고, 별도의 등록 절차가 없는 이유다
 
 :::caution[함정]
 **CoreDNS Pod이 죽으면 클러스터 전체의 이름 해석이 죽는다.**
@@ -107,8 +107,8 @@ l4 -> p4: { style.stroke-dash: 3 }
 `파드이름.서비스이름.네임스페이스.svc.cluster.local`\
 예: `db-0.db-headless.default.svc.cluster.local`
 
-headless Service(9장)에서만 나오는 이름이다. Pod 이름이 `db-0`, `db-1`처럼
-고정되는 StatefulSet(5장)과 짝을 이뤄, **특정 인스턴스를 이름으로 지목**할 때 쓴다.
+headless Service([Service](/cka/services/))에서만 나오는 이름이다. Pod 이름이 `db-0`, `db-1`처럼
+고정되는 StatefulSet([워크로드](/cka/workloads/))과 짝을 이뤄, **특정 인스턴스를 이름으로 지목**할 때 쓴다.
 일반 ClusterIP Service에는 이런 Pod별 이름이 생기지 않는다.
 
 :::tip[시험]
@@ -119,7 +119,7 @@ headless Service(9장)에서만 나오는 이름이다. Pod 이름이 `db-0`, `d
 ## Pod 안의 resolv.conf
 
 Pod이 어느 네임서버에 물어볼지는 컨테이너 이미지가 아니라
-**Pod을 만들 때 kubelet이 써 넣는 resolv.conf가** 정한다 (2장의 노드 컴포넌트).
+**Pod을 만들 때 kubelet이 써 넣는 resolv.conf가** 정한다 ([아키텍처](/cka/architecture/)의 노드 컴포넌트).
 아래 `dnsPolicy`에 따라 내용이 달라지므로 Pod마다 다를 수 있다 —
 DNS가 이상하면 이 파일부터 열어보는 이유다.
 
@@ -341,7 +341,7 @@ hosts {
 ## DNS 진단
 
 "연결이 안 된다"는 증상만으로는 이름이 안 풀린 것인지, 이름은 풀렸는데 Service가
-잘못된 것인지 구분되지 않는다 (9장의 진단 표와 같은 문제다). 그래서
+잘못된 것인지 구분되지 않는다 ([Service](/cka/services/)의 진단 표와 같은 문제다). 그래서
 **항상 되는 이름 하나를 기준점으로 잡고** 거기서부터 층을 벗긴다.
 
 <Steps>
@@ -396,7 +396,7 @@ a: "CoreDNS Pod 다운\nkube-dns 엔드포인트가 비어 있다" { class: bad 
 b: "Corefile 의 kubernetes 플러그인 이상\n또는 dnsPolicy 잘못" { class: warn }
 c: "forward 대상 문제\n노드 /etc/resolv.conf 확인" { class: warn }
 d: "짧은 이름을 썼다\n→ FQDN 이 필요" { class: warn }
-e: "Service · 엔드포인트 문제 · 9장\n또는 NetworkPolicy · 12장" { class: warn }
+e: "Service · 엔드포인트 문제 · Service\n또는 NetworkPolicy · NetworkPolicy" { class: warn }
 f: "ndots:5 로 인한 불필요한 조회\nCoreDNS 레플리카 부족" { class: warn }
 
 s -> a: 모든 이름
@@ -413,15 +413,15 @@ s -> f: 간헐적으로 느리다
 | 클러스터 이름만 안 된다 | Corefile의 `kubernetes` 플러그인 이상, `dnsPolicy` 잘못 |
 | 외부 도메인만 안 된다 | `forward` 대상(노드 resolv.conf) 문제 |
 | 특정 네임스페이스만 안 된다 | 짧은 이름을 썼다 → **FQDN 필요** |
-| DNS는 되는데 연결이 안 된다 | Service/엔드포인트 문제 (9장) 또는 **NetworkPolicy** (12장) |
+| DNS는 되는데 연결이 안 된다 | Service/엔드포인트 문제 ([Service](/cka/services/)) 또는 **NetworkPolicy** ([NetworkPolicy](/cka/networkpolicy/)) |
 | 간헐적으로 느리다 | `ndots:5`로 인한 불필요한 조회, CoreDNS 레플리카 부족 |
 
 :::caution[함정]
 **NetworkPolicy로 egress를 막으면 DNS도 막힌다.**
-UDP 53번을 명시적으로 허용하지 않으면 이름 해석부터 실패한다. 12장에서 다룬다.
+UDP 53번을 명시적으로 허용하지 않으면 이름 해석부터 실패한다. [NetworkPolicy](/cka/networkpolicy/)에서 다룬다.
 :::
 
-## 10장 요약
+## 요약
 
 - CoreDNS는 **평범한 Deployment**, 앞의 Service 이름은 여전히 **`kube-dns`**
 - 이름 규칙: **`서비스.네임스페이스.svc.cluster.local`**
