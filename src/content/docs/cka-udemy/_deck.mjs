@@ -376,15 +376,23 @@ export default {
 		},
 		{
 			"label": "Cluster Architecture",
-			"title": "ServiceAccount와 imagePullSecrets",
+			"title": "ServiceAccount — Pod 신원과 토큰",
 			"href": "/cka-udemy/service-account/",
-			"desc": "Pod 신원 · projected token · 레지스트리 Secret · 실제 image pull",
+			"desc": "Pod 신원 · 토큰 발급 · 자동 마운트 · projected token",
 			"items": [
 				[
 					"CKA API 요청 처리 흐름",
 					"/cka/api-access/"
 				]
 			],
+			"tone": "zone"
+		},
+		{
+			"label": "Cluster Architecture",
+			"title": "imagePullSecrets — 프라이빗 이미지 받기",
+			"href": "/cka-udemy/image-pull-secrets/",
+			"desc": "Secret 도움말 · 레지스트리 자격증명 · Pod 템플릿 · 실제 image pull",
+			"items": [],
 			"tone": "zone"
 		},
 		{
