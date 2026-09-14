@@ -191,6 +191,7 @@ Keycloak 두 service에만 부여하고, Samba administrator/user password는 Ke
 | `keycloak_db_password` | `secrets/keycloak-db-password` | PostgreSQL·Keycloak `/run/secrets/keycloak_db_password` |
 | `keycloak_bootstrap_admin_password` | `secrets/keycloak-bootstrap-admin-password` | Keycloak `/run/secrets/keycloak_bootstrap_admin_password` |
 | `keycloak_https_key` | `web-ca/keycloak.key` | Keycloak `/run/secrets/keycloak_https_key` |
+| `keycloak_local_user_password` | `secrets/keycloak-local-user-password` | Keycloak `/run/secrets/keycloak_local_user_password` |
 | `samba_tls_key` | 기존 `directory-ca/dc1.key` | Samba `/run/secrets/samba_tls_key` |
 | `samba_admin_password` | 기존 `secrets/samba-admin-password` | Samba와 일회성 directory 진단 container |
 | `samba_alice_password` / `samba_bob_password` | 기존 `secrets/samba-alice-password` / `samba-bob-password` | Samba와 일회성 directory 진단 container |
@@ -200,6 +201,12 @@ Keycloak 두 service에만 부여하고, Samba administrator/user password는 Ke
 `/opt/keycloak/conf/truststores/directory-ca.crt`, HTTPS leaf target은
 `/run/keycloak-lab/certs/keycloak.crt`다. 앱 A/B key와 client/session secret 이름은 P06/P07에서 같은
 원칙으로 추가한다.
+
+P05의 초기 realm 파일은 `study-realm.json`이고 시작 시 `--import-realm`으로 읽는다. `study`가 이미
+DB에 있으면 Keycloak의 startup import 규칙대로 건너뛰므로 container 재생성이 기존 realm을 덮어쓰지
+않는다. bootstrap 관리자는 `lab-admin`, 학습용 로컬 사용자는 `local-user`
+(`local-user@keycloak.test`)다. 두 password는 JSON에 넣지 않고 Keycloak UID 1000의 wrapper가 각각의
+file-backed secret을 읽어 process 환경으로 넘기며, 추적 JSON에는 환경 변수 placeholder만 둔다.
 
 ## 데이터와 볼륨 수명
 

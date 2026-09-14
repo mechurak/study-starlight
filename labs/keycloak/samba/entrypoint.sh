@@ -8,6 +8,7 @@ set -eu
 
 admin_password_file=/run/secrets/samba_admin_password
 certificate_directory=/run/keycloak-lab/certs
+tls_key_file=/run/secrets/samba_tls_key
 persisted_config=/var/lib/samba/etc/smb.conf
 domain_database=/var/lib/samba/private/sam.ldb
 
@@ -15,7 +16,7 @@ for required_file in \
   "$admin_password_file" \
   "$certificate_directory/ca.crt" \
   "$certificate_directory/dc1.crt" \
-  "$certificate_directory/dc1.key"
+  "$tls_key_file"
 do
   if [ ! -s "$required_file" ]; then
     echo "required Samba input is missing or empty: $required_file" >&2
@@ -44,7 +45,7 @@ if [ ! -e "$domain_database" ]; then
     -e "/^\[global\]$/a\\
 \ttls cafile = $certificate_directory/ca.crt\\
 \ttls certfile = $certificate_directory/dc1.crt\\
-\ttls keyfile = $certificate_directory/dc1.key\\
+\ttls keyfile = $tls_key_file\\
 \ttls enabled = yes" \
     /etc/samba/smb.conf
 
@@ -54,6 +55,9 @@ elif [ ! -s "$persisted_config" ]; then
   echo "Samba domain database exists but its persisted smb.conf is missing; refusing to guess" >&2
   exit 1
 else
+  sed -i \
+    -e "s|^[[:space:]]*tls keyfile[[:space:]]*=.*|\ttls keyfile = $tls_key_file|" \
+    "$persisted_config"
   cp "$persisted_config" /etc/samba/smb.conf
 fi
 

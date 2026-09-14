@@ -1,0 +1,26 @@
+{
+  "realm": "study",
+  "displayName": "Keycloak Study Lab",
+  "enabled": true,
+  "sslRequired": "external",
+  "registrationAllowed": false,
+  "resetPasswordAllowed": false,
+  "rememberMe": false,
+  "users": [
+    {
+      "username": "${KEYCLOAK_LAB_LOCAL_USER_USERNAME}",
+      "enabled": true,
+      "firstName": "Local",
+      "lastName": "User",
+      "email": "local-user@keycloak.test",
+      "emailVerified": true,
+      "credentials": [
+        {
+          "type": "password",
+          "value": "${KEYCLOAK_LAB_LOCAL_USER_PASSWORD}",
+          "temporary": false
+        }
+      ]
+    }
+  ]
+}

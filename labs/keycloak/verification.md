@@ -106,3 +106,50 @@ cd labs/keycloak
 
 비밀번호·개인키를 제외한 상세 실행 산출물은 `.state/verification/p04/`에 있다. 이 결과를 Ubuntu
 P03 또는 Ubuntu P04의 실제 결과로 사용하지 않는다.
+
+## P05 Compose PostgreSQL·Keycloak
+
+| 환경 | 상태 | 실제 범위 |
+|---|---|---|
+| macOS 26.6.2 arm64 + Colima 0.10.3 | 자동 검증 통과, browser 사용자 보류 | Colima 4 CPU/8 GiB, Docker client 29.6.1/server 29.5.2, Compose 5.5.1 |
+| 네이티브 Ubuntu 24.04 + rootful Docker Engine | 미실행 | Ubuntu P03 플랫폼 검증과 함께 별도 실행해야 함 |
+
+사용자 승인 뒤 label·고정 image·`.20` 주소·loopback `30080`~`30082` mapping이 모두 일치한 P04
+`keycloak-lab` cluster 하나만 삭제했다. 다른 kind cluster와 전역 대상은 건드리지 않았다. 삭제 전후로
+Samba named volume, domain SID, directory CA·secret, P03/P04 기록의 hash와 live directory 결과가
+같음을 확인했다. `kind.yaml`, `kind/`, `k8s/`와 P04 검증 파일은 그대로 보존했다.
+
+같은 승인 범위에서 default Colima를 삭제·초기화하지 않고 2 CPU/2 GiB에서 4 CPU/8 GiB로 재시작했다.
+재시작 직후 Docker가 노출한 memory는 8,307,167,232 bytes, `MemAvailable`은 6,853,424 KiB였고 Docker
+data filesystem 여유는 80,367,064 KiB였다. 기존 Supabase container 8개가 같은 PostgreSQL·Storage
+named volume과 Studio bind mount로 복귀했고 healthcheck 대상은 모두 healthy였다. P05 자동 검증 시작
+시점에는 `MemAvailable` 6,238,556 KiB, disk 여유 80,120,864 KiB를 기록했다.
+
+`./scripts/verify-p05.sh`의 마지막 전체 실행은 다음을 통과했다.
+
+- 고정 digest의 PostgreSQL 18.6과 Keycloak 26.7.3, 기존 Samba와 일회성 진단 container를 Compose로
+  실행했다. PostgreSQL volume은 `keycloak-lab-postgres-data` 하나를 `/var/lib/postgresql`에 mount했고
+  DB·Samba host port는 publish하지 않았다. Keycloak만 `127.0.0.1:30080`에 같은 target port를 냈다.
+- web CA와 `keycloak.keycloak.test` SAN·serverAuth leaf, DB/bootstrap/local-user password를 Git 제외
+  `.state`에 만들었다. Keycloak UID 1000, PostgreSQL UID 999, 진단 UID 65534가 자기 file-backed secret을
+  실제로 읽었고 mount는 read-only였다. secret 값은 `docker inspect`의 environment에 없었다.
+- `study` realm과 `local-user`를 만들었다. bootstrap `lab-admin` credential과 `local-user`의 Authorization
+  Code 로그인 폼은 host에서 명시적 web CA 검증을 유지한 채 성공했다. 이 curl 기반 확인은 browser
+  검증을 대신한 것으로 기록하지 않는다.
+- UID 65534 진단 container에서 `dc1.ad.keycloak.test`와 `keycloak.keycloak.test`가 각각 `.10`과 `.20`으로
+  해석됐다. directory CA LDAPS 검색, alice/bob bind, web CA discovery/JWKS와 issuer 일치를 확인했다.
+  web CA로 LDAPS 검증, directory CA로 HTTPS 검증, 오답 alice password는 각각 실패했다. 진단 명령은
+  공개 endpoint를 호출하지 않았다.
+- Samba의 SID·alice/bob·`app-users`·`api-admins` 결과가 P03 기준과 같았다. PostgreSQL과 Keycloak
+  container를 강제 재생성한 뒤에도 `study` realm, discovery/JWKS, 진단 결과와 P03 상태가 유지됐다.
+
+상세 자동 검증 산출물은 `.state/verification/p05/`에 있다. host SecureTransport는 `--cacert`로 web CA를
+명시했을 때 discovery/JWKS와 issuer를 검증했다. macOS login keychain의 root trust 설정에는 사용자
+인증이 필요하다. 2026-09-14 사용자 결정으로 관리자 인증과, 인증서 오류 우회 없이 Chrome에서 Admin
+Console·`local-user` account 화면에 로그인하는 검증은 후속으로 보류했으며 현재 **미실행**이다. 따라서
+P05 작업 상태는 browser 확인 전까지 `blocked`로 유지한다.
+
+### Ubuntu P03 플랫폼 검증 보류 유지
+
+P05의 macOS/Colima 결과는 네이티브 Ubuntu의 P03 또는 P05 결과로 일반화하지 않는다. Ubuntu 24.04 +
+rootful Docker Engine에서 `./samba/verify-p03.sh`를 실행하는 기존 보류 항목은 그대로 남아 있다.

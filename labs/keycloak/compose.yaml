@@ -22,11 +22,11 @@ services:
       - samba_admin_password
       - samba_alice_password
       - samba_bob_password
+      - samba_tls_key
     volumes:
       - keycloak-lab-samba-data:/var/lib/samba
       - ./.state/directory-ca/ca.crt:/run/keycloak-lab/certs/ca.crt:ro
       - ./.state/directory-ca/dc1.crt:/run/keycloak-lab/certs/dc1.crt:ro
-      - ./.state/directory-ca/dc1.key:/run/keycloak-lab/certs/dc1.key:ro
     networks:
       keycloak-lab:
         ipv4_address: 172.30.0.10
@@ -49,6 +49,127 @@ services:
     mem_limit: 1g
     stop_grace_period: 30s
 
+  postgres:
+    image: postgres:18.6-bookworm@sha256:1c59e2c3c818eaa0f0628f695b36e7c9e362d6b219b36a54a32df645cbd7e1af
+    container_name: keycloak-lab-postgres
+    environment:
+      POSTGRES_DB: keycloak
+      POSTGRES_USER: keycloak
+      POSTGRES_PASSWORD_FILE: /run/secrets/keycloak_db_password
+    secrets:
+      - keycloak_db_password
+    volumes:
+      - keycloak-lab-postgres-data:/var/lib/postgresql
+    networks:
+      keycloak-lab:
+        aliases:
+          - postgres
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - pg_isready --username=keycloak --dbname=keycloak
+      interval: 5s
+      timeout: 5s
+      retries: 24
+      start_period: 10s
+    cpus: 0.5
+    mem_limit: 512m
+    stop_grace_period: 30s
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.7.3@sha256:ff4257d0d64efbe99ed1ddfaf07765cc3c36dc7518bf8324d41961327f441c54
+    container_name: keycloak-lab-keycloak
+    entrypoint:
+      - /opt/keycloak/bin/keycloak-lab-entrypoint
+    environment:
+      KC_DB: postgres
+      KC_DB_URL_HOST: postgres
+      KC_DB_URL_DATABASE: keycloak
+      KC_DB_USERNAME: keycloak
+      KC_HOSTNAME: https://keycloak.keycloak.test:30080
+      KC_HTTPS_PORT: "30080"
+      KC_HTTPS_CERTIFICATE_FILE: /run/keycloak-lab/certs/keycloak.crt
+      KC_HTTPS_CERTIFICATE_KEY_FILE: /run/secrets/keycloak_https_key
+      KC_TRUSTSTORE_PATHS: /opt/keycloak/conf/truststores/directory-ca.crt
+      KC_HEALTH_ENABLED: "true"
+      KC_METRICS_ENABLED: "true"
+      KC_HTTP_MANAGEMENT_SCHEME: http
+      KC_BOOTSTRAP_ADMIN_USERNAME: lab-admin
+      KEYCLOAK_LAB_LOCAL_USER_USERNAME: local-user
+    secrets:
+      - keycloak_db_password
+      - keycloak_bootstrap_admin_password
+      - keycloak_https_key
+      - keycloak_local_user_password
+    volumes:
+      - ./keycloak/entrypoint.sh:/opt/keycloak/bin/keycloak-lab-entrypoint:ro
+      - ./keycloak/study-realm.json:/opt/keycloak/data/import/study-realm.json:ro
+      - ./.state/web-ca/keycloak.crt:/run/keycloak-lab/certs/keycloak.crt:ro
+      - ./.state/directory-ca/ca.crt:/opt/keycloak/conf/truststores/directory-ca.crt:ro
+    networks:
+      keycloak-lab:
+        ipv4_address: 172.30.0.20
+        aliases:
+          - keycloak.keycloak.test
+    ports:
+      - name: keycloak-https
+        target: 30080
+        published: "30080"
+        host_ip: 127.0.0.1
+        protocol: tcp
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test:
+        - CMD
+        - /bin/bash
+        - -ec
+        - >-
+          exec 3<>/dev/tcp/127.0.0.1/9000;
+          printf 'HEAD /health/ready HTTP/1.0\r\n\r\n' >&3;
+          grep -q 'HTTP/1.0 200' <&3
+      interval: 5s
+      timeout: 5s
+      retries: 36
+      start_period: 40s
+    cpus: 1.5
+    mem_limit: 2g
+    stop_grace_period: 30s
+
+  diagnostic:
+    image: keycloak-lab-samba:4.19.5-ubuntu24.04
+    container_name: keycloak-lab-diagnostic
+    profiles:
+      - diagnostic
+    entrypoint:
+      - /run/keycloak-lab/diagnostic/verify-compose.sh
+    user: "65534:65534"
+    read_only: true
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    secrets:
+      - samba_admin_password
+      - samba_alice_password
+      - samba_bob_password
+    volumes:
+      - ./scripts/verify-compose.sh:/run/keycloak-lab/diagnostic/verify-compose.sh:ro
+      - ./.state/directory-ca/ca.crt:/run/keycloak-lab/directory-ca/ca.crt:ro
+      - ./.state/web-ca/ca.crt:/run/keycloak-lab/web-ca/ca.crt:ro
+    tmpfs:
+      - /tmp:size=16m,mode=1777
+    networks:
+      - keycloak-lab
+    depends_on:
+      samba:
+        condition: service_healthy
+      keycloak:
+        condition: service_healthy
+    cpus: 0.25
+    mem_limit: 256m
+
 networks:
   keycloak-lab:
     name: keycloak-lab
@@ -60,6 +181,8 @@ networks:
 volumes:
   keycloak-lab-samba-data:
     name: keycloak-lab-samba-data
+  keycloak-lab-postgres-data:
+    name: keycloak-lab-postgres-data
 
 secrets:
   samba_admin_password:
@@ -68,3 +191,13 @@ secrets:
     file: ./.state/secrets/samba-alice-password
   samba_bob_password:
     file: ./.state/secrets/samba-bob-password
+  samba_tls_key:
+    file: ./.state/directory-ca/dc1.key
+  keycloak_db_password:
+    file: ./.state/secrets/keycloak-db-password
+  keycloak_bootstrap_admin_password:
+    file: ./.state/secrets/keycloak-bootstrap-admin-password
+  keycloak_https_key:
+    file: ./.state/web-ca/keycloak.key
+  keycloak_local_user_password:
+    file: ./.state/secrets/keycloak-local-user-password
