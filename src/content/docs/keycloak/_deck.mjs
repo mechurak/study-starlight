@@ -48,8 +48,7 @@ export default {
 		},
 		{
 			"id": "foundations",
-			"label": "기초",
-			"allowEmpty": true
+			"label": "기초"
 		},
 		{
 			"id": "login",
