@@ -48,6 +48,7 @@ export const deckConfigSchema = z
 					.object({
 						id: idSchema,
 						label: z.string().min(1),
+						allowEmpty: z.literal(true).optional(),
 					})
 					.strict(),
 			)

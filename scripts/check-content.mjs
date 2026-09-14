@@ -160,7 +160,7 @@ for (const deck of deckDefinitions) {
 	}
 	if (frontmatter.aliases) errors.push(`${relative(indexFile)}: 덱 alias는 _deck.mjs에 둔다.`);
 	for (const group of deck.groups) {
-		if (group.items.length === 0) errors.push(`${relative(path.join(docsRoot, deck.slug, '_deck.mjs'))}: '${group.id}' 그룹이 비어 있습니다.`);
+		if (group.items.length === 0 && !group.allowEmpty) errors.push(`${relative(path.join(docsRoot, deck.slug, '_deck.mjs'))}: '${group.id}' 그룹이 비어 있습니다.`);
 	}
 }
 

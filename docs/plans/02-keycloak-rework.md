@@ -2,8 +2,8 @@
 
 작성일: 2026-09-14
 상태: 진행 중
-지금 위치: P11 구현과 macOS/Colima 비브라우저 빈 상태 전체 재현 완료 · Ubuntu P03·P11과 P05·P06 macOS browser는 blocked/보류 유지 · 본문 개편 미착수
-실행 범위: Compose 기반 P11만 — guarded 실제 초기화, 빈 상태 최초 시작, 로컬 SSO/API, AD 로그인·그룹, refresh, 보존 중단·재개, 자원·보존 검증과 기록. 본문 개편·후속 선택 실습은 포함하지 않는다.
+지금 위치: D00 새 그룹·예약 order·병행 이관 안내 준비 완료 · D01 미착수 · Ubuntu P03·P11과 P05·P06 macOS browser는 blocked/보류 유지
+실행 범위: D00만 — 기존 그룹을 유지한 새 목차 그룹 추가, 예약 order 중복 확인, index 병행 이관 안내와 실행 기록. D01 이후 본문·선택 실습은 포함하지 않는다.
 보류: Ubuntu P03 플랫폼 검증 보류 — macOS/Colima 결과를 Ubuntu 결과로 일반화하지 않는다.
 
 [계획 관리 규칙](README.md)의 번호·상태·갱신·완료 절차를 따른다.
@@ -203,6 +203,8 @@ D00은 P11 뒤 실행한다. `_deck.mjs`에 아래 새 그룹을 추가하되 �
 새 페이지가 하나씩 완성될 때 자동 등록되도록 하며 빈 MDX를 미리 만들지 않는다.
 기존 번호 페이지와 새 페이지의 병행 기간은 이관 중임을 index에서 짧게 밝힌다.
 아래 order는 새 페이지용 예약값으로, D00에서 실제 중복이 없는지 확인한다.
+새 그룹은 첫 페이지가 생길 때까지만 `allowEmpty: true`로 표시하고, 각 그룹의 첫 작업인
+D01·D04·D07·D11·D16·D21·D26에서 해당 표시를 제거한다.
 
 각 D 작업의 입력은 공통 지침 + P11 결과 + 표의 원본 + 관련 labs 파일 + 관련 공식 문서다.
 수정 범위는 **대상 MDX 한 개**, 필요한 같은 덱의 요약/링크, 실행 기록이다.
@@ -359,3 +361,4 @@ Astro/호스팅 구성을 먼저 확인하고 필요한 [배포 지침](../deplo
 | P09 | done | `labs/keycloak/app/Dockerfile`, `seed-p09.mjs`, `labs/keycloak/compose.yaml`, `labs/keycloak/scripts/verify-p09.mjs`, `verify-p09.sh`, `labs/keycloak/decisions.md`, `labs/keycloak/verification.md`, 이 문서 | 26.7 LDAP import/sync·session/refresh guide와 26.7.3 MSAD mapper·TokenManager·user-cache clear API 대조. `verify-p09.sh` 전체 통과: group 제거, Samba alice disable, exact Samba stop을 독립 실행하고 새 로그인·새 로그인 전후 refresh·기존 JWT·앱 session을 분리 관찰. 매 시나리오와 최종 P08 정상 상태 복구 통과 | group sync 직후 `DEFAULT` cache가 이전 membership을 반환해 공식 user-cache clear를 sync 뒤 명시. group 변경은 새/refresh token만 admin 권한 제거, disable은 새 로그인/refresh 거부, LDAP outage는 새 로그인 거부와 기존 refresh 성공을 관찰; 기존 JWT와 앱 session token은 세 경우 모두 exp 전 유지. 초기 marker 권한 실패 2회와 cache 발견 실패도 source 변경 전 또는 trap으로 복구. Samba는 Microsoft AD DS가 아닌 4.19.5 AD 호환 대역. 두 volume·SID·CA·secret·P03~P08 기록과 Supabase 8개 동일. P05·P06 browser와 Ubuntu P03 blocked/보류 유지 | P10은 미착수; 요청된 P09 범위 종료 |
 | P10 | done | `labs/keycloak/README.md`, `labs/keycloak/scripts/lifecycle-common.sh`, `first-start.sh`, `status.sh`, `stop.sh`, `resume.sh`, `service.sh`, `reset.sh`, `verify-p10.sh`, `labs/keycloak/decisions.md`, `labs/keycloak/verification.md`, 이 문서 | `verify-p10.sh` 통과: 중단 전 P08/P09 정상 상태, exact project 보존형 down 뒤 container/network 부재와 두 volume·`.state` 보존, `up --wait` 재개 뒤 여섯 service healthy, SID/P03·P08/P09 결과와 CA·secret·P03~P09 기록·Supabase 8개 동일. API stopped→서비스별 start→healthy와 P08 결과 유지 확인. reset dry-run과 무확인 exit 2 guard만 검증. shell syntax, Compose config, diff와 금지 명령 범위 검사 | 최초 시작은 빈 volume을 요구하고 P05~P08 준비/seed를 readiness 순서로 적용. 일반 stop에 volume option 없음. reset은 정확한 project resource와 Compose `.state` 항목을 먼저 출력하고 고정 확인 문자열 전에는 삭제하지 않으며 P04 kind 자산은 제외. 최초 서비스별 검증에서 shell 변수 충돌을 발견해 요청 이름을 분리한 뒤 재통과. 실제 초기화/빈 상태 시작은 상태 삭제 금지로 미실행해 P11에 남김. Samba는 AD 호환 대역. P05·P06 browser와 Ubuntu P03 blocked/보류 유지 | P11은 미착수; 요청된 P10 범위 종료 |
 | P11 | blocked | `labs/keycloak/README.md`, `labs/keycloak/compose.yaml`, `labs/keycloak/scripts/verify-p11.sh`, `verify-p11-refresh.mjs`, `labs/keycloak/decisions.md`, `labs/keycloak/verification.md`, `src/content/docs/keycloak/_baseline.md`, 이 문서 | guarded reset 뒤 `verify-p11.sh` 최종 통과: macOS 26.6.2 arm64/Colima 0.10.3에서 kind·kubectl 없이 빈 상태 최초 시작 105초, 여섯 service healthy. local-user 앱 A→B SSO와 API 401/403/200, LDAPS `READ_ONLY` sync·alice/bob login·group→role→claim·API 200/403, alice refresh 200. 보존 stop/resume 뒤 SID·identity·volume과 세 진단 출력 동일. idle·시나리오·최종 `docker stats`, `MemAvailable`, image/volume disk 기록. P04 자산과 모든 비대상 container/network/volume reset 직후·중단·최종 fingerprint 동일. shell/Node syntax, P11 Compose config, 진단 container 격리·read-only mount와 secret-shaped evidence 검사 통과 | 실제 reset은 P03·P05~P10 로컬 상세 증거를 의도대로 삭제했고 P10 보존 요약을 P11에 이관. 준비 build는 pinned snapshot을 실제 조회했고 진단은 `--pull never`와 내부 endpoint만 사용. 새 CA serial 허용 조건과 bind mount fingerprint 버그를 발견해 각각 고친 뒤 최종 전체 재실행 통과. Samba는 AD 호환 대역이며 browser·Microsoft AD DS 결과가 아님. P05·P06 browser는 blocked, Ubuntu P03·P11은 미실행이므로 지원 환경 전체 P11은 blocked 유지 | 사용자 후속 요청 시 Ubuntu P03→P11 실제 검증; 현재 요청 범위 종료 |
+| D00 | done | `src/content/docs/keycloak/_deck.mjs`, `src/content/docs/keycloak/index.mdx`, `src/data/deck-schema.mjs`, `src/data/load-decks.mjs`, `scripts/check-content.mjs`, `docs/content-authoring.md`, 이 문서 | 기준 커밋 `9d8f629`와 clean 작업 트리 확인. 기존 order 10–130과 D01–D28 예약 order 1000–1270의 중복 없음. 기존 6개 group id를 유지한 채 새 7개 group id 추가, index 병행 이관 안내 반영. 첫 검사에서 의도한 빈 그룹 7개를 기존 규칙이 거부해 명시적 `allowEmpty` 계약을 추가한 뒤 `pnpm check` 통과 | 빈 그룹 예외는 단계적 이관에만 쓰고 각 그룹의 첫 페이지에서 제거하며 topic 설정에는 전달하지 않음. 새 그룹을 기존 그룹 뒤에 두어 이관 시작 시점의 기존 사이드바 순서를 유지. P05·P06 browser와 Ubuntu P03·P11의 blocked/보류 상태 유지. D01 이후 본문과 선택 실습은 미착수 | D01 |

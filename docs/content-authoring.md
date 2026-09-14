@@ -110,6 +110,8 @@ sidebar:
 ```
 
 - `deckGroup`은 같은 폴더의 `_deck.mjs`에 선언한 `groups[].id` 중 하나다.
+- 빈 그룹은 허용하지 않는다. 단계적 이관을 위해 페이지보다 그룹을 먼저 선언해야 할 때만
+  `allowEmpty: true`를 붙이고, 그 그룹의 첫 페이지를 추가할 때 제거한다.
 - `sidebar.order`는 덱 전체에서 겹치지 않는 숫자다. 사이에 장을 끼워 넣기 쉽도록 보통 10 단위로 둔다.
 - 사이드바 라벨은 `title`에서 온다. 제목·파일명·URL에는 페이지 순서 번호를 붙이지 않는다.
   예: `ServiceAccount — Pod의 신원`, `service-account.mdx`, `/cka/service-account/`.

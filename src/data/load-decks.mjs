@@ -180,7 +180,7 @@ export const topics = [...loadedDecks]
 		icon: deck.icon,
 		items: [
 			deck.slug,
-			...deck.groups.map((group) => ({ label: group.label, items: group.items })),
+			...deck.groups.map(({ label, items }) => ({ label, items })),
 		],
 	}));
 

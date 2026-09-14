@@ -45,6 +45,41 @@ export default {
 		{
 			"id": "glossary",
 			"label": "마무리"
+		},
+		{
+			"id": "foundations",
+			"label": "기초",
+			"allowEmpty": true
+		},
+		{
+			"id": "login",
+			"label": "로그인과 토큰",
+			"allowEmpty": true
+		},
+		{
+			"id": "access",
+			"label": "접근 제어",
+			"allowEmpty": true
+		},
+		{
+			"id": "directory",
+			"label": "외부 디렉터리",
+			"allowEmpty": true
+		},
+		{
+			"id": "integrations",
+			"label": "연동",
+			"allowEmpty": true
+		},
+		{
+			"id": "operations",
+			"label": "운영",
+			"allowEmpty": true
+		},
+		{
+			"id": "reference",
+			"label": "문제 해결과 마무리",
+			"allowEmpty": true
 		}
 	],
 	"map": [
