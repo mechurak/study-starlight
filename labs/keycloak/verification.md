@@ -520,3 +520,37 @@ source/destination을 비교하는 수정본으로 경고 없이 전체 통과�
 네이티브 Ubuntu 24.04 + rootful Docker Engine의 P03과 P11은 계속 **미실행**이다. macOS/Colima P11
 결과를 Ubuntu 결과로 일반화하지 않으며, 지원 환경 전체의 검증은 Ubuntu에서 P03부터 실제 실행할 때까지
 완료로 표시하지 않는다.
+
+## D09 복제 browser flow의 OTP MFA
+
+| 환경 | 상태 | 실제 범위 |
+|---|---|---|
+| macOS 26.6.2 arm64 + Colima 0.10.3 | 비브라우저 HTML form 검증 통과 | Keycloak 26.7.3, 복제 browser flow, TOTP/HMAC-SHA1/6자리/30초 |
+| 실제 macOS Chrome | 미실행 | P05·P06의 CA trust/browser 보류를 유지 |
+| 네이티브 Ubuntu 24.04 + rootful Docker Engine | 미실행 | Ubuntu P03 플랫폼 검증 뒤 별도 실행 필요 |
+
+2026-09-14에 기존 여섯 Compose service가 healthy이고 Docker가 4 CPU·8,307,167,232 bytes를 노출하며
+`MemAvailable`이 5,924,464 KiB인 상태에서 다음을 실행했다.
+
+```bash
+cd labs/keycloak
+./scripts/verify-d09.sh
+```
+
+최종 실행은 realm 기본 `browser` flow를 `d09-browser-otp`로 복제한 뒤 required Username Password
+Form과 Conditional 2FA 구조를 확인했다. 전용 public client `d09-mfa`에만 browser flow override와
+PKCE S256을 적용하고, 전용 로컬 사용자에게 `CONFIGURE_TOTP` required action을 부여했다. seed를 두 번
+연속 실행한 출력은 같았다.
+
+진단 client는 실제 Keycloak HTML form을 따라 첫 password 로그인에서 Configure OTP 화면을 받고
+TOTP를 등록한 뒤 callback에 도달했다. 새 인증 session에서는 고정 오답이 OTP form에서 거부되고 정상
+OTP가 callback에 도달했다. 분실 복구 시나리오는 관리 API로 해당 사용자의 OTP credential 하나만
+삭제하고 `CONFIGURE_TOTP`를 재부여했으며, 재등록 callback 뒤 OTP credential 하나와 required action
+해제를 확인했다. 비밀번호·OTP secret/code·cookie·authorization code는 출력이나 검증 파일에 남기지
+않았다. 다른 Compose service와 별도 Supabase workload의 상태도 전후 동일했다.
+
+첫 구현은 Configure OTP form의 내부 제출 secret을 Base32 표시값으로 오인해 계산에 실패했다. 수동
+등록 화면의 표시용 Base32 secret과 hidden 제출값을 구분해 고쳤다. 이후 OTP 등록 뒤 User Profile
+검증이 이어지는 것을 확인해 전용 사용자의 이름·이메일을 seed에 명시했고, 최종 전체 실행은 통과했다.
+이 결과는 web CA를 명시한 Compose 진단 client의 실제 form 흐름이며 보류 중인 Chrome 검증을 대신하지
+않는다.

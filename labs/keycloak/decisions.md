@@ -437,6 +437,26 @@ P05-C는 배포하지 않고 공식 문서와 현재 runtime을 읽기 전용으
   지원을 대조했다. `GroupMembershipMapper` source에서는 full group path를 access token claim으로
   출력하는 설정을 확인했다.
 
+## 2026-09-14 D09 MFA 실습 결정
+
+D09는 realm 기본 `browser` flow를 직접 수정하지 않고 `d09-browser-otp`로 복제한다. 전용 public
+client `d09-mfa`의 browser flow binding override에만 복제 flow를 연결해 기존 앱 A/B 로그인에 영향을
+주지 않는다. 복제한 26.7.3 기본 flow의 required Username Password Form과 Conditional 2FA를 확인하고,
+전용 로컬 사용자 `d09-mfa-user`에 `CONFIGURE_TOTP` required action을 부여한다. client는 정확한 진단
+callback 하나와 Authorization Code + PKCE S256만 허용하며 implicit·Direct Access Grants·service
+account는 끈다.
+
+검증은 Keycloak 26.7.3 기본 OTP policy인 TOTP/HMAC-SHA1/6자리/30초를 seed 단계에서 확인한 뒤 시작한다.
+첫 로그인에서 비밀번호 다음 Configure OTP 화면과 callback 완료, 새 로그인에서 오답 OTP 거부와 정상
+OTP callback을 구분한다. 분실 복구는 관리 API로 해당 사용자의 OTP credential 하나만 삭제하고
+`CONFIGURE_TOTP`를 다시 부여한 뒤 재등록과 callback, 최종 OTP credential 하나를 확인한다. OTP secret,
+code, password, cookie, authorization code는 process memory에만 두고 검증 파일에 기록하지 않는다.
+이 자동화는 web CA를 명시적으로 신뢰하는 Compose 진단 client의 실제 HTML form 흐름이며 보류 중인
+macOS Chrome 검증을 대신하지 않는다.
+
+근거는 Keycloak 26.7 Server Administration Guide의 authentication flow 복제 권고, 기본 browser
+flow의 Conditional 2FA·OTP Form 구조, Configure OTP required action과 credential 복구 절차다.
+
 ## 2026-09-14 P09 변경·장애 관찰 결정
 
 P09는 provider 설정을 바꾸지 않고 P08의 `READ_ONLY`, `importEnabled=true`, `cachePolicy=DEFAULT`,
