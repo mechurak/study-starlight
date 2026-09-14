@@ -1,9 +1,9 @@
 # 2. Keycloak 덱 재구성 실행 계획
 
 작성일: 2026-09-14
-상태: 계획
-지금 위치: 계획 작성 완료 · 구현 미착수 · 다음 P01
-실행 범위: 조사·계획만. 후속 실행 요청에서 지정한 범위로 갱신한다.
+상태: 진행 중
+지금 위치: P01 완료 · 실습 환경과 본문 개편 미착수 · 다음 P02
+실행 범위: P01만 — baseline과 기존 주요 절 이관 계약 갱신. P02 이후와 본문 개편은 제외한다.
 
 [계획 관리 규칙](README.md)의 번호·상태·갱신·완료 절차를 따른다.
 
@@ -22,8 +22,8 @@ Samba는 AD 호환 디렉터리 실습에 사용한다. 결과를 Microsoft AD D
 검증한 것으로 서술하지 않는다. LDAP/LDAPS 연동을 본선으로 하고 Kerberos/SPNEGO를 이용한
 데스크톱 SSO는 심화 범위로 남긴다.
 
-현재 요청은 이 계획 문서 작성이다. 아래 구현 작업은 후속 실행 요청에서 수행한다.
-작은 모델에게 **작업 ID 하나씩 맡길 수 있도록** 분리했다. 후속 요청이 한 작업이면 그 작업까지,
+이번 실행 범위는 P01까지다. P02 이후의 실습 환경 구현과 본문 개편은 후속 실행 요청에서 수행한다.
+작업은 **작업 ID 하나씩 맡길 수 있도록** 분리했다. 후속 요청이 한 작업이면 그 작업까지,
 전체 완료이면 의존 순서로 이어서 실행한다. 이 문서는 서브에이전트 생성이나 병렬 실행을 요구하지 않는다.
 
 ## 실행자가 읽을 것
@@ -210,20 +210,52 @@ D19/D20은 우선 선택 기준·구성·진단을 다루는 참조 페이지다
 ## 기존 내용 이관과 옛 링크
 
 원본 이름은 `src/content/docs/keycloak/` 기준이다. D 작업은 기존 파일을 즉시 지우지 않는다.
+아래 표는 P01에서 원본의 h2와 이관 판단이 필요한 h3를 목표 목차와 대조한 계약이다.
+`참고 자료`는 해당 주장을 받는 목적지로, 장 요약은 해당 목적지와 최종 `wrapup`으로 흡수한다.
+목적지가 여러 개인 절은 내용을 그대로 복제하지 않고 각 페이지의 질문에 맞는 사실만 나눈다.
 
-| 기존 파일 | 새 목적지 |
-|---|---|
-| `00-intro.mdx`, `01-why.mdx` | keycloak-overview, index |
-| `02-oauth-oidc.mdx` | oauth-oidc, token-validation |
-| `03-structure.mdx` | realm-and-users, clients-and-sso, groups-and-roles, scopes-and-mappers |
-| `04-ad-federation.mdx` | ad-and-ldap, ldap-federation, directory-group-mapping, directory-changes, identity-brokering; Kerberos는 심화 지도 |
-| `05-sessions.mdx` | sessions-and-logout, storage-and-availability |
-| `06-k8s-oidc.mdx` | kubernetes-oidc |
-| `07-apps.mdx` | clients-and-sso, oauth2-proxy, sessions-and-logout, directory-group-mapping |
-| `08-deploy.mdx` | lab-setup, deployment, storage-and-availability |
-| `09-ops.mdx` | observability, backup-and-upgrade, administration-and-keys |
-| `10-troubleshooting.mdx` | troubleshooting; 세부 절은 관련 페이지 |
-| `11-glossary.mdx`, `12-wrapup.mdx` | glossary, wrapup |
+| 기존 파일 | 주요 절·세부 항목 | 새 목적지 |
+|---|---|---|
+| `index.mdx` | 구성, 전체를 관통하는 두 문장, 문제·작업으로 바로 찾기 | index 최종 구성·탐색 링크(F01), keycloak-overview, directory-group-mapping, troubleshooting |
+| `00-intro.mdx` | 대상·범위 | index, keycloak-overview, lab-setup |
+|  | 멘탈 모델: 통역사 / 두 번의 매핑 / 서명으로 흐르는 신뢰 | keycloak-overview / directory-group-mapping / token-validation |
+|  | 기준 시점 | `_baseline.md`, keycloak-overview, deployment, backup-and-upgrade |
+| `01-why.mdx` | 앱별 AD 직접 연동의 문제, 인증 중앙화, Keycloak의 자리·동급 제품 | keycloak-overview |
+|  | 3개 경계·2번의 매핑 | keycloak-overview, directory-group-mapping |
+| `02-oauth-oidc.mdx` | OAuth의 위임 문제와 OIDC 인증, 토큰 세 종류, Authorization Code + PKCE | oauth-oidc; access token 검증은 token-validation, refresh 수명은 sessions-and-logout |
+|  | 다른 flow의 선택 기준 | oauth-oidc; client credentials는 service-accounts |
+|  | JWT 서명·최소 검증 축, discovery/JWKS | token-validation |
+|  | SAML의 위치 | saml |
+| `03-structure.mdx` | Realm | realm-and-users |
+|  | Client와 redirect/public/confidential 구분 | clients-and-sso |
+|  | protocol mapper와 client scope | scopes-and-mappers |
+|  | Group과 Realm/Client Role | groups-and-roles |
+|  | 콘솔 메뉴와 개념의 대응 | 해당 개념 페이지; 자동화 진입점은 administration-and-keys |
+| `04-ad-federation.mdx` | Federation/Brokering 비교와 비밀번호 소재 | ad-and-ldap, ldap-federation, identity-brokering |
+|  | DN·OU·속성, LDAP provider·LDAPS 설정 | ad-and-ldap |
+|  | Edit mode, import, sync | ldap-federation, directory-changes |
+|  | LDAP 속성·그룹 mapper | directory-group-mapping |
+|  | Kerberos/SPNEGO | wrapup의 심화 지도. 기본 실습에는 넣지 않음 |
+|  | `kcadm.sh`·Terraform·Operator 자동화와 멱등성 | administration-and-keys, deployment |
+|  | AD 연동 진단과 bind/인증서 보안 | troubleshooting, directory-changes, ad-and-ldap, observability |
+| `05-sessions.mdx` | 세션·토큰 층, 수명 다이얼, refresh/offline token, 로그아웃·강제 종료 | sessions-and-logout |
+|  | persistent sessions와 DB·캐시 | storage-and-availability |
+| `06-k8s-oidc.mdx` | 인증서 문제, 전체 흐름, Keycloak client/mapper, API server 설정, kubelogin, RBAC, 운영 함정 | kubernetes-oidc |
+| `07-apps.mdx` | 세 연동 패턴과 공통 client 체크리스트 | clients-and-sso; 비네이티브 앱 경계는 oauth2-proxy |
+|  | oauth2-proxy 설정·헤더 신뢰 | oauth2-proxy |
+|  | claim 전달의 다섯 고리 | scopes-and-mappers, directory-group-mapping, troubleshooting |
+|  | Keycloak·proxy cookie·앱 세션 로그아웃 | sessions-and-logout, oauth2-proxy |
+| `08-deploy.mdx` | dev/운영 차이, Operator/직접 배포, DB·hostname·TLS, 이미지 최적화 | lab-setup, deployment |
+|  | HA·DB·캐시의 상태 경계 | storage-and-availability |
+| `09-ops.mdx` | 백업과 export 차이, 업그레이드 | backup-and-upgrade |
+|  | 서명 키·유출 대응, 관리 권한 위임 | administration-and-keys; 토큰 회수 한계는 sessions-and-logout |
+|  | 이벤트·메트릭·로그, 운영 루틴 | observability |
+| `10-troubleshooting.mdx` | 진단 사슬, 도구, 로그인·토큰·kubectl 표, 심층 진단 | troubleshooting; 관찰 도구는 observability, kubectl 고유 항목은 kubernetes-oidc |
+| `11-glossary.mdx` | 인증, AD/LDAP, 프로토콜/token, Keycloak, 연동/배포 용어 | glossary와 각 용어의 본문 페이지 |
+| `12-wrapup.mdx` | 전체 지도, 장별 문장, 마지막 요약 | wrapup |
+|  | 구축 체크리스트 | lab-setup, deployment, storage-and-availability, wrapup의 완료표 |
+|  | 사고 대응 카드 | troubleshooting |
+|  | 심화 주제 | wrapup의 심화 지도와 해당 참조 페이지 |
 
 마지막 이관은 기존 파일 하나 또는 아래 지정 범위만 처리한다. 한 번에 모든 파일을 삭제하지 않는다.
 
@@ -263,6 +295,7 @@ Astro/호스팅 구성을 먼저 확인하고 필요한 [배포 지침](../deplo
 | 작업 | 상태 | 변경 파일 | 검증 결과/근거 | 결정·잔여 문제 | 다음 작업 |
 |---|---|---|---|---|---|
 | 계획 작성 | done | 이 문서 | diff·참조 경로 확인 | 컨테이너 실행 미착수 | P01 |
+| P01 | done | `src/content/docs/keycloak/_baseline.md`, 이 문서, `docs/plans/README.md` | `git diff --check`; 계획·baseline 링크와 원본/목표 slug 대조 | 합의한 학습 순서와 Ubuntu 컨테이너 경계를 baseline에 반영. 기존 index와 00~12의 주요 절 목적지 확정. 버전 유지, 실습·본문 미착수 | P02 |
 
 새 세션에 넘길 요청 예시:
 

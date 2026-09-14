@@ -4,22 +4,55 @@
 
 ## 이 덱의 축
 
-덱 전체의 뼈대는 **"인증을 중앙화하고, 각 소비자가 그 결과를 어디까지 신뢰하는가"**다.
-제품 메뉴를 차례로 소개하는 대신 다음 흐름을 유지한다.
+덱 전체의 뼈대는 **"인증을 중앙화하고, 외부 계정과 권한이 앱의 허용 결정까지 어떻게
+이어지는가"**다. 제품 메뉴를 차례로 소개하는 대신 다음 학습 흐름을 유지한다.
 
-1. AD가 사용자·그룹의 원본이다.
-2. Keycloak이 로그인·세션을 맡고 OIDC 토큰을 발급한다.
-3. protocol mapper가 그룹·역할을 token claim으로 옮긴다.
-4. 앱·oauth2-proxy·kube-apiserver가 claim을 읽어 자기 권한 모델로 바꾼다.
+1. 로컬 사용자로 realm·client·OIDC 로그인과 Keycloak 세션을 먼저 이해한다.
+2. 같은 realm의 앱 두 개가 Keycloak 로그인을 재사용하고, API가 access token을 검증해 인가한다.
+3. Samba AD DC를 외부 사용자·그룹 원본으로 붙여 User Federation의 책임 경계를 확인한다.
+4. LDAP mapper가 외부 그룹을 Keycloak 모델로, protocol mapper가 그룹·역할을 token claim으로
+   옮기는 두 단계를 추적한다.
+5. 앱·oauth2-proxy·kube-apiserver가 claim을 읽어 자기 권한 모델로 바꾸고, 계정·그룹 변경과
+   장애의 영향이 세션과 토큰의 수명에 따라 달라짐을 확인한다.
 
-문제가 생기면 이 흐름을 **원본 → federation → mapper → token → 소비자** 순서로 확인한다.
+이 흐름을 마치면 독자는 Keycloak이 인증 시스템에서 맡는 자리, 로컬 사용자와 외부 디렉터리의
+차이, OIDC 로그인과 최종 인가의 경계, 그룹이 API 권한이 되는 두 단계, 로그아웃·계정 변경·LDAP
+장애가 새 로그인과 기존 접근에 미치는 차이를 설명하고 재현할 수 있어야 한다.
+
+사용자 관리, 로그인 정책과 MFA, 앱 연결, 외부 디렉터리, 운영은 각각 다시 찾을 수 있는 문서로
+나눈다. 기본 실습에 포함되지 않는 brokering·SAML·service account·oauth2-proxy·Kubernetes OIDC는
+Keycloak 전체에서의 자리와 선택 기준을 설명하고, 별도 실습을 실제로 검증한 항목만 재현 절차로 쓴다.
+
+외부 계정·그룹 문제가 생기면 **원본 → federation → mapper → token → 소비자** 순서로 확인한다.
 같은 이유로 로그아웃·권한 회수도 **Keycloak 세션**, **이미 발급된 token**, **앱 자체 세션**을
 한 덩어리로 말하지 않는다.
+
+## 컨테이너 실습의 기준과 경계
+
+- 기본 환경은 **Ubuntu + Docker + kind + Samba AD DC**다. Keycloak·PostgreSQL·테스트 앱 A/B·API는
+  전용 kind 클러스터에, Samba AD DC는 같은 Ubuntu 머신의 별도 Docker 컨테이너에 둔다.
+- 실습은 로컬 계정 로그인 → 앱 A/B SSO → API의 401/403/200 → Samba 계정 로그인 → 외부 그룹의
+  Keycloak·token·API 권한 반영 순서로 진행한다.
+- 외부 디렉터리 본선은 LDAP/LDAPS User Federation이다. Kerberos/SPNEGO 데스크톱 SSO는 심화
+  지도로 남기며 기본 재현 범위에 넣지 않는다.
+- Samba는 **AD 호환 디렉터리 실습 대역**이다. 이 결과를 Microsoft AD DS나 Windows 도메인에서
+  검증한 것으로 일반화하지 않는다.
+- 별도 VM과 Windows Server는 요구하지 않는다. Samba를 kind Pod로 옮기거나 OpenLDAP으로
+  바꾸는 것도 기본 구현이 아니다.
+- 단일 kind 환경은 학습·장애 관찰용이다. 이를 운영 HA 검증으로 서술하지 않으며, 운영 배포의
+  hostname·TLS·Secret·DB·캐시·백업 경계는 별도로 설명한다.
+- 실습 명령과 설정의 원본은 `labs/keycloak/`에 둔다. 본문은 검증된 결과와 필요한 부분만 설명하고,
+  사이트 검사 통과를 컨테이너 실습 성공으로 취급하지 않는다.
+
+현재 컨테이너 실습은 아직 구축·검증되지 않았다. 빈 상태에서 전체 시나리오를 재현하기 전에는
+예정된 명령이나 동작을 성공한 사실처럼 쓰지 않는다.
 
 ## 다른 덱과의 경계
 
 - 이 덱은 OAuth 2.0·OIDC를 Keycloak 운영에 필요한 깊이까지만 설명한다. 표준 전체나 범용 보안
   이론으로 넓히지 않는다.
+- Samba AD DC의 사용자·그룹 seed와 LDAPS 연결은 이 덱의 실습 범위지만, Samba 자체 운영과
+  Windows 도메인 관리는 다루지 않는다.
 - 쿠버네티스 연동에서는 **Keycloak client·claim mapping·kube-apiserver 인증**을 맡는다.
   일반 RBAC·인증서 발급은 [cka 덱](/cka/)으로 넘긴다.
 - Keycloak의 Operator·hostname·캐시·세션·백업은 이 덱이 맡는다. PostgreSQL 자체의 설치·HA와
