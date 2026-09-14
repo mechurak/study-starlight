@@ -1,0 +1,93 @@
+---
+title: "Kubernetes OIDC 인증"
+description: "kubectl이 Keycloak에서 받은 신원을 API server 인증과 RBAC 권한으로 연결하는 기준"
+aliases: [kubectl OIDC, Kubernetes JWT authenticator, AuthenticationConfiguration, OIDC exec plugin]
+reviewedAt: 2026-09-14
+deckGroup: integrations
+sidebar:
+  order: 1190
+---
+
+import Thesis from '../../../components/docs/Thesis.astro';
+import TermIntro from '../../../components/docs/TermIntro.astro';
+
+<Thesis>Kubernetes OIDC는 Keycloak token을 사용자 신원으로 검증하는 인증 단계이며, 실제 API 권한은 별도의 RBAC binding이 결정한다.</Thesis>
+
+kubectl 자체가 password를 API server에 보내는 구조가 아니다. 보통 credential plugin이 browser에서
+Authorization Code + PKCE 로그인을 수행해 token을 얻고, kubectl이 그 bearer token을 API server에
+제시한다.
+
+<TermIntro
+  terms={[
+    ['JWT authenticator', '', 'API server가 JWT의 서명·issuer·audience·claim 조건을 검증해 Kubernetes 사용자와 group을 만드는 인증기.'],
+    ['AuthenticationConfiguration', '', '여러 JWT issuer와 claim mapping·validation 규칙을 구조화해 선언하는 API server 설정 파일.'],
+    ['credential plugin', '', 'kubectl exec credential 규약으로 browser 로그인과 token 갱신을 맡는 외부 프로그램.'],
+    ['RBAC binding', '', '인증된 username 또는 group을 Role·ClusterRole에 연결하는 권한 부여 객체.'],
+  ]}
+/>
+
+## 이 장에서 답할 질문
+
+- Keycloak, kubectl plugin, API server는 각각 무엇을 검증하는가?
+- OIDC 인증 성공과 Kubernetes 권한 허용은 왜 다른가?
+- IdP 장애나 설정 오류 때 cluster 접근을 어떻게 복구하는가?
+
+## 인증 흐름을 나눈다
+
+```text
+kubectl -> credential plugin -> browser -> Keycloak public client + PKCE
+kubectl <- ExecCredential token ---- plugin
+kubectl -- Bearer JWT -------------> kube-apiserver JWT authenticator
+authenticated username/groups ----> RBAC authorization
+```
+
+로컬 도구는 secret을 안전하게 숨길 수 없으므로 browser 로그인 client는 public client와 PKCE를 쓴다.
+redirect URI를 로컬 callback 범위로 제한하고 implicit flow와 password grant는 쓰지 않는다.
+
+## API server 검증을 고정한다
+
+[Kubernetes AuthenticationConfiguration 문서](https://kubernetes.io/docs/reference/access-authn-authz/authentication-config/)의
+`apiserver.config.k8s.io/v1` `AuthenticationConfiguration`은 JWT issuer URL, audience, claim mapping과
+validation rule을 파일로 선언한다. issuer는 Keycloak realm의 공개 HTTPS URL과 정확히 같아야 한다.
+
+API server는 최소한 다음을 확인한다.
+
+- 신뢰한 issuer의 JWKS로 검증되는 서명과 허용 algorithm
+- cluster용 client ID 같은 정확한 audience
+- `exp` 등 token 유효 시간과 필요한 claim 조건
+- username·groups claim을 충돌 없는 Kubernetes 이름으로 바꾸는 mapping
+
+legacy `--oidc-*` flag와 structured authentication config를 동시에 섞지 않는다. 설정 변경 전에는 사용
+중인 Kubernetes 버전의 API와 지원 필드를 다시 확인한다. [Kubernetes 인증 문서](https://kubernetes.io/docs/reference/access-authn-authz/authentication/)는
+bearer token과 authenticator의 전체 위치를 설명한다.
+
+## 인증 뒤에 RBAC를 붙인다
+
+OIDC가 성공해도 RBAC binding이 없으면 API 요청은 403이다. Keycloak group이나 role을 무제한
+`cluster-admin`에 바로 연결하지 않고, namespace Role과 최소 ClusterRole부터 설계한다.
+[Kubernetes RBAC 문서](https://kubernetes.io/docs/reference/access-authn-authz/rbac/)의 subject 이름이
+실제 authenticator가 만든 username/group과 정확히 일치하는지 `kubectl auth can-i`와 audit log로 확인한다.
+
+| 단계 | 대표 실패 | 확인할 곳 |
+|---|---|---|
+| plugin/browser 로그인 | callback·PKCE·CA 오류 | plugin 로그, Keycloak event |
+| JWT 인증 | 401 | issuer·audience·서명·시간·claim rule |
+| RBAC 인가 | 403 | mapping된 username/group, binding, verb/resource |
+
+## 복구 접근을 OIDC 밖에 둔다
+
+Keycloak이나 DNS·CA가 장애여도 cluster를 복구할 수 있도록 제한된 break-glass credential과 접근 절차를
+OIDC와 독립적으로 보관한다. 사용 주체, 보관 위치, 만료·회수, 사용 알림과 사후 감사를 정한다.
+일상 kubeconfig에 상시 섞어 두는 장기 관리자 인증서는 복구 절차가 아니다.
+
+## 이 덱의 실행 범위
+
+이 페이지는 현재 Kubernetes 인증 설정을 읽고 설계하기 위한 참조다. 기본 Compose 실습은 kind·kubectl을
+요구하지 않으며 이번 작업에서 cluster, credential plugin, AuthenticationConfiguration 또는 RBAC 객체를
+새로 만들거나 실행하지 않았다. P04의 과거 kind 연결 기록도 이 OIDC 흐름의 성공 증거가 아니다.
+
+## 요약
+
+- kubectl plugin은 public client + PKCE로 token을 얻고 API server는 JWT를 독립 검증한다.
+- username/group 인증과 RBAC 권한 부여를 분리해 401과 403을 다른 층에서 진단한다.
+- IdP 장애에 대비한 제한된 break-glass 접근을 OIDC 경로 밖에 유지한다.

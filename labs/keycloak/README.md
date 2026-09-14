@@ -148,12 +148,15 @@ P09_ACTION=inspect ./samba/compose.sh --profile p09 run --rm --no-deps \
   --env P09_ACTION=inspect p09-admin
 ./scripts/verify-d09.sh       # 복제 browser flow의 OTP 등록·성공·실패·복구
 ./scripts/verify-d16.sh       # 두 번째 test realm의 OIDC brokering·최초 계정 연결
+./scripts/verify-d18.sh       # service account client credentials·최소 API 권한
 ```
 
 `verify-d09.sh`는 전용 client와 사용자에만 복제 flow를 적용한다. realm 기본 browser flow나 앱 A/B의
 binding을 바꾸지 않으며, OTP secret·code·password·cookie를 출력하지 않는다.
 `verify-d16.sh`도 `d16-upstream` test realm과 `upstream-oidc` provider, 전용 client/user만 만들며
 외부 SaaS 계정이나 실제 회사 IdP를 요구하지 않는다.
+`verify-d18.sh`는 전용 confidential client와 service account에 `app-user`만 부여하고, secret 오답과
+JWT 검증, API 401/200/403을 확인한다. 사용자 password·browser session·refresh token은 사용하지 않는다.
 
 P10의 보존 중단·재개와 reset dry-run/guard 검증은 다음 명령이다. 실제 volume 또는 `.state` 초기화는
 실행하지 않는다.

@@ -578,3 +578,23 @@ identity link 하나가 생겼다. 새 browser session의 두 번째 broker 로�
 endpoint 호출이 web CA를 trust하지 않아 TLS 실패했다. web CA의 public certificate를 기존 truststore
 디렉터리에 추가하고 Keycloak container만 재생성한 뒤 최종 검증이 통과했다. 이 결과는 test realm을
 upstream으로 쓴 OIDC brokering이며 실제 회사 IdP나 Chrome 검증 결과가 아니다.
+
+## D18 client credentials 서비스 계정
+
+| 환경 | 상태 | 실제 범위 |
+|---|---|---|
+| macOS 26.6.2 arm64 + Colima 0.10.3 | Compose 진단 통과 | Keycloak 26.7.3 service account와 기존 `lab-api` |
+| 실제 browser·사용자 로그인 | 해당 없음 | client credentials에는 browser와 사용자 password를 사용하지 않음 |
+| 네이티브 Ubuntu 24.04 + rootful Docker Engine | 미실행 | Ubuntu P03 이후 별도 실행 필요 |
+
+`./scripts/verify-d18.sh`는 confidential client `d18-worker`와 service account를 멱등하게 seed했다.
+Standard/Implicit/Direct Access flow와 Full Scope Allowed는 껐고 service account 역할과 client role scope
+양쪽에 `app-user`만 남겼다. `lab-api` audience mapper도 전용 client에 적용했다. seed를 두 번 연속
+실행한 출력은 같았고 기존 여섯 상시 service는 전후 모두 healthy였다.
+
+진단에서 오답 client secret은 token endpoint의 HTTP 401로 거부됐다. 정상 client credentials 응답의
+access token은 RS256 서명, 고정 study issuer, `lab-api` audience, 미래 `exp`를 통과했고 subject는
+`service-account-d18-worker`, realm 역할은 `app-user` 포함·`api-admin` 제외였다. refresh token은
+발급되지 않았다. 기존 API는 무토큰 `/user` 401, 같은 token의 `/user` 200, `/admin` 403을 반환했다.
+client secret과 access token 원문은 출력이나 증거 파일에 남기지 않았다. 상세 비밀 제외 산출물은
+`.state/verification/d18/`에 있다.

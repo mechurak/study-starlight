@@ -583,6 +583,18 @@ Compose DNS의 Keycloak·앱·API·Samba endpoint만 사용한다. volume 사용
 별도로 기록한다. 이 측정은 macOS/Colima arm64 한 환경의 단일 표본이며 Compose hard limit을 낮추거나
 Ubuntu 자원값으로 일반화하는 근거로 쓰지 않는다.
 
+## D18 서비스 계정 경계
+
+자동화 주체는 사람의 password나 browser session을 재사용하지 않고 전용 confidential client
+`d18-worker`의 service account와 `client_credentials` grant를 사용한다. Standard Flow, Implicit Flow,
+Direct Access Grants와 Full Scope Allowed는 끈다. client secret은 `.state/secrets/`에서 실행 시 생성하며
+추적 파일이나 진단 출력에 넣지 않는다.
+
+최종 token 역할은 service account에 부여한 역할과 client role scope의 교집합으로 제한한다. 두 경계에
+`app-user`만 두고 `api-admin`은 제거한다. `lab-api` audience mapper를 client에 직접 적용하며 API는 기존
+RS256·고정 issuer·audience·expiration 검증 뒤 endpoint별 역할을 검사한다. 이 구성은 secret 기반
+service account의 최소 예제이며 플랫폼 workload identity나 key rotation을 검증한 결과는 아니다.
+
 ## 공식 근거
 
 - Keycloak: [26.7.3 release](https://github.com/keycloak/keycloak/releases/tag/26.7.3),

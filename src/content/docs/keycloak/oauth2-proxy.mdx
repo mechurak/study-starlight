@@ -1,0 +1,81 @@
+---
+title: "oauth2-proxy로 앱 보호하기"
+description: "OIDC를 직접 구현하지 않는 앱 앞에 인증 proxy를 둘 때의 경계와 우회 방지"
+aliases: [oauth2-proxy, auth proxy, reverse proxy authentication, X-Auth-Request, forward auth]
+reviewedAt: 2026-09-14
+deckGroup: integrations
+sidebar:
+  order: 1180
+---
+
+import Thesis from '../../../components/docs/Thesis.astro';
+import TermIntro from '../../../components/docs/TermIntro.astro';
+
+<Thesis>인증 proxy는 OIDC를 모르는 앱을 보호할 수 있지만, upstream 우회와 신원 header 위조를 막아야만 인증 경계가 된다.</Thesis>
+
+기존 앱에 OIDC callback, state·nonce, token 검증과 session 처리를 넣기 어렵다면 `oauth2-proxy` 같은
+reverse proxy가 Keycloak 로그인을 수행하고 인증된 요청만 upstream에 전달할 수 있다.
+
+<TermIntro
+  terms={[
+    ['authentication proxy', '', '브라우저와 앱 사이에서 로그인·callback·session을 처리하고 인증된 요청만 전달하는 proxy.'],
+    ['upstream', '', 'proxy 뒤에서 실제 업무 요청을 처리하는 앱.'],
+    ['identity header', '', 'proxy가 검증한 사용자 이름·email·group 등을 upstream에 전달하는 HTTP header.'],
+    ['bypass path', '', '인증 proxy를 거치지 않고 upstream에 직접 닿을 수 있는 네트워크 또는 별도 route.'],
+  ]}
+/>
+
+## 이 장에서 답할 질문
+
+- OIDC 책임은 proxy와 앱 사이에서 어떻게 나뉘는가?
+- 전달 header를 신뢰하려면 어떤 네트워크 조건이 필요한가?
+- proxy cookie 삭제와 Keycloak logout은 왜 별개인가?
+
+## 요청 경계를 먼저 그린다
+
+```text
+browser -> ingress/LB -> oauth2-proxy -> upstream app
+                         |
+                         +-> Keycloak authorization/token endpoints
+```
+
+미인증 요청은 Keycloak으로 보내고 callback에서 code를 교환한 뒤 proxy session cookie를 만든다.
+이후 proxy가 cookie를 검증하고 upstream 요청에 식별 정보를 붙인다. 앱이 access token의 API 권한까지
+판단해야 한다면 token 전달과 앱의 독립 검증 경계도 따로 설계한다.
+
+[oauth2-proxy 설정 문서](https://oauth2-proxy.github.io/oauth2-proxy/configuration/overview/)와
+[integration 문서](https://oauth2-proxy.github.io/oauth2-proxy/configuration/integration/)에서 provider,
+redirect URL, cookie secret, reverse-proxy 배치와 header 전달 옵션을 확인할 수 있다.
+
+## upstream 우회를 닫는다
+
+upstream은 외부에 직접 publish하지 않고 proxy가 있는 private network에서만 접근시킨다. ingress의 다른
+route, debug port, 내부 load balancer가 같은 앱으로 곧장 연결되면 로그인은 쉽게 우회된다.
+
+클라이언트가 보낸 `X-Auth-Request-User`, `X-Auth-Request-Email`, `Authorization` 같은 신원 header는
+신뢰 경계 입구에서 제거하고 proxy가 검증한 값으로 다시 써야 한다. upstream은 지정된 proxy에서 온
+요청만 받아야 한다. 여러 proxy를 겹치면 어느 hop이 `X-Forwarded-*`를 덮어쓰고 신뢰하는지도 명시한다.
+
+## session과 logout을 분리한다
+
+| 상태 | 소유자 | 로그아웃 때 할 일 |
+|---|---|---|
+| proxy session cookie | oauth2-proxy | proxy sign-out으로 cookie 제거 |
+| Keycloak SSO session | Keycloak | 필요하면 OIDC end-session 요청 |
+| upstream 자체 session | 앱 | 앱이 별도 session을 만들었다면 함께 종료 |
+
+proxy cookie만 지우면 Keycloak SSO session 때문에 다음 접근에서 곧바로 다시 로그인될 수 있다. 반대로
+Keycloak session만 끝내도 이미 발급된 proxy cookie가 만료 전까지 남는 구성인지 확인해야 한다.
+cookie에는 Secure, HttpOnly, 적절한 SameSite·domain·path와 짧은 수명을 적용한다.
+
+## 이 덱의 실행 범위
+
+이 페이지는 선택 기준과 위험 경계를 설명하는 참조 문서다. 현재 Compose의 앱 A/B를 oauth2-proxy로
+교체하거나 추가 proxy를 실행하지 않았다. 실제 도입 때는 보호 route와 직접 upstream route를 함께
+검사하고, 위조 header, 만료 cookie, logout 후 재접근을 대표 테스트로 둔다.
+
+## 요약
+
+- 인증 proxy는 OIDC 처리를 대신하지만 upstream 앱과의 네트워크·header 경계가 안전성의 핵심이다.
+- upstream 직접 접근을 닫고 외부 신원 header를 제거한 뒤 proxy 값만 신뢰한다.
+- proxy cookie, Keycloak SSO session, 앱 session은 서로 다른 상태이므로 logout 범위를 명시한다.
