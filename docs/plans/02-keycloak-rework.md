@@ -2,8 +2,8 @@
 
 작성일: 2026-09-14
 상태: 진행 중
-지금 위치: P01 완료 · 실습 환경과 본문 개편 미착수 · 다음 P02
-실행 범위: P01만 — baseline과 기존 주요 절 이관 계약 갱신. P02 이후와 본문 개편은 제외한다.
+지금 위치: P02 완료 · 실습 환경 구현과 본문 개편 미착수 · 다음 P03
+실행 범위: P02만 — 공식 자료에 근거한 실습 환경 결정 작성. P03 이후와 본문 개편은 제외한다.
 
 [계획 관리 규칙](README.md)의 번호·상태·갱신·완료 절차를 따른다.
 
@@ -22,7 +22,7 @@ Samba는 AD 호환 디렉터리 실습에 사용한다. 결과를 Microsoft AD D
 검증한 것으로 서술하지 않는다. LDAP/LDAPS 연동을 본선으로 하고 Kerberos/SPNEGO를 이용한
 데스크톱 SSO는 심화 범위로 남긴다.
 
-이번 실행 범위는 P01까지다. P02 이후의 실습 환경 구현과 본문 개편은 후속 실행 요청에서 수행한다.
+이번 실행 범위는 P02까지다. P03 이후의 실습 환경 구현과 본문 개편은 후속 실행 요청에서 수행한다.
 작업은 **작업 ID 하나씩 맡길 수 있도록** 분리했다. 후속 요청이 한 작업이면 그 작업까지,
 전체 완료이면 의존 순서로 이어서 실행한다. 이 문서는 서브에이전트 생성이나 병렬 실행을 요구하지 않는다.
 
@@ -296,6 +296,7 @@ Astro/호스팅 구성을 먼저 확인하고 필요한 [배포 지침](../deplo
 |---|---|---|---|---|---|
 | 계획 작성 | done | 이 문서 | diff·참조 경로 확인 | 컨테이너 실행 미착수 | P01 |
 | P01 | done | `src/content/docs/keycloak/_baseline.md`, 이 문서, `docs/plans/README.md` | `git diff --check`; 계획·baseline 링크와 원본/목표 slug 대조 | 합의한 학습 순서와 Ubuntu 컨테이너 경계를 baseline에 반영. 기존 index와 00~12의 주요 절 목적지 확정. 버전 유지, 실습·본문 미착수 | P02 |
+| P02 | done | `labs/keycloak/decisions.md`, 이 문서 | 2026-09-14 공식 release/registry/package metadata 조회, 지정 download HTTP 200, amd64/arm64 manifest 확인; 추적 파일 `git diff --check`와 새 파일 `git diff --no-index --check`; 문서 내 공식 URL HTTP 확인. image pull·container 실행·자원 실측은 미실행 | Ubuntu 24.04와 amd64/arm64, Keycloak 26.7.3·PostgreSQL 18.6·kind v0.33.0/Kubernetes v1.35.8·Ubuntu Samba 4.19.5·Node 24 의존성을 digest/snapshot/lockfile로 고정. 동일 공개 issuer, loopback NodePort, 분리 CA, volume 수명과 추정 자원 확정. P03에서 Samba 단독 동작과 권한·volume 경계를 실제 검증 | P03 |
 
 새 세션에 넘길 요청 예시:
 
