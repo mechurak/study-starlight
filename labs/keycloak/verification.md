@@ -598,3 +598,22 @@ access token은 RS256 서명, 고정 study issuer, `lab-api` audience, 미래 `e
 발급되지 않았다. 기존 API는 무토큰 `/user` 401, 같은 token의 `/user` 200, `/admin` 403을 반환했다.
 client secret과 access token 원문은 출력이나 증거 파일에 남기지 않았다. 상세 비밀 제외 산출물은
 `.state/verification/d18/`에 있다.
+
+## D24 PostgreSQL 백업과 격리 복원
+
+| 환경 | 상태 | 실제 범위 |
+|---|---|---|
+| macOS 26.6.2 arm64 + Colima 0.10.3 | DB dump·격리 복원 통과 | PostgreSQL 18.6 custom-format dump와 별도 임시 volume |
+| Keycloak 애플리케이션을 복원 DB에 연결 | 미실행 | DB schema/data 검증만 수행하고 live 연결은 변경하지 않음 |
+| 네이티브 Ubuntu 24.04 + rootful Docker Engine | 미실행 | Ubuntu P03 이후 별도 실행 필요 |
+
+`./scripts/verify-d24.sh`는 기존 여섯 상시 service가 healthy인 상태에서 live `keycloak` database를
+`pg_dump --format=custom --no-owner --no-privileges`로 읽었다. archive list에 `REALM` table data가
+포함된 것을 확인한 뒤 같은 고정 PostgreSQL image를 network-none 일회성 container와 전용
+`keycloak-lab-d24-restore` volume으로 실행해 `pg_restore --exit-on-error`로 복원했다.
+
+source와 restore의 realm·client·user 수는 같았다. 복원 DB에서 `study/app-a`, `study/d18-worker`,
+`d16-upstream/study-broker`를 직접 조회했다. dump 크기와 SHA-256은 로컬 result에 남겼지만 DB password나
+row 값은 출력하지 않았다. 복원 container·volume은 성공 뒤 제거됐고 live PostgreSQL volume과 Keycloak
+설정은 바뀌지 않았으며 여섯 service는 모두 healthy였다. dump는 민감한 영속 상태를 포함할 수 있어
+ignore된 mode 0700 `.state/verification/d24/`에만 있으며 추적하지 않는다.

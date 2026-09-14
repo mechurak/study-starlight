@@ -149,6 +149,7 @@ P09_ACTION=inspect ./samba/compose.sh --profile p09 run --rm --no-deps \
 ./scripts/verify-d09.sh       # 복제 browser flow의 OTP 등록·성공·실패·복구
 ./scripts/verify-d16.sh       # 두 번째 test realm의 OIDC brokering·최초 계정 연결
 ./scripts/verify-d18.sh       # service account client credentials·최소 API 권한
+./scripts/verify-d24.sh       # PostgreSQL custom dump·격리 복원·핵심 realm/client 확인
 ```
 
 `verify-d09.sh`는 전용 client와 사용자에만 복제 flow를 적용한다. realm 기본 browser flow나 앱 A/B의
@@ -157,6 +158,9 @@ binding을 바꾸지 않으며, OTP secret·code·password·cookie를 출력하�
 외부 SaaS 계정이나 실제 회사 IdP를 요구하지 않는다.
 `verify-d18.sh`는 전용 confidential client와 service account에 `app-user`만 부여하고, secret 오답과
 JWT 검증, API 401/200/403을 확인한다. 사용자 password·browser session·refresh token은 사용하지 않는다.
+`verify-d24.sh`는 live DB에서 custom-format dump를 읽고 네트워크 없는 임시 PostgreSQL volume에
+복원한다. source/restore 수와 핵심 realm/client를 확인한 뒤 임시 container·volume만 제거하며 live DB나
+상시 service를 교체하지 않는다.
 
 P10의 보존 중단·재개와 reset dry-run/guard 검증은 다음 명령이다. 실제 volume 또는 `.state` 초기화는
 실행하지 않는다.

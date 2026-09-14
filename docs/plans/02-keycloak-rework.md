@@ -2,7 +2,7 @@
 
 작성일: 2026-09-14
 상태: 진행 중
-지금 위치: D18-L·D18~D20 완료 · 다음 D21 · Ubuntu P03·P11과 P05·P06 macOS browser는 blocked/보류 유지
+지금 위치: D24-L 완료 · 다음 D21~D24 · Ubuntu P03·P11과 P05·P06 macOS browser는 blocked/보류 유지
 실행 범위: 사용자 요청에 따른 D02~D28, D09-L·D16-L·D18-L·D24-L, F01~F04 전체 완료. D19·D20 추가 실행 실습과 Kubernetes OIDC 선택 실습은 제외한다.
 보류: Ubuntu P03 플랫폼 검증 보류 — macOS/Colima 결과를 Ubuntu 결과로 일반화하지 않는다.
 
@@ -371,3 +371,4 @@ Astro/호스팅 구성을 먼저 확인하고 필요한 [배포 지침](../deplo
 | D16~D17 | done | `src/content/docs/keycloak/identity-brokering.mdx`, `saml.mdx`, `_deck.mjs`, 이 문서 | D16-L JS/shell syntax·Compose config 재확인, truststore 변경 뒤 P08 federation/login/token/API 진단 재통과. Keycloak 26.7 OIDC brokering·SAML 공식 문서 대조. `pnpm check` 통과: 콘텐츠 규칙, 461개 page build·Pagefind, 37,525개 내부 페이지·anchor 링크 | 검증한 OIDC brokering과 SAML 선택 참조를 분리. `integrations`의 `allowEmpty` 제거. SAML 전체 실습은 범위 밖으로 명시 | D18-L |
 | D18-L | done | `labs/keycloak/app/Dockerfile`, `seed-d18.mjs`, `labs/keycloak/compose.yaml`, `labs/keycloak/scripts/prepare-d18-state.sh`, `verify-d18.mjs`, `verify-d18.sh`, `labs/keycloak/README.md`, `decisions.md`, `verification.md`, 이 문서 | JS/shell syntax, D18 Compose config, seed 2회 동일 확인. `verify-d18.sh` 통과: 오답 secret 401, access token RS256·issuer·audience·exp, `app-user` 포함·`api-admin` 제외, API 401/200/403, refresh token 없음 | 전용 confidential client의 Standard/Implicit/Direct flow와 Full Scope Allowed를 끄고 service account 역할과 client scope의 교집합을 최소화. 사용자 password/browser를 사용하지 않음. Ubuntu는 미실행 | D18 |
 | D18~D20 | done | `src/content/docs/keycloak/service-accounts.mdx`, `oauth2-proxy.mdx`, `kubernetes-oidc.mdx`, 이 문서 | Keycloak 26.7 service account, oauth2-proxy 설정·integration, Kubernetes AuthenticationConfiguration·인증·RBAC 공식 문서 대조. D18 실행 결과를 본문과 대조. `pnpm check` 통과 | service account 실제 검증과 proxy/Kubernetes 참조 경계를 분리. 요청대로 D19·D20 추가 실행 실습과 Kubernetes cluster·OIDC 실행은 하지 않았고 성공으로 기록하지 않음 | D21 |
+| D24-L | done | `labs/keycloak/scripts/verify-d24.sh`, `labs/keycloak/README.md`, `decisions.md`, `verification.md`, 이 문서 | shell syntax 확인. live PostgreSQL custom dump 생성·archive 검사, network-none 임시 PostgreSQL에 `pg_restore --exit-on-error`, source/restore realm·client·user 수 일치와 `study/app-a`, `study/d18-worker`, `d16-upstream/study-broker` 확인. 임시 container·volume 제거와 상시 6 service healthy 확인 | live DB·volume과 Keycloak 연결을 바꾸지 않는 격리 복원. dump는 credential을 포함할 수 있어 ignore된 mode 0700 증거 디렉터리에만 보관. realm export는 이 복구를 대신하지 않음 | D21 |

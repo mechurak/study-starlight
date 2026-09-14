@@ -595,6 +595,18 @@ Direct Access Grants와 Full Scope Allowed는 끈다. client secret은 `.state/s
 RS256·고정 issuer·audience·expiration 검증 뒤 endpoint별 역할을 검사한다. 이 구성은 secret 기반
 service account의 최소 예제이며 플랫폼 workload identity나 key rotation을 검증한 결과는 아니다.
 
+## D24 데이터베이스 백업·복원 경계
+
+Keycloak 영속 상태의 복구 원본은 PostgreSQL database로 둔다. D24는 실행 중인 DB에 custom-format
+`pg_dump`를 수행하고, 같은 고정 PostgreSQL image의 network-none 일회성 container와 전용 volume에
+`pg_restore --exit-on-error`로 복원한다. live PostgreSQL volume이나 Keycloak 연결 설정은 변경하지 않는다.
+
+복원 판정은 archive에 `REALM` table data가 있고 source/restore의 realm·client·user 수가 같으며,
+`study/app-a`, `study/d18-worker`, `d16-upstream/study-broker`가 복원 DB에 존재하는 조건이다. dump에는
+credential 등 민감한 DB 상태가 포함될 수 있으므로 ignore된 `.state/verification/d24/`에 mode 0700으로
+두고 추적·공유하지 않는다. 검증 뒤 임시 container와 volume은 제거한다. realm export는 구성 이관
+보조물이며 이 DB 복구 검증을 대신하지 않는다.
+
 ## 공식 근거
 
 - Keycloak: [26.7.3 release](https://github.com/keycloak/keycloak/releases/tag/26.7.3),
