@@ -1,11 +1,10 @@
 # 2. Keycloak 덱 재구성 실행 계획
 
 작성일: 2026-09-14
-상태: 차단
-지금 위치: P03 macOS/Colima 검증 완료 · 네이티브 Ubuntu 검증 미실행 · 다음 P03 검증 재개
-실행 범위: P03만 — Samba 단독 환경 구현과 검증. P04 이후와 본문 개편은 제외한다.
-차단 해제 조건: Ubuntu 24.04의 지원 아키텍처(amd64 또는 arm64) + rootful Docker/Compose 고정 버전 환경에서
-`labs/keycloak/samba/verify-p03.sh`가 끝까지 통과해야 한다.
+상태: 진행 중
+지금 위치: Compose 중심으로 계획 전환 완료 · P04 kind 검증 기록 보존 · 다음 P05-C → P05
+실행 범위: 계획 문서 갱신만 — 기본 실습을 Docker Compose로 전환하고 Kubernetes는 후속 선택 실습으로 둔다. 구현·실행 환경 변경은 이번 범위에 포함하지 않는다.
+보류: Ubuntu P03 플랫폼 검증 보류 — macOS/Colima 결과를 Ubuntu 결과로 일반화하지 않는다.
 
 [계획 관리 규칙](README.md)의 번호·상태·갱신·완료 절차를 따른다.
 
@@ -16,15 +15,18 @@ Keycloak 전반을 이해하고, macOS/Colima와 Ubuntu/Docker Engine 환경에�
 확인하고, 나중에는 증상·개념·작업 이름으로 찾아볼 수 있어야 한다.
 
 개인 환경은 **macOS + Colima**, 회사 환경은 **Ubuntu + Docker Engine**이다.
-Keycloak·PostgreSQL·테스트 앱·API는 kind 안에, Samba는 같은 Docker runtime의 별도
-컨테이너에 둔다. Colima가 관리하는 Linux VM 외에 별도 VM과 Windows Server는 요구하지 않는다.
-Samba를 kind Pod로 옮기거나 OpenLDAP으로 대체하는 것은 이 계획의 기본 구현이 아니다.
+Keycloak·PostgreSQL·테스트 앱 A/B·API·Samba를 같은 Docker runtime의 **Docker Compose 서비스**로
+실행한다. 기본 실습은 kind·kubectl 없이 생성·검증할 수 있어야 한다. Colima가 관리하는 Linux VM 외에
+별도 VM과 Windows Server는 요구하지 않으며, Samba는 AD DC 컨테이너로 유지한다.
 
 Samba는 AD 호환 디렉터리 실습에 사용한다. 결과를 Microsoft AD DS와 Windows 도메인 환경에서
 검증한 것으로 서술하지 않는다. LDAP/LDAPS 연동을 본선으로 하고 Kerberos/SPNEGO를 이용한
 데스크톱 SSO는 심화 범위로 남긴다.
 
-이번 실행 범위는 P03까지다. P04 이후의 kind 연동·Keycloak/PostgreSQL·앱과 본문 개편은 시작하지 않는다.
+이번에는 합의한 Compose 전환을 계획에만 반영한다. 인증·SSO·API 인가·LDAP 연동을 Compose에서 먼저
+완성하고, Kubernetes 배포·kubectl OIDC는 기본 실습 완료 후 별도 요청으로 실행하는 선택 실습으로 둔다.
+P04의 kind 검증은 당시 결과로 보존하며 Compose 경로의 검증을 대신하지 않는다. 네이티브 Ubuntu P03은
+사용자가 나중에 별도로 수행한다. macOS/Colima P03 통과를 바탕으로 Compose 후속 작업은 진행할 수 있다.
 작업은 **작업 ID 하나씩 맡길 수 있도록** 분리했다. 후속 요청이 한 작업이면 그 작업까지,
 전체 완료이면 의존 순서로 이어서 실행한다. 이 문서는 서브에이전트 생성이나 병렬 실행을 요구하지 않는다.
 
@@ -37,16 +39,17 @@ Samba는 AD 호환 디렉터리 실습에 사용한다. 결과를 Microsoft AD D
 - MDX 작성 시: [콘텐츠 작성 규칙](../content-authoring.md), 대상 원본 페이지, `_deck.mjs`
 - D2 작성 시: [D2 작성 규칙](../d2-authoring.md)
 - 공통 실습 환경 참조: [환경 baseline](../../src/content/docs/lab-environment/_baseline.md),
-  [kind 환경](../../src/content/docs/lab-environment/01-kind.mdx)
+  [kind 환경](../../src/content/docs/lab-environment/01-kind.mdx)의 Docker·Colima 준비 절. 기본 실습은
+  kind·kubectl 설치를 요구하지 않는다.
 
 계획 문서는 계획 번호를 붙인다. 학습 페이지는 번호 없는 이름을 사용하며, 기존 CKA 개편 계획의
 학습 페이지 번호 명명·커밋·전체 브라우저 순회 절차를 가져오지 않는다.
-현재 baseline은 AD가 처음부터 존재하는 관리자 관점을 전제한다. P01에서 이번 합의에 맞게
-수정하되, 인증/인가·두 단계 매핑·세션/토큰·issuer 구분은 유지한다.
+P01에서 정한 인증/인가·두 단계 매핑·세션/토큰·issuer 구분은 유지한다. 현재 baseline과 decisions의
+kind 배치 계약은 아직 이전 설계이므로 P05-C에서 Compose 설계와 맞춘 후 P05를 구현한다.
 
 ## 완료 조건
 
-- [ ] macOS에서는 Colima, Ubuntu에서는 Docker Engine으로 문서의 명령을 사용해 전체 환경을 생성할 수 있다.
+- [ ] macOS에서는 Colima, Ubuntu에서는 Docker Engine으로 kind·kubectl 없이 Compose 기본 환경을 생성할 수 있다. 두 환경의 실제 검증 결과를 각각 남긴다.
 - [ ] 로컬 계정 로그인 → 두 앱 SSO → API 인가 → Samba 계정 로그인 → 그룹 매핑을 재현한다.
 - [ ] 그룹 변경·계정 비활성화·LDAP 장애의 영향을 새 로그인/refresh/기존 JWT/앱 세션으로 구분한다.
 - [ ] 중단·재시작·초기화를 구분하고, 빈 상태에서 다시 만들어 같은 결과를 얻는다.
@@ -58,34 +61,58 @@ Samba는 AD 호환 디렉터리 실습에 사용한다. 결과를 Microsoft AD D
 
 ```text
 macOS / Colima / Docker 또는 Ubuntu / Docker Engine
-├─ kind: keycloak-lab (context: kind-keycloak-lab)
-│  ├─ Keycloak ── PostgreSQL
-│  ├─ 앱 A / 앱 B ── API
-│  └─ 실습 전용 진단 Pod
-└─ Samba AD DC (별도 컨테이너 + 영속 볼륨)
-          ↑
-          └── Keycloak에서 LDAPS 연결
+└─ Compose project: keycloak-lab / 전용 Docker network
+   ├─ Keycloak ── PostgreSQL (named volume)
+   ├─ 앱 A / 앱 B ── API
+   ├─ Samba AD DC (기존 named volume, Keycloak에서 LDAPS 연결)
+   └─ 실습 전용 진단 container (필요할 때 실행)
 ```
 
-위 이름은 다른 실습과의 충돌을 피하기 위한 기본값이다. 필요한 경우 P02에서 한 번 확정하고
-후속 작업이 임의로 바꾸지 않는다. 호스트의 기존 클러스터·DNS·CA 설정을 덮어쓰지 않는다.
+기존 Compose project·bridge `keycloak-lab`, Samba 주소·domain·named volume·CA·secret은 보존한다.
+P05-C에서 Compose의 주소·포트·DNS·인증서 mount·DB volume 계약을 먼저 확정한다. 호스트의 기존
+클러스터·DNS·CA 설정을 덮어쓰지 않는다.
 
 | 항목 | 기본 방향 | 확정 작업 |
 |---|---|---|
 | 지원 환경 | macOS + Colima와 Ubuntu + Docker Engine. 실제 OS/runtime/CPU 아키텍처를 기록하고 환경별 검증 결과를 구분 | P02, P03 |
 | Samba 이미지 | 출처·유지 상태·아키텍처·권한 요구를 확인. 적합한 이미지가 없으면 Ubuntu 패키지 기반 Dockerfile 작성 | P02, P03 |
-| 버전 | Keycloak·PostgreSQL·kind/node·Samba·앱 의존성을 고정. `latest` 사용 금지 | P02 |
-| 네트워크 | Docker 네트워크에서 kind 노드와 Samba 통신. Pod에서의 DNS와 라우팅은 별도로 검증 | P04 |
-| 주소 | 공개 Keycloak issuer 하나, 브라우저/Pod에서 접근 가능한 이름, 앱 callback 주소를 함께 설계 | P02, P05 |
-| TLS | HTTPS와 LDAPS의 CA 신뢰를 별도로 처리. 인증서 검증 비활성화를 완성 구성으로 채택하지 않음 | P04, P05 |
-| 배포 | 기본 실습은 단일 Keycloak + PostgreSQL + 명시적 매니페스트. Operator는 운영 설명에서 다룸 | P05 |
+| 버전 | Keycloak·PostgreSQL·Samba·앱의 P02 고정값 유지. kind/node는 선택 실습용으로 보존. `latest` 사용 금지 | P02, P05-C |
+| 네트워크 | Compose 전용 bridge에서 서비스 이름·alias로 통신. 진단 container에서 Samba DNS·LDAPS 경로 확인 | P05-C, P05 |
+| 주소 | 공개 Keycloak issuer 하나를 브라우저와 container에서 동일하게 사용. callback·내부 listener·host publish 포트를 함께 확정 | P05-C, P05 |
+| TLS | HTTPS와 LDAPS의 분리 CA와 검증 유지. 로컬 secret·인증서의 Compose mount 방식 확정 | P05-C, P05 |
+| 배포 | 단일 Keycloak + PostgreSQL을 Compose로 실행. Kubernetes·Operator는 운영 설명 및 후속 선택 실습 | P05 |
 | 테스트 앱 | 검증된 OIDC 라이브러리를 쓰는 최소 앱 하나를 A/B 두 Client로 실행하고 API 인가 확인 | P06 |
 | 영속성 | Samba와 DB 데이터의 위치·수명·초기화 대상을 명시 | P03, P05, P10 |
 
-현재 P03 Samba 파일은 macOS/Colima에서 실제 image build·provision·LDAPS·영속성을 검증했다.
-네이티브 Ubuntu에서는 아직 실행하지 않았다. 특히 Docker 컨테이너 이름이 Pod에서도 자동으로
-해석된다고 가정하지 않는다. 불가능한 환경 조건을 만나면 이유와 다음 조치를 기록하며,
+현재 P03 Samba와 P04 kind-to-Samba 경로는 macOS/Colima에서 검증했다. Compose의 Keycloak·앱 경로와
+네이티브 Ubuntu는 아직 검증하지 않았다. 불가능한 환경 조건을 만나면 이유와 다음 조치를 기록하며,
 사용자 합의 없이 VM을 추가하거나 Samba를 다른 제품으로 바꾸지 않는다.
+
+### Compose 전환 계약과 기존 환경 처리
+
+P05-C는 다음 변경을 `labs/keycloak/decisions.md`와 Keycloak baseline에 반영하는 계약 정리 작업이다.
+이번 계획 수정에서는 두 파일과 실행 환경을 변경하지 않는다.
+
+- 현재 공개 URL·issuer·callback 이름은 우선 유지한다. Compose DNS alias와 container listener를 어떻게
+  연결할지 확정해 브라우저와 container에서 같은 URL·포트로 TLS 검증 및 discovery/JWKS 접근이 가능해야 한다.
+  host port만 바꿔 연결하고 container 내부에서는 다른 issuer를 쓰는 구성으로 해결하지 않는다.
+- CoreDNS·NodePort·ClusterIP·PVC·Kubernetes Secret 전제를 Compose 서비스 DNS·loopback publish·
+  named volume·로컬 파일 기반 secret/인증서 mount 계약으로 바꾼다. DB·API·Samba는 host에 publish하지 않는다.
+- P04 node가 점유하는 `.20`과 host `30080`~`30082`를 조사한다. 해당 주소·포트를 Compose에 재사용한다면
+  P05 실행 시 이 실습 소유 node의 연결·포트를 먼저 해제하는 절차와 데이터 보존 범위를 확정한다.
+  node 중단만으로 bridge IP까지 해제된다고 가정하지 않는다. 이번 계획 수정으로 cluster를 중단·삭제하지 않는다.
+- 기존 `kind.yaml`, `kind/`, 진단 Pod와 P04 기록은 선택 실습 참고로 보존한다. 기본 시작·검증·초기화는
+  이 파일이나 실행 중인 kind cluster에 의존하지 않아야 한다. 향후 정확한 실습 cluster를 정리해도
+  Samba named volume·로컬 CA·secret은 유지하며, 전역 prune이나 Colima 초기화는 하지 않는다.
+- Colima 2 CPU/2 GiB와 동시 실행 Supabase를 기준으로 Compose 전체 자원을 다시 산정한다. 기존
+  4 CPU/8 GiB 권장은 출발점이며, kind 제외만으로 2 GiB가 충분하다고 판정하지 않는다. 증설·runtime
+  변경 시 다른 workload의 중단 및 데이터 영향을 확인하고 필요한 사용자 결정을 기록한다.
+
+### Ubuntu P03 플랫폼 검증 보류
+
+- [ ] Ubuntu 24.04 + rootful Docker Engine 고정 버전에서 `labs/keycloak/samba/verify-p03.sh`를 실행한다.
+- macOS/Colima의 P03 통과는 Ubuntu 결과로 일반화하지 않는다. 이 보류 항목은 Compose 후속 작업을 막지 않지만
+  실제 Ubuntu 실행 전에는 Ubuntu 지원 경로를 검증 완료로 표시하지 않는다.
 
 ## 산출물 배치
 
@@ -96,10 +123,11 @@ labs/keycloak/
   README.md              # 실행 진입점, 선행조건, 단계별 명령
   decisions.md           # 버전·이미지·주소·포트·자원·선택 근거
   verification.md        # 실습 환경과 실제 결과, 미검증 사항
-  compose.yaml           # Samba 컨테이너와 볼륨
-  kind.yaml              # 전용 클러스터 설정
+  compose.yaml           # 기본 실습의 Samba·DB·Keycloak·앱·API 서비스와 볼륨
+  kind.yaml              # P04 보존 산출물, 후속 Kubernetes 선택 실습용
+  kind/                  # P04 네트워크·CA·진단 스크립트 보존, 기본 실행에는 미사용
   samba/                 # 이미지/초기화/테스트 사용자·그룹
-  k8s/                   # DB·Keycloak·앱·API 매니페스트
+  k8s/                   # P04 진단 Pod 보존, 추가 배포는 선택 실습 요청 시 작성
   app/                   # OIDC 앱과 API의 최소 코드·의존성
   scripts/               # 생성·초기 데이터·확인·중단·정리
 src/content/docs/keycloak/
@@ -136,24 +164,30 @@ src/content/docs/keycloak/
 ## 선행 구현 작업
 
 모든 작업은 시작 전 공통 지침을 읽는다. 아래 입력은 추가로 필요한 파일/기록이다.
-P01~P11은 순서대로 실행한다. 각 작업의 계획 기록 수정은 항상 범위에 포함된다.
+P01~P04의 기록은 보존한다. 남은 기본 작업은 P05-C → P05~P11 순서로 실행한다.
+P05-C/P05는 macOS P03 검증 결과를 입력으로 사용하며 P04 cluster 실행을 선행 조건으로 두지 않는다.
+각 작업의 계획 기록 수정은 항상 범위에 포함된다.
 
 | ID | 입력 | 수정 범위와 작업 | 완료 판정 |
 |---|---|---|---|
 | P01 | 현재 baseline, 본문 제목·주요 절, 이 계획 | baseline의 학습 축·범위 갱신. 아래 이관 표의 누락 절을 확인하여 보충 | 기존 주요 절에 목적지가 있고 사용자 합의와 baseline이 일치. 버전은 근거 없이 올리지 않음 |
 | P02 | P01, 공식 배포/컨테이너/LDAP/kind/Samba 문서 | `labs/keycloak/decisions.md` 작성. 실행 환경, 고정 버전, 네트워크·주소·포트·CA·볼륨, 앱 라이브러리 선택 | 다운로드/이미지 가용성·아키텍처 확인. 선택값과 근거 URL·확인일 기록. 자원 수치는 추정/실측 구분 |
 | P03 | decisions | `compose.yaml`, `samba/`, 로컬 산출물 ignore 규칙. Samba 단독 기동과 사용자·그룹 seed | 디렉터리 조회·사용자 bind 성공. 컨테이너 재생성 후 계정 유지, seed 재실행 중복 없음 |
-| P04 | P03 결과, decisions | `kind.yaml`, 실습 네트워크/CA 스크립트·진단 Pod | Pod에서 Samba 이름 해석·LDAPS 검색·사용자 bind 성공. 틀린 CA/비밀번호 실패. 공개 인터넷 노출 불필요 |
-| P05 | P04, Keycloak 공식 hostname/DB/컨테이너 문서 | `k8s/`의 PostgreSQL·Keycloak, 초기 Realm/로컬 계정 설정 | 브라우저 콘솔/계정 로그인, Pod의 discovery/JWKS 접근, issuer 일치. Keycloak 재생성 후 설정 유지 |
-| P06 | P05, 선택한 OIDC 라이브러리 공식 문서 | `app/`, 앱 A 배포, Client seed | Authorization Code + PKCE 로그인. state/nonce/redirect 처리는 라이브러리 사용. 로그인 실패도 확인. 비밀번호 grant로 대체하지 않음 |
-| P07 | P06 | 동일 앱 B 배포, API와 역할 매핑, 관련 seed | A 로그인 뒤 B에서 자격 증명 재입력 없이 로그인. API는 access token의 서명·iss·aud·exp 검증. 무토큰 401, 권한 부족 403, 허용 200 |
+| P04 | P03 결과, decisions의 당시 kind 계약 | 완료한 `kind.yaml`, 네트워크/CA 스크립트·진단 Pod 보존. 기본 Compose 의존성에서 제외 | 당시 macOS Pod DNS·LDAPS·bind 결과 보존. Compose 및 Ubuntu 결과로 일반화하지 않음 |
+| P05-C | P03 macOS 결과, P04 자원·포트 기록, 현재 decisions/baseline, 필요한 공식 Compose·Keycloak 문서 | decisions와 baseline의 Compose 전환 계약 정리. 위 전환 항목의 주소·listener·DNS·CA·volume·자원·기존 kind 처리 확정. 배포 파일·본문 구현은 제외 | 기본 경로에 kind 의존성 없음. 동일 issuer의 host/container 접근 설계와 기존 상태 보존·포트 충돌 해소 절차 명시. 미실행 사항 구분, diff·참조 확인 |
+| P05 | P05-C, P03 macOS 결과, Keycloak 공식 hostname/DB/컨테이너 문서 | `compose.yaml`에 PostgreSQL·Keycloak과 진단 container, 초기 Realm/로컬 계정·CA 스크립트 추가 | 브라우저 콘솔/계정 로그인, container의 discovery/JWKS 접근과 issuer 일치. Compose 진단에서 Samba DNS·CA 검증 LDAPS 검색·alice/bob bind·오답 CA/비밀번호 실패·외부 인터넷 없이 진단·P03 상태 유지 확인. Keycloak/DB container 재생성 후 설정 유지 |
+| P06 | P05, 선택한 OIDC 라이브러리 공식 문서 | `app/`, Compose 앱 A 서비스, Client seed | Authorization Code + PKCE 로그인. state/nonce/redirect 처리는 라이브러리 사용. 로그인 실패도 확인. 비밀번호 grant로 대체하지 않음 |
+| P07 | P06 | Compose 앱 B·API 서비스와 역할 매핑, 관련 seed | A 로그인 뒤 B에서 자격 증명 재입력 없이 로그인. API는 access token의 서명·iss·aud·exp 검증. 무토큰 401, 권한 부족 403, 허용 200 |
 | P08 | P07, LDAP Federation 공식 문서 | Federation 설정/seed와 검증 명령 | READ_ONLY 기본. Samba alice/bob 로그인 성공. LDAP 그룹 가져오기 → 역할/claim 매핑 → API 결과를 단계별 확인 |
 | P09 | P08 | 변경·장애 시나리오 스크립트/수동 절차, verification 기록 | 그룹 제거·계정 비활성화·AD 중단·복구에서 새 로그인/refresh/기존 토큰/앱 세션 결과와 설정값·경과 시간 기록. 복구 뒤 정상 상태 확인 |
-| P10 | P03~P09 산출물 | README와 시작·상태·중단·재개·초기화 절차 | 데이터 보존 중단/재개와 데이터 삭제 초기화를 구분. 삭제 대상 이름을 출력하고 이 실습 소유 리소스만 처리. 전역 prune 금지 |
-| P11 | 전체 labs 산출물 | 누락 수정, verification의 최소 실습 검증 기록 | 빈 실습 상태에서 생성 → 로컬 SSO/API → AD 로그인/그룹 → 중단·재개까지 재현. 버전·명령·성공/실패 근거 기록, 비밀값 제외 |
+| P10 | P03, P05-C~P09의 Compose 산출물 | README와 Compose 시작·상태·중단·재개·초기화 절차 | 서비스별 기동과 readiness, 데이터 보존 중단/재개 및 명시적 volume 초기화 구분. 정확한 project/리소스만 처리. 기본 cleanup에 kind 조작이나 전역 prune 없음 |
+| P11 | 기본 Compose 산출물, P10 | 누락 수정, verification의 환경별 전체 실습 검증 기록 | kind·kubectl 없이 빈 실습 상태에서 생성 → 로컬 SSO/API → AD 로그인/그룹 → 중단·재개 재현. 준비 단계의 다운로드와 인터넷 없이 수행할 진단 구분. OS별 버전·자원·명령·결과 기록, Ubuntu 미실행이면 전체 검증 완료 처리하지 않음 |
 
 P11이 실습 본문 작성의 선행 조건이다. P02~P10에서 발견한 선택 변경은 decisions에 먼저 반영하고
 관련 파일만 맞춘다. 컨테이너 이미지의 동작을 추측해 긴 완성 문서를 먼저 쓰지 않는다.
+
+Kubernetes 배포·kubectl OIDC의 실행 실습은 P11 이후 별도 요청 시 작업 ID·입력·검증 조건을 추가한다.
+기본 실습의 완료 조건에는 포함하지 않는다. D20의 참조 설명과 D21의 운영 배포 비교는 유지한다.
 
 ## 목표 목차와 페이지별 작업
 
@@ -171,7 +205,7 @@ D00은 P11 뒤 실행한다. `_deck.mjs`에 아래 새 그룹을 추가하되 �
 | ID | 그룹 / order | 대상 파일과 한 가지 질문 | 재사용 원본 | 추가 완료 조건 |
 |---|---|---|---|---|
 | D01 | foundations / 1000 | `keycloak-overview`: Keycloak은 인증 시스템에서 무엇을 맡나 | 00-intro, 01-why | 로컬 사용자·Federation·Brokering의 큰 그림과 본선/심화 범위 |
-| D02 | foundations / 1010 | `lab-setup`: 이 덱의 컨테이너 환경은 어떻게 준비하나 | labs README, 08-deploy | 공통 kind 설치 링크, 자원·주소·CA·정리 위치. 검증한 전제만 명시 |
+| D02 | foundations / 1010 | `lab-setup`: 이 덱의 컨테이너 환경은 어떻게 준비하나 | labs README, 08-deploy | 공통 Docker·Colima 준비와 Compose 실행, 자원·주소·CA·정리 위치. kind·kubectl 불필요, 검증한 전제만 명시 |
 | D03 | foundations / 1020 | `realm-and-users`: 첫 Realm과 사용자는 어떻게 만드나 | 03-structure | master와 학습 Realm 구분, 사용자 생성·비밀번호/required action·로그인 |
 | D04 | login / 1030 | `oauth-oidc`: 앱 로그인의 표준 흐름은 무엇인가 | 02-oauth-oidc | OAuth/OIDC, 세 토큰, Code+PKCE를 한 로그인 흐름으로 설명 |
 | D05 | login / 1040 | `clients-and-sso`: 앱 두 개를 어떻게 로그인에 연결하나 | 03-structure, 07-apps | public/confidential, redirect, 실제 A/B SSO 확인 |
@@ -189,9 +223,9 @@ D00은 P11 뒤 실행한다. `_deck.mjs`에 아래 새 그룹을 추가하되 �
 | D17 | integrations / 1160 | `saml`: SAML 연동은 OIDC와 무엇이 다른가 | 신규 | SP/IdP·metadata/assertion·서명·선택 기준. 전체 SAML 실습은 범위 밖 |
 | D18 | integrations / 1170 | `service-accounts`: 사용자 없이 서비스가 어떻게 인증하나 | 신규 | client credentials, 최소 권한, 사용자 로그인과 구분. API 허용/거부 검증 |
 | D19 | integrations / 1180 | `oauth2-proxy`: OIDC를 모르는 앱은 어떻게 보호하나 | 07-apps | proxy 경계·헤더 신뢰·우회 경로·쿠키와 로그아웃. 기본 A/B 앱을 교체하지 않음 |
-| D20 | integrations / 1190 | `kubernetes-oidc`: kubectl 로그인은 어떻게 연결하나 | 06-k8s-oidc | 기준 K8s 버전의 인증 설정, public client+PKCE, 인증/RBAC 구분, 복구용 관리자 접근 |
-| D21 | operations / 1200 | `deployment`: 실습 배포와 운영 배포는 어떻게 다른가 | 08-deploy | Operator/직접 배포 비교, hostname·proxy·TLS·Secret, realm import 한계 |
-| D22 | operations / 1210 | `storage-and-availability`: 재시작과 장애를 무엇이 견디나 | 05-sessions, 08-deploy | DB·캐시·persistent sessions 역할. 단일 kind 실습을 HA 검증으로 쓰지 않음 |
+| D20 | integrations / 1190 | `kubernetes-oidc`: kubectl 로그인은 어떻게 연결하나 | 06-k8s-oidc | 후속 선택 실습의 참조 설명. 기준 K8s 인증 설정, public client+PKCE, 인증/RBAC·복구 접근 구분. 기본 실습에 cluster 생성을 요구하지 않음 |
+| D21 | operations / 1200 | `deployment`: 실습 배포와 운영 배포는 어떻게 다른가 | 08-deploy | Compose 기본 실습과 운영 Kubernetes·Operator/직접 배포 비교, hostname·proxy·TLS·secret·realm import 한계. K8s 실행은 선택 실습 |
+| D22 | operations / 1210 | `storage-and-availability`: 재시작과 장애를 무엇이 견디나 | 05-sessions, 08-deploy | Compose named volume과 DB·캐시·persistent sessions 역할. 단일 인스턴스 실습을 HA 검증으로 쓰지 않음 |
 | D23 | operations / 1220 | `observability`: 인증 문제를 어디서 관찰하나 | 09-ops, 10-troubleshooting | 이벤트·관리 이벤트·로그·health/metrics, 비밀값 제외한 진단 예 |
 | D24 | operations / 1230 | `backup-and-upgrade`: 설정과 데이터를 어떻게 복구하나 | 09-ops | DB 백업/복구와 realm export 차이, 버전별 업그레이드 근거, 실습 DB 복구 확인 |
 | D25 | operations / 1240 | `administration-and-keys`: 관리 권한과 서명 키를 어떻게 관리하나 | 09-ops | master/위임·관리 API·키 교체/구 키 검증 기간 구분 |
@@ -202,8 +236,9 @@ D00은 P11 뒤 실행한다. `_deck.mjs`에 아래 새 그룹을 추가하되 �
 D09/D16/D18/D24는 새 실습이 필요하므로 각각 본문 작성 전에 `D09-L`처럼 보조 작업을 만든다.
 보조 작업은 labs의 해당 기능만 구현·검증하고 종료하며, 다음 세션에서 MDX를 작성한다.
 D19/D20은 우선 선택 기준·구성·진단을 다루는 참조 페이지다. 실행 가능한 완성 실습으로 제공하려면
-같은 방식의 보조 작업을 먼저 완료한다. Kubernetes OIDC를 검증할 때는 IdP가 같은 클러스터에
-있는 부트스트랩 의존성과 관리자 복구 경로를 명시하고 기본 실습 클러스터를 무작정 재생성하지 않는다.
+같은 방식의 보조 작업을 먼저 완료한다. Kubernetes OIDC는 P11 이후 별도 요청 시 실행한다.
+그때 IdP의 Compose/cluster 배치와 연결 경계, 같은 클러스터에 둘 경우의 부트스트랩 의존성,
+관리자 복구 경로를 명시하고 기존 실습 상태를 무작정 재생성하지 않는다.
 
 모든 학습 페이지는 핵심 요약 → 큰 그림 → 이 장의 질문 → 설명 → 필요한 실습/확인 → 요약 순서다.
 새 페이지에 Thesis와 필요한 TermIntro를 사용하며 제목·파일·URL·본문 참조에 순서 번호를 붙이지 않는다.
@@ -286,7 +321,7 @@ Astro/호스팅 구성을 먼저 확인하고 필요한 [배포 지침](../deplo
 - [Keycloak hostname](https://www.keycloak.org/server/hostname): 공개 주소와 issuer
 - [Keycloak 운영 배포](https://www.keycloak.org/server/configuration-production): 운영 설정
 - [Keycloak Operator](https://www.keycloak.org/operator/installation): 운영 배포 선택
-- [kind 구성](https://kind.sigs.k8s.io/docs/user/configuration/): 노드·포트 구성
+- [kind 구성](https://kind.sigs.k8s.io/docs/user/configuration/): P04 기록과 후속 선택 실습의 노드·포트 구성
 - [Ubuntu Samba AD DC](https://ubuntu.com/server/docs/how-to/samba/provision-samba-ad-controller/): 디렉터리 구축과 확인. 이 가이드는 컨테이너 배포 검증 결과가 아님
 
 ## 실행 기록과 재개 방법
@@ -300,25 +335,35 @@ Astro/호스팅 구성을 먼저 확인하고 필요한 [배포 지침](../deplo
 | 계획 작성 | done | 이 문서 | diff·참조 경로 확인 | 컨테이너 실행 미착수 | P01 |
 | P01 | done | `src/content/docs/keycloak/_baseline.md`, 이 문서, `docs/plans/README.md` | `git diff --check`; 계획·baseline 링크와 원본/목표 slug 대조 | 합의한 학습 순서와 Ubuntu 컨테이너 경계를 baseline에 반영. 기존 index와 00~12의 주요 절 목적지 확정. 버전 유지, 실습·본문 미착수 | P02 |
 | P02 | done | `labs/keycloak/decisions.md`, 이 문서 | 2026-09-14 공식 release/registry/package metadata 조회, 지정 download HTTP 200, amd64/arm64 manifest 확인; 추적 파일 `git diff --check`와 새 파일 `git diff --no-index --check`; 문서 내 공식 URL HTTP 확인. image pull·container 실행·자원 실측은 미실행 | Ubuntu 24.04와 amd64/arm64, Keycloak 26.7.3·PostgreSQL 18.6·kind v0.33.0/Kubernetes v1.35.8·Ubuntu Samba 4.19.5·Node 24 의존성을 digest/snapshot/lockfile로 고정. 동일 공개 issuer, loopback NodePort, 분리 CA, volume 수명과 추정 자원 확정. P03에서 Samba 단독 동작과 권한·volume 경계를 실제 검증 | P03 |
-| P03 | blocked | `.gitignore`, `labs/keycloak/compose.yaml`, `labs/keycloak/decisions.md`, `labs/keycloak/verification.md`, `labs/keycloak/samba/`, `src/content/docs/keycloak/_baseline.md`, 이 문서, `docs/plans/README.md` | Ubuntu Samba 공식 provision·사용자 흐름과 Ubuntu snapshot/package를 대조. macOS 26.6.2 arm64 + Colima 0.10.3(Ubuntu 24.04.4 VM)에서 빈 volume으로 `verify-p03.sh` 전체 통과: arm64 image build와 Samba `2:4.19.5+dfsg-4ubuntu9.7`, AD provision, LDAPS 조회·alice/bob bind, seed 2회 재실행 결과 동일, force recreate 전후 domain SID·사용자·그룹 동일, healthy 확인. Compose config, shell 구문·실행 비트, ignore, whitespace, 금지 설정·host port 부재 검사 통과. 네이티브 Ubuntu는 **미실행** | `lab-environment` 덱대로 macOS/Colima와 Ubuntu/Docker Engine을 지원 범위로 분리. 기본 capability provision은 SYSVOL ACL `NT_STATUS_ACCESS_DENIED`로 실패했고 `security.*` xattr 근거를 decisions에 먼저 기록한 뒤 최소 `SYS_ADMIN`만 추가. `privileged=false`, 전용 bridge, Docker socket·host port 없음 확인. 네이티브 Ubuntu에서 같은 스크립트가 통과할 때까지 P03은 완료 아님 | P03 네이티브 Ubuntu 검증 재개; 통과 후에만 P04 |
+| P03 | blocked | `.gitignore`, `labs/keycloak/compose.yaml`, `labs/keycloak/decisions.md`, `labs/keycloak/verification.md`, `labs/keycloak/samba/`, `src/content/docs/keycloak/_baseline.md`, 이 문서, `docs/plans/README.md` | Ubuntu Samba 공식 provision·사용자 흐름과 Ubuntu snapshot/package를 대조. macOS 26.6.2 arm64 + Colima 0.10.3(Ubuntu 24.04.4 VM)에서 빈 volume으로 `verify-p03.sh` 전체 통과: arm64 image build와 Samba `2:4.19.5+dfsg-4ubuntu9.7`, AD provision, LDAPS 조회·alice/bob bind, seed 2회 재실행 결과 동일, force recreate 전후 domain SID·사용자·그룹 동일, healthy 확인. Compose config, shell 구문·실행 비트, ignore, whitespace, 금지 설정·host port 부재 검사 통과. 네이티브 Ubuntu는 **미실행** | `lab-environment` 덱대로 macOS/Colima와 Ubuntu/Docker Engine을 지원 범위로 분리. 기본 capability provision은 SYSVOL ACL `NT_STATUS_ACCESS_DENIED`로 실패했고 `security.*` xattr 근거를 decisions에 먼저 기록한 뒤 최소 `SYS_ADMIN`만 추가. `privileged=false`, 전용 bridge, Docker socket·host port 없음 확인. Ubuntu P03 플랫폼 검증은 사용자 요청으로 보류하며 macOS 결과로 일반화하지 않음. macOS P03 통과 결과를 P04 선행 조건으로 사용할 수 있음 | Ubuntu P03 플랫폼 검증 보류; P04 진행 허용 |
+| P04 | done | `labs/keycloak/kind.yaml`, `labs/keycloak/kind/`, `labs/keycloak/k8s/directory-diagnostic.yaml`, `labs/keycloak/verification.md`, 이 문서, `docs/plans/README.md` | kind v0.33.0/Kubernetes·kubectl v1.35.8로 `keycloak-lab` 생성. macOS/Colima 진단 Pod에서 `dc1.ad.keycloak.test` → `172.30.0.10` 해석, `.10:636` 연결, directory CA LDAPS 검색, alice/bob bind 통과. 잘못된 CA TLS 검증과 잘못된 비밀번호 bind 실패. 로컬 load image + `imagePullPolicy: Never`로 진단 명령의 공개 endpoint 의존 없음. P03 결과와 P04 후 SID·사용자·그룹 `cmp` 일치. host current context와 `/etc/hosts` 불변, port는 loopback 한정, 다른 Docker network·Samba volume·CA/secret 유지. shell 구문·server dry-run·whitespace 통과 | Colima 2 CPU/2 GiB는 전체 권장 4 CPU/8 GiB 미달. Supabase 8개와 named volume이 있어 VM 재시작을 동반한 증설은 하지 않음. P04 직후 node 약 575 MiB, pressure 없음, 기존 healthcheck 항목 healthy. P05 전에 중단 시간 합의 후 증설 또는 별도 profile/runtime 필요. Ubuntu P03 및 P04 실제 실행은 미실행 | P05; Ubuntu P03 플랫폼 검증 보류 유지 |
+
+### Compose 전환 계획 갱신
+
+| 작업 | 상태 | 변경 파일 | 검증 결과/근거 | 결정·잔여 문제 | 다음 작업 |
+|---|---|---|---|---|---|
+| Compose 전환 계획 | done | 이 문서만 | 기존 diff·P01~P04 기록·baseline·decisions 대조, `git diff --check`와 참조 경로 확인 | 사용자 합의에 따라 기본 실습을 Compose로 전환. P04 실행 기록은 당시 결과로 보존하며 위 기록의 다음 작업은 이 행으로 갱신. decisions/baseline 및 실습 구현은 아직 이전 계약이므로 P05-C에서 먼저 정리. 실행 중인 cluster와 기존 파일·volume·CA·secret에는 변경 없음. Ubuntu P03 플랫폼 검증 보류 유지 | P05-C → P05 |
+| P05-C | todo | 예정: decisions, Keycloak baseline, 계획 기록 | 미실행 | Compose 주소·listener·DNS·CA·DB volume·자원과 P04 node의 주소/포트 충돌 처리 계약 확정 필요 | P05 |
 
 새 세션에 넘길 요청 예시:
 
 ```text
 AGENTS.md와 docs/plans/README.md를 읽고,
-docs/plans/02-keycloak-rework.md의 P03 Ubuntu 검증만 재개해줘.
+docs/plans/02-keycloak-rework.md의 P05-C만 실행해줘.
 
-현재 git 상태와 P01~P03 실행 기록, labs/keycloak/decisions.md,
-labs/keycloak/verification.md를 먼저 확인해. Ubuntu 24.04의 rootful Docker Engine에서
-고정된 Docker·Compose 버전과 실제 아키텍처를 확인한 뒤, 빈 Samba volume으로
-labs/keycloak/samba/verify-p03.sh를 끝까지 실행해.
+현재 git 상태와 P01~P04 실행 기록, Keycloak baseline, labs/keycloak/decisions.md,
+labs/keycloak/verification.md와 Compose 전환 계획 기록을 먼저 확인해.
+Ubuntu P03 플랫폼 검증은 보류 상태이며 macOS 결과를 Ubuntu 결과로 일반화하지 마.
 
-image build와 AD provision, LDAPS 조회·alice/bob bind, seed 멱등성,
-컨테이너 재생성 뒤 domain SID·사용자·그룹 유지, privileged·host network·Docker socket·
-host port 부재를 실제 결과로 검증해. 지원 환경이나 버전이 맞지 않으면 성공으로 기록하지 마.
+기본 실습을 kind·kubectl 없이 Compose로 실행하도록 decisions와 baseline의 계약을 먼저 맞춰줘.
+필요한 공식 Compose·Keycloak 문서를 확인하고, 동일 issuer의 브라우저/container 접근,
+DNS alias·내부 listener·host port·분리 CA·secret mount·named volume·자원을 확정해.
+P04 node가 점유한 주소와 포트를 조사해 Compose 전환 시 필요한 정확한 처리 절차를 기록해.
+Samba named volume·domain·CA·secret은 보존하고 Colima의 다른 workload 영향을 확인해.
+P04 기록과 파일은 보존하되 기본 실습의 선행 조건에서 제외해.
 
-검증 결과를 labs/keycloak/verification.md와 계획의 상태·실행 기록·다음 작업에 반영해.
-Ubuntu 검증까지 통과하면 P03만 done으로 바꾸고 계획 전체는 진행 중, 다음 작업은 P04로 둬.
-이번에는 P04 구현이나 Keycloak 본문 개편을 시작하지 마.
+이번에는 계약 문서와 계획 기록만 수정하고 서비스 배포·cluster 중단/삭제·Colima 자원 변경·본문 개편은 하지 마.
+diff와 참조를 확인하고 계획에 실제 결정과 미해결 사항을 남겨줘.
+P05-C가 끝나면 다음 작업은 Compose 기반 P05로 두고 Ubuntu P03 플랫폼 검증 보류를 계속 표시해.
 커밋·푸시는 하지 마.
 ```
