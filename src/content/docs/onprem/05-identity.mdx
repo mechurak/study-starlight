@@ -16,7 +16,7 @@ import TermIntro from '../../../components/docs/TermIntro.astro';
   terms={[
     ['IdP', 'Identity Provider, 신원 공급자', '"이 사람이 누구인지" 확인해 주고 그 결과를 토큰으로 발급하는 쪽. 이 덱에서는 **Keycloak**이 그 자리다.'],
     ['SSO', 'Single Sign-On', '한 번 로그인하면 여러 앱에 다시 로그인하지 않아도 되는 것. 계정이 한 곳에만 있으니 **퇴사자 차단도 한 곳**에서 끝난다.'],
-    ['OIDC', 'OpenID Connect', 'OAuth 2.0 위에 "누구인지"(신원)를 얹은 프로토콜. 앱은 ID 토큰을 받아 사용자를 안다. 상세는 [Keycloak 덱 2장](/keycloak/02-oauth-oidc/).'],
+    ['OIDC', 'OpenID Connect', 'OAuth 2.0 위에 "누구인지"(신원)를 얹은 프로토콜. 앱은 ID 토큰을 받아 사용자를 안다. 상세는 [Keycloak OAuth와 OIDC](/keycloak/oauth-oidc/).'],
     ['oauth2-proxy', '', '앱 앞에 서서 **로그인 여부를 대신 확인해 주는 리버스 프록시**. 앱이 OIDC를 몰라도 인증을 강제할 수 있다.'],
     ['claim', '클레임', '토큰 안에 실린 사용자 정보 조각(이메일 · 그룹 · 부서). 앱은 이걸 보고 권한을 정한다.'],
     ['외부 인가', 'External Authorization', '게이트웨이가 요청을 백엔드로 넘기기 전에 **다른 서비스에 물어보는** 기능. Gateway API 구현체에서 oauth2-proxy를 이 자리에 꽂는다.'],
@@ -109,7 +109,7 @@ q2 -> p2: 아니다
 | **Prometheus** | ② | 인증 기능이 없다. **반드시** 앞에 세운다 |
 | **Alertmanager** | ② | 침묵을 아무나 걸 수 있으면 알림 체계가 무의미해진다 |
 | **Loki · Tempo** | — | 사용자에게 직접 노출하지 않는다. **Grafana 뒤에** 둔다 |
-| **Kubernetes API** | ③ | → [Keycloak 덱 6장](/keycloak/06-k8s-oidc/) |
+| **Kubernetes API** | ③ | → [Keycloak Kubernetes OIDC](/keycloak/kubernetes-oidc/) |
 
 ## 패턴 ② — oauth2-proxy를 어디에 꽂나
 
@@ -253,7 +253,7 @@ tok -> role: ③ 도구별 매핑
    도구가 늘어날 때마다 그룹을 만들기 시작하면 관리가 무너진다.
 
 2. **Keycloak에서 groups claim을 토큰에 싣는다.** client scope와 mapper 설정이며,
-   [Keycloak 덱 3장](/keycloak/03-structure/)이 다룬다.
+   [Keycloak Client와 SSO](/keycloak/clients-and-sso/)가 다룬다.
 
 3. **도구마다 그 claim을 자기 역할로 번역한다.**
 
@@ -271,7 +271,7 @@ tok -> role: ③ 도구별 매핑
 
 4. **claim이 실제로 도착하는지 확인한다.** 안 되면 사슬 어디가 끊겼는지 순서대로 본다 —
    AD 매퍼 → Keycloak scope → 토큰 → 도구 설정. 진단 절차는
-   [Keycloak 덱 7장](/keycloak/07-apps/)의 "다섯 고리 점검"에 있다.
+   [Keycloak Scope와 Mapper](/keycloak/scopes-and-mappers/)와 [문제 진단](/keycloak/troubleshooting/)에서 확인한다.
 
 </Steps>
 
@@ -279,8 +279,8 @@ tok -> role: ③ 도구별 매핑
 
 | 문제 | 왜 생기나 | 어떻게 다루나 |
 |---|---|---|
-| **로그아웃이 한 번에 안 된다** | 세션이 세 층(앱 쿠키 · 프록시 쿠키 · Keycloak SSO 세션) | 도구 로그아웃 링크를 Keycloak의 end-session으로 보낸다 ([Keycloak 덱 5장](/keycloak/05-sessions/)) |
-| **Keycloak이 죽으면 아무도 못 들어온다** | 신원을 한 곳에 모은 대가 | Keycloak을 HA로([Keycloak 덱 8장](/keycloak/08-deploy/)), **깨진 유리 계정**을 도구마다 하나 남긴다 |
+| **로그아웃이 한 번에 안 된다** | 세션이 세 층(앱 쿠키 · 프록시 쿠키 · Keycloak SSO 세션) | 도구 로그아웃 링크를 Keycloak의 end-session으로 보낸다 ([Keycloak Session과 Logout](/keycloak/sessions-and-logout/)) |
+| **Keycloak이 죽으면 아무도 못 들어온다** | 신원을 한 곳에 모은 대가 | Keycloak의 [저장소와 가용성](/keycloak/storage-and-availability/)을 설계하고 **깨진 유리 계정**을 도구마다 하나 남긴다 |
 | **자동화는 사람 로그인을 못 한다** | CI(Continuous Integration, 지속적 통합)·스크립트에는 브라우저가 없다 | 서비스 계정 토큰(Argo CD)·API 키를 따로 두고 **감사 로그를 남긴다** |
 
 :::caution[함정 — 깨진 유리 계정]

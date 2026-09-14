@@ -23,30 +23,6 @@ export default {
 	"termIntro": "required",
 	"groups": [
 		{
-			"id": "intro",
-			"label": "시작"
-		},
-		{
-			"id": "oauth-oidc",
-			"label": "프로토콜"
-		},
-		{
-			"id": "structure",
-			"label": "Keycloak 들여다보기"
-		},
-		{
-			"id": "k8s-oidc",
-			"label": "연동"
-		},
-		{
-			"id": "deploy",
-			"label": "배포와 운영"
-		},
-		{
-			"id": "glossary",
-			"label": "마무리"
-		},
-		{
 			"id": "foundations",
 			"label": "기초"
 		},

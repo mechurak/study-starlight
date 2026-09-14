@@ -13,7 +13,7 @@
 | 번호 | 계획 | 상태 |
 |---|---|---|
 | 01 | [CKA 실습 덱 개편](01-cka-udemy-rework.md) · [이관 계약](01-cka-udemy-migration.md) | 완료 |
-| 02 | [Keycloak 덱 재구성](02-keycloak-rework.md) | 진행 중 |
+| 02 | [Keycloak 덱 재구성](02-keycloak-rework.md) | 차단 |
 
 ## 번호와 파일명
 

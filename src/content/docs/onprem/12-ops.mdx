@@ -175,7 +175,7 @@ kubectl get pvc smoke && kubectl delete pvc smoke
 | kubelet 클라이언트 인증서 | 1년 | 자동 회전(기본) | 노드가 `NotReady` |
 | cert-manager 발급 인증서 | 90일 등 | 자동 | 브라우저 경고 → 서비스 접속 불가 |
 | 사내 루트·중간 CA | 수년 | **수동** | 발급한 모든 인증서가 동시에 |
-| Keycloak 서명 키 | 정책에 따라 | 롤오버 ([Keycloak 덱 9장](/keycloak/09-ops/)) | 토큰 검증 실패 |
+| Keycloak 서명 키 | 정책에 따라 | 롤오버 ([Keycloak 관리 권한과 서명 키](/keycloak/administration-and-keys/)) | 토큰 검증 실패 |
 | 서비스 계정 토큰(외부 시스템용) | 설정에 따라 | 재발급 | CI(지속적 통합)·연동 실패 |
 
 ```bash

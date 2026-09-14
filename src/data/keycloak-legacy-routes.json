@@ -1,0 +1,182 @@
+{
+  "00-intro": {
+    "target": "/keycloak/keycloak-overview/",
+    "anchors": {
+      "이-덱은-누구를-위한-것인가": "/keycloak/keycloak-overview/",
+      "다루는-것과-다루지-않는-것": "/keycloak/keycloak-overview/",
+      "미리-잡아두면-좋은-멘탈-모델": "/keycloak/keycloak-overview/",
+      "1-keycloak은-두-세계-사이의-통역사다": "/keycloak/keycloak-overview/",
+      "2-매핑은-두-번-일어난다": "/keycloak/directory-group-mapping/",
+      "3-신뢰는-서명으로-흐른다": "/keycloak/token-validation/",
+      "이-덱의-기준-시점": "/keycloak/deployment/",
+      "참고-자료": "/keycloak/keycloak-overview/",
+      "0장-요약": "/keycloak/keycloak-overview/#요약"
+    }
+  },
+  "01-why": {
+    "target": "/keycloak/keycloak-overview/",
+    "anchors": {
+      "문제--앱마다-ad에-직접-붙으면": "/keycloak/keycloak-overview/",
+      "해법--인증을-한-곳으로-모은다": "/keycloak/keycloak-overview/",
+      "keycloak은-무엇인가": "/keycloak/keycloak-overview/",
+      "같은-층의-다른-물건들": "/keycloak/keycloak-overview/",
+      "사내-구성의-전체-그림--3개-경계-2번의-매핑": "/keycloak/directory-group-mapping/",
+      "참고-자료": "/keycloak/keycloak-overview/",
+      "1장-요약": "/keycloak/keycloak-overview/#요약"
+    }
+  },
+  "02-oauth-oidc": {
+    "target": "/keycloak/oauth-oidc/",
+    "anchors": {
+      "문제--비밀번호를-주지-않고-권한을-넘기려면": "/keycloak/oauth-oidc/",
+      "oauth만으로는-로그인이-안-된다--oidc가-얹은-것": "/keycloak/oauth-oidc/",
+      "토큰-세-종류--신분증-출입증-재발급권": "/keycloak/oauth-oidc/",
+      "로그인의-표준-경로--authorization-code-flow": "/keycloak/oauth-oidc/",
+      "다른-흐름들--언제-무엇을-쓰나": "/keycloak/oauth-oidc/",
+      "jwt-해부--서명이-신뢰를-만든다": "/keycloak/token-validation/",
+      "검증의-최소-축": "/keycloak/token-validation/",
+      "discovery--설정의-출발점은-url-하나": "/keycloak/token-validation/",
+      "saml은-어디에-있나": "/keycloak/saml/",
+      "참고-자료": "/keycloak/oauth-oidc/",
+      "2장-요약": "/keycloak/oauth-oidc/#요약"
+    }
+  },
+  "03-structure": {
+    "target": "/keycloak/realm-and-users/",
+    "anchors": {
+      "realm--격리된-보안-공간": "/keycloak/realm-and-users/",
+      "client--앱-하나의-등록-정보": "/keycloak/clients-and-sso/",
+      "토큰에-무엇이-실리나--mapper와-scope": "/keycloak/scopes-and-mappers/",
+      "protocol-mapper--claim을-만드는-규칙": "/keycloak/scopes-and-mappers/",
+      "scope--앱이-요청하는-범위": "/keycloak/scopes-and-mappers/",
+      "group과-role--인가를-어디에-둘까": "/keycloak/groups-and-roles/",
+      "콘솔에서-길-찾기--메뉴와-개념의-대응": "/keycloak/administration-and-keys/",
+      "참고-자료": "/keycloak/realm-and-users/",
+      "3장-요약": "/keycloak/realm-and-users/#요약"
+    }
+  },
+  "04-ad-federation": {
+    "target": "/keycloak/ad-and-ldap/",
+    "anchors": {
+      "두-가지-연동-방식--페더레이션과-브로커링": "/keycloak/identity-brokering/",
+      "인증은-누가-하나--비밀번호의-소재": "/keycloak/ldap-federation/",
+      "ad-용어-해부--설정-값을-읽기-위한-최소한": "/keycloak/ad-and-ldap/",
+      "ldap-프로바이더-설정": "/keycloak/ldap-federation/",
+      "edit-mode와-동기화--ad와의-관계-설정": "/keycloak/ldap-federation/",
+      "edit-mode--누가-주인인가": "/keycloak/ldap-federation/",
+      "import와-sync": "/keycloak/directory-changes/",
+      "ldap-매퍼--경계-의-실체": "/keycloak/directory-group-mapping/",
+      "group-매퍼--가장-중요한-매퍼": "/keycloak/directory-group-mapping/",
+      "데스크톱-sso--kerberos": "/keycloak/wrapup/#아직-검증하지-않은-범위",
+      "콘솔-클릭을-코드로--kcadmsh-자동화": "/keycloak/administration-and-keys/",
+      "ad-연동-트러블슈팅": "/keycloak/troubleshooting/",
+      "보안-메모": "/keycloak/ad-and-ldap/",
+      "참고-자료": "/keycloak/ad-and-ldap/",
+      "4장-요약": "/keycloak/ad-and-ldap/#요약"
+    }
+  },
+  "05-sessions": {
+    "target": "/keycloak/sessions-and-logout/",
+    "anchors": {
+      "문제--수명은-트레이드오프-다이얼이다": "/keycloak/sessions-and-logout/",
+      "구조--세션과-토큰은-층이-다르다": "/keycloak/sessions-and-logout/",
+      "다이얼-목록--realm-settings의-sessions와-tokens": "/keycloak/sessions-and-logout/",
+      "refresh-token--세션에-묶인-재발급권": "/keycloak/sessions-and-logout/",
+      "offline-token--로그아웃-후에도-살아야-하는-작업": "/keycloak/sessions-and-logout/",
+      "로그아웃--한-번에-다-끊기는-어렵다": "/keycloak/sessions-and-logout/",
+      "관리자의-강제-종료": "/keycloak/sessions-and-logout/",
+      "세션은-어디에-저장되나--26의-변화": "/keycloak/storage-and-availability/",
+      "참고-자료": "/keycloak/sessions-and-logout/",
+      "5장-요약": "/keycloak/sessions-and-logout/#요약"
+    }
+  },
+  "06-k8s-oidc": {
+    "target": "/keycloak/kubernetes-oidc/",
+    "anchors": {
+      "문제--인증서-kubeconfig는-회수가-안-된다": "/keycloak/kubernetes-oidc/",
+      "전체-그림": "/keycloak/kubernetes-oidc/#인증-흐름을-나눈다",
+      "keycloak-쪽-준비--client-하나와-매퍼-둘": "/keycloak/kubernetes-oidc/",
+      "api-서버-쪽-설정--두-세대": "/keycloak/kubernetes-oidc/#api-server-검증을-고정한다",
+      "kubectl-쪽--kubelogin": "/keycloak/kubernetes-oidc/#인증-흐름을-나눈다",
+      "rbac-매핑--여기부터는-아는-길": "/keycloak/kubernetes-oidc/#인증-뒤에-rbac를-붙인다",
+      "운영-함정-셋": "/keycloak/kubernetes-oidc/#복구-접근을-oidc-밖에-둔다",
+      "참고-자료": "/keycloak/kubernetes-oidc/",
+      "6장-요약": "/keycloak/kubernetes-oidc/#요약"
+    }
+  },
+  "07-apps": {
+    "target": "/keycloak/clients-and-sso/",
+    "anchors": {
+      "세-패턴--앱의-처지에-따라-갈린다": "/keycloak/clients-and-sso/",
+      "client-등록-체크리스트--패턴-공통": "/keycloak/clients-and-sso/",
+      "패턴---oauth2-proxy-해부": "/keycloak/oauth2-proxy/",
+      "claim이-앱까지-안-와요--다섯-고리-점검": "/keycloak/scopes-and-mappers/",
+      "로그아웃은-세-층이다": "/keycloak/sessions-and-logout/",
+      "참고-자료": "/keycloak/clients-and-sso/",
+      "7장-요약": "/keycloak/clients-and-sso/#요약"
+    }
+  },
+  "08-deploy": {
+    "target": "/keycloak/deployment/",
+    "anchors": {
+      "문제--dev-모드와-프로덕션의-거리": "/keycloak/deployment/",
+      "무엇으로-배포하나": "/keycloak/deployment/",
+      "프로덕션-필수-설정--네-가지-답": "/keycloak/deployment/",
+      "-db--원본은-postgresql이다": "/keycloak/storage-and-availability/",
+      "-hostname--배포-설정이-아니라-프로토콜-설정이다": "/keycloak/deployment/#공개-url을-프로토콜-계약으로-다룬다",
+      "-tls--종료-지점과-신뢰-선언": "/keycloak/deployment/#공개-url을-프로토콜-계약으로-다룬다",
+      "-ha--여러-대가-하나처럼": "/keycloak/storage-and-availability/",
+      "이미지와-기동-최적화": "/keycloak/deployment/#image와-secret을-분리한다",
+      "참고-자료": "/keycloak/deployment/",
+      "8장-요약": "/keycloak/deployment/#요약"
+    }
+  },
+  "09-ops": {
+    "target": "/keycloak/backup-and-upgrade/",
+    "anchors": {
+      "백업--원본은-db-export는-보조": "/keycloak/backup-and-upgrade/",
+      "업그레이드--롤백-수단은-db-백업뿐": "/keycloak/backup-and-upgrade/",
+      "서명-키-관리--무중단-롤오버": "/keycloak/administration-and-keys/",
+      "유출-대응--회수의-도구들": "/keycloak/administration-and-keys/#비상-변경의-영향-범위를-안다",
+      "관리-권한-위임--master는-금고에": "/keycloak/administration-and-keys/",
+      "가시성--이벤트--메트릭--로그": "/keycloak/observability/",
+      "운영-루틴-요약": "/keycloak/observability/",
+      "참고-자료": "/keycloak/backup-and-upgrade/",
+      "9장-요약": "/keycloak/backup-and-upgrade/#요약"
+    }
+  },
+  "10-troubleshooting": {
+    "target": "/keycloak/troubleshooting/",
+    "anchors": {
+      "진단의-축--사슬의-어디가-끊겼나": "/keycloak/troubleshooting/#마지막-성공-지점을-찾는다",
+      "도구-상자--다섯-개면-대부분-열린다": "/keycloak/troubleshooting/",
+      "표-a--로그인-진입리다이렉트-구간": "/keycloak/troubleshooting/#증상별로-한-경계를-고친다",
+      "표-b--토큰-검증전달-구간": "/keycloak/troubleshooting/#증상별로-한-경계를-고친다",
+      "표-c--kubectl--api-서버-구간": "/keycloak/kubernetes-oidc/",
+      "그래도-못-찾겠으면--층을-내려간다": "/keycloak/troubleshooting/#운영-장애는-의존성부터-복구한다",
+      "참고-자료": "/keycloak/troubleshooting/",
+      "10장-요약": "/keycloak/troubleshooting/#요약"
+    }
+  },
+  "11-glossary": {
+    "target": "/keycloak/glossary/",
+    "anchors": {
+      "인증의-큰-그림": "/keycloak/glossary/#신원과-로그인",
+      "ad와-ldap": "/keycloak/glossary/#디렉터리와-권한",
+      "프로토콜과-토큰": "/keycloak/glossary/#oauthoidc와-token",
+      "keycloak-내부": "/keycloak/glossary/",
+      "연동과-배포": "/keycloak/glossary/#연동과-운영"
+    }
+  },
+  "12-wrapup": {
+    "target": "/keycloak/wrapup/",
+    "anchors": {
+      "전체-지도": "/keycloak/wrapup/#전체-흐름",
+      "장별-핵심-한-문장": "/keycloak/wrapup/#다시-찾는-지도",
+      "구축-체크리스트--처음-세울-때": "/keycloak/lab-setup/",
+      "사고-대응-카드--급할-때-이-순서": "/keycloak/troubleshooting/",
+      "여기서-더-파려면": "/keycloak/wrapup/#아직-검증하지-않은-범위",
+      "마지막-한-장": "/keycloak/wrapup/#요약"
+    }
+  }
+}

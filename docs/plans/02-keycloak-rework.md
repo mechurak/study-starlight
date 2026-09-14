@@ -1,8 +1,8 @@
 # 2. Keycloak 덱 재구성 실행 계획
 
 작성일: 2026-09-14
-상태: 진행 중
-지금 위치: F01 완료 · 다음 F02-a~m 옛 페이지 이관 · Ubuntu P03·P11과 P05·P06 macOS browser는 blocked/보류 유지
+상태: 차단
+지금 위치: 허용된 D02~D28·필수 보조 랩·F01~F04 완료 · 지원 환경 전체 완료는 Ubuntu P03·P11과 P05·P06 macOS browser 검증 대기
 실행 범위: 사용자 요청에 따른 D02~D28, D09-L·D16-L·D18-L·D24-L, F01~F04 전체 완료. D19·D20 추가 실행 실습과 Kubernetes OIDC 선택 실습은 제외한다.
 보류: Ubuntu P03 플랫폼 검증 보류 — macOS/Colima 결과를 Ubuntu 결과로 일반화하지 않는다.
 
@@ -55,12 +55,12 @@ P01에서 정한 인증/인가·두 단계 매핑·세션/토큰·issuer 구분�
 ## 완료 조건
 
 - [ ] macOS에서는 Colima, Ubuntu에서는 Docker Engine으로 kind·kubectl 없이 Compose 기본 환경을 생성할 수 있다. 두 환경의 실제 검증 결과를 각각 남긴다.
-- [ ] 로컬 계정 로그인 → 두 앱 SSO → API 인가 → Samba 계정 로그인 → 그룹 매핑을 재현한다.
-- [ ] 그룹 변경·계정 비활성화·LDAP 장애의 영향을 새 로그인/refresh/기존 JWT/앱 세션으로 구분한다.
-- [ ] 중단·재시작·초기화를 구분하고, 빈 상태에서 다시 만들어 같은 결과를 얻는다.
-- [ ] 사용자 관리·로그인 정책·앱 연결·외부 디렉터리·운영이 각각 찾아볼 수 있는 문서로 존재한다.
-- [ ] 기존 내용의 주요 절마다 이관 목적지가 있고 옛 URL·절 북마크의 처리 결과가 남는다.
-- [ ] 사이트 검사와 실제 실습 검증을 구분하고, 실행하지 못한 실습을 성공으로 기록하지 않는다.
+- [x] 로컬 계정 로그인 → 두 앱 SSO → API 인가 → Samba 계정 로그인 → 그룹 매핑을 재현한다.
+- [x] 그룹 변경·계정 비활성화·LDAP 장애의 영향을 새 로그인/refresh/기존 JWT/앱 세션으로 구분한다.
+- [x] 중단·재시작·초기화를 구분하고, 빈 상태에서 다시 만들어 같은 결과를 얻는다.
+- [x] 사용자 관리·로그인 정책·앱 연결·외부 디렉터리·운영이 각각 찾아볼 수 있는 문서로 존재한다.
+- [x] 기존 내용의 주요 절마다 이관 목적지가 있고 옛 URL·절 북마크의 처리 결과가 남는다.
+- [x] 사이트 검사와 실제 실습 검증을 구분하고, 실행하지 못한 실습을 성공으로 기록하지 않는다.
 
 ## 확정한 기본 설계와 미검증 사항
 
@@ -375,3 +375,21 @@ Astro/호스팅 구성을 먼저 확인하고 필요한 [배포 지침](../deplo
 | D21~D25 | done | `src/content/docs/keycloak/deployment.mdx`, `storage-and-availability.mdx`, `observability.mdx`, `backup-and-upgrade.mdx`, `administration-and-keys.mdx`, `_deck.mjs`, 이 문서 | Keycloak 26.7 deployment/hostname/container/cache/health/metrics/import-export/update/admin 공식 문서와 D24-L 결과 대조. 첫 `pnpm check`는 MDX 줄 시작 `export`를 문법으로 해석해 실패했고 표현 수정 후 통과: 콘텐츠 규칙, 469개 page build·Pagefind, 38,473개 내부 페이지·anchor 링크 | Compose와 운영 HA, DB/cache/app 상태, event/management signal, DB backup과 export, 위임 관리와 signing key 수명주기를 분리. `operations` 첫 페이지에 따라 `allowEmpty` 제거. Kubernetes/HA/rolling upgrade는 실행 성공으로 쓰지 않음 | D26 |
 | D26~D28 | done | `src/content/docs/keycloak/troubleshooting.mdx`, `glossary.mdx`, `wrapup.mdx`, `_deck.mjs`, `scripts/check-content.mjs`, `docs/content-authoring.md`, 이 문서 | P09·P11·D09-L·D16-L·D18-L·D24-L 실제 결과와 공식 Keycloak hostname/health/admin 문서 대조. 첫 `pnpm check`는 번호 없는 `glossary`/`wrapup`을 TermIntro 예외로 인식하지 못해 실패; 검사와 작성 규칙이 exact 또는 suffix slug를 허용하도록 맞춘 뒤 통과: 콘텐츠 규칙, 472개 page build·Pagefind, 38,905개 내부 페이지·anchor 링크 | 증상→마지막 성공 경계→복구 지도, 새 페이지 링크 중심 용어집, 검증/미실행 범위를 분리한 마무리 작성. `reference`의 `allowEmpty` 제거. browser·Ubuntu·실제 AD/IdP·proxy/Kubernetes·HA는 재개 조건과 함께 미실행으로 유지 | F01 |
 | F01 | done | `src/content/docs/keycloak/index.mdx`, `_deck.mjs`, `_baseline.md`, 이 문서 | final map의 모든 href가 실제 topic route인지 loader 검사. `pnpm check` 통과: 콘텐츠 규칙, 472개 page build·Pagefind, 38,928개 내부 페이지·anchor 링크 | 이관 중 안내와 번호 표시를 제거하고 큰 그림→로그인/접근→디렉터리→다른 연동→운영→문제 해결 map으로 교체. index 탐색 표를 새 질문 중심 URL로 전환하고 baseline의 Brokering/Service Account 실제 보조 실습과 참조-only 범위를 수정 | F02-a |
+| F02-a~m | done | `src/content/docs/keycloak/00-intro.mdx`~`12-wrapup.mdx` 삭제, `src/data/keycloak-legacy-routes.json`, `src/pages/keycloak/[legacy].astro`, `observability/05-grafana.mdx`, `onprem/05-identity.mdx`, `07-cnpg.mdx`, `12-ops.mdx`, `_baseline.md`, 이 문서 | 13개 원본의 h2/h3 115개와 P01 이관 표 대조. 저장소 전체 old slug 유입 링크를 새 URL로 교체. static build에서 13개 noindex 호환 URL 생성, 115개 bookmark map과 53개 고유 새 page/anchor 존재 확인. Playwright 대표 검증: 옛 AD group mapper→`directory-group-mapping`, 옛 key rollover→`administration-and-keys` 이동·제목 확인 | Cloudflare Pages static 배포와 기존 CKA 패턴에 맞춰 hash-aware client redirect 사용. 일대다 분할 heading은 새 목적지를 명시하고 원본 MDX는 제거. 호환 URL은 content collection/sidebar/Pagefind 본문으로 중복 등록되지 않음 | F03 |
+| F03 | done | `src/content/docs/keycloak/_deck.mjs`, `_baseline.md`, `glossary.mdx`, `wrapup.mdx`, 이 문서 | Keycloak 폴더에 번호 파일·번호 제목/참조 없음, 삭제한 6개 legacy group id와 해당 `deckGroup` 없음, old slug 직접 참조 없음(호환 JSON·이관 기록 제외). `_deck.mjs` map, glossary, wrapup과 전체 이관 표 대조 | 최종 7개 질문 중심 group만 유지. 호환 route 위치와 갱신 의무를 baseline에 기록. 참조-only와 실제 실습·보류 범위를 최종 문서에서 분리 | F04 |
+| F04 | done | 전체 Keycloak 본문·labs·계획 기록 | 최종 `pnpm check` 통과: 425개 MDX/424개 topic page, 472개 HTML build·Pagefind, 37,073개 내부 페이지·anchor 링크. D18 client credentials와 D24 DB 복원은 이번 범위에서 실제 통과; F 이관은 lab code/상태를 바꾸지 않아 실습을 반복하지 않음. 상시 6 service healthy 확인 | 요청된 D02~D28, D09-L/D16-L/D18-L/D24-L, F01~F04 완료. D19/D20 추가 실행과 Kubernetes OIDC 실행은 요청대로 제외. 전체 계획은 macOS Chrome P05/P06과 네이티브 Ubuntu P03→P11이 미실행이라 `차단` 유지 | 아래 재개 조건 |
+
+## 현재 차단과 재개 조건
+
+허용된 콘텐츠·실습·이관 범위는 끝났다. 계획 전체의 첫 완료 조건은 두 지원 host 환경의 실제 결과를
+요구하므로 macOS/Colima 결과만으로 `완료`로 바꾸지 않는다.
+
+- macOS browser: 사용자가 `.state/web-ca/ca.crt`의 system keychain 신뢰 변경을 승인한 뒤 실제 Chrome에서
+  Admin Console 로그인과 앱 A Authorization Code + PKCE 로그인을 대표 경로로 확인한다. 완료하면 P05·P06의
+  browser 부분과 `verification.md`를 갱신한다.
+- Ubuntu: Ubuntu 24.04 + rootful Docker Engine host에서 `cd labs/keycloak && ./samba/verify-p03.sh`를 먼저
+  실행한다. 통과한 같은 환경에서 reset dry-run 대상과 비대상 workload를 확인한 뒤
+  `./scripts/verify-p11.sh --confirm DELETE-keycloak-lab-compose-state`를 실행한다. 두 결과를 macOS 기록과
+  분리해 남기고 P03·P11 및 첫 완료 조건을 판정한다.
+- D19/D20의 oauth2-proxy 실행과 Kubernetes OIDC/cluster 실습은 이번 요청에서 제외됐으며 이 계획을
+  unblock하는 조건이 아니다. 필요하면 별도 실행 범위와 topology·복구 접근을 먼저 정한다.

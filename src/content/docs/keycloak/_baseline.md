@@ -116,6 +116,10 @@ Compose 계약은 2026-09-14에 공식 출처로 확인했다. 버전이나 현�
 
 ## 서술·검증 규칙
 
+번호를 제거하기 전 00~12 URL과 주요 heading bookmark는
+`src/data/keycloak-legacy-routes.json` 및 `src/pages/keycloak/[legacy].astro`에서 새 질문 중심 페이지로
+보낸다. 새 페이지를 분할·이름 변경할 때 이 호환 map의 target과 anchor도 함께 확인한다.
+
 - 학습 본문 첫머리의 `<TermIntro>`와 장 끝 요약을 유지한다.
 - 콘솔 메뉴 이름만 나열하지 말고 **없으면 생기는 문제 → 동작 원리 → 설정 → 점검** 순서로 쓴다.
 - URL은 가능하면 고정 endpoint를 외우게 하지 말고 realm discovery 문서에서 확인하도록 안내한다.
