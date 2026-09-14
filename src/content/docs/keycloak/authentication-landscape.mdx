@@ -1,7 +1,7 @@
 ---
 title: "인증 생태계의 큰 그림"
-description: "AD·LDAP·IdP 제품과 OAuth·OIDC·SAML·Authorization Code·PKCE·SSO의 종류와 연결 관계"
-aliases: [인증 큰 그림, AD FS, AD DS, 인증 프로토콜, federation]
+description: "인증·인가의 필요성과 AD·LDAP·IdP·OIDC·SAML·PKCE를 계층별로 구분하는 큰 그림"
+aliases: [인증 큰 그림, 인증과 인가, authentication, authorization, AD FS, AD DS, 인증 프로토콜, federation]
 reviewedAt: 2026-09-14
 deckGroup: foundations
 sidebar:
@@ -11,45 +11,44 @@ sidebar:
 import Thesis from '../../../components/docs/Thesis.astro';
 import TermIntro from '../../../components/docs/TermIntro.astro';
 
-<Thesis>AD·LDAP·Keycloak·OAuth·OIDC·SAML은 같은 종류의 기술이 아니며, 저장소·제품·프로토콜·흐름·보호 장치·로그인 경험으로 나눠야 관계가 보인다.</Thesis>
+<Thesis>인증은 사용자가 누구인지 확인하고 인가는 그 사용자의 행동을 허용할지 판단하며, 관련 기술은 신원 원본부터 앱의 결정까지 계층별로 놓아야 관계가 보인다.</Thesis>
 
-사내 앱이 사용자 비밀번호를 직접 검증하게 두면 앱마다 비밀번호 처리, 로그인 정책, 감사 지점이
-늘어난다. 대신 앱은 사용자를 Identity Provider(IdP)로 보내고, IdP가 돌려준 인증 결과를 검증한다.
-디렉터리는 계정과 그룹의 원본으로 남고, IdP가 앱 앞에서 로그인과 세션을 맡는다.
+사용자가 관리 화면의 삭제 버튼을 눌렀다고 하자. 시스템은 먼저 **요청자가 누구인지** 확인하고,
+그다음 **그 사용자가 이 작업을 해도 되는지** 판단해야 한다. 앞이 인증(authentication), 뒤가
+인가(authorization)다. 인증만 있으면 로그인한 모든 사용자가 같은 일을 할 수 있고, 인가만
+있으면 정책을 누구에게 적용할지 알 수 없다.
+
+사내 앱마다 이 두 판단을 모두 직접 구현하면 비밀번호 처리와 로그인 정책이 중복되고, 권한 규칙과
+감사 지점도 흩어진다. 그래서 로그인은 Identity Provider(IdP)로 모으고, 앱과 API는 IdP가 전달한
+신원·권한 정보를 자기 정책과 결합해 최종 접근을 결정한다.
 
 <TermIntro
   terms={[
+    ['authentication', '인증', '비밀번호·OTP 같은 자격 증명이나 기존 세션을 확인해 요청자의 신원을 확립하는 과정.'],
+    ['authorization', '인가', '확인된 신원이 특정 자원에 특정 행동을 해도 되는지 정책으로 판단하는 과정.'],
     ['IdP', 'Identity Provider', '사용자를 인증하고 앱이 검증할 수 있는 인증 결과를 제공하는 주체. Keycloak과 AD FS가 이 역할을 할 수 있다.'],
-    ['federation', '', '서로 다른 신원 시스템이 표준 프로토콜이나 저장소 연결을 통해 신원 정보를 신뢰하고 이어 쓰는 관계.'],
   ]}
 />
 
 ## 이 장에서 답할 질문
 
-- AD·LDAP·IdP·OIDC·SAML은 각각 제품인가, 프로토콜인가?
+- 인증과 인가는 왜 둘 다 필요하고, 각각 누가 결정하는가?
+- AD·LDAP·IdP·OIDC·SAML은 어느 계층에 있으며, 같은 층의 대안은 무엇인가?
 - Authorization Code와 PKCE는 OIDC 로그인 안에서 어떻게 이어지는가?
 - Keycloak이 AD를 직접 읽는 경로와 AD FS에 인증을 맡기는 경로는 무엇이 다른가?
 
-## 먼저 종류를 나눈다
+## 인증 다음에 인가가 온다
 
-이름이 함께 등장한다고 같은 층의 대안은 아니다. 예를 들어 LDAP 대신 OIDC를 고르는 것이 아니라,
-디렉터리와 IdP 사이에는 LDAP를 쓰고 IdP와 앱 사이에는 OIDC를 쓸 수 있다.
+| 판단 | 묻는 질문 | 없으면 생기는 문제 | 이 덱에서 주로 결정하는 곳 |
+|---|---|---|---|
+| **인증** | 이 요청자는 누구인가? | 다른 사람을 사칭하거나 출처를 알 수 없는 요청을 사용자 요청처럼 처리한다. | Keycloak 같은 IdP가 자격 증명·세션을 확인한다. |
+| **인가** | 이 사용자가 이 자원에 이 행동을 해도 되는가? | 로그인했다는 이유만으로 일반 사용자가 관리자 작업까지 할 수 있다. | 앱·API가 token의 claim과 자기 권한 정책을 함께 보고 최종 결정한다. |
 
-| 개념 | 종류 | 이 구조에서 하는 일 |
-|---|---|---|
-| [AD / AD DS](https://learn.microsoft.com/en-us/windows-server/identity/ad-ds/get-started/virtual-dc/active-directory-domain-services-overview) | 디렉터리 제품·서비스 | 사용자·그룹 같은 디렉터리 객체를 계층 구조로 보관한다. 여기서 AD는 Active Directory Domain Services(AD DS)를 뜻한다. |
-| LDAP / LDAPS | 디렉터리 접근 프로토콜 | 디렉터리 entry를 조회하고 bind로 자격 증명을 확인한다. LDAPS는 이 통신을 TLS로 보호한다. |
-| [Keycloak](https://www.keycloak.org/docs/26.7.0/server_admin/#core-concepts-and-terms) · [AD FS](https://learn.microsoft.com/en-us/windows-server/identity/ad-fs/ad-fs-overview) | IdP 제품·구성요소 | 사용자를 인증하고 federation 관계를 중계하며 앱에 인증 결과를 제공한다. AD FS는 AD DS와 다른 역할이다. |
-| [OAuth 2.0](https://www.rfc-editor.org/rfc/rfc6749.html) | 접근 권한 위임 프레임워크 | 앱이 제한된 API 접근 권한을 access token으로 받게 한다. 그 자체가 사용자 로그인 프로토콜은 아니다. |
-| [OpenID Connect(OIDC)](https://openid.net/specs/openid-connect-core-1_0-18.html) | OAuth 2.0 위의 사용자 인증 프로토콜 | OAuth 2.0 흐름에 ID token과 표준 claim을 더해 앱이 로그인한 사용자를 확인하게 한다. |
-| [SAML 2.0](https://docs.oasis-open.org/security/saml/Post2.0/sstc-saml-tech-overview-2.0.html) | 별도 계열의 federation 로그인 프로토콜 | IdP와 앱이 브라우저를 거쳐 XML assertion을 주고받아 로그인한다. OIDC 위에서 동작하는 기술이 아니다. |
-| [Authorization Code](https://www.rfc-editor.org/rfc/rfc6749.html#section-4.1) | OAuth 2.0의 흐름 | 브라우저에는 access token 대신 짧게 쓰는 일회성 code를 전달하고, 앱이 그 code를 token으로 교환한다. |
-| [PKCE](https://www.rfc-editor.org/rfc/rfc7636.html) | Authorization Code의 보호 장치 | 처음 보낸 `code_challenge`와 교환 때의 `code_verifier`를 묶어, code를 훔친 다른 주체의 token 교환을 막는다. |
-| SSO | 로그인 경험 | 프로토콜 이름이 아니라 같은 IdP 세션을 여러 앱의 로그인 요청이 재사용해 비밀번호 재입력을 줄인 결과다. |
+인증은 인가의 입력을 만들지만 인가를 대신하지 않는다. 예를 들어 Keycloak이 `sub=alice`,
+`groups=[finance]`라는 claim을 넣은 access token을 발급할 수는 있다. 그러나 Alice가 결재 문서를
+삭제해도 되는지는 그 문서를 소유한 앱이나 API의 정책이 판단한다.
 
-## 한 요청이 지나는 경계를 본다
-
-```d2 layout=elk pad=40 title="앱 A와 B가 같은 Keycloak 또는 AD FS 세션을 재사용하고 디렉터리·OIDC/SAML·OAuth API 경계로 이어지는 구조"
+```d2 layout=elk pad=40 title="IdP의 인증 결과를 받은 API가 별도의 정책으로 최종 인가하는 흐름"
 direction: down
 
 classes: {
@@ -59,34 +58,105 @@ classes: {
   mute: { style: { fill: "#f1f5f9"; stroke: "#94a3b8"; font-color: "#334155" } }
 }
 
-browser: 사용자 · 브라우저 { class: mute }
-apps: "앱 A: 먼저 로그인\n앱 B: 나중에 로그인" { class: ok }
-idp: "Keycloak 또는 AD FS\n같은 IdP 세션 재사용 지점 = SSO" { class: key }
-directory: "AD / 디렉터리\n사용자 · 그룹 원본" { class: mute }
+person: "사용자\n자격 증명 제시" { class: mute }
+idp: "IdP · Keycloak\n인증: 누구인가?" { class: key }
+app: "앱\n인증 결과로\n로그인 세션 생성" { class: ok }
+api: "API\n인가: 이 행동을 허용할까?" { class: warn }
+policy: "권한 정책\nclaim + 대상 자원\n+ 행동" { class: mute }
 
-code: "OIDC Authorization Code\n브라우저 callback의 일회성 code" { class: warn }
-pkce: "앱 → token endpoint\ncode + code_verifier 검증 = PKCE" { class: warn }
-oidcapp: "앱이 받는 OIDC 결과\nID token · access token" { class: ok }
-samlapp: "앱이 받는 SAML 결과\n서명된 assertion" { class: ok }
-api: API { class: ok }
-
-browser -> apps: 각 앱 방문
-apps -> idp: "각각 OIDC/SAML 요청\nOIDC라면 code_challenge 전송"
-idp -> directory: "Keycloak User Federation\nLDAP/LDAPS 조회 · bind"
-
-idp -> code: OIDC 선택
-code -> pkce
-pkce -> oidcapp
-
-idp -> samlapp: SAML 선택
-oidcapp -> api: OAuth access token
+person -> idp: 로그인
+idp -> app: 검증 가능한 token
+app -> api: access token으로 요청
+policy -> api
 ```
 
-앱 A와 앱 B는 서로의 cookie를 공유하지 않는다. 두 앱이 각각 Keycloak 또는 AD FS로 로그인 요청을
-보냈을 때 **같은 IdP 세션을 다시 쓰는 지점**이 SSO다. OIDC를 선택했다면 Authorization Code 안에서
-`code_challenge`와 `code_verifier`를 확인하는 부분에 PKCE가 붙는다. SAML은 code나 PKCE 없이 별도의
-assertion 흐름을 쓴다. 앱이 API를 호출할 때는 OAuth access token을 보내고, API가 그 token과 권한을
-검증한다.
+token이 없거나 유효하지 않아 신원을 확인하지 못하면 보통 `401 Unauthorized`, 신원은 확인했지만
+권한이 부족하면 `403 Forbidden`으로 구분한다. 이 덱의 실습도 이 경계를 직접 확인한다.
+
+## 기술을 계층별로 놓는다
+
+이름이 함께 등장한다고 모두 같은 층의 대안은 아니다. 아래 표에서 **한 행 안의 항목**이 같은 질문에
+답하는 개념이다. 예를 들어 LDAP와 OIDC 중 하나를 고르는 것이 아니라, IdP가 디렉터리를 읽을 때는
+LDAP를 쓰고 앱과 로그인 결과를 주고받을 때는 OIDC를 쓸 수 있다.
+
+| 계층 | 이 계층의 질문 | 같은 층에 놓고 볼 개념 |
+|---|---|---|
+| **신원 원본** | 사용자와 그룹은 어디에 저장되는가? | [AD / AD DS](https://learn.microsoft.com/en-us/windows-server/identity/ad-ds/get-started/virtual-dc/active-directory-domain-services-overview), Keycloak 로컬 사용자 저장소 |
+| **원본 연결** | IdP는 외부 디렉터리를 어떻게 조회하는가? | LDAP, TLS로 보호한 LDAPS |
+| **인증 제공자(IdP)** | 누가 로그인과 인증 세션을 맡는가? | [Keycloak](https://www.keycloak.org/docs/26.7.0/server_admin/#core-concepts-and-terms), [AD FS](https://learn.microsoft.com/en-us/windows-server/identity/ad-fs/ad-fs-overview) |
+| **앱 로그인 프로토콜** | IdP와 앱은 인증 결과를 어떤 형식으로 주고받는가? | [OpenID Connect(OIDC)](https://openid.net/specs/openid-connect-core-1_0-18.html), [SAML 2.0](https://docs.oasis-open.org/security/saml/Post2.0/sstc-saml-tech-overview-2.0.html) |
+| **접근 권한 위임** | 앱은 API 접근 권한을 어떻게 위임받는가? | OAuth 2.0 |
+| **권한 위임 흐름** | 브라우저를 지나는 결과를 어떻게 token으로 바꾸는가? | Authorization Code |
+| **code 보호 장치** | 탈취한 code의 교환을 어떻게 막는가? | PKCE |
+| **사용자가 겪는 결과** | 여러 앱에서 로그인이 어떻게 느껴지는가? | SSO |
+
+### 신원 원본과 원본 연결
+
+[AD DS(Active Directory Domain Services)](https://learn.microsoft.com/en-us/windows-server/identity/ad-ds/get-started/virtual-dc/active-directory-domain-services-overview)는
+사용자·그룹 같은 디렉터리 객체를 계층 구조로 보관하는 서비스다. LDAP는 그런 디렉터리의 entry를
+조회하고 bind로 자격 증명을 확인하는 **접근 프로토콜**이며, LDAPS는 그 통신을 TLS로 보호한다.
+따라서 AD DS와 LDAP는 경쟁 제품이 아니라 “저장하는 곳”과 “접근하는 방법”의 관계다.
+
+### 인증 제공자
+
+[Keycloak](https://www.keycloak.org/docs/26.7.0/server_admin/#core-concepts-and-terms)과
+[AD FS](https://learn.microsoft.com/en-us/windows-server/identity/ad-fs/ad-fs-overview)는 모두 IdP 역할을
+할 수 있다. 사용자를 인증하고 세션을 관리하며 앱이 검증할 수 있는 결과를 제공한다. AD FS는
+AD DS와 이름이 비슷하지만, 사용자·그룹을 저장하는 디렉터리와는 다른 Windows Server 역할이다.
+
+### 앱 로그인 프로토콜
+
+[OIDC](https://openid.net/specs/openid-connect-core-1_0-18.html)와
+[SAML 2.0](https://docs.oasis-open.org/security/saml/Post2.0/sstc-saml-tech-overview-2.0.html)은 IdP와 앱
+사이에서 선택할 수 있는 같은 층의 로그인 프로토콜이다. OIDC는 OAuth 2.0 위에 ID token과 표준
+claim을 더하고, SAML은 브라우저를 거쳐 서명된 XML assertion을 전달한다. SAML이 OIDC 위에서
+동작하거나 OIDC의 한 흐름인 것은 아니다.
+
+### OIDC가 사용하는 OAuth 흐름과 보호 장치
+
+이 네 항목도 서로 동급인 선택지가 아니다.
+
+| 개념 | 바로 위 개념과의 관계 | 하는 일 |
+|---|---|---|
+| [OAuth 2.0](https://www.rfc-editor.org/rfc/rfc6749.html) | 기반 프레임워크 | 앱이 제한된 API 접근 권한을 access token으로 받게 한다. 그 자체가 사용자 로그인 프로토콜은 아니다. |
+| OIDC | OAuth 2.0에 인증을 추가 | ID token과 표준 claim으로 앱이 로그인한 사용자를 확인하게 한다. |
+| [Authorization Code](https://www.rfc-editor.org/rfc/rfc6749.html#section-4.1) | OAuth 2.0에서 선택하는 흐름 | 브라우저에는 access token 대신 짧게 쓰는 일회성 code를 전달하고, 앱이 그 code를 token으로 교환한다. |
+| [PKCE](https://www.rfc-editor.org/rfc/rfc7636.html) | Authorization Code에 붙는 보호 장치 | `code_challenge`와 `code_verifier`를 묶어, code를 훔친 다른 주체의 token 교환을 막는다. |
+
+### SSO는 별도 프로토콜이 아니라 결과다
+
+앱 A와 앱 B는 서로의 cookie를 공유하지 않는다. 두 앱이 각각 같은 IdP로 로그인 요청을 보냈을 때
+IdP가 이미 있는 인증 세션을 재사용하면 사용자는 비밀번호를 다시 입력하지 않는다. 이 경험이
+Single Sign-On(SSO)이다. OIDC나 SAML 중 어느 프로토콜을 쓰더라도 같은 원리로 만들 수 있다.
+
+## 한 요청이 지나는 경계를 본다
+
+```d2 layout=elk pad=40 title="AD DS에서 Keycloak과 OIDC를 거쳐 앱과 API 인가까지 이어지는 대표 경로"
+direction: down
+
+classes: {
+  key: { style: { fill: "#dbeafe"; stroke: "#2563eb"; font-color: "#1e3a8a" } }
+  ok: { style: { fill: "#dcfce7"; stroke: "#16a34a"; font-color: "#14532d" } }
+  warn: { style: { fill: "#fef3c7"; stroke: "#d97706"; font-color: "#78350f" } }
+  mute: { style: { fill: "#f1f5f9"; stroke: "#94a3b8"; font-color: "#334155" } }
+}
+
+source: "① 신원 원본\nAD/AD DS" { class: mute }
+idp: "② 인증 제공자\nKeycloak" { class: key }
+protocol: "③ 앱 로그인 프로토콜\nOIDC" { class: warn }
+apps: "④ 앱 A · 앱 B\n각자 로그인 세션 생성" { class: ok }
+api: "⑤ API\naccess token과 정책으로 인가" { class: ok }
+
+source -> idp: "User Federation\nLDAP/LDAPS"
+idp -> protocol: 인증 결과 전달
+protocol -> apps: ID token
+apps -> api: OAuth access token
+```
+
+이 그림은 표의 각 층에서 하나씩 고른 **대표 조합**이다. Keycloak 로컬 사용자는 ②에서 시작하고,
+SAML 앱은 ③을 SAML로 바꾼다. 위쪽은 신원을 가져와 인증 결과를 만드는 구간이고, 아래쪽 API는
+그 결과를 입력으로 최종 인가하는 구간이다. OIDC를 선택했다면 보통 Authorization Code 흐름에
+PKCE를 붙인다. SAML을 선택하면 code나 PKCE 없이 별도의 assertion 흐름을 쓴다.
 
 ## 혼동하기 쉬운 경계를 지킨다
 
@@ -102,6 +172,7 @@ assertion 흐름을 쓴다. 앱이 API를 호출할 때는 OAuth access token을
 
 회사에 AD와 AD FS가 모두 있어도 Keycloak을 연결하는 경로는 하나로 고정되지 않는다. 자격 증명을
 검증하는 주체와 브라우저가 이동하는 위치를 보면 두 경로를 가를 수 있다.
+여기서 federation은 서로 다른 신원 시스템을 연결해 신원 정보를 이어 쓰는 관계를 넓게 가리킨다.
 
 | 경로 | 실제 연결 | 인증하는 곳 | 브라우저 이동 | 선택 결과 |
 |---|---|---|---|---|
@@ -128,6 +199,7 @@ AD FS를 같은 제품처럼 부르거나, AD가 있다는 이유만으로 연�
 
 ## 요약
 
+- 인증은 요청자가 누구인지 확인하고, 인가는 그 신원이 해당 작업을 해도 되는지 별도로 판단한다.
 - AD/AD DS는 디렉터리이고 LDAP/LDAPS는 그 디렉터리에 접근하는 프로토콜이다.
 - Keycloak과 AD FS는 IdP가 될 수 있고, 앱과는 OIDC나 SAML로 연결한다.
 - OAuth 2.0 access token은 API 권한 위임에 쓰며 OIDC가 사용자 인증을 더한다.
