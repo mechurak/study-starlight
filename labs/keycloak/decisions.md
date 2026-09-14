@@ -198,13 +198,18 @@ Keycloak 두 service에만 부여하고, Samba administrator/user password는 Ke
 | `app_a_client_secret` | `secrets/app-a-client-secret` | 앱 A와 일회성 Client seed container `/run/secrets/app_a_client_secret` |
 | `app_a_session_secret` | `secrets/app-a-session-secret` | 앱 A `/run/secrets/app_a_session_secret` |
 | `app_a_https_key` | `web-ca/app-a.key` | 앱 A `/run/secrets/app_a_https_key` |
+| `app_b_client_secret` | `secrets/app-b-client-secret` | 앱 B와 일회성 P07 seed container `/run/secrets/app_b_client_secret` |
+| `app_b_session_secret` | `secrets/app-b-session-secret` | 앱 B `/run/secrets/app_b_session_secret` |
+| `app_b_https_key` | `web-ca/app-b.key` | 앱 B `/run/secrets/app_b_https_key` |
 
 공개 `web-ca/ca.crt`·`web-ca/keycloak.crt`, `directory-ca/ca.crt`·`directory-ca/dc1.crt`는 secret으로
 가장하지 않고 필요한 service에만 명시적 read-only bind mount한다. Keycloak의 directory CA target은
 `/opt/keycloak/conf/truststores/directory-ca.crt`, HTTPS leaf target은
 `/run/keycloak-lab/certs/keycloak.crt`다. P06의 앱 A는 위 세 secret만 받고, Client seed는 bootstrap
 관리자 password와 앱 A client secret만 받는다. 앱 A process에는 bootstrap credential을 주지 않는다.
-앱 B의 key와 client/session secret은 P07에서 같은 원칙으로 추가한다.
+P07의 앱 B도 자기 key와 client/session secret만 받는다. P07 seed는 bootstrap 관리자 password와 앱 B
+client secret만 받고, 앱 B process에는 bootstrap credential을 주지 않는다. API는 private secret을 받지
+않고 web CA certificate만 읽어 고정 issuer의 discovery/JWKS를 검증한다.
 
 P05의 초기 realm 파일은 `study-realm.json`이고 시작 시 `--import-realm`으로 읽는다. `study`가 이미
 DB에 있으면 Keycloak의 startup import 규칙대로 건너뛰므로 container 재생성이 기존 realm을 덮어쓰지
@@ -275,6 +280,24 @@ P07 API는 신뢰한 issuer의 discovery/JWKS만 사용하고 access token의 �
 `jku` 같은 token header가 임의 JWKS 위치를 선택하게 하지 않는다. 무토큰 401, 유효하지만 권한 부족
 403, 허용 200을 구분한다.
 
+P07은 앱 A/B가 같은 server source와 image를 사용하되 client ID·callback·cookie·client/session/TLS
+secret은 각각 분리한다. 앱 A에서 받은 access token은 memory session 안에만 두고 앱의 `/api/*` 경로가
+bridge 내부 `http://api:3000`으로 전달한다. browser나 host에 token endpoint를 추가하지 않는다. 앱 B
+로그인은 앱 A 로그인 때 생긴 Keycloak SSO cookie를 재사용하되 앱 B 자체 session cookie는 별도로 만든다.
+
+Keycloak에는 bearer-only client `lab-api`, realm role `app-user`·`api-admin`, 앱 A/B 각각의
+`oidc-audience-mapper`를 둔다. mapper는 access token의 `aud`에 `lab-api`만 추가하고 ID token audience를
+바꾸지 않는다. P07의 로컬 기준 사용자는 `app-user`만 부여받아 `/user`는 200, `/admin`은 403이 된다.
+P08에서 Samba 그룹을 이 역할로 옮기는 단계는 아직 구현하지 않는다. API는 `jose`의 고정 RS256 remote
+JWKS 검증에 `issuer=https://keycloak.keycloak.test:30080/realms/study`, `audience=lab-api`를 넘기고 숫자
+`exp` claim도 필수로 확인한다. API는 Compose bridge에만 두고 host port를 publish하지 않는다.
+
+P07 seed는 Node의 단일 프로세스에서 master realm의 built-in `admin-cli`로 bootstrap 관리자 인증을 한
+뒤 Admin REST를 호출한다. 관리자 password와 짧은 access token은 process memory에만 있고 출력·파일로
+남기지 않는다. 앱 B/API client, 역할, 역할 할당, audience mapper는 존재 수를 확인해 생성하거나 정확한
+추적값으로 갱신하며 두 번 연속 실행 결과가 같아야 한다. 이 관리자 bootstrap 흐름은 앱 A/B의 Direct
+Access Grants를 켜는 것이 아니다.
+
 앱 A Client seed는 별도 일회성 Compose service가 Keycloak의 HTTPS 관리 API에 web CA truststore를
 명시하고 적용한다. confidential client `app-a`는 정확한 callback 하나만 허용하고 Standard Flow와
 PKCE S256만 사용한다. Implicit Flow, Direct Access Grants(password grant), service account는 끈다.
@@ -297,7 +320,7 @@ Docker data filesystem의 사용 가능 disk 20 GiB 이상**이다. 각 service�
 |---|---:|---:|---|
 | Keycloak 1 container | `1.5` | `2g` | 공식 memory 권장 반영, Compose 실측 전 |
 | PostgreSQL 1 container | `0.5` | `512m` | 소량 realm/session용 추정, Compose 실측 전 |
-| 앱 A/B/API 각 1 container | 각 `0.25` | 각 `256m` | 최소 Node 앱 추정, P06/P07 실측 전 |
+| 앱 A/B/API 각 1 container | 각 `0.25` | 각 `256m` | 최소 Node 앱. P06/P07 Compose hard limit 적용 |
 | Samba container | `1.0` | `1g` | P03에 적용해 macOS/Colima 통과; 관찰 idle 약 184 MiB |
 | 일회성 진단 container | `0.25` | `256m` | 실행할 때만 사용, P05 실측 전 |
 | 합계 | `4.0` | `4.5 GiB` | hard limit 합계. 동시에 항상 사용하는 양이라는 뜻은 아님 |
@@ -343,8 +366,8 @@ P11에서는 실행한 환경과 아키텍처를 명시하고 idle 안정화 뒤
 - Ubuntu package index가 Samba `2:4.19.5+dfsg-4ubuntu9.7`의 amd64/arm64를 표시했고
   `20260913T000000Z` snapshot의 `noble-updates/Release`는 HTTP 200이었다.
 - npm registry metadata의 latest와 tarball HTTP 200을 `openid-client@6.8.8`, `jose@6.2.12`,
-  `express@5.2.1`, `express-session@1.19.0` 각각 확인했다. 실제 dependency tree는 P06에서 생성하는
-  lockfile이 고정한다.
+  `express@5.2.1`, `express-session@1.19.0` 각각 확인했다. 실제 dependency tree는 P06의 lockfile과
+  P07에서 추가한 exact `jose@6.2.12` 항목이 고정한다.
 
 digest와 platform을 조회한 정확한 metadata endpoint는
 [Keycloak Quay manifest](https://quay.io/v2/keycloak/keycloak/manifests/26.7.3),

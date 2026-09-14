@@ -6,9 +6,8 @@ WORKDIR /opt/keycloak-lab-app
 COPY package.json package-lock.json ./
 RUN npm ci --omit=dev && npm cache clean --force
 
-COPY healthcheck.mjs server.mjs ./
+COPY api-healthcheck.mjs api.mjs healthcheck.mjs seed-p07.mjs server.mjs ./
 
 USER node
-EXPOSE 30081
 
 CMD ["node", "server.mjs"]

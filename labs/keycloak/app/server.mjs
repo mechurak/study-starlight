@@ -33,14 +33,20 @@ const callbackUrl = new URL('/callback', appOrigin)
 const issuer = new URL(requiredEnvironment('OIDC_ISSUER'))
 const clientId = requiredEnvironment('OIDC_CLIENT_ID')
 const port = Number(requiredEnvironment('APP_PORT'))
+const sessionCookieName = requiredEnvironment('SESSION_COOKIE_NAME')
+const clientSecretFile = requiredEnvironment('OIDC_CLIENT_SECRET_FILE')
+const sessionSecretFile = requiredEnvironment('SESSION_SECRET_FILE')
+const httpsCertificateFile = requiredEnvironment('HTTPS_CERTIFICATE_FILE')
+const httpsKeyFile = requiredEnvironment('HTTPS_KEY_FILE')
+const apiOrigin = process.env.API_ORIGIN
 
 const clientSecret = readSecret(
   'OIDC client secret',
-  '/run/secrets/app_a_client_secret',
+  clientSecretFile,
 )
 const sessionSecret = readSecret(
   'session secret',
-  '/run/secrets/app_a_session_secret',
+  sessionSecretFile,
 )
 
 const oidcConfiguration = await oidc.discovery(issuer, clientId, clientSecret)
@@ -49,7 +55,7 @@ const app = express()
 app.disable('x-powered-by')
 app.use(
   session({
-    name: 'app-a.sid',
+    name: sessionCookieName,
     secret: sessionSecret,
     resave: false,
     saveUninitialized: false,
@@ -136,13 +142,14 @@ app.get('/callback', async (request, response) => {
     )
     const claims = tokens.claims()
 
-    if (!claims?.sub) {
-      throw new Error('validated ID Token has no subject')
+    if (!claims?.sub || !tokens.access_token) {
+      throw new Error('validated token response is missing a subject or access token')
     }
 
     request.session.user = {
       subject: claims.sub,
       username: claims.preferred_username ?? claims.sub,
+      accessToken: tokens.access_token,
     }
     await saveSession(request)
     response.redirect('/')
@@ -153,6 +160,34 @@ app.get('/callback', async (request, response) => {
   }
 })
 
+if (apiOrigin) {
+  const apiBaseUrl = new URL(apiOrigin)
+
+  app.get('/api/:permission', async (request, response, next) => {
+    const user = request.session.user
+    if (!user?.accessToken) {
+      response.status(401).json({ error: 'authentication_required' })
+      return
+    }
+
+    try {
+      const apiResponse = await fetch(
+        new URL(`/${encodeURIComponent(request.params.permission)}`, apiBaseUrl),
+        {
+          headers: { authorization: `Bearer ${user.accessToken}` },
+          signal: AbortSignal.timeout(5_000),
+        },
+      )
+      const body = await apiResponse.text()
+      response.status(apiResponse.status)
+      response.set('content-type', apiResponse.headers.get('content-type') ?? 'text/plain')
+      response.send(body)
+    } catch (error) {
+      next(error)
+    }
+  })
+}
+
 app.use((error, _request, response, _next) => {
   console.error(`application request failed: ${error?.name ?? 'Error'}`)
   response.status(500).type('text/plain').send('Application error')
@@ -160,8 +195,8 @@ app.use((error, _request, response, _next) => {
 
 const server = https.createServer(
   {
-    cert: fs.readFileSync('/run/keycloak-lab/certs/app-a.crt'),
-    key: fs.readFileSync('/run/secrets/app_a_https_key'),
+    cert: fs.readFileSync(httpsCertificateFile),
+    key: fs.readFileSync(httpsKeyFile),
   },
   app,
 )

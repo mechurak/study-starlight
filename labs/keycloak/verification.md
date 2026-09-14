@@ -212,3 +212,54 @@ P05도 기존 browser 확인 전까지 blocked 상태를 유지한다.
 
 P06의 macOS/Colima 결과도 네이티브 Ubuntu의 P03 또는 P06 결과로 일반화하지 않는다. Ubuntu 24.04 +
 rootful Docker Engine의 기존 P03 플랫폼 검증은 계속 미실행이며 별도 실행 결과가 필요하다.
+
+## P07 앱 B SSO와 API 인가
+
+| 환경 | 상태 | 실제 범위 |
+|---|---|---|
+| macOS 26.6.2 arm64 + Colima 0.10.3 | 비브라우저 자동 검증 통과 | Node.js 24.21.0 image, `openid-client` 6.8.8, `jose` 6.2.12, Express 5.2.1 |
+| 네이티브 Ubuntu 24.04 + rootful Docker Engine | 미실행 | Ubuntu P03 플랫폼 검증과 함께 별도 실행해야 함 |
+
+P05·P06의 macOS browser CA trust·로그인 확인은 기존 결정대로 미실행 `blocked` 상태를 유지했다. P07은
+그 보류를 선행 차단으로 쓰지 않고, web CA를 명시적으로 신뢰하는 Compose 진단 client로 SSO와 API
+경계를 확인했다. 실행 직전 Docker runtime은 4 CPU와 8,307,167,232 bytes, Colima `MemAvailable`은
+6,002,872 KiB, Docker data disk 여유는 79,889,124 KiB였다.
+
+다음을 실행해 P07 범위만 검증했다.
+
+```bash
+cd labs/keycloak
+./scripts/verify-p07.sh
+```
+
+실제 확인 결과는 다음과 같다.
+
+- 앱 A/B는 같은 고정 Node image를 사용하지만 confidential client, 정확한 callback, HTTPS leaf,
+  client/session secret과 session cookie 이름을 분리했다. 앱 B는 `127.0.0.1:30082`에만 publish하고
+  web CA로 host HTTPS가 성공했으며 directory CA를 잘못 사용하면 TLS 검증이 실패했다.
+- 일회성 P07 seed가 bearer-only `lab-api`, realm role `app-user`·`api-admin`, 앱 A/B의 `lab-api`
+  audience mapper를 적용했다. `local-user`에는 `app-user`만 할당하고 `api-admin`은 할당하지 않았다.
+  seed를 두 번 연속 실행해 중복 없이 동일한 성공 결과가 나왔다. 최초 구현에서 Keycloak image에 없는
+  `awk`를 사용한 seed는 mapper 단계에서 종료됐고, 생성된 P07 객체를 멱등 갱신하는 단일 Node Admin REST
+  seed로 교체한 뒤 전체 검증을 처음부터 통과했다.
+- 진단 client는 앱 A에서 `local-user` credential을 한 번 제출해 Authorization Code + PKCE 로그인을
+  마친 뒤 동일한 Keycloak cookie로 앱 B authorization endpoint를 호출했다. 로그인 폼이나 password
+  제출 없이 앱 B callback이 즉시 돌아왔고 앱 B의 별도 session에서 같은 사용자를 확인했다.
+- API는 host port 없이 Compose bridge의 `api:3000`에서만 실행했다. `jose` remote JWKS로 RS256 서명,
+  고정 issuer, `lab-api` audience와 숫자 `exp`를 검증한다. 실제 요청은 무토큰 401, malformed token 401,
+  유효하지만 `api-admin`이 없는 token 403, 앱 A/B의 `app-user` token 200을 각각 반환했다.
+- 앱 A/B/API는 UID 1000, read-only root filesystem, 모든 capability drop,
+  `no-new-privileges`로 실행했다. 앱 B secret은 필요한 service에만 read-only mount했고 inspect environment에
+  값이 없었다. API에는 private secret mount가 없다.
+- P03의 domain SID·alice/bob·그룹 결과, Samba/PostgreSQL named volume, P03~P06 검증 기록, 기존
+  directory/web CA와 Keycloak·앱 A secret의 fingerprint가 전후 같았다. 별도 Supabase container 8개의
+  실행·health·mount 상태도 같았으며 prune, reset, volume 삭제, Colima 재시작은 하지 않았다.
+
+비밀번호·private key·cookie·authorization code·access token을 제외한 상세 산출물은
+`.state/verification/p07/`에 있다. 이 비브라우저 SSO 결과는 보류 중인 P05 Admin Console/account 화면과
+P06 실제 Chrome 검증을 대신하지 않으며 두 작업의 상태는 계속 `blocked`다.
+
+### Ubuntu P03 플랫폼 검증 보류 유지
+
+P07의 macOS/Colima 결과도 네이티브 Ubuntu의 P03 또는 P07 결과로 일반화하지 않는다. Ubuntu 24.04 +
+rootful Docker Engine의 기존 P03 플랫폼 검증은 계속 미실행이며 별도 실행 결과가 필요하다.
