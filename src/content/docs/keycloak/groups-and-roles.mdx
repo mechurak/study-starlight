@@ -1,0 +1,82 @@
+---
+title: "Group과 Role로 접근 조직하기"
+description: "사용자 묶음과 권한 라벨, Realm Role과 Client Role, 최종 앱 인가의 경계를 구분하는 방법"
+aliases: [Keycloak group, Realm Role, Client Role, role mapping, 인가]
+reviewedAt: 2026-09-14
+deckGroup: access
+sidebar:
+  order: 1060
+---
+
+import Thesis from '../../../components/docs/Thesis.astro';
+import TermIntro from '../../../components/docs/TermIntro.astro';
+
+<Thesis>Group은 사용자를 조직하고 role은 허용 능력을 이름 붙이며, 최종 요청 허용은 token을 소비하는 앱이 결정한다.</Thesis>
+
+사용자마다 권한을 직접 붙이면 입·퇴사와 조직 이동 때 누락을 찾기 어렵다. 사용자는 group으로
+묶고 group에 role을 부여한 뒤, 앱은 token의 role을 자기 정책으로 해석한다.
+
+<TermIntro
+  terms={[
+    ['group', '', '사용자를 계층적으로 묶는 Keycloak 모델. 사용자는 group의 role과 속성을 상속할 수 있다.'],
+    ['Realm Role', '', 'realm 여러 client에서 공통으로 쓸 수 있는 권한 라벨. token의 realm_access.roles에 실리는 것이 기본이다.'],
+    ['Client Role', '', '특정 client가 소유하는 권한 라벨. token의 resource_access.<client>.roles에 실리는 것이 기본이다.'],
+    ['role mapping', '', '사용자나 group에 role을 연결하는 관계. token에 실을 mapper와는 별도 단계다.'],
+  ]}
+/>
+
+## 큰 그림
+
+`사용자 → group membership → group의 role mapping → token role claim → 앱 정책`으로 흐른다.
+외부 디렉터리를 붙이면 앞에 LDAP group mapper 단계가 하나 더 생긴다. 각 화살표가 별도 설정이므로
+콘솔의 group membership만 보고 API 권한까지 들어갔다고 단정하지 않는다.
+
+## 이 장에서 답할 질문
+
+- group과 role은 각각 무엇을 표현하는가?
+- Realm Role과 Client Role은 어떻게 고르는가?
+- Keycloak이 role을 발급하면 앱 인가도 끝난 것인가?
+
+## Group은 사람을 묶는다
+
+group은 `/engineering/backend`처럼 조직·직무 집합을 표현한다. 사용자에게 개별 role을 반복해서
+붙이는 대신 group에 role을 연결하면 membership 변경이 권한 변경의 입력이 된다. Keycloak 관리
+가이드의 [group 설명](https://www.keycloak.org/docs/26.7.0/server_admin/#groups)은 group 속성과 role
+mapping을 구성원이 상속하는 모델을 설명한다.
+
+디렉터리 group을 가져올 때도 외부 원본 이름과 Keycloak group, 업무 권한 role을 구분한다. 이름이
+비슷하다는 이유로 외부 group 문자열을 API가 직접 신뢰하게 만들 필요는 없다.
+
+## Role은 할 수 있는 일을 나타낸다
+
+| 선택 | 알맞은 경우 | trade-off |
+|---|---|---|
+| Realm Role | `api-admin`처럼 여러 client가 공통 해석 | realm 전역 이름이므로 의미를 넓히지 않게 관리 |
+| Client Role | 한 client에만 의미 있는 세부 기능 | 소비자가 어느 `resource_access`를 읽는지 명확히 해야 함 |
+| Composite Role | 여러 role 묶음을 하나로 부여 | 실제 token에는 하위 role이 펼쳐질 수 있어 변경 영향 확인 필요 |
+
+이 실습은 흐름을 단순하게 보려고 `app-user`와 `api-admin` Realm Role을 쓴다. `/app-users` group에는
+`app-user`, `/api-admins`에는 `api-admin`을 연결한다.
+
+## 인증과 최종 인가 사이
+
+Keycloak은 사용자의 membership과 role mapping을 계산해 token claim으로 낼 수 있다. 그러나
+`/admin` 요청을 허용할지는 API 코드가 결정한다. token이 유효해도 `api-admin`이 없으면 403이어야
+하며, 무토큰은 401이어야 한다.
+
+| 사용자 | group | 실습 role | `/user` | `/admin` |
+|---|---|---|---|---|
+| alice | `/app-users`, `/api-admins` | `app-user`, `api-admin` | 200 | 200 |
+| bob | `/app-users` | `app-user` | 200 | 403 |
+
+:::tip[권한 모델의 문장부터 쓴다]
+"`api-admins` 구성원은 관리 endpoint를 호출할 수 있다"처럼 업무 규칙을 먼저 쓰고 group→role→claim을
+구성한다. token 모양부터 만들면 디렉터리 구조가 앱 정책으로 그대로 새기 쉽다.
+:::
+
+## 요약
+
+- group은 사용자 집합, role은 허용 능력의 라벨이다.
+- Realm Role은 realm 공통, Client Role은 특정 client 소유 권한에 맞는다.
+- group에 role을 연결하는 일과 role을 token에 싣는 일은 별개다.
+- Keycloak은 claim을 발급하지만 최종 403/200 결정은 API가 맡는다.

@@ -1,0 +1,84 @@
+---
+title: "Access Token 검증"
+description: "API가 discovery와 JWKS로 서명·issuer·audience·만료를 검증하고 401과 403을 나누는 방법"
+aliases: [JWT 검증, JWKS, issuer, audience, "401", "403"]
+reviewedAt: 2026-09-14
+deckGroup: login
+sidebar:
+  order: 1050
+---
+
+import Thesis from '../../../components/docs/Thesis.astro';
+import TermIntro from '../../../components/docs/TermIntro.astro';
+
+<Thesis>API는 access token의 서명·issuer·audience·만료를 모두 검증한 뒤에만 claim으로 권한을 판단한다.</Thesis>
+
+JWT 모양을 decode해 claim이 보이는 것과 믿을 수 있는 token이라는 판단은 다르다. API는 Keycloak
+realm의 discovery와 JWKS에서 검증 재료를 얻고, 자기 API를 대상으로 발급된 유효한 access token인지
+먼저 확인한다.
+
+<TermIntro
+  terms={[
+    ['discovery', '', 'realm의 issuer·authorization·token·JWKS endpoint와 지원 기능을 알려 주는 OIDC 메타데이터 문서.'],
+    ['JWKS', 'JSON Web Key Set', 'Keycloak이 token 서명을 검증할 공개키를 배포하는 문서. private signing key는 포함하지 않는다.'],
+    ['audience', '', 'token이 사용되도록 발급된 대상. API는 aud에 자기 식별자가 있는지 확인한다.'],
+    ['claim', '', 'issuer·subject·만료·role처럼 token에 담긴 이름과 값. 서명 검증 전에는 신뢰할 수 없다.'],
+  ]}
+/>
+
+## 큰 그림
+
+`iss`가 가리키는 realm → discovery의 `jwks_uri` → JWKS 공개키 → JWT 서명 검증 → `aud`·`exp`
+검증 → 권한 claim 판정 순서다. 어느 앞 단계가 실패해도 뒤의 role을 믿지 않는다.
+
+## 이 장에서 답할 질문
+
+- API가 JWT에서 최소한 무엇을 검증해야 하는가?
+- ID token과 access token을 왜 바꾸어 쓰면 안 되는가?
+- 401과 403은 어느 경계에서 갈리는가?
+
+## 검증의 최소 축
+
+[Keycloak OIDC endpoint 문서](https://www.keycloak.org/securing-apps/oidc-layers)는 realm discovery와
+certificate(JWKS) endpoint를 정의한다. 검증된 라이브러리에는 고정 issuer와 허용 algorithm·audience를
+명시하고, JWKS key 선택과 signature 처리를 맡긴다.
+
+| 검증 | 막는 문제 | 이 실습의 기대값 |
+|---|---|---|
+| 서명·algorithm | 임의 claim 변조, 허용하지 않은 algorithm | Keycloak realm의 RS256 JWKS |
+| `iss` | 다른 realm·IdP token 혼입 | `https://keycloak.keycloak.test:30080/realms/study` |
+| `aud` | 다른 client/resource용 token 재사용 | `lab-api` |
+| `exp` | 만료된 bearer 재사용 | 숫자 만료 시각이 현재보다 뒤 |
+
+JWKS는 key rotation 때문에 여러 공개키를 가질 수 있다. `kid`를 무시하고 공개키 하나를 영구 복사하는
+대신 library의 remote JWKS cache와 갱신 경로를 쓴다. 장애 때는 discovery의 issuer와 JWKS URL, TLS
+CA, token header의 `kid` 순서로 확인한다.
+
+## ID token은 API bearer가 아니다
+
+ID token의 audience는 로그인 client이며 그 client가 사용자 인증 결과를 확인하는 데 쓴다. access
+token은 resource API 호출용이다. 두 token이 모두 JWT이고 일부 claim이 겹쳐도 수신자와 검증 규칙이
+다르다. API는 ID token을 bearer로 받아들이지 않는다.
+
+## 401과 403을 나눈다
+
+| 응답 | 의미 | 예 |
+|---|---|---|
+| `401 Unauthorized` | 신뢰할 인증 정보가 없음 | bearer 없음, malformed JWT, 서명·iss·aud·exp 실패 |
+| `403 Forbidden` | 인증 token은 유효하지만 작업 권한이 없음 | `app-user`는 있으나 `api-admin`이 없음 |
+| `200 OK` | token 검증과 endpoint 권한 조건을 모두 통과 | `/user`의 `app-user`, `/admin`의 `api-admin` |
+
+P07의 API는 host port 없이 Compose bridge 안에서만 실행되고 `jose` remote JWKS로 위 네 축을
+검증했다. 실제 결과는 무토큰·malformed token 401, 권한 부족 403, 허용된 요청 200이었다.
+
+:::caution[인가 실패를 로그인으로 돌리지 않는다]
+유효한 token이 403을 받았다면 password나 SSO보다 audience·role·group claim과 API 정책을 본다.
+반대로 서명이나 issuer가 틀린 401을 role 추가로 고칠 수 없다.
+:::
+
+## 요약
+
+- decode는 검증이 아니며, signature·issuer·audience·expiration을 모두 확인해야 한다.
+- discovery와 JWKS를 쓰면 endpoint와 공개키 교체를 표준 경로로 따라갈 수 있다.
+- ID token은 client의 로그인 확인용, access token은 API 호출용이다.
+- 401은 인증 정보가 유효하지 않은 상태, 403은 유효한 신원에 권한이 부족한 상태다.

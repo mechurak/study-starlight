@@ -52,13 +52,11 @@ export default {
 		},
 		{
 			"id": "login",
-			"label": "로그인과 토큰",
-			"allowEmpty": true
+			"label": "로그인과 토큰"
 		},
 		{
 			"id": "access",
-			"label": "접근 제어",
-			"allowEmpty": true
+			"label": "접근 제어"
 		},
 		{
 			"id": "directory",

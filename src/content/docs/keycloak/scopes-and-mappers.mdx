@@ -1,0 +1,88 @@
+---
+title: "Client Scope와 Protocol Mapper"
+description: "앱마다 필요한 audience·group·role claim만 access token에 넣는 방법"
+aliases: [client scope, protocol mapper, groups claim, audience mapper, token claim]
+reviewedAt: 2026-09-14
+deckGroup: access
+sidebar:
+  order: 1070
+---
+
+import Thesis from '../../../components/docs/Thesis.astro';
+import TermIntro from '../../../components/docs/TermIntro.astro';
+
+<Thesis>Client scope는 mapper 묶음을 client에 적용하고, protocol mapper는 Keycloak 모델의 어떤 값을 어느 token claim에 넣을지 정한다.</Thesis>
+
+Keycloak에 group과 role이 정확히 보여도 앱 token에 자동으로 원하는 모양이 생기지는 않는다.
+앱이 받을 최소 정보와 API audience를 client scope와 mapper로 명시해야 한다.
+
+<TermIntro
+  terms={[
+    ['client scope', '', '여러 protocol mapper와 role scope를 묶어 client에 default 또는 optional로 적용하는 재사용 단위.'],
+    ['protocol mapper', '', '사용자 속성·group·role·audience를 token의 특정 claim과 형식으로 변환하는 규칙.'],
+    ['default scope', '', 'client가 요청 문자열에 쓰지 않아도 항상 적용되는 client scope.'],
+    ['optional scope', '', 'authorization request의 scope 값으로 요청할 때만 적용되는 client scope.'],
+  ]}
+/>
+
+## 큰 그림
+
+| 입력 | mapper | 출력 예 |
+|---|---|---|
+| Keycloak group membership | Group Membership mapper | `groups: ["/app-users"]` |
+| Realm Role mapping | Realm Role mapper | `realm_access.roles: ["app-user"]` |
+| 대상 API | Audience mapper | `aud: ["lab-api"]` |
+| 사용자 속성 | User Attribute mapper | `department: "platform"` |
+
+LDAP에서 group을 Keycloak 모델로 들이는 mapper는 federation 경계이고, 여기의 protocol mapper는
+Keycloak 모델을 token으로 내보내는 경계다. 둘을 "group mapper" 하나로 줄여 말하지 않는다.
+
+## 이 장에서 답할 질문
+
+- client scope와 OAuth의 `scope` 요청은 어떻게 이어지는가?
+- mapper는 어떤 token에 어떤 claim을 넣는가?
+- 앱 A/B와 API에 최소한 무엇을 보내야 하는가?
+
+## Default와 Optional을 고른다
+
+모든 로그인에 필요한 `profile`·role 묶음은 default가 편하다. 민감하거나 특정 기능에서만 필요한
+claim은 optional로 두고 앱이 명시적으로 요청하게 한다. [Keycloak client scope 문서](https://www.keycloak.org/docs/26.7.0/server_admin/#_client_scopes)는
+연결된 scope와 mapper, role scope mapping이 실제 token을 어떻게 만드는지 설명하며 **Evaluate**에서
+특정 사용자·client 조합의 결과를 미리 볼 수 있다.
+
+scope를 요청했다고 사용자가 가지지 않은 role이 생기지는 않는다. role claim은 사용자의 유효 role과
+client에 허용된 role scope의 결과이며, `Full Scope Allowed`는 그 허용 폭을 넓힌다.
+
+## Token 종류와 claim을 맞춘다
+
+mapper마다 ID token, access token, UserInfo 포함 여부를 따로 정할 수 있다. 프로필 화면에 필요한
+claim과 API 인가에 필요한 claim을 무조건 모든 token에 복제하지 않는다.
+
+| 필요 | 둘 자리 | 이유 |
+|---|---|---|
+| 로그인 화면의 표시 이름 | ID token 또는 UserInfo | client의 사용자 표시 목적 |
+| API 권한 role | access token | resource server가 검증 |
+| API 식별자 | access token의 `aud` | 다른 API용 token 재사용 방지 |
+| 외부 조직 group | 필요한 소비자의 access token | token 크기·정보 노출 최소화 |
+
+이 실습은 앱 A/B client에 `lab-api` Audience mapper를 적용한다. LDAP group mapper가 alice/bob의
+membership을 Keycloak으로 가져오고, group의 Realm Role mapping과 OIDC mapper가 각각
+`groups`·`realm_access.roles`를 access token에 싣는다.
+
+## 두 사용자를 비교해 검증한다
+
+P08의 실제 token 검증 결과에서 alice는 `/app-users`, `/api-admins`와 `app-user`, `api-admin`을
+가졌고 bob은 `/app-users`와 `app-user`만 가졌다. 두 token 모두 RS256·고정 issuer·`lab-api`
+audience·숫자 `exp`를 통과했다. 이 차이가 API의 alice `/admin` 200, bob `/admin` 403으로 이어졌다.
+
+:::caution[claim 이름만 보지 않는다]
+`groups`가 있어도 문자열인지 배열인지, full path를 쓰는지, access token에 들어갔는지까지 소비자
+계약과 맞아야 한다. UI의 사용자 group 목록은 token 출력 검증을 대신하지 않는다.
+:::
+
+## 요약
+
+- client scope는 mapper 묶음을 client에 default 또는 optional로 적용한다.
+- protocol mapper는 Keycloak 모델을 token claim으로 변환하며 LDAP mapper와 다른 경계다.
+- ID token과 access token의 수신자에 맞춰 필요한 claim만 넣는다.
+- Evaluate와 실제 발급 token, 마지막 API 결과를 함께 봐야 전체 mapping을 검증할 수 있다.

@@ -1,0 +1,140 @@
+---
+title: "Compose 실습 환경 준비"
+description: "Colima 또는 Docker Engine에서 Keycloak·앱·API·Samba 실습을 시작하고 멈추는 방법"
+aliases: [Keycloak lab, Docker Compose 실습, Colima Keycloak]
+reviewedAt: 2026-09-14
+deckGroup: foundations
+sidebar:
+  order: 1010
+---
+
+import { Steps, Tabs, TabItem } from '@astrojs/starlight/components';
+import Thesis from '../../../components/docs/Thesis.astro';
+import TermIntro from '../../../components/docs/TermIntro.astro';
+
+<Thesis>이 덱의 본선은 Keycloak·PostgreSQL·앱 A/B·API·Samba를 한 Compose project에서 실행하며, kind와 kubectl을 요구하지 않는다.</Thesis>
+
+개념 설명에서 확인하는 로그인·SSO·권한 결과는 `labs/keycloak/`의 한 실습 환경에서 나온다.
+브라우저와 container 모두 같은 issuer를 쓰고, 웹 HTTPS CA와 디렉터리 LDAPS CA는 분리한다.
+
+<TermIntro
+  terms={[
+    ['Compose project', '', '여러 container·network·volume을 하나의 이름으로 묶어 수명 주기를 관리하는 단위. 이 실습 이름은 keycloak-lab이다.'],
+    ['issuer', '', '토큰을 발급한 주체를 식별하는 URL. 검증자는 토큰의 iss가 기대한 값과 정확히 같은지 확인한다.'],
+    ['CA', 'Certificate Authority', 'TLS 인증서의 신뢰 뿌리. 이 실습은 웹 HTTPS와 디렉터리 LDAPS의 CA를 서로 바꿔 쓸 수 없게 나눈다.'],
+  ]}
+/>
+
+## 큰 그림
+
+| 경계 | 실습 값 | 이유 |
+|---|---|---|
+| project·network | `keycloak-lab` 전용 Compose project와 bridge | 다른 로컬 workload와 자원 수명을 섞지 않음 |
+| 공개 issuer | `https://keycloak.keycloak.test:30080/realms/study` | host와 container가 같은 `iss`·discovery·JWKS 사용 |
+| 공개 앱 | 앱 A `30081`, 앱 B `30082`, 모두 loopback publish | 브라우저 진입점만 host에 노출 |
+| 내부 서비스 | PostgreSQL·API·Samba는 host port 없음 | Compose bridge 밖 우회 접근을 만들지 않음 |
+| 영속 데이터 | Samba·PostgreSQL named volume | container 재생성과 데이터 초기화를 구분 |
+
+이 구성은 학습과 장애 관찰용 단일 인스턴스다. 운영 HA를 검증한 결과가 아니며, Samba도 Microsoft
+AD DS가 아니라 AD 호환 디렉터리 대역이다.
+
+## 이 장에서 답할 질문
+
+- 어느 runtime과 자원이 필요한가?
+- 최초 시작·보존 중단·재개·초기화는 어떻게 다른가?
+- 어떤 결과가 실제로 검증됐고 무엇이 아직 보류인가?
+
+## 준비 조건
+
+<Tabs syncKey="operating-system">
+<TabItem label="macOS">
+
+Colima와 Docker client·Compose plugin을 준비한다. 이 저장소에서 검증한 profile은 4 logical CPU,
+8 GiB RAM이며 시작 직전 가용 memory 5 GiB와 Docker data disk 20 GiB 이상을 확인했다.
+
+```bash
+colima status
+docker version
+docker compose version
+```
+
+</TabItem>
+<TabItem label="Ubuntu">
+
+Ubuntu 24.04의 rootful Docker Engine과 Compose plugin을 준비한다. 명령 경로는 제공하지만 네이티브
+Ubuntu에서의 P03·전체 P11 실행은 아직 보류이므로 macOS 결과를 Ubuntu 결과로 읽으면 안 된다.
+
+```bash
+docker version
+docker compose version
+docker info --format '{{.OSType}} {{.Architecture}}'
+```
+
+</TabItem>
+</Tabs>
+
+이미지와 package는 `labs/keycloak/decisions.md`의 digest·snapshot·lockfile로 고정돼 있다. 최초
+준비/build에는 registry와 package 저장소 접근이 필요하지만, 준비 뒤 진단은 `--pull never`와 Compose
+내부 endpoint를 사용한다. `latest`로 바꾸면 이 덱의 검증 기준에서 벗어난다.
+
+## 최초 시작과 상태 확인
+
+<Steps>
+1. 저장소의 실습 디렉터리로 이동한다.
+
+   ```bash
+   cd labs/keycloak
+   ```
+
+2. 빈 실습 상태에서 CA·secret을 만들고 service와 seed를 readiness 순서로 시작한다.
+
+   ```bash
+   ./scripts/first-start.sh
+   ```
+
+3. 여섯 service와 핵심 endpoint 상태를 확인한다.
+
+   ```bash
+   ./scripts/status.sh
+   ```
+</Steps>
+
+비밀번호·private key·token은 Git 제외 `labs/keycloak/.state/`에서 생성된다. 값을 환경 변수나 문서에
+복사하지 않는다. 세부 명령과 예상 출력의 정본은 `labs/keycloak/README.md`, 실제 검증 기록은
+`labs/keycloak/verification.md`다.
+
+## 중단·재개·초기화
+
+```bash
+./scripts/stop.sh
+./scripts/resume.sh
+```
+
+`stop.sh`는 정확한 Compose project의 container와 network만 내리고 두 named volume과 `.state`를
+남긴다. `resume.sh` 뒤에는 realm·사용자·디렉터리 SID가 그대로여야 한다.
+
+전체 초기화는 별도 명령이며 삭제 대상을 먼저 보여 주고 고정 확인 문자열을 요구한다.
+
+```bash
+./scripts/reset.sh
+```
+
+이 명령은 실습의 PostgreSQL·Samba 데이터와 로컬 CA·secret·검증 산출물을 삭제한다. P04의 kind
+파일이나 다른 Docker project를 지우지 않으며, 전역 prune이나 Colima 초기화를 하지 않는다.
+
+## 검증된 범위와 보류
+
+2026-09-14 macOS 26.6.2 arm64와 Colima 0.10.3에서 빈 상태 최초 시작, 로컬 사용자 SSO/API,
+Samba 사용자 로그인·그룹 매핑, 보존 중단·재개를 kind·kubectl 없이 재현했다. curl과 진단 client는
+web CA를 명시해 검증했다.
+
+macOS keychain에 CA를 신뢰 root로 등록해야 하는 실제 Chrome Admin Console·앱 로그인은 보류다.
+네이티브 Ubuntu의 Samba P03과 전체 P11도 미실행이다. 따라서 명령이 존재한다는 사실과 해당 환경에서
+성공했다는 기록을 구분한다.
+
+## 요약
+
+- 본선 환경은 하나의 `keycloak-lab` Compose project이며 kind·kubectl이 필요 없다.
+- host와 container는 같은 issuer를 쓰고, 내부 DB·API·Samba는 host에 publish하지 않는다.
+- 일반 중단은 데이터를 보존하고, 확인이 필요한 reset만 실습 데이터와 `.state`를 지운다.
+- macOS 비브라우저 재현은 통과했지만 macOS Chrome과 네이티브 Ubuntu 검증은 보류다.

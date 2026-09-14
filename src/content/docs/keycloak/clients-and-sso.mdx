@@ -1,0 +1,88 @@
+---
+title: "Client 연결과 SSO"
+description: "앱마다 별도 client를 등록하고 같은 realm 세션으로 자격 증명 재입력 없는 로그인을 확인하는 방법"
+aliases: [Keycloak client, SSO, public client, confidential client, redirect URI]
+reviewedAt: 2026-09-14
+deckGroup: login
+sidebar:
+  order: 1040
+---
+
+import Thesis from '../../../components/docs/Thesis.astro';
+import TermIntro from '../../../components/docs/TermIntro.astro';
+
+<Thesis>앱마다 client·redirect·secret·앱 세션은 분리하되, 같은 realm의 Keycloak 로그인 세션을 재사용하는 것이 SSO다.</Thesis>
+
+SSO는 앱 A의 cookie를 앱 B가 읽는 기능이 아니다. 두 앱이 각자 OIDC client와 세션을 유지하면서,
+로그인 판단을 같은 Keycloak realm에 맡기기 때문에 자격 증명을 한 번만 입력하는 구조다.
+
+<TermIntro
+  terms={[
+    ['client', '', 'Keycloak에 등록한 앱 하나의 프로토콜·redirect·credential·scope 설정 단위.'],
+    ['public client', '', 'client secret을 안전하게 보관할 수 없는 브라우저·모바일·CLI 앱. Authorization Code + PKCE를 쓴다.'],
+    ['confidential client', '', '서버 측에서 client 인증 수단을 안전하게 보관할 수 있는 앱. secret 자체를 브라우저에 보내지 않는다.'],
+    ['SSO session', '', 'Keycloak이 realm에서 유지하는 로그인 상태. 각 앱의 자체 session과 별개다.'],
+  ]}
+/>
+
+## 큰 그림
+
+| 상태 | 소유자 | 앱 사이 공유 여부 |
+|---|---|---|
+| Keycloak 로그인 cookie·SSO session | Keycloak | 같은 realm의 다음 authorization 요청에 재사용 |
+| 앱 A session cookie | 앱 A | 앱 B가 읽지 않음 |
+| 앱 B session cookie | 앱 B | 앱 A가 읽지 않음 |
+| client secret | 각 confidential client | 다른 앱과 공유하지 않음 |
+
+## 이 장에서 답할 질문
+
+- public과 confidential client는 무엇으로 고르는가?
+- redirect URI와 client credential을 왜 앱마다 나누는가?
+- 앱 A 로그인 뒤 앱 B SSO가 됐다는 것을 무엇으로 확인하는가?
+
+## 앱 하나에 client 하나
+
+앱을 등록할 때 가장 먼저 보는 값은 Client ID, Client authentication, Standard Flow, PKCE method,
+Valid redirect URIs다. [Keycloak client 관리 문서](https://www.keycloak.org/docs/26.7.0/server_admin/#assembly-managing-clients_server_administration_guide)는
+브라우저 기반 public client가 secret을 지킬 수 없으므로 redirect URI를 좁게 제한해야 한다고 설명한다.
+
+| 판단 | 설정 |
+|---|---|
+| server가 secret을 file로 제한해 읽을 수 있음 | confidential + client authentication |
+| SPA·native CLI처럼 secret을 배포물에서 숨길 수 없음 | public + Authorization Code + PKCE |
+| browser callback | scheme·host·port·path까지 실제 값만 등록 |
+| 사용하지 않는 flow | implicit·Direct Access Grants·service account를 끔 |
+
+client를 공유하면 redirect 허용 목록과 secret 교체 수명, 감사 주체가 뒤섞인다. 이 실습은 `app-a`와
+`app-b`를 별도 confidential client로 만들고 각각 다른 callback·client secret·session secret을 쓴다.
+
+## SSO가 일어나는 순서
+
+1. 브라우저가 앱 A에서 로그인을 시작하고 Keycloak에서 자격 증명을 제출한다.
+2. Keycloak은 realm SSO session을 만들고 앱 A callback에 code를 보낸다.
+3. 앱 A는 code를 교환하고 자기 session을 만든다.
+4. 같은 브라우저가 앱 B 로그인을 시작하면 앱 B도 자기 authorization request를 보낸다.
+5. Keycloak은 기존 SSO session을 확인해 로그인 폼 없이 앱 B callback으로 돌려보낸다.
+6. 앱 B는 별도의 code 교환과 앱 B session 생성을 마친다.
+
+"앱 B 화면이 열렸다"만으로는 부족하다. P07 검증은 앱 A에서 password를 한 번 제출한 뒤 같은
+Keycloak cookie로 앱 B authorization endpoint를 호출했고, 두 번째 로그인 폼과 password 제출 없이
+앱 B의 별도 session에서 같은 사용자를 확인했다.
+
+:::caution[SSO와 공동 로그아웃은 별개다]
+로그인을 재사용한다고 앱 A cookie, 앱 B cookie, Keycloak SSO session이 하나가 되지는 않는다.
+한 앱에서 local session만 지우면 다른 앱과 Keycloak session은 남을 수 있다.
+:::
+
+## secret과 TLS 경계
+
+앱 A/B의 client·session·TLS private key는 필요한 service에만 read-only file secret으로 mount한다.
+Compose 환경 변수와 image에 값을 넣지 않으며 bootstrap 관리자 credential도 앱에 주지 않는다.
+두 앱은 loopback에만 HTTPS를 publish하고 issuer는 Keycloak과 동일한 web CA로 검증한다.
+
+## 요약
+
+- 앱마다 client와 redirect URI, credential, 앱 session을 분리한다.
+- secret을 감출 수 없는 client는 public이며 Code+PKCE를 사용한다.
+- SSO는 같은 Keycloak realm session을 재사용하는 것이지 앱 cookie 공유가 아니다.
+- 성공 판정은 앱 B가 별도 authorization 흐름을 거치되 자격 증명을 다시 요구하지 않는 것이다.
