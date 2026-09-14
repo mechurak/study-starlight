@@ -9,15 +9,16 @@ import DeckMap from '../../../components/docs/DeckMap.astro';
 
 > 앱은 디렉터리 password를 받지 않고, Keycloak이 증명한 신원을 검증해 자기 권한을 결정한다.
 
-이 덱은 Keycloak의 자리와 OIDC를 이해한 뒤 Docker Compose에서 로컬 사용자 SSO와 API 인가를
-재현한다. 이어서 Samba AD 호환 디렉터리를 LDAPS Federation으로 연결하고 group이 token claim과
-API 역할이 되는 두 매핑을 추적한다. 마지막에는 brokering·서비스 계정과 배포·관찰·복구 경계를 다룬다.
+이 덱은 디렉터리·IdP 제품·로그인 프로토콜의 종류를 먼저 구분하고 Keycloak의 자리와 OIDC를 이해한 뒤,
+Docker Compose에서 로컬 사용자 SSO와 API 인가를 재현한다. 이어서 Samba AD 호환 디렉터리를 LDAPS
+Federation으로 연결하고 group이 token claim과 API 역할이 되는 두 매핑을 추적한다. 마지막에는
+brokering·서비스 계정과 배포·관찰·복구 경계를 다룬다.
 
 실습 기준은 Keycloak 26.7.3, PostgreSQL 18.6, Samba 4.19.5와 Node 24다. macOS/Colima 비브라우저
 기본 흐름은 검증했지만 네이티브 Ubuntu와 실제 Chrome, Microsoft AD DS, 운영 HA는 미검증이다.
 [마무리](/keycloak/wrapup/)에서 통과·참조·보류 범위를 구분한다.
 
-<LinkButton href="/keycloak/keycloak-overview/" icon="right-arrow">큰 그림부터 읽기</LinkButton>
+<LinkButton href="/keycloak/authentication-landscape/" icon="right-arrow">큰 그림부터 읽기</LinkButton>
 <LinkButton href="/keycloak/lab-setup/" icon="right-arrow">Compose 실습 시작하기</LinkButton>
 
 ## 구성
@@ -55,7 +56,7 @@ Keycloak이 개인키로 서명한 토큰을, 각자가 공개키(JWKS)로 검�
 | 약어·용어만 빠르게 찾기 | [Keycloak 용어 사전](/keycloak/glossary/) | 역할별 뜻과 상세 페이지 링크 |
 
 <LinkCard
-  title="Keycloak — 인증 시스템의 허브"
-  description="Keycloak이 여러 신원 원본과 앱 사이에서 맡는 역할부터 살펴본다."
-  href="/keycloak/keycloak-overview/"
+  title="인증 생태계의 큰 그림"
+  description="AD·LDAP·IdP·OAuth·OIDC·SAML·PKCE·SSO가 각각 무엇이고 어디에서 이어지는지 먼저 구분한다."
+  href="/keycloak/authentication-landscape/"
 />

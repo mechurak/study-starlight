@@ -13,9 +13,11 @@ import TermIntro from '../../../components/docs/TermIntro.astro';
 
 <Thesis>Keycloak은 여러 신원 원본의 로그인을 한곳에서 처리하고, 앱이 검증할 수 있는 토큰을 발급하는 인증 허브다.</Thesis>
 
-앱마다 비밀번호를 직접 확인하게 두지 않고, 로그인과 세션은 Keycloak에 모은다. 사용자는 어디에서
-왔든 Keycloak realm의 사용자로 정리되고, 앱은 같은 방식으로 받은 토큰을 검증한다. 다만 토큰의
-신원과 claim을 실제 권한으로 바꾸어 요청을 허용하는 마지막 판단은 앱이나 API가 맡는다.
+[인증 생태계의 큰 그림](/keycloak/authentication-landscape/)에서 디렉터리·IdP·프로토콜을 구분했다면,
+이제 그중 Keycloak이 놓이는 자리를 좁혀 본다. 앱마다 비밀번호를 직접 확인하게 두지 않고 로그인과
+세션은 Keycloak에 모은다. 사용자는 어디에서 왔든 Keycloak realm의 사용자로 정리되고, 앱은 같은
+방식으로 받은 토큰을 검증한다. 다만 토큰의 신원과 claim을 실제 권한으로 바꾸어 요청을 허용하는
+마지막 판단은 앱이나 API가 맡는다.
 
 <TermIntro
   terms={[
@@ -114,7 +116,7 @@ assertion을 발급한다. 앱은 Keycloak의 공개키와 token claim을 이용
 :::tip[Federation과 Brokering을 가르는 질문]
 Keycloak이 LDAP로 **사용자 저장소를 직접 조회**한다면 User Federation이고, 브라우저를 OIDC·SAML
 **로그인 서버로 보낸다면** Identity Brokering이다. AD가 있다는 사실만으로 둘 중 하나가 정해지지는
-않으며, AD 앞에 ADFS나 Entra ID 같은 IdP가 이미 있는지가 선택을 가른다.
+않으며, AD 앞에 AD FS나 Entra ID 같은 IdP가 이미 있는지가 선택을 가른다.
 :::
 
 ## 이 덱의 본선과 심화 범위

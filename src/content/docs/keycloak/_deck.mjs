@@ -54,12 +54,12 @@ export default {
 	"map": [
 		{
 			"label": "큰 그림과 실습",
-			"href": "/keycloak/keycloak-overview/",
-			"title": "Keycloak의 자리부터 재현 환경까지",
+			"href": "/keycloak/authentication-landscape/",
+			"title": "인증 생태계에서 Keycloak의 자리와 실습까지",
 			"tone": "key",
-			"desc": "인증·인가 경계 · Compose 환경 · Realm과 사용자",
-			"note": "무엇을 중앙화하고 어떤 결과까지 실제 확인했나",
-			"items": [["실습 환경", "/keycloak/lab-setup/"], ["Realm과 사용자", "/keycloak/realm-and-users/"]]
+			"desc": "디렉터리·IdP·프로토콜 · Keycloak 역할 · Compose 환경",
+			"note": "비슷한 인증 용어는 어떤 종류이고 어디에서 이어지나",
+			"items": [["Keycloak의 역할", "/keycloak/keycloak-overview/"], ["실습 환경", "/keycloak/lab-setup/"]]
 		},
 		{
 			"label": "로그인과 접근",

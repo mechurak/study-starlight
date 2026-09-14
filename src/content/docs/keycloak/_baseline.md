@@ -7,6 +7,9 @@
 덱 전체의 뼈대는 **"인증을 중앙화하고, 외부 계정과 권한이 앱의 허용 결정까지 어떻게
 이어지는가"**다. 제품 메뉴를 차례로 소개하는 대신 다음 학습 흐름을 유지한다.
 
+세부 학습에 앞서 AD/AD DS·LDAP/LDAPS·IdP 제품·OIDC/SAML·Authorization Code/PKCE·SSO를
+종류별로 구분하고, 디렉터리에서 IdP와 앱·API까지 이어지는 큰 그림을 먼저 잡는다.
+
 1. 로컬 사용자로 realm·client·OIDC 로그인과 Keycloak 세션을 먼저 이해한다.
 2. 같은 realm의 앱 두 개가 Keycloak 로그인을 재사용하고, API가 access token을 검증해 인가한다.
 3. Samba AD DC를 외부 사용자·그룹 원본으로 붙여 User Federation의 책임 경계를 확인한다.
