@@ -87,6 +87,7 @@ pnpm preview
 | 문서 | 내용 |
 |---|---|
 | [AGENTS.md](AGENTS.md) | 작업 진입점, 반드시 읽을 문서와 깨뜨리면 안 되는 설정 — `CLAUDE.md`는 이 파일을 import하는 어댑터 |
+| [docs/plans/README.md](docs/plans/README.md) | 계획 목록과 번호·상태·실행 기록·완료 규칙 |
 | [docs/content-authoring.md](docs/content-authoring.md) | 제목 계층, 프론트매터, 컴포넌트 작성 규칙 |
 | [docs/d2-authoring.md](docs/d2-authoring.md) | D2를 추가·수정할 때만 읽는 배치·문법·의미 팔레트 |
 | [docs/verification.md](docs/verification.md) | 자동 검사와 변경별 브라우저 검증 |

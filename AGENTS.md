@@ -6,6 +6,7 @@ Astro Starlight 기반 개인 스터디 노트 사이트. 슬라이드가 아니
 ## 작업에 맞춰 읽을 것
 
 - 구조·명령을 처음 확인하거나 새 덱을 만들 때: [README.md](README.md)
+- 작업 계획을 만들거나 실행·재개·마감할 때: [docs/plans/README.md](docs/plans/README.md)
 - 콘텐츠를 쓰거나 고칠 때: [docs/content-authoring.md](docs/content-authoring.md)
 - D2를 추가하거나 고칠 때: [docs/d2-authoring.md](docs/d2-authoring.md)
 - 검증 방법: [docs/verification.md](docs/verification.md)
@@ -31,6 +32,14 @@ dev 서버는 백그라운드 모드로 띄운다: `pnpm astro dev --background`
 확인 필요가 있을 때만 한다. 페이지 추가·분할·이름·순서 변경만으로 브라우저를 띄우지 않는다.
 필요해도 바뀐 동작과 대표 페이지 1~2개에 한정하고, 덱 전체를 순회하지 않는다.
 검사가 통과하면 끝낸다. 결과에 영향을 주는 새 변경·실패·미해결 문제가 있을 때만 해당 검사를 반복한다.
+
+## 작업 계획
+
+계획 문서는 `docs/plans/<번호>-<slug>.md`에 두고 번호를 붙인다. 번호 발급·상태·실행 기록·완료
+절차는 [계획 관리 규칙](docs/plans/README.md)을 따른다. 아래 번호 없는 명명은 학습 페이지에 적용한다.
+실행 범위는 사용자 요청이 기준이다. 계획만 요청하면 구현하지 않고, 특정 작업만 요청하면 해당 작업의
+수정·검증·기록까지 마친다. 전체 완료를 맡겼다면 허용된 다음 작업을 이어 간다.
+계획 파일이 있다는 이유로 이미 허용된 구현의 승인을 다시 요구하지 않는다.
 
 ## 덱
 
