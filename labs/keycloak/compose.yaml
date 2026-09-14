@@ -90,7 +90,7 @@ services:
       KC_HTTPS_PORT: "30080"
       KC_HTTPS_CERTIFICATE_FILE: /run/keycloak-lab/certs/keycloak.crt
       KC_HTTPS_CERTIFICATE_KEY_FILE: /run/secrets/keycloak_https_key
-      KC_TRUSTSTORE_PATHS: /opt/keycloak/conf/truststores/directory-ca.crt
+      KC_TRUSTSTORE_PATHS: /opt/keycloak/conf/truststores
       KC_HEALTH_ENABLED: "true"
       KC_METRICS_ENABLED: "true"
       KC_HTTP_MANAGEMENT_SCHEME: http
@@ -106,6 +106,7 @@ services:
       - ./keycloak/study-realm.json:/opt/keycloak/data/import/study-realm.json:ro
       - ./.state/web-ca/keycloak.crt:/run/keycloak-lab/certs/keycloak.crt:ro
       - ./.state/directory-ca/ca.crt:/opt/keycloak/conf/truststores/directory-ca.crt:ro
+      - ./.state/web-ca/ca.crt:/opt/keycloak/conf/truststores/web-ca.crt:ro
     networks:
       keycloak-lab:
         ipv4_address: 172.30.0.20
@@ -422,6 +423,59 @@ services:
     depends_on:
       keycloak:
         condition: service_healthy
+    environment:
+      NODE_EXTRA_CA_CERTS: /run/keycloak-lab/web-ca/ca.crt
+    cpus: 0.25
+    mem_limit: 256m
+
+  d16-seed:
+    image: keycloak-lab-app:node24
+    build:
+      context: ./app
+      args:
+        NODE_IMAGE: node:24.21.0-bookworm-slim@sha256:2fe369e969550cde8e867afc3fe370b260140cab4a23d467074295b42163d553
+    profiles:
+      - d16
+    entrypoint: [node, seed-d16.mjs]
+    user: node
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    secrets:
+      - keycloak_bootstrap_admin_password
+      - d16_upstream_client_secret
+      - d16_upstream_user_password
+    volumes:
+      - ./.state/web-ca/ca.crt:/run/keycloak-lab/web-ca/ca.crt:ro
+    tmpfs:
+      - /tmp:size=16m,mode=1777
+    networks: [keycloak-lab]
+    depends_on:
+      keycloak: { condition: service_healthy }
+    environment:
+      NODE_EXTRA_CA_CERTS: /run/keycloak-lab/web-ca/ca.crt
+    cpus: 0.25
+    mem_limit: 256m
+
+  d16-diagnostic:
+    image: keycloak-lab-app:node24
+    profiles: [d16]
+    entrypoint: [node, /opt/keycloak-lab-app/verify-d16.mjs]
+    user: node
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    secrets:
+      - keycloak_bootstrap_admin_password
+      - d16_upstream_user_password
+    volumes:
+      - ./scripts/verify-d16.mjs:/opt/keycloak-lab-app/verify-d16.mjs:ro
+      - ./.state/web-ca/ca.crt:/run/keycloak-lab/web-ca/ca.crt:ro
+    tmpfs:
+      - /tmp:size=16m,mode=1777
+    networks: [keycloak-lab]
+    depends_on:
+      keycloak: { condition: service_healthy }
     environment:
       NODE_EXTRA_CA_CERTS: /run/keycloak-lab/web-ca/ca.crt
     cpus: 0.25
@@ -751,3 +805,7 @@ secrets:
     file: ./.state/web-ca/app-b.key
   d09_mfa_user_password:
     file: ./.state/secrets/d09-mfa-user-password
+  d16_upstream_client_secret:
+    file: ./.state/secrets/d16-upstream-client-secret
+  d16_upstream_user_password:
+    file: ./.state/secrets/d16-upstream-user-password

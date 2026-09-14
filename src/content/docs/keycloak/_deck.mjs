@@ -64,8 +64,7 @@ export default {
 		},
 		{
 			"id": "integrations",
-			"label": "연동",
-			"allowEmpty": true
+			"label": "연동"
 		},
 		{
 			"id": "operations",

@@ -457,6 +457,26 @@ macOS Chrome 검증을 대신하지 않는다.
 근거는 Keycloak 26.7 Server Administration Guide의 authentication flow 복제 권고, 기본 browser
 flow의 Conditional 2FA·OTP Form 구조, Configure OTP required action과 credential 복구 절차다.
 
+## 2026-09-14 D16 Identity Brokering 실습 결정
+
+D16은 같은 Keycloak instance의 두 번째 `d16-upstream` realm을 외부 OIDC IdP 대역으로 쓴다. 실제
+회사 IdP나 소셜 계정을 요구하지 않으면서 study realm→upstream authorization→study broker callback의
+표준 경계를 확인할 수 있다. upstream에는 confidential `study-broker` client와 완전한 profile을 가진
+전용 사용자 하나만 두고, study에는 public `d16-broker-diagnostic` client와 `upstream-oidc` provider를
+둔다. 두 client는 Authorization Code를 사용하고 진단 client는 PKCE S256을 요구한다.
+
+provider는 upstream issuer·authorization/token/UserInfo/JWKS URL을 같은 HTTPS origin으로 검증하고
+`syncMode=IMPORT`, `storeToken=false`, 기본 `first broker login` flow를 쓴다. 최초 로그인은 고유한 외부
+사용자를 study의 로컬 broker user로 만들고 federated identity 하나를 연결해야 하며, 두 번째 로그인은
+같은 local user/link를 재사용해야 한다. 같은 email/username의 기존 계정을 자동 연결하는 시나리오는
+보안상 별도 선택이므로 이 실습에 넣지 않는다.
+
+Keycloak server가 자기 HTTPS endpoint를 upstream IdP로 호출하므로 기존 directory CA뿐 아니라 public
+web CA도 `/opt/keycloak/conf/truststores/`에 read-only mount했다. `KC_TRUSTSTORE_PATHS`는 그 디렉터리를
+읽는다. 두 CA와 leaf SAN이 분리된 구조는 유지되며 private key는 추가로 공유하지 않는다. 첫 실행에서
+token endpoint TLS가 web CA를 신뢰하지 못해 실패한 사실을 근거로 이 변경을 적용했고 Keycloak container만
+재생성해 DB·Samba volume과 기존 realm을 보존한 뒤 전체 D16 검증을 다시 통과했다.
+
 ## 2026-09-14 P09 변경·장애 관찰 결정
 
 P09는 provider 설정을 바꾸지 않고 P08의 `READ_ONLY`, `importEnabled=true`, `cachePolicy=DEFAULT`,

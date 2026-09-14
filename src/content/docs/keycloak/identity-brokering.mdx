@@ -1,0 +1,92 @@
+---
+title: "Identity Brokering"
+description: "다른 OIDC IdP로 사용자를 보내 인증받고 최초 로그인에서 로컬 계정과 외부 신원을 연결하는 방법"
+aliases: [Identity Broker, external IdP, first broker login, account linking, kc_idp_hint]
+reviewedAt: 2026-09-14
+deckGroup: integrations
+sidebar:
+  order: 1150
+---
+
+import Thesis from '../../../components/docs/Thesis.astro';
+import TermIntro from '../../../components/docs/TermIntro.astro';
+
+<Thesis>Identity Brokering은 password 저장소를 조회하는 대신 브라우저를 외부 IdP로 보내 인증받고 그 신원을 realm 사용자에 연결한다.</Thesis>
+
+AD를 LDAP로 직접 조회하는 Federation과, 이미 존재하는 OIDC·SAML IdP를 신뢰하는 Brokering은
+사용자 원본과 인증 위치가 다르다. Brokering에서도 내부 앱은 외부 IdP가 아니라 Keycloak token만 받는다.
+
+<TermIntro
+  terms={[
+    ['Identity Broker', '', '내부 client와 외부 IdP 사이에서 인증 요청·응답을 중계하고 외부 신원을 자기 사용자 모델에 연결하는 역할.'],
+    ['upstream IdP', '', '실제 사용자 인증을 수행해 Keycloak broker에 OIDC code/token 또는 SAML assertion을 보내는 외부 신원 제공자.'],
+    ['first broker login', '', '처음 본 외부 신원을 새 로컬 사용자로 만들거나 기존 계정에 안전하게 연결하는 Keycloak flow.'],
+    ['federated identity link', '', 'Keycloak 로컬 사용자와 특정 IdP의 외부 subject를 잇는 지속 관계.'],
+  ]}
+/>
+
+## 큰 그림
+
+`내부 앱 → study realm → upstream IdP 로그인 → study broker callback → first broker login → study token →
+내부 앱`으로 흐른다. 앱은 upstream token이나 password를 직접 받지 않는다.
+
+## 이 장에서 답할 질문
+
+- User Federation과 Identity Brokering은 어디에서 갈리는가?
+- 최초 외부 로그인 때 어떤 local user/link가 만들어지는가?
+- 기존 계정 자동 연결을 왜 조심해야 하는가?
+
+## 외부 IdP를 등록한다
+
+OIDC provider에는 alias, upstream issuer와 authorization/token/UserInfo/JWKS URL, broker client ID와
+credential, signature 검증, first login flow와 sync mode를 설정한다. 이 실습은 `syncMode=IMPORT`로
+최초 profile을 가져오고 upstream token은 저장하지 않는다.
+
+[Keycloak Identity Brokering 가이드](https://www.keycloak.org/docs/26.7.0/server_admin/#_identity_broker)는
+브라우저 redirect, 외부 응답 검증, 사용자 import/link와 내부 client token 발급을 순서대로 설명한다.
+`kc_idp_hint`를 쓰면 login page의 provider 선택을 건너뛰되 client별 허용 정책은 별도로 둔다.
+
+## 최초 계정 연결을 검증한다
+
+```bash
+cd labs/keycloak
+./scripts/verify-d16.sh
+```
+
+실습은 같은 Keycloak의 두 번째 `d16-upstream` realm을 OIDC IdP 대역으로 사용한다. 오답 upstream
+password가 거부되고 정상 로그인은 study broker callback과 diagnostic client callback까지 이어졌다.
+첫 로그인 뒤 study realm에는 local user 하나와 `upstream-oidc` link 하나가 생겼다. 새 browser
+session의 두 번째 로그인은 같은 user ID와 link를 재사용했다.
+
+실제 외부 SaaS 계정은 필요하지 않지만, 이 결과를 특정 회사 IdP의 claim·logout·장애 동작으로
+일반화하지 않는다.
+
+## 같은 email 자동 연결을 경계한다
+
+외부 IdP가 보낸 email과 같은 local account가 있다고 자동으로 같은 사람이라고 단정하면 account
+takeover가 될 수 있다. Keycloak 기본 first broker login은 고유 사용자를 생성하고, 충돌 시 기존 계정
+재인증 같은 확인 단계를 구성할 수 있다. `Trust Email`은 upstream이 email 검증을 신뢰할 근거가 있을
+때만 켠다.
+
+| 상황 | 안전한 방향 |
+|---|---|
+| 처음 보는 고유 외부 subject | 새 local user와 provider link 생성 |
+| 같은 username/email의 local user 존재 | 기존 계정 재인증 또는 검증된 조직 정책으로 연결 |
+| upstream claim 변경 | IMPORT/FORCE sync mode와 mapper별 소유권 명시 |
+| upstream token이 필요 없음 | `Store Tokens`를 끄고 노출 면적 축소 |
+
+## Federation과 비교한다
+
+| | User Federation | Identity Brokering |
+|---|---|---|
+| 인증 위치 | Keycloak이 LDAP bind를 호출 | 외부 IdP가 OIDC/SAML로 인증 |
+| browser 이동 | Keycloak login 안에서 처리 | upstream IdP로 redirect |
+| password 경로 | Keycloak→LDAP bind | Keycloak·내부 앱은 upstream password를 받지 않음 |
+| 사용자 연결 | storage provider의 사용자 모델 | local user + federated identity link |
+
+## 요약
+
+- Brokering은 외부 IdP로 redirect해 인증받고 내부 앱에는 Keycloak token을 발급한다.
+- 첫 broker 로그인은 외부 subject를 local user와 지속적인 provider link로 연결한다.
+- 같은 email 자동 연결은 신뢰 근거와 재인증 없이 사용하면 위험하다.
+- 이 덱은 두 test realm의 OIDC 흐름을 검증했으며 실제 회사 IdP 결과는 아니다.

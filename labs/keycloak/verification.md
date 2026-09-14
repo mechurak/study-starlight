@@ -554,3 +554,27 @@ OTP가 callback에 도달했다. 분실 복구 시나리오는 관리 API로 해
 검증이 이어지는 것을 확인해 전용 사용자의 이름·이메일을 seed에 명시했고, 최종 전체 실행은 통과했다.
 이 결과는 web CA를 명시한 Compose 진단 client의 실제 form 흐름이며 보류 중인 Chrome 검증을 대신하지
 않는다.
+
+## D16 두 realm OIDC Identity Brokering
+
+| 환경 | 상태 | 실제 범위 |
+|---|---|---|
+| macOS 26.6.2 arm64 + Colima 0.10.3 | 비브라우저 HTML form 검증 통과 | Keycloak 26.7.3의 두 realm, OIDC provider, first broker login |
+| 실제 외부 IdP·회사 계정 | 미실행 | 동일 Keycloak의 test realm만 upstream 대역으로 사용 |
+| 네이티브 Ubuntu 24.04 + rootful Docker Engine | 미실행 | Ubuntu P03 이후 별도 실행 필요 |
+
+`./scripts/verify-d16.sh`는 `d16-upstream` realm과 confidential broker client, 전용 upstream user,
+study realm의 public diagnostic client와 OIDC provider를 seed했다. seed를 두 번 연속 실행한 출력이
+같았고 기존 여섯 상시 service는 최종적으로 모두 healthy였다.
+
+진단은 study authorization request가 upstream realm 로그인으로 redirect되는 것을 확인했다. 오답
+upstream password는 그 로그인 form에서 거부됐고, 정상 password는 upstream code→study broker callback→
+진단 client callback으로 이어졌다. 첫 로그인 뒤 study에는 로컬 사용자 하나와 `upstream-oidc` federated
+identity link 하나가 생겼다. 새 browser session의 두 번째 broker 로그인은 같은 local user ID와 link를
+재사용했다. password·client secret·upstream token·cookie·authorization code는 출력하지 않았다.
+
+첫 실행은 browser cookie를 이름만으로 저장해 두 realm의 같은 이름·다른 Path cookie를 덮어써
+`invalid_code`로 실패했다. 실제 cookie Path를 보존하도록 고친 뒤에는 Keycloak server의 upstream token
+endpoint 호출이 web CA를 trust하지 않아 TLS 실패했다. web CA의 public certificate를 기존 truststore
+디렉터리에 추가하고 Keycloak container만 재생성한 뒤 최종 검증이 통과했다. 이 결과는 test realm을
+upstream으로 쓴 OIDC brokering이며 실제 회사 IdP나 Chrome 검증 결과가 아니다.

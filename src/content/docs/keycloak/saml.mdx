@@ -1,0 +1,78 @@
+---
+title: "SAML 연동의 자리"
+description: "SAML의 SP·IdP·metadata·assertion·서명을 OIDC와 비교하고 선택 기준을 정리"
+aliases: [SAML 2.0, Service Provider, Identity Provider, SAML assertion, metadata]
+reviewedAt: 2026-09-14
+deckGroup: integrations
+sidebar:
+  order: 1160
+---
+
+import Thesis from '../../../components/docs/Thesis.astro';
+import TermIntro from '../../../components/docs/TermIntro.astro';
+
+<Thesis>SAML은 browser SSO를 위한 XML assertion 중심 프로토콜이며, 기존 enterprise 앱의 지원 계약이 있을 때 OIDC 대신 선택한다.</Thesis>
+
+Keycloak은 OIDC와 SAML client·Identity Provider를 모두 지원한다. 새 API 중심 앱에는 OIDC가 자연스럽지만,
+기존 enterprise 제품이 SAML SP만 제공한다면 protocol을 억지로 바꾸기보다 신뢰 경계를 정확히 구성한다.
+
+<TermIntro
+  terms={[
+    ['SP', 'Service Provider', 'SAML assertion을 받아 사용자를 로그인시키는 앱. OIDC의 client/RP에 가까운 역할.'],
+    ['assertion', '', 'IdP가 인증 결과와 subject·attribute·조건을 XML로 표현하고 서명하는 SAML 문서.'],
+    ['metadata', '', 'entity ID, endpoint, signing certificate 같은 SAML 연동 정보를 교환하는 XML 문서.'],
+    ['ACS', 'Assertion Consumer Service', 'SP가 SAML response를 받는 callback endpoint.'],
+  ]}
+/>
+
+## 큰 그림
+
+브라우저가 SP에서 로그인을 시작하면 AuthnRequest를 IdP에 전달하고, IdP는 인증 뒤 서명된 SAML
+Response/assertion을 브라우저를 통해 SP의 ACS로 보낸다. SP는 issuer·destination·audience·시간 조건과
+서명을 검증하고 자기 session을 만든다.
+
+## 이 장에서 답할 질문
+
+- SAML의 SP·IdP는 OIDC의 client·provider와 어떻게 대응하는가?
+- metadata와 assertion에서 무엇을 신뢰하는가?
+- 어떤 경우에 OIDC 대신 SAML을 고르는가?
+
+## OIDC와 비교한다
+
+| | OIDC | SAML 2.0 |
+|---|---|---|
+| 주 데이터 | JSON/JWT, discovery·JWKS | XML assertion, metadata·X.509 certificate |
+| browser callback | redirect URI의 code | ACS의 SAML Response |
+| API bearer | OAuth access token과 자연스럽게 연결 | SAML assertion 자체를 일반 API bearer로 쓰지 않음 |
+| 주 사용처 | 현대 web/mobile/API | 기존 enterprise SaaS·상용 제품 SSO |
+
+둘 다 redirect destination을 좁게 등록하고 issuer/entity ID, audience, signature와 시간 조건을 검증해야
+한다. XML signature wrapping 같은 구현 함정을 피하려고 직접 parser를 만들지 않고 검증된 SAML
+library나 제품 adapter를 사용한다.
+
+## Metadata와 key 수명을 관리한다
+
+metadata import는 초기 설정을 빠르게 하지만 영구 자동 동기화를 뜻하지 않을 수 있다. 상대 endpoint와
+certificate 교체 방식, metadata 재수집 주기, 겹치는 구·신 signing certificate 기간을 운영 계약으로
+정한다. encryption certificate와 signing certificate의 목적도 구분한다.
+
+[Keycloak 26.7 SAML client 문서](https://www.keycloak.org/docs/26.7.0/server_admin/#saml-clients)는
+entity ID·ACS·서명과 assertion 설정을 설명하고, 같은 관리 가이드의 Identity Provider 절은 외부 SAML
+IdP brokering을 다룬다.
+
+## 이 덱의 범위
+
+이 페이지는 SAML을 선택하고 진단할 기준만 제공한다. metadata 교환부터 실제 SP 로그인·logout·key
+rotation까지의 완성 실습은 이번 범위에 포함하지 않았으므로 성공한 절차처럼 쓰지 않는다.
+
+:::caution[assertion attribute가 곧 앱 권한은 아니다]
+SAML attribute mapper로 group·role을 보낼 수 있어도 SP가 그 값을 어떻게 권한으로 해석하는지는 앱
+정책이다. OIDC와 마찬가지로 인증 결과와 최종 인가를 나눈다.
+:::
+
+## 요약
+
+- SAML은 SP·IdP 사이에서 XML assertion과 metadata로 browser SSO를 구성한다.
+- SP는 서명뿐 아니라 issuer·destination·audience·시간 조건을 확인한다.
+- 새 API 중심 앱에는 OIDC, SAML만 지원하는 기존 enterprise 앱에는 SAML이 자연스럽다.
+- 이번 범위는 참조 설명이며 전체 SAML 실행 실습을 검증하지 않았다.
