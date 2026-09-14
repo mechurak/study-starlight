@@ -2,8 +2,8 @@
 
 작성일: 2026-09-14
 상태: 진행 중
-지금 위치: P10 Compose lifecycle 구현과 비파괴 검증 완료 · P05·P06 macOS browser 확인은 blocked 유지 · 다음 P11
-실행 범위: Compose 기반 P10만 — 최초 시작·readiness·보존 중단/재개·서비스별 기동·guarded 초기화 구현과 비파괴 검증·기록. P11 이후와 본문 개편은 포함하지 않는다.
+지금 위치: P11 구현과 macOS/Colima 비브라우저 빈 상태 전체 재현 완료 · Ubuntu P03·P11과 P05·P06 macOS browser는 blocked/보류 유지 · 본문 개편 미착수
+실행 범위: Compose 기반 P11만 — guarded 실제 초기화, 빈 상태 최초 시작, 로컬 SSO/API, AD 로그인·그룹, refresh, 보존 중단·재개, 자원·보존 검증과 기록. 본문 개편·후속 선택 실습은 포함하지 않는다.
 보류: Ubuntu P03 플랫폼 검증 보류 — macOS/Colima 결과를 Ubuntu 결과로 일반화하지 않는다.
 
 [계획 관리 규칙](README.md)의 번호·상태·갱신·완료 절차를 따른다.
@@ -48,8 +48,9 @@ P05의 Compose 자동 검증은 통과했고 macOS 관리자 인증이 필요한
 
 계획 문서는 계획 번호를 붙인다. 학습 페이지는 번호 없는 이름을 사용하며, 기존 CKA 개편 계획의
 학습 페이지 번호 명명·커밋·전체 브라우저 순회 절차를 가져오지 않는다.
-P01에서 정한 인증/인가·두 단계 매핑·세션/토큰·issuer 구분은 유지한다. P05-C에서 baseline과
-decisions를 Compose 설계에 맞췄으므로 다음 작업은 Compose 기반 P05 구현·검증이다.
+P01에서 정한 인증/인가·두 단계 매핑·세션/토큰·issuer 구분은 유지한다. P11의 macOS/Colima
+비브라우저 빈 상태 재현은 통과했지만, P05·P06 browser와 네이티브 Ubuntu P03·P11은 검증 완료로
+표시하지 않는다.
 
 ## 완료 조건
 
@@ -357,3 +358,4 @@ Astro/호스팅 구성을 먼저 확인하고 필요한 [배포 지침](../deplo
 | P08 | done | `labs/keycloak/app/Dockerfile`, `seed-p08.mjs`, `labs/keycloak/compose.yaml`, `labs/keycloak/scripts/verify-p08.mjs`, `verify-p08.sh`, `labs/keycloak/decisions.md`, `labs/keycloak/verification.md`, 이 문서 | Keycloak 26.7 guide와 26.7.3 LDAP/group/OIDC mapper source·Admin sync path 대조. `verify-p08.sh` 전체 통과: LDAPS-only READ_ONLY provider와 group mapper/role/claim seed 2회 동일, alice/bob Keycloak Code+PKCE 로그인, Keycloak membership, RS256·iss·aud·exp 검증 token의 groups/realm roles, 앱 A→API alice user/admin 200·bob user 200/admin 403, 무토큰 401 | `vendor=ad`는 Samba AD 호환 schema 선택이며 Microsoft AD DS 검증이 아님. 첫 실행은 seed 뒤 진단 script mount의 Node module 탐색 실패; 데이터 삭제 없이 mount target만 고쳐 전체 재실행 통과. 직접 영향받는 local-user 앱 A→API 200/403만 재검증하고 전체 P07 SSO는 반복하지 않음. 두 volume·SID·CA·secret·P03~P07 기록과 Supabase 8개 상태 동일. P05·P06 browser와 Ubuntu P03 blocked/보류 유지 | P09는 미착수; 요청된 P08 범위 종료 |
 | P09 | done | `labs/keycloak/app/Dockerfile`, `seed-p09.mjs`, `labs/keycloak/compose.yaml`, `labs/keycloak/scripts/verify-p09.mjs`, `verify-p09.sh`, `labs/keycloak/decisions.md`, `labs/keycloak/verification.md`, 이 문서 | 26.7 LDAP import/sync·session/refresh guide와 26.7.3 MSAD mapper·TokenManager·user-cache clear API 대조. `verify-p09.sh` 전체 통과: group 제거, Samba alice disable, exact Samba stop을 독립 실행하고 새 로그인·새 로그인 전후 refresh·기존 JWT·앱 session을 분리 관찰. 매 시나리오와 최종 P08 정상 상태 복구 통과 | group sync 직후 `DEFAULT` cache가 이전 membership을 반환해 공식 user-cache clear를 sync 뒤 명시. group 변경은 새/refresh token만 admin 권한 제거, disable은 새 로그인/refresh 거부, LDAP outage는 새 로그인 거부와 기존 refresh 성공을 관찰; 기존 JWT와 앱 session token은 세 경우 모두 exp 전 유지. 초기 marker 권한 실패 2회와 cache 발견 실패도 source 변경 전 또는 trap으로 복구. Samba는 Microsoft AD DS가 아닌 4.19.5 AD 호환 대역. 두 volume·SID·CA·secret·P03~P08 기록과 Supabase 8개 동일. P05·P06 browser와 Ubuntu P03 blocked/보류 유지 | P10은 미착수; 요청된 P09 범위 종료 |
 | P10 | done | `labs/keycloak/README.md`, `labs/keycloak/scripts/lifecycle-common.sh`, `first-start.sh`, `status.sh`, `stop.sh`, `resume.sh`, `service.sh`, `reset.sh`, `verify-p10.sh`, `labs/keycloak/decisions.md`, `labs/keycloak/verification.md`, 이 문서 | `verify-p10.sh` 통과: 중단 전 P08/P09 정상 상태, exact project 보존형 down 뒤 container/network 부재와 두 volume·`.state` 보존, `up --wait` 재개 뒤 여섯 service healthy, SID/P03·P08/P09 결과와 CA·secret·P03~P09 기록·Supabase 8개 동일. API stopped→서비스별 start→healthy와 P08 결과 유지 확인. reset dry-run과 무확인 exit 2 guard만 검증. shell syntax, Compose config, diff와 금지 명령 범위 검사 | 최초 시작은 빈 volume을 요구하고 P05~P08 준비/seed를 readiness 순서로 적용. 일반 stop에 volume option 없음. reset은 정확한 project resource와 Compose `.state` 항목을 먼저 출력하고 고정 확인 문자열 전에는 삭제하지 않으며 P04 kind 자산은 제외. 최초 서비스별 검증에서 shell 변수 충돌을 발견해 요청 이름을 분리한 뒤 재통과. 실제 초기화/빈 상태 시작은 상태 삭제 금지로 미실행해 P11에 남김. Samba는 AD 호환 대역. P05·P06 browser와 Ubuntu P03 blocked/보류 유지 | P11은 미착수; 요청된 P10 범위 종료 |
+| P11 | blocked | `labs/keycloak/README.md`, `labs/keycloak/compose.yaml`, `labs/keycloak/scripts/verify-p11.sh`, `verify-p11-refresh.mjs`, `labs/keycloak/decisions.md`, `labs/keycloak/verification.md`, `src/content/docs/keycloak/_baseline.md`, 이 문서 | guarded reset 뒤 `verify-p11.sh` 최종 통과: macOS 26.6.2 arm64/Colima 0.10.3에서 kind·kubectl 없이 빈 상태 최초 시작 105초, 여섯 service healthy. local-user 앱 A→B SSO와 API 401/403/200, LDAPS `READ_ONLY` sync·alice/bob login·group→role→claim·API 200/403, alice refresh 200. 보존 stop/resume 뒤 SID·identity·volume과 세 진단 출력 동일. idle·시나리오·최종 `docker stats`, `MemAvailable`, image/volume disk 기록. P04 자산과 모든 비대상 container/network/volume reset 직후·중단·최종 fingerprint 동일. shell/Node syntax, P11 Compose config, 진단 container 격리·read-only mount와 secret-shaped evidence 검사 통과 | 실제 reset은 P03·P05~P10 로컬 상세 증거를 의도대로 삭제했고 P10 보존 요약을 P11에 이관. 준비 build는 pinned snapshot을 실제 조회했고 진단은 `--pull never`와 내부 endpoint만 사용. 새 CA serial 허용 조건과 bind mount fingerprint 버그를 발견해 각각 고친 뒤 최종 전체 재실행 통과. Samba는 AD 호환 대역이며 browser·Microsoft AD DS 결과가 아님. P05·P06 browser는 blocked, Ubuntu P03·P11은 미실행이므로 지원 환경 전체 P11은 blocked 유지 | 사용자 후속 요청 시 Ubuntu P03→P11 실제 검증; 현재 요청 범위 종료 |

@@ -444,3 +444,79 @@ P10 상세 산출물은 비밀값을 제외한 `.state/verification/p10/`에 있
 
 P10의 macOS/Colima 결과도 네이티브 Ubuntu의 P03 또는 P10 결과로 일반화하지 않는다. Ubuntu 24.04 +
 rootful Docker Engine의 기존 P03 플랫폼 검증은 계속 미실행이며 별도 실행 결과가 필요하다.
+
+## P11 빈 상태 Compose 전체 재현
+
+| 환경 | 상태 | 실제 범위 |
+|---|---|---|
+| macOS 26.6.2 arm64 + Colima 0.10.3 | 비브라우저 빈 상태 전체 재현 통과 | Colima VM Ubuntu 24.04.4 arm64, Docker client 29.6.1/server 29.5.2, Compose 5.5.1 |
+| 네이티브 Ubuntu 24.04 + rootful Docker Engine | 미실행 | Ubuntu P03 플랫폼 검증 뒤 같은 P11 명령을 별도로 실행해야 함 |
+
+P05·P06의 macOS browser CA trust·Chrome 로그인은 기존 `blocked`, Ubuntu P03 플랫폼 검증은 보류로
+유지했다. P11은 browser flow, kind·kubectl, Microsoft AD DS 검증을 대신하지 않는다. 실행 전
+macOS host kernel은 Darwin 25.6.0 arm64, Colima는 4 CPU/8 GiB·disk 100 GiB였고 Docker가 노출한
+runtime은 Ubuntu 24.04.4 aarch64, 4 CPU, 8,307,167,232 bytes였다.
+
+P10의 dry-run·guard만 통과한 상태에서 다음 확인 문자열을 명시해 실제 초기화와 빈 상태 재현을
+실행했다.
+
+```bash
+cd labs/keycloak
+./scripts/verify-p11.sh --confirm DELETE-keycloak-lab-compose-state
+```
+
+최종 성공 실행은 다음 순서와 결과를 확인했다.
+
+1. exact `keycloak-lab` project의 여섯 container, bridge, Samba/PostgreSQL named volume과
+   directory/web CA·secret·P03/P05~P10 로컬 검증 기록만 삭제됐다. project 자산과 Compose 생성 상태가
+   빈 조건을 확인한 뒤 최초 시작으로 넘어갔다.
+2. P04의 `.state/coredns`, 격리 kubeconfig, 고정 kind/kubectl/Compose 도구,
+   `.state/verification/p04`, 추적한 `kind.yaml`·`kind/`·`k8s/` fingerprint는 reset 직후·보존 중단·
+   최종 재개 뒤 모두 같았다. kind·kubectl 명령은 실행하지 않았고 P04 cluster도 다시 만들지 않았다.
+3. 모든 비대상 container/network/volume을 비교했다. 실행 중인 Supabase 8개와 기존 exited Supabase
+   container 하나, 별도 exited container 하나의 상태·health·mount·network, 관련 network와 volume은
+   세 비교 시점에 같았다.
+4. 빈 상태 `first-start.sh`는 105초에 CA·secret·두 volume과 Samba domain, PostgreSQL/Keycloak,
+   앱 A/B·API, P05~P08 seed를 만들었다. reset 전 identity 파일 각각과 새 파일의 SHA-256이 달랐고 두
+   volume 생성 metadata도 바뀌었다. 여섯 상시 service는 모두 `running/healthy`였다.
+5. local-user가 앱 A에 credential을 한 번 제출한 뒤 앱 B는 재입력 없이 SSO했다. API는 무토큰과
+   malformed token 401, 유효하지만 역할 부족 403, `app-user` 역할 200을 반환했고 RS256·issuer·audience·
+   expiration 검증을 유지했다.
+6. LDAPS-only `READ_ONLY` federation과 group mapper sync 뒤 alice/bob 로그인이 성공했다. alice는
+   `/app-users,/api-admins` → `app-user,api-admin` → API 200/200, bob은 `/app-users` → `app-user` →
+   200/403이었다. local-user의 200/403도 유지됐다.
+7. alice의 별도 Authorization Code + PKCE flow에서 refresh가 HTTP 200으로 성공했다. 새 access token은
+   같은 group/role, 고정 issuer·audience·expiration 검증과 API 200/200을 통과했다. token·code·cookie는
+   출력이나 증거 파일에 기록하지 않았다. 실제 생성한 진단 container는 user `node`, read-only root,
+   capability 전체 drop, `no-new-privileges`, 256 MiB limit, host port 없음이었고 alice password와 web CA,
+   진단 script 세 bind mount만 모두 read-only로 가졌다.
+8. `stop.sh` 뒤 project container/network가 없고 새 volume·CA·secret이 보존된 조건을 확인했다.
+   `resume.sh` 뒤 여섯 service가 다시 healthy였으며 Samba SID
+   `S-1-5-21-1132250501-802315094-551798401`, 디렉터리 결과, local SSO/API, AD login/group/API와
+   refresh 출력이 중단 전과 byte-for-byte 같았다.
+
+최종 실행의 시작 직전 `MemAvailable`은 6,066,640 KiB, Docker data disk 여유는 79,888,516 KiB였다.
+idle 표본에서 Samba 219.1 MiB, PostgreSQL 58.11 MiB, Keycloak 494.8 MiB, API 24.6 MiB, 앱 A 40.9 MiB,
+앱 B 24.28 MiB를 사용했다. 네 시나리오 표본의 최저 `MemAvailable`은 5,854,816 KiB였고 Keycloak의
+최대 관찰값은 refresh 때 602.1 MiB였다. 재개 뒤 최종 표본은 Samba 186.4 MiB, PostgreSQL 37.05 MiB,
+Keycloak 497.3 MiB, API 36.54 MiB, 앱 A 37.94 MiB, 앱 B 37.18 MiB였다. 이 표본은 기존 4 CPU/4.5 GiB
+hard-limit 계약을 바꾸지 않는다.
+
+image virtual size는 Ubuntu base 28,949,196 bytes, PostgreSQL 155,261,177 bytes, Keycloak
+266,417,908 bytes, Samba 92,644,071 bytes, 앱 image 82,101,867 bytes였다. network를 끄고 local image만
+사용해 잰 volume 사용량은 Samba 45,516 KiB, PostgreSQL 70,400 KiB였다. 최초 Samba build는 고정한
+Ubuntu snapshot artifact를 실제 조회했으므로 준비 단계를 offline 검증으로 기록하지 않는다. 그 뒤
+local SSO/API, LDAP sync, AD login/group, refresh와 재개 후 진단은 `--pull never`의 local image와 Compose
+내부 endpoint만 성공 기준으로 사용했다. 상세 산출물은 비밀값을 제외한 `.state/verification/p11/`에 있다.
+
+검증 자동화의 첫 시도는 reset 뒤 새로 생긴 directory CA serial 파일을 오류로 취급한 identity 집합
+비교 때문에 멈췄다. 다음 시도는 기능상 완료했지만 비대상 bind mount에 volume 전용 `Name`을 읽는
+fingerprint 경고가 있어 그 통과 판정을 최종 근거로 쓰지 않고 후검사를 고쳤다. 두 경우 모두 빈 상태 기능
+흐름은 통과했고 최종 실행은 새 파일을 허용하면서 기존 identity 각각의 교체를 요구하고, 모든 mount의
+source/destination을 비교하는 수정본으로 경고 없이 전체 통과했다.
+
+### Ubuntu P03·P11 플랫폼 검증 보류 유지
+
+네이티브 Ubuntu 24.04 + rootful Docker Engine의 P03과 P11은 계속 **미실행**이다. macOS/Colima P11
+결과를 Ubuntu 결과로 일반화하지 않으며, 지원 환경 전체의 검증은 Ubuntu에서 P03부터 실제 실행할 때까지
+완료로 표시하지 않는다.

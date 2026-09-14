@@ -577,6 +577,38 @@ services:
     cpus: 0.25
     mem_limit: 256m
 
+  p11-diagnostic:
+    image: keycloak-lab-app:node24
+    profiles:
+      - p11
+    entrypoint:
+      - node
+      - /opt/keycloak-lab-app/verify-p11-refresh.mjs
+    user: node
+    read_only: true
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    environment:
+      NODE_EXTRA_CA_CERTS: /run/keycloak-lab/web-ca/ca.crt
+    secrets:
+      - samba_alice_password
+    volumes:
+      - ./scripts/verify-p11-refresh.mjs:/opt/keycloak-lab-app/verify-p11-refresh.mjs:ro
+      - ./.state/web-ca/ca.crt:/run/keycloak-lab/web-ca/ca.crt:ro
+    tmpfs:
+      - /tmp:size=16m,mode=1777
+    networks:
+      - keycloak-lab
+    depends_on:
+      keycloak:
+        condition: service_healthy
+      api:
+        condition: service_healthy
+    cpus: 0.25
+    mem_limit: 256m
+
   app-a-diagnostic:
     image: keycloak-lab-app:node24
     profiles:

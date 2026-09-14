@@ -4,7 +4,7 @@ Keycloak·PostgreSQL·앱 A/B·API와 Samba AD DC를 `keycloak-lab` Docker Compo
 실행하는 실습 진입점이다. 기본 경로에는 kind와 kubectl을 사용하지 않는다. Samba는 **Microsoft AD
 DS가 아니라 AD 호환 디렉터리 실습 대역**이며, 이 결과를 Windows domain 검증으로 일반화하지 않는다.
 
-현재 macOS/Colima 비브라우저 경로는 P03~P10 범위에서 검증했다. macOS browser의 CA trust와 실제
+현재 macOS/Colima 비브라우저 경로는 P03~P11 범위에서 검증했다. macOS browser의 CA trust와 실제
 Chrome 로그인은 P05·P06의 `blocked` 항목으로 남아 있고, Ubuntu 24.04 + rootful Docker Engine의 P03
 플랫폼 검증도 보류 상태다. 두 항목은 Compose lifecycle 사용을 막지 않지만 통과한 것으로 간주하지 않는다.
 
@@ -22,6 +22,7 @@ cd labs/keycloak
 ./scripts/service.sh start api # service 하나와 Compose 의존성 기동
 ./scripts/service.sh status api
 ./scripts/reset.sh --dry-run   # 초기화 대상 출력만
+./scripts/verify-p11.sh --confirm DELETE-keycloak-lab-compose-state
 ```
 
 스크립트는 `compose.yaml`의 고정 project name과 파일을 명시하여 `keycloak-lab`만 다룬다. 다른
@@ -153,3 +154,16 @@ P10의 보존 중단·재개와 reset dry-run/guard 검증은 다음 명령이�
 ```bash
 ./scripts/verify-p10.sh
 ```
+
+P11의 빈 상태 전체 재현은 실제 Compose volume과 P03·P05 이후 로컬 검증 기록을 삭제한다. 위의 reset
+dry-run으로 대상을 먼저 확인하고, P04 자산과 다른 workload의 전후 상태를 함께 비교할 때만 다음 명령을
+사용한다. 이 명령도 reset과 같은 고정 확인 문자열 없이는 exit 2로 거부된다.
+
+```bash
+./scripts/verify-p11.sh --confirm DELETE-keycloak-lab-compose-state
+```
+
+P11은 빈 상태 최초 시작, 로컬 사용자 앱 A→앱 B SSO와 API, Samba alice/bob 로그인과 group→role→claim,
+refresh, 보존 중단·재개 뒤 같은 결과를 비브라우저 경로로 확인한다. 최초 image pull/build와 패키지 준비는
+인터넷이 필요할 수 있지만, 이후 진단은 로컬 image에 `--pull never`를 적용한다. macOS browser 검증과
+네이티브 Ubuntu 검증은 이 명령의 성공으로 대체되지 않는다.

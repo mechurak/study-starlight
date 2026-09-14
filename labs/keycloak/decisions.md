@@ -503,6 +503,46 @@ network, 두 named volume과 삭제할 `.state` entry를 모두 출력한다. P0
 `DELETE-keycloak-lab-compose-state`가 있어야 진행한다. 일반 중단에는 이 경로를 사용하지 않으며
 `down --volumes`, 전역 prune/삭제, Colima reset/delete, kind 조작은 lifecycle에 넣지 않는다.
 
+## 2026-09-14 P11 빈 상태 전체 재현 결정
+
+P11은 P10과 같은 확인 문자열을 다시 요구하는 `verify-p11.sh` 하나에서만 실제 Compose 초기화를
+수행한다. 이 명령은 실행 전 P10 보존 결과를 요구하고, `reset.sh --dry-run` 뒤
+`reset.sh --confirm DELETE-keycloak-lab-compose-state`를 호출한다. 최초 실행이나 재검증 중 실패했더라도
+이전 P10 보존 결과를 P11 로컬 증거에 복사해 두므로 같은 guarded 절차로만 다시 시작할 수 있다.
+
+삭제 후에는 project container·network·두 named volume과 Compose 생성 `.state`가 모두 사라졌는지
+먼저 확인한다. 동시에 `.state/coredns`, `.state/kubeconfig`, `.state/tools`,
+`.state/verification/p04`와 추적한 `kind.yaml`·`kind/`·`k8s/`를 파일 fingerprint로 비교한다. 모든
+비대상 Docker container는 실행 여부·health·mount·network, 모든 비대상 network와 volume은 driver·
+subnet·label을 reset 직후, 보존 중단 시점, 최종 재개 뒤에 비교한다. 따라서 P11 성공은 실행 중인
+Supabase만이 아니라 기존 exited container와 그 자산도 바뀌지 않은 조건을 포함한다. P04 자산이 없는
+환경에서는 부재 상태 자체를 비교하며, optional kind 실습을 Compose P11의 선행 조건으로 만들지 않는다.
+
+빈 상태의 `first-start.sh`는 CA·leaf key·password/client/session secret과 Samba/PostgreSQL volume을
+새로 만들고 P05~P08 seed를 readiness 순서로 적용한다. reset 전후에는 기존 identity 파일 각각의
+SHA-256이 바뀌고 volume 생성 metadata가 바뀌었는지 확인하되 값 자체는 기록하지 않는다. 정상적인
+`stop.sh`·`resume.sh`에서는 새 identity와 volume metadata, Samba SID와 디렉터리 결과가 그대로인지
+확인한다. P11 전체 초기화는 P03·P05~P10의 로컬 상세 증거를 의도대로 지우므로 P10 보존 요약만 P11
+증거에 복사하고, 과거의 검증 사실은 추적한 `verification.md`와 계획 실행 기록에 보존한다.
+
+P11의 로컬 SSO/API와 Samba 로그인·group→role→claim은 기존 P07/P08 진단을 그대로 사용한다. refresh는
+P08의 public 진단 client로 alice의 Authorization Code + PKCE 로그인을 새로 수행하고 refresh token으로
+받은 access token의 RS256 서명·고정 issuer·`lab-api` audience·`exp`, group/role과 API 200/200을
+검증하는 `p11-diagnostic`을 추가했다. 이 service는 Samba alice password 하나와 web CA만 읽고,
+read-only root filesystem·전체 capability drop·`no-new-privileges`·256 MiB limit을 유지한다.
+
+최초 image pull/build와 Samba image의 고정 snapshot package 준비는 인터넷이 필요할 수 있는 준비
+단계다. 실제 macOS 실행에서도 Samba build의 고정 remote `ADD`가 snapshot artifact를 조회했다. 이후
+P07/P08/P11 진단과 반복 LDAP sync에는 `--pull never`를 적용해 로컬 image만 사용하고, 성공 판정은
+Compose DNS의 Keycloak·앱·API·Samba endpoint만 사용한다. volume 사용량 측정 container도
+`--network none --pull never`로 격리한다. 이 경계를 offline image 준비까지 검증했다는 뜻으로
+확대하지 않는다.
+
+자원은 최초 시작 직후 idle, 로컬 SSO/API, LDAP sync, AD 로그인·group claim, refresh와 최종 재개 뒤에
+`docker stats --no-stream` 및 `MemAvailable`로 관찰한다. image virtual size와 두 volume의 실제 사용량도
+별도로 기록한다. 이 측정은 macOS/Colima arm64 한 환경의 단일 표본이며 Compose hard limit을 낮추거나
+Ubuntu 자원값으로 일반화하는 근거로 쓰지 않는다.
+
 ## 공식 근거
 
 - Keycloak: [26.7.3 release](https://github.com/keycloak/keycloak/releases/tag/26.7.3),

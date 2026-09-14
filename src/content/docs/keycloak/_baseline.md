@@ -55,11 +55,13 @@ Keycloak 전체에서의 자리와 선택 기준을 설명하고, 별도 실습�
 - 실습 명령과 설정의 원본은 `labs/keycloak/`에 둔다. 본문은 검증된 결과와 필요한 부분만 설명하고,
   사이트 검사 통과를 컨테이너 실습 성공으로 취급하지 않는다.
 
-Samba 단독 P03과 P04 kind-to-Samba 경로는 macOS/Colima에서만 검증됐다. P04 파일과 당시 결과는
-Kubernetes 후속 선택 실습용으로 보존하되 Compose 기본 실습의 선행 조건이나 검증 근거로 사용하지
-않는다. Compose의 Keycloak·앱 경로와 네이티브 Ubuntu는 아직 검증되지 않았다. **Ubuntu P03 플랫폼
-검증 보류**를 유지하고 macOS 결과를 Ubuntu 결과로 일반화하지 않는다. 각 환경에서 실제로 재현한
-범위를 구분하며 예정된 명령이나 동작을 성공한 사실처럼 쓰지 않는다.
+Samba 단독 P03, P04 kind-to-Samba 경로, Compose 기본 실습은 macOS/Colima에서 검증됐다. P11은 실제
+Compose 전체 초기화 뒤 kind·kubectl 없이 로컬 SSO/API, Samba 로그인·그룹 매핑·refresh, 보존
+중단·재개를 빈 상태에서 다시 재현했다. P04 파일과 당시 결과는 Kubernetes 후속 선택 실습용으로
+보존하되 Compose 기본 실습의 선행 조건이나 검증 근거로 사용하지 않는다. macOS browser의 CA
+trust·실제 Chrome 로그인은 P05·P06의 `blocked`, 네이티브 Ubuntu는 **P03 플랫폼 검증부터 보류**다.
+비브라우저 macOS 결과를 두 미실행 경로나 Microsoft AD DS 결과로 일반화하지 않으며, 각 환경에서 실제로
+재현한 범위와 예정된 명령을 구분한다.
 
 ## 다른 덱과의 경계
 
