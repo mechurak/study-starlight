@@ -195,12 +195,16 @@ Keycloak 두 service에만 부여하고, Samba administrator/user password는 Ke
 | `samba_tls_key` | 기존 `directory-ca/dc1.key` | Samba `/run/secrets/samba_tls_key` |
 | `samba_admin_password` | 기존 `secrets/samba-admin-password` | Samba와 일회성 directory 진단 container |
 | `samba_alice_password` / `samba_bob_password` | 기존 `secrets/samba-alice-password` / `samba-bob-password` | Samba와 일회성 directory 진단 container |
+| `app_a_client_secret` | `secrets/app-a-client-secret` | 앱 A와 일회성 Client seed container `/run/secrets/app_a_client_secret` |
+| `app_a_session_secret` | `secrets/app-a-session-secret` | 앱 A `/run/secrets/app_a_session_secret` |
+| `app_a_https_key` | `web-ca/app-a.key` | 앱 A `/run/secrets/app_a_https_key` |
 
 공개 `web-ca/ca.crt`·`web-ca/keycloak.crt`, `directory-ca/ca.crt`·`directory-ca/dc1.crt`는 secret으로
 가장하지 않고 필요한 service에만 명시적 read-only bind mount한다. Keycloak의 directory CA target은
 `/opt/keycloak/conf/truststores/directory-ca.crt`, HTTPS leaf target은
-`/run/keycloak-lab/certs/keycloak.crt`다. 앱 A/B key와 client/session secret 이름은 P06/P07에서 같은
-원칙으로 추가한다.
+`/run/keycloak-lab/certs/keycloak.crt`다. P06의 앱 A는 위 세 secret만 받고, Client seed는 bootstrap
+관리자 password와 앱 A client secret만 받는다. 앱 A process에는 bootstrap credential을 주지 않는다.
+앱 B의 key와 client/session secret은 P07에서 같은 원칙으로 추가한다.
 
 P05의 초기 realm 파일은 `study-realm.json`이고 시작 시 `--import-realm`으로 읽는다. `study`가 이미
 DB에 있으면 Keycloak의 startup import 규칙대로 건너뛰므로 container 재생성이 기존 realm을 덮어쓰지
@@ -270,6 +274,13 @@ P06은 매 로그인마다 `openid-client`로 PKCE verifier/challenge, state, no
 P07 API는 신뢰한 issuer의 discovery/JWKS만 사용하고 access token의 허용 algorithm도 고정한다.
 `jku` 같은 token header가 임의 JWKS 위치를 선택하게 하지 않는다. 무토큰 401, 유효하지만 권한 부족
 403, 허용 200을 구분한다.
+
+앱 A Client seed는 별도 일회성 Compose service가 Keycloak의 HTTPS 관리 API에 web CA truststore를
+명시하고 적용한다. confidential client `app-a`는 정확한 callback 하나만 허용하고 Standard Flow와
+PKCE S256만 사용한다. Implicit Flow, Direct Access Grants(password grant), service account는 끈다.
+seed는 같은 client가 있으면 동일한 추적 설정과 로컬 client secret으로 갱신하고, 중복 client가 있으면
+임의로 하나를 고르지 않고 실패한다. 관리자 password와 client secret 값은 명령 인자나 추적 JSON에
+넣지 않고 각 container의 file-backed secret에서 읽는다.
 
 `package.json`은 exact version을 쓰고 `package-lock.json`을 추적하며 image build는 `npm ci`를 사용한다.
 두 앱의 session과 secret은 서로 분리한다. memory session store는 재시작 때 로그인 상태가 사라지는 것을

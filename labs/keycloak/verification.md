@@ -153,3 +153,62 @@ P05 작업 상태는 browser 확인 전까지 `blocked`로 유지한다.
 
 P05의 macOS/Colima 결과는 네이티브 Ubuntu의 P03 또는 P05 결과로 일반화하지 않는다. Ubuntu 24.04 +
 rootful Docker Engine에서 `./samba/verify-p03.sh`를 실행하는 기존 보류 항목은 그대로 남아 있다.
+
+## P06 앱 A OIDC 로그인
+
+| 환경 | 상태 | 실제 범위 |
+|---|---|---|
+| macOS 26.6.2 arm64 + Colima 0.10.3 | 비브라우저 자동 검증 통과, browser 사용자 보류 | Node.js 24.21.0 image, `openid-client` 6.8.8, Express 5.2.1, `express-session` 1.19.0 |
+| 네이티브 Ubuntu 24.04 + rootful Docker Engine | 미실행 | Ubuntu P03 플랫폼 검증과 함께 별도 실행해야 함 |
+
+P05의 Compose 자동 검증 결과에 영향을 주는 기존 service 설정은 바꾸지 않았다. 실행 전에 Samba,
+PostgreSQL, Keycloak이 모두 기존 container에서 healthy이고 P03~P05 기록, 두 named volume, 두 CA와
+기존 secret이 남아 있음을 확인했다. Colima는 4 CPU/8 GiB였고 `MemAvailable`은 6,204,204 KiB,
+Docker data disk 여유는 80,120,860 KiB였다. 별도 Supabase container 8개도 중단하지 않았으며 Colima
+설정, volume, domain, CA를 변경하거나 prune/reset하지 않았다. P05 전체 검증은 반복하지 않았다.
+
+다음을 실행해 P06 범위만 검증했다.
+
+```bash
+cd labs/keycloak
+./scripts/verify-p06.sh
+```
+
+실제 확인 결과는 다음과 같다.
+
+- 고정 Node 24.21.0 base digest로 앱 image를 만들고 lockfile의 exact `openid-client` 6.8.8,
+  Express 5.2.1, `express-session` 1.19.0을 `npm ci`로 설치했다. install audit은 취약점 0개였다.
+- 별도 일회성 seed service가 web CA를 신뢰한 HTTPS 관리 경로로 confidential Client `app-a`를 만들었다.
+  callback은 `https://app-a.keycloak.test:30081/callback` 하나이며 Standard Flow와 PKCE S256을 사용하고,
+  implicit flow·Direct Access Grants(password grant)·service account는 끈 설정이다. seed를 연속 두 번
+  실행해 같은 client를 갱신하고 중복 없이 끝나는 것도 확인했다.
+- 앱 A는 `127.0.0.1:30081`에만 HTTPS를 publish하고 Compose alias도 같은 FQDN을 사용했다. app
+  container의 issuer는 P05와 같은 `https://keycloak.keycloak.test:30080/realms/study`였으며 별도 내부
+  issuer나 HTTP, TLS 검증 우회를 사용하지 않았다. host에서도 web CA를 명시한 health 요청은 성공하고
+  directory CA를 잘못 사용한 요청은 TLS 검증에서 실패했다.
+- 진단 container의 실제 로그인에서 authorization request가 `response_type=code`, 정확한 redirect URI,
+  PKCE `S256` challenge, state, nonce를 모두 포함했다. `local-user`의 올바른 credential로 Keycloak
+  callback과 `openid-client`의 code 교환·검증을 거쳐 앱 session의 사용자까지 확인했다. password 값,
+  authorization code, token은 출력하거나 검증 파일에 저장하지 않았다.
+- 고정 오답 password는 Keycloak login form에 남아 앱 callback으로 돌아오지 않았다. authorization
+  request의 state와 nonce를 각각 변조한 두 시나리오는 callback에서 HTTP 400으로 끝났고 상세 오류를
+  응답에 노출하지 않았다. 등록하지 않은 redirect URI도 Keycloak이 HTTP 400으로 거부했다.
+- 앱은 Node image UID 1000, read-only root filesystem, 모든 capability drop과
+  `no-new-privileges`로 실행했다. client/session/TLS private key는 필요한 service에만 read-only
+  file-backed secret으로 mount했고 앱의 `docker inspect` environment에 값이 없음을 확인했다.
+  앱에는 bootstrap 관리자 password를 mount하지 않았다.
+
+비밀번호·private key·cookie·authorization code·token을 제외한 상세 산출물은
+`.state/verification/p06/`에 있다.
+
+macOS login/system keychain에는 현재 CA certificate 항목이 있지만 `security verify-cert -p ssl`은
+`labs/keycloak/.state/web-ca/ca.crt`를 신뢰된 SSL root로 판정하지 않는다. root trust 변경에는 사용자
+관리자 인증이 필요하며 2026-09-14의 P05 보류 결정 범위를 넘는다. 따라서
+인증서 오류를 무시하지 않는 실제 Chrome에서 앱 A → Keycloak → 앱 A 로그인을 확인하지 않았고 P06은
+browser 확인 전까지 **blocked**다. 이 보류는 구현과 위 CA 명시 비브라우저 검증을 막지 않았으며,
+P05도 기존 browser 확인 전까지 blocked 상태를 유지한다.
+
+### Ubuntu P03 플랫폼 검증 보류 유지
+
+P06의 macOS/Colima 결과도 네이티브 Ubuntu의 P03 또는 P06 결과로 일반화하지 않는다. Ubuntu 24.04 +
+rootful Docker Engine의 기존 P03 플랫폼 검증은 계속 미실행이며 별도 실행 결과가 필요하다.

@@ -170,6 +170,121 @@ services:
     cpus: 0.25
     mem_limit: 256m
 
+  app-a-seed:
+    image: quay.io/keycloak/keycloak:26.7.3@sha256:ff4257d0d64efbe99ed1ddfaf07765cc3c36dc7518bf8324d41961327f441c54
+    profiles:
+      - p06
+    entrypoint:
+      - /bin/bash
+      - /run/keycloak-lab/seed/seed-app-a.sh
+    user: "1000:0"
+    read_only: true
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    secrets:
+      - keycloak_bootstrap_admin_password
+      - app_a_client_secret
+    volumes:
+      - ./keycloak/seed-app-a.sh:/run/keycloak-lab/seed/seed-app-a.sh:ro
+      - ./.state/web-ca/ca.crt:/run/keycloak-lab/web-ca/ca.crt:ro
+    tmpfs:
+      - /tmp:size=32m,mode=1777
+    networks:
+      - keycloak-lab
+    depends_on:
+      keycloak:
+        condition: service_healthy
+    cpus: 0.25
+    mem_limit: 256m
+
+  app-a:
+    image: keycloak-lab-app:node24
+    build:
+      context: ./app
+      args:
+        NODE_IMAGE: node:24.21.0-bookworm-slim@sha256:2fe369e969550cde8e867afc3fe370b260140cab4a23d467074295b42163d553
+    container_name: keycloak-lab-app-a
+    environment:
+      APP_NAME: App A
+      APP_ORIGIN: https://app-a.keycloak.test:30081
+      APP_PORT: "30081"
+      OIDC_ISSUER: https://keycloak.keycloak.test:30080/realms/study
+      OIDC_CLIENT_ID: app-a
+      NODE_EXTRA_CA_CERTS: /run/keycloak-lab/web-ca/ca.crt
+    secrets:
+      - app_a_client_secret
+      - app_a_session_secret
+      - app_a_https_key
+    volumes:
+      - ./.state/web-ca/ca.crt:/run/keycloak-lab/web-ca/ca.crt:ro
+      - ./.state/web-ca/app-a.crt:/run/keycloak-lab/certs/app-a.crt:ro
+    read_only: true
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    tmpfs:
+      - /tmp:size=16m,mode=1777
+    networks:
+      keycloak-lab:
+        aliases:
+          - app-a.keycloak.test
+    ports:
+      - name: app-a-https
+        target: 30081
+        published: "30081"
+        host_ip: 127.0.0.1
+        protocol: tcp
+    depends_on:
+      keycloak:
+        condition: service_healthy
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - healthcheck.mjs
+      interval: 5s
+      timeout: 5s
+      retries: 24
+      start_period: 10s
+    cpus: 0.25
+    mem_limit: 256m
+    stop_grace_period: 15s
+
+  app-a-diagnostic:
+    image: keycloak-lab-app:node24
+    profiles:
+      - p06
+    entrypoint:
+      - node
+      - /run/keycloak-lab/diagnostic/verify-app-a.mjs
+    user: node
+    read_only: true
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    environment:
+      NODE_EXTRA_CA_CERTS: /run/keycloak-lab/web-ca/ca.crt
+    secrets:
+      - keycloak_local_user_password
+    volumes:
+      - ./scripts/verify-app-a.mjs:/run/keycloak-lab/diagnostic/verify-app-a.mjs:ro
+      - ./.state/web-ca/ca.crt:/run/keycloak-lab/web-ca/ca.crt:ro
+    tmpfs:
+      - /tmp:size=16m,mode=1777
+    networks:
+      - keycloak-lab
+    depends_on:
+      keycloak:
+        condition: service_healthy
+      app-a:
+        condition: service_healthy
+    cpus: 0.25
+    mem_limit: 256m
+
 networks:
   keycloak-lab:
     name: keycloak-lab
@@ -201,3 +316,9 @@ secrets:
     file: ./.state/web-ca/keycloak.key
   keycloak_local_user_password:
     file: ./.state/secrets/keycloak-local-user-password
+  app_a_client_secret:
+    file: ./.state/secrets/app-a-client-secret
+  app_a_session_secret:
+    file: ./.state/secrets/app-a-session-secret
+  app_a_https_key:
+    file: ./.state/web-ca/app-a.key

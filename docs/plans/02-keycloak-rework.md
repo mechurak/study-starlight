@@ -2,8 +2,8 @@
 
 작성일: 2026-09-14
 상태: 진행 중
-지금 위치: P05 Compose 구현·자동 검증 완료 · 사용자 결정으로 macOS browser CA trust·로그인 확인 보류
-실행 범위: Compose 기반 P05만 — 구현·자동 검증·기록 완료, browser 검증은 후속 보류. P06 이후와 본문 개편은 포함하지 않는다.
+지금 위치: P06 앱 A 구현·비브라우저 자동 검증 완료 · macOS browser CA trust·로그인 확인 보류로 blocked
+실행 범위: Compose 기반 P06만 — 앱 A·Client seed 구현과 자동 검증·기록. P07 이후와 본문 개편은 포함하지 않는다.
 보류: Ubuntu P03 플랫폼 검증 보류 — macOS/Colima 결과를 Ubuntu 결과로 일반화하지 않는다.
 
 [계획 관리 규칙](README.md)의 번호·상태·갱신·완료 절차를 따른다.
@@ -28,6 +28,9 @@ P05-C에서 합의한 Compose 전환을 decisions와 baseline의 계약에 반�
 실행하는 선택 실습으로 둔다.
 P04의 kind 검증은 당시 결과로 보존하며 Compose 경로의 검증을 대신하지 않는다. 네이티브 Ubuntu P03은
 사용자가 나중에 별도로 수행한다. macOS/Colima P03 통과를 바탕으로 Compose 후속 작업은 진행할 수 있다.
+P05의 Compose 자동 검증은 통과했고 macOS 관리자 인증이 필요한 browser CA trust·로그인만 사용자
+결정으로 보류했다. P05 상태는 `blocked`로 유지하지만 이 browser 보류를 P06 구현 착수의 선행 차단으로
+사용하지 않는다.
 작업은 **작업 ID 하나씩 맡길 수 있도록** 분리했다. 후속 요청이 한 작업이면 그 작업까지,
 전체 완료이면 의존 순서로 이어서 실행한다. 이 문서는 서브에이전트 생성이나 병렬 실행을 요구하지 않는다.
 
@@ -349,28 +352,30 @@ Astro/호스팅 구성을 먼저 확인하고 필요한 [배포 지침](../deplo
 | Compose 전환 계획 | done | 이 문서만 | 기존 diff·P01~P04 기록·baseline·decisions 대조, `git diff --check`와 참조 경로 확인 | 사용자 합의에 따라 기본 실습을 Compose로 전환. P04 실행 기록은 당시 결과로 보존하며 위 기록의 다음 작업은 이 행으로 갱신. decisions/baseline 및 실습 구현은 아직 이전 계약이므로 P05-C에서 먼저 정리. 실행 중인 cluster와 기존 파일·volume·CA·secret에는 변경 없음. Ubuntu P03 플랫폼 검증 보류 유지 | P05-C → P05 |
 | P05-C | done | `labs/keycloak/decisions.md`, `src/content/docs/keycloak/_baseline.md`, 이 문서 | 2026-09-14 공식 Keycloak hostname/TLS/truststore/container·Docker Compose alias/port/secret/volume/down·PostgreSQL 18 volume·kind delete 문서 및 로컬 kind help 대조. Git 초기 상태 clean. P04 node/network/port, Colima 자원·disk·memory, 실행 중 Supabase와 mount/limit을 읽기 전용 조사. `git diff --check`, 변경 diff와 내부·공식 참조 경로 확인. 배포·cluster/Colima 변경·실습 검증은 미실행 | issuer와 내부 listener를 `keycloak.keycloak.test:30080` 하나로 통일하고 host loopback/hosts와 Compose alias를 분리. web/directory CA, service별 secret mount, Samba/PG18 named volume, 4 CPU/8 GiB·가용 memory 5 GiB·disk 20 GiB 계약 확정. P04 node의 `.20`·`30080`~`30082` 점유를 확인하고 exact cluster 하나의 삭제 전후 보존 절차를 기록. 현재 2 CPU/2 GiB와 Supabase 무제한 workload 때문에 P05 실제 기동 전 사용자 승인 아래 Colima 중단·증설 필요. file-backed secret의 실제 image UID read와 Compose 전체 값은 P05에서 검증. Ubuntu P03 플랫폼 검증 보류 유지 | Compose 기반 P05 |
 | P05 | blocked | `labs/keycloak/compose.yaml`, `labs/keycloak/keycloak/`, `labs/keycloak/scripts/`, `labs/keycloak/samba/entrypoint.sh`, `labs/keycloak/decisions.md`, `labs/keycloak/verification.md`, 이 문서 | 사용자 승인 뒤 exact P04 cluster만 삭제하고 보존 상태 대조, default Colima를 삭제 없이 4 CPU/8 GiB로 증설. Supabase 8개 mount·health 복귀 확인. `verify-p05.sh` 전체 통과: PostgreSQL/Keycloak/Samba healthy, 동일 issuer의 container discovery/JWKS와 web CA, LDAPS 양/음성, P03 동일성, UID 1000/999/65534 secret read·read-only mount, inspect env 비노출, PG18 volume, DB/Keycloak 강제 재생성 뒤 realm·진단 유지. host `--cacert` discovery/JWKS와 local-user Authorization Code form 성공. browser는 미실행 | `study` startup import와 local-user를 추가하고 기존 realm은 skip하여 DB 상태를 보존. Samba의 보존 `smb.conf`는 private key를 새 secret target으로 idempotent하게 갱신. 2026-09-14 사용자 결정으로 macOS 관리자 인증과 Chrome Admin Console/local-user 로그인은 후속 보류. Ubuntu P03 플랫폼 검증 보류 유지, macOS 결과로 일반화하지 않음 | 후속 요청에서 macOS CA trust 승인 뒤 browser 2경로 확인; 현재 P05 범위 종료 |
+| P06 | blocked | `labs/keycloak/app/`, `labs/keycloak/compose.yaml`, `labs/keycloak/keycloak/seed-app-a.sh`, `labs/keycloak/scripts/prepare-p06-state.sh`, `app-a-leaf.ext`, `verify-app-a.mjs`, `verify-p06.sh`, `labs/keycloak/decisions.md`, `labs/keycloak/verification.md`, 이 문서 | 고정 Node 24.21.0 image와 exact lockfile build·npm audit 취약점 0. 일회성 HTTPS Client seed와 재실행 일치, 앱 UID 1000·read-only secret·inspect env 비노출·loopback 30081 확인. `verify-p06.sh`에서 Authorization Code + PKCE S256 local-user 로그인과 앱 session 통과; 오답 password, 변조 state/nonce, 미등록 redirect 실패 통과. web CA를 명시해 TLS 검증 유지. 실제 Chrome은 미실행 | P05 browser 보류가 P06 구현 착수를 막지 않는다고 명시하고 앱에 bootstrap credential을 주지 않는 별도 seed service를 사용. `openid-client`가 discovery, code 교환, state·nonce·redirect 검증을 담당하며 password grant와 인증서 우회 없음. macOS keychain이 web CA를 신뢰하지 않고 root trust에는 사용자 관리자 인증이 필요하므로 browser 확인 전까지 blocked. P05도 blocked 유지. Ubuntu P03/P06 미실행 유지, macOS 결과로 일반화하지 않음 | 사용자 승인 범위에서 web CA trust 뒤 P05 browser 2경로와 P06 Chrome 앱 로그인 확인; P07은 미착수 |
 
 새 세션에 넘길 요청 예시:
 
 ```text
 AGENTS.md와 docs/plans/README.md를 읽고,
-docs/plans/02-keycloak-rework.md에서 보류한 P05 macOS browser 검증만 실행해줘.
+docs/plans/02-keycloak-rework.md에서 보류한 P05·P06 macOS browser 검증만 실행해줘.
 
-현재 git 상태와 P05 실행 기록, Keycloak baseline, labs/keycloak/decisions.md,
-labs/keycloak/verification.md, compose와 P05 scripts를 먼저 확인해. 실행 중인 Keycloak·PostgreSQL·
-Samba와 Colima 자원, Supabase workload가 이전 기록과 같은지도 읽기 전용으로 확인해.
+현재 git 상태와 P05·P06 실행 기록, Keycloak baseline, labs/keycloak/decisions.md,
+labs/keycloak/verification.md, compose와 P05/P06 scripts를 먼저 확인해. 실행 중인 앱 A·Keycloak·
+PostgreSQL·Samba와 Colima 자원, Supabase workload가 이전 기록과 같은지도 읽기 전용으로 확인해.
 
 macOS system/login keychain이 `labs/keycloak/.state/web-ca/ca.crt`를 SSL root로 실제 신뢰하는지 먼저
 확인해. 신뢰가 없으면 인증서 오류를 무시하거나 우회하지 말고 사용자에게 로컬 관리자 인증이 필요한
-명령을 안내한 뒤 P05를 blocked로 유지해. 신뢰가 있으면 `playwright-cli`의 격리된 Chrome session과
-host resolver rule로 `keycloak.keycloak.test`만 `127.0.0.1`에 연결하고 `ignoreHTTPSErrors`는 false로 둬.
+명령을 안내한 뒤 P05·P06을 blocked로 유지해. 신뢰가 있으면 `playwright-cli`의 격리된 Chrome session과
+host resolver rule로 Keycloak과 앱 A 이름만 `127.0.0.1`에 연결하고 `ignoreHTTPSErrors`는 false로 둬.
 
 별도 browser context에서 `lab-admin`의 Admin Console 로그인과 `local-user`의 study account 로그인을
-각각 확인해. password 값은 출력·명령 인자·추적 파일에 남기지 말고 `.state/secrets/` source를 안전하게
-읽어 사용해. 실제 browser TLS와 URL, realm을 확인하고 임시 Playwright 산출물이 Git 상태에 남지 않게 해.
-두 경로가 통과했을 때만 verification과 계획의 P05를 done으로 갱신하고 다음 작업을 P06으로 바꿔.
+각각 확인하고, 다시 격리한 context에서 앱 A → Keycloak → 앱 A 로그인을 확인해. password 값은
+출력·명령 인자·추적 파일에 남기지 말고 `.state/secrets/` source를 안전하게 읽어 사용해. 실제 browser
+TLS와 URL, realm을 확인하고 임시 Playwright 산출물이 Git 상태에 남지 않게 해. 앞의 두 경로가
+통과했을 때만 P05를, 앱 A 경로가 통과했을 때만 P06을 done으로 갱신해.
 이미 통과한 전체 Compose 검증은 runtime이나 결과에 영향을 주는 변경이 없으면 반복하지 마.
 Ubuntu P03 플랫폼 검증 보류를 계속 표시하고 macOS 결과를 Ubuntu 결과로 일반화하지 마.
-본문 개편과 P06 구현은 하지 마.
+본문 개편과 P07 이후 구현은 하지 마.
 커밋·푸시는 하지 마.
 ```
