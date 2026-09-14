@@ -1,0 +1,79 @@
+---
+title: "디렉터리 변경과 장애의 반영 시점"
+description: "Group 제거·계정 비활성화·LDAP 중단이 새 로그인·refresh·기존 JWT·앱 세션에 미치는 차이"
+aliases: [LDAP 장애, AD 계정 비활성화, group sync, user cache, 권한 회수]
+reviewedAt: 2026-09-14
+deckGroup: directory
+sidebar:
+  order: 1140
+---
+
+import Thesis from '../../../components/docs/Thesis.astro';
+import TermIntro from '../../../components/docs/TermIntro.astro';
+
+<Thesis>원본 변경과 LDAP 장애의 영향은 새 인증·refresh·기존 JWT·앱 세션마다 다른 시점에 나타난다.</Thesis>
+
+외부 계정을 끄거나 group에서 빼도 이미 발급된 bearer와 앱 cookie가 한순간에 사라지지는 않는다.
+변경 원본, sync와 cache, session, token 만료의 시간축을 분리해 관찰한다.
+
+<TermIntro
+  terms={[
+    ['full sync', '', '외부 사용자 상태를 Keycloak의 import 표현에 명시적으로 반영하는 작업.'],
+    ['user cache', '', 'provider 조회 결과를 재사용하는 Keycloak node의 cache. sync 성공과 cache 갱신을 같은 일로 보지 않는다.'],
+    ['existing JWT', '', '변경 전에 이미 발급되어 소비자가 보유한 access token. 로컬 검증이면 원본을 다시 조회하지 않는다.'],
+  ]}
+/>
+
+## 큰 그림
+
+P09는 각 시나리오마다 변경 전 token·refresh·앱 session을 만들고, 원본 변경과 명시적 sync/cache clear
+뒤 `기존 JWT → refresh → 새 로그인 → 별도 기존 refresh → 앱 session`을 관찰했다. 매 시나리오 후
+Samba와 Keycloak 모델을 정상으로 복구한 다음 다음 실험을 시작했다.
+
+## 이 장에서 답할 질문
+
+- group 제거, 계정 disable, LDAP outage는 어느 경로를 막는가?
+- sync와 cache clear를 왜 따로 실행하는가?
+- 장애 복구 뒤 정상 상태를 무엇으로 확인하는가?
+
+## 관찰 결과
+
+| 변화 | 새 로그인 | refresh | 변경 전 JWT | 앱 session의 기존 token |
+|---|---|---|---|---|
+| alice를 `api-admins`에서 제거 | 성공, admin role 없음 | 성공, 새 token에서 admin role 없음 | `exp` 전 admin claim 유지 | `exp` 전 기존 admin 호출 유지 |
+| alice 계정 비활성화 | 거부 | 거부 | `exp` 전 서명 검증·기존 claim 유지 | `exp` 전 기존 token 사용 가능 |
+| Samba 중단 | LDAP password 검증이 필요한 로그인 거부 | 관찰한 기존 client session은 성공 | `exp` 전 유지 | 기존 token으로 유지 |
+
+LDAP outage의 refresh 성공은 Keycloak 26.7.3 단일 node, `READ_ONLY`, import enabled,
+`cachePolicy=DEFAULT`와 이미 만들어진 session에서 관찰한 결과다. cache eviction, 다른 policy, 다중 node에
+일반화하지 않는다.
+
+## 변경을 반영한다
+
+group 변경은 Samba 원본을 바꾼 뒤 group mapper의 `fedToKeycloak` sync를 실행한다. 계정 disable은
+full user sync가 `userAccountControl`을 읽어 Keycloak `enabled=false`로 만든 것을 확인한다. P09에서는
+group sync 직후 이전 membership이 cache에서 보여 공식 `POST /admin/realms/study/clear-user-cache`를
+sync 뒤 추가했다.
+
+이미 발급된 JWT는 다시 쓰이지 않는다. 빠른 권한 회수가 필요하면 access token lifespan을 짧게 하고,
+고위험 endpoint에서 introspection·deny list·session-aware 검증 같은 별도 비용과 가용성 trade-off를
+설계한다.
+
+## 장애와 복구 절차
+
+1. 정확한 `keycloak-lab-samba` container만 멈추고 stopped 상태를 확인한다.
+2. 새 로그인, 기존 refresh, 기존 JWT와 앱 session을 각각 기록한다.
+3. Samba를 다시 시작하고 health와 directory CA LDAPS bind를 기다린다.
+4. alice enabled와 두 group membership을 원본에서 복구한다.
+5. full/group sync와 user cache clear 뒤 Keycloak 모델을 확인한다.
+6. alice·bob 로그인, claim과 API 200/403이 P08 기준으로 돌아왔는지 확인한다.
+
+고정 sleep 대신 container health와 명시적인 Admin API 상태를 deadline 안에서 poll한다. 실패 중에도
+trap이 원본과 service 복구를 시도하며, 최종 정상 검증이 없으면 시나리오를 통과로 기록하지 않는다.
+
+## 요약
+
+- 원본 변경은 sync·cache·새 발급을 거쳐야 token에 반영된다.
+- 계정 disable은 새 로그인과 refresh를 막아도 기존 JWT를 즉시 지우지 않는다.
+- LDAP 중단은 새 외부 인증과 기존 session 경로에 다르게 작용할 수 있다.
+- 각 장애 뒤 원본·Federation·claim·API까지 정상 상태를 확인해야 복구가 끝난다.

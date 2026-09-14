@@ -2,7 +2,7 @@
 
 작성일: 2026-09-14
 상태: 진행 중
-지금 위치: D09-L·D09·D10 완료 · 다음 D11 · Ubuntu P03·P11과 P05·P06 macOS browser는 blocked/보류 유지
+지금 위치: D11~D15 완료 · 다음 D16-L · Ubuntu P03·P11과 P05·P06 macOS browser는 blocked/보류 유지
 실행 범위: 사용자 요청에 따른 D02~D28, D09-L·D16-L·D18-L·D24-L, F01~F04 전체 완료. D19·D20 추가 실행 실습과 Kubernetes OIDC 선택 실습은 제외한다.
 보류: Ubuntu P03 플랫폼 검증 보류 — macOS/Colima 결과를 Ubuntu 결과로 일반화하지 않는다.
 
@@ -366,3 +366,4 @@ Astro/호스팅 구성을 먼저 확인하고 필요한 [배포 지침](../deplo
 | D02~D08 | done | `src/content/docs/keycloak/lab-setup.mdx`, `realm-and-users.mdx`, `oauth-oidc.mdx`, `clients-and-sso.mdx`, `token-validation.mdx`, `groups-and-roles.mdx`, `scopes-and-mappers.mdx`, `_deck.mjs`, 이 문서 | Keycloak 26.7 Server Administration·OIDC endpoint 공식 문서와 P05~P11 실제 기록 대조. OIDC D2 정적 렌더 796×858, 겹침 없음. 첫 `pnpm check`는 numeric alias 2개를 schema가 거부해 문자열로 수정했고, 재실행 통과: 콘텐츠 규칙, 452개 page build·Pagefind, 36,595개 내부 페이지·anchor 링크 | 환경 준비→realm/user→Code+PKCE→A/B SSO→API token 검증→group/role→claim 흐름으로 정리. `login`·`access` 첫 페이지 추가에 따라 `allowEmpty` 제거. macOS Chrome과 네이티브 Ubuntu는 성공으로 쓰지 않았고 보류 상태 유지. D19·D20 추가 실행 실습과 Kubernetes OIDC 실행은 미착수 | D09-L |
 | D09-L | done | `labs/keycloak/app/Dockerfile`, `seed-d09.mjs`, `labs/keycloak/compose.yaml`, `labs/keycloak/scripts/prepare-d09-state.sh`, `verify-d09.mjs`, `verify-d09.sh`, `labs/keycloak/README.md`, `decisions.md`, `verification.md`, 이 문서 | Keycloak 26.7 authentication flow·OTP required action 공식 문서와 26.7.3 login theme source 대조. JS/shell syntax와 D09 Compose config 통과. `verify-d09.sh` 최종 통과: browser flow 복제와 전용 client override, seed 2회 동일, 첫 TOTP 등록, 오답 거부, 정상 OTP callback, credential 삭제→required action→재등록 복구. 여섯 service와 별도 Supabase workload 전후 상태 동일 | 기본 flow를 수정하지 않고 `d09-mfa` client에만 복제 flow를 적용. 내부 제출 secret과 표시 Base32 값 구분, 자동 User Profile action을 발견해 전용 사용자 profile을 명시한 뒤 재검증. 비밀값은 출력하지 않음. 실제 Chrome과 Ubuntu 검증은 기존 보류 유지 | D09 |
 | D09~D10 | done | `src/content/docs/keycloak/authentication-flows.mdx`, `sessions-and-logout.mdx`, 이 문서 | Keycloak 26.7 authentication flow·OTP·session 관리와 OIDC logout 공식 문서 대조. D09-L JS/shell syntax와 Compose config 재확인 후 `pnpm check` 통과: 콘텐츠 규칙, 454개 page build·Pagefind, 36,787개 내부 페이지·anchor 링크 | D09의 복제 flow·OTP 등록/오답/복구 결과와 세션·token·앱 logout 경계를 각각 한 질문으로 정리. 보류 중인 Chrome 검증을 자동 form 결과로 대체하지 않음 | D11 |
+| D11~D15 | done | `src/content/docs/keycloak/ad-and-ldap.mdx`, `samba-directory.mdx`, `ldap-federation.mdx`, `directory-group-mapping.mdx`, `directory-changes.mdx`, `_deck.mjs`, 이 문서 | Keycloak 26.7 LDAP·group 공식 문서와 P03·P08·P09 실제 기록 대조. mapper D2 정적 렌더 346×1136, 겹침 없음. `pnpm check` 통과: 콘텐츠 규칙, 459개 page build·Pagefind, 37,302개 내부 페이지·anchor 링크 | 연결 개념→Samba 원본→Federation→두 mapper→변경/장애 시간축으로 분리. `directory`의 `allowEmpty` 제거. Samba 결과를 Microsoft AD DS로 일반화하지 않고 Ubuntu 보류 유지 | D16-L |

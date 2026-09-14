@@ -1,0 +1,82 @@
+---
+title: "AD와 LDAP 연결 읽기"
+description: "DN·OU·bind DN·검색 범위와 LDAPS 신뢰를 이해하고 Samba 실습과 Microsoft AD DS의 범위를 구분하는 방법"
+aliases: [Active Directory, LDAP, LDAPS, bind DN, users DN, search scope]
+reviewedAt: 2026-09-14
+deckGroup: directory
+sidebar:
+  order: 1100
+---
+
+import Thesis from '../../../components/docs/Thesis.astro';
+import TermIntro from '../../../components/docs/TermIntro.astro';
+
+<Thesis>AD 연결은 디렉터리 트리에서 어디를 어떤 계정으로 얼마나 깊게 찾을지와 어느 CA를 신뢰할지를 정하는 일이다.</Thesis>
+
+Keycloak의 User Federation 설정에는 URL만 있는 것이 아니다. 사용자 시작 DN, bind 계정, username과
+고유 ID 속성, 검색 범위, TLS 신뢰가 함께 맞아야 사용자를 찾고 비밀번호를 검증할 수 있다.
+
+<TermIntro
+  terms={[
+    ['LDAP', 'Lightweight Directory Access Protocol', '트리 형태의 디렉터리에서 entry를 조회·변경하고 자격 증명을 bind로 검증하는 프로토콜.'],
+    ['DN', 'Distinguished Name', '디렉터리 entry의 전체 경로. 예: CN=alice,CN=Users,DC=ad,DC=keycloak,DC=test.'],
+    ['bind DN', '', 'Keycloak이 사용자 검색과 속성 조회에 사용하는 디렉터리 계정 식별자. 최종 사용자 password bind와 구분한다.'],
+    ['LDAPS', '', 'TLS 연결 위에서 LDAP를 사용하는 방식. 서버 이름과 인증서 체인 검증을 우회하지 않는다.'],
+  ]}
+/>
+
+## 큰 그림
+
+| 질문 | 이 실습의 답 |
+|---|---|
+| 어디에 접속하나 | `ldaps://dc1.ad.keycloak.test:636` |
+| 어디부터 사용자를 찾나 | `CN=Users,DC=ad,DC=keycloak,DC=test` |
+| 어떤 이름이 로그인 ID인가 | `sAMAccountName` |
+| 어떤 값이 고유 ID인가 | `objectGUID` |
+| 누가 검색하나 | Samba Administrator bind credential |
+| 누가 비밀번호를 검증하나 | 로그인 사용자로 디렉터리 bind |
+
+## 이 장에서 답할 질문
+
+- DN·OU·users DN과 검색 범위는 어떤 관계인가?
+- 관리 bind와 사용자 password 검증은 무엇이 다른가?
+- Samba AD 호환 실습 결과를 어디까지 일반화할 수 있는가?
+
+## 트리의 시작점과 깊이를 정한다
+
+DN은 `CN=Users` 같은 relative name과 `DC=ad,DC=keycloak,DC=test` 도메인 경로를 합친 전체 위치다.
+Keycloak의 Users DN은 사용자 검색의 base가 된다. one-level 검색은 바로 아래만, subtree 검색은 하위
+조직까지 찾는다. OU를 여러 단계로 운영한다면 실제 배치와 검색 범위를 함께 설계한다.
+
+username LDAP attribute는 로그인 때 입력값을 어느 속성과 비교할지 정한다. AD 계열에서는 흔히
+`sAMAccountName`을 쓰지만 UPN 로그인을 요구한다면 별도 형식과 중복 규칙을 확인해야 한다. UUID
+attribute는 이름 변경 뒤에도 같은 사용자를 식별할 안정적인 원본 값이어야 한다.
+
+## 두 bind를 구분한다
+
+관리 bind credential은 검색과 group membership 조회에 쓰며 최소 읽기 권한으로 제한한다. 사용자가
+로그인할 때는 찾은 사용자 entry와 제출된 password로 별도 bind를 시도해 자격 증명을 확인한다.
+Keycloak DB에 LDAP 사용자의 원문 password를 복사해 검증하는 구조가 아니다.
+
+## LDAPS 신뢰를 끝까지 유지한다
+
+Keycloak은 directory CA를 truststore로 읽고 `dc1.ad.keycloak.test` 인증서 이름을 검증한다. web CA로
+LDAPS를 검증하거나 directory CA로 Keycloak HTTPS를 검증하면 실패해야 한다. certificate 검증 실패를
+TLS 우회 옵션으로 숨기지 말고 CA chain·SAN·container 시간·DNS를 순서대로 확인한다.
+
+[Keycloak LDAP 가이드](https://www.keycloak.org/docs/26.7.0/server_admin/#_ldap)은 connection URL,
+bind DN, Users DN, vendor별 username·RDN·UUID attribute와 edit mode를 설명한다.
+
+## Samba와 Microsoft AD DS의 경계
+
+이 덱은 Ubuntu package 기반 Samba 4.19.5 AD DC container가 제공하는 AD 호환 schema로
+`vendor=ad`, `sAMAccountName`, `objectGUID`, `group/member`를 검증했다. Microsoft AD DS, Windows
+도메인 가입, site·replication, Kerberos/SPNEGO를 검증한 결과가 아니다. 실제 AD DS로 옮길 때는 CA,
+bind 권한, OU 배치, forest/domain 정책과 속성값을 다시 확인한다.
+
+## 요약
+
+- LDAP 연결은 URL뿐 아니라 base DN·검색 범위·속성·bind 권한의 조합이다.
+- 관리 bind는 검색용이고 사용자 bind는 제출된 password 검증용이다.
+- LDAPS는 directory CA와 서버 이름 검증을 유지한다.
+- Samba AD 호환 대역의 결과를 Microsoft AD DS나 Windows domain 결과로 일반화하지 않는다.

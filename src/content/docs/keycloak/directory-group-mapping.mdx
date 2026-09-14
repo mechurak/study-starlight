@@ -1,0 +1,89 @@
+---
+title: "디렉터리 Group을 앱 권한으로 매핑하기"
+description: "LDAP group mapper와 role mapping·protocol mapper·API 정책을 차례로 추적하는 방법"
+aliases: [AD group mapping, LDAP group mapper, group claim, 원본 federation mapper token 소비자]
+reviewedAt: 2026-09-14
+deckGroup: directory
+sidebar:
+  order: 1130
+---
+
+import Thesis from '../../../components/docs/Thesis.astro';
+import TermIntro from '../../../components/docs/TermIntro.astro';
+
+<Thesis>AD group이 앱 권한이 되려면 LDAP mapper와 role mapping, protocol mapper, 앱 정책의 네 경계를 모두 지나야 한다.</Thesis>
+
+"group mapping을 했다"는 말은 어느 경계를 뜻하는지 모호하다. 외부 membership을 Keycloak group으로
+가져오는 일과, 그 값을 token claim으로 싣고 API가 권한으로 해석하는 일은 별도 설정이다.
+
+<TermIntro
+  terms={[
+    ['LDAP group mapper', '', '외부 LDAP group과 membership을 Keycloak group 모델로 가져오는 federation mapper.'],
+    ['protocol mapper', '', 'Keycloak의 group·role을 OIDC token claim으로 내보내는 mapper.'],
+    ['consumer', '', 'token을 받아 검증하고 claim을 자기 권한 규칙으로 바꾸는 앱 또는 API.'],
+  ]}
+/>
+
+```d2 layout=elk pad=40 title="Samba group이 Keycloak federation과 mapper를 지나 token claim과 API 권한으로 이어지는 경로"
+direction: down
+
+classes: {
+  key: { style: { fill: "#dbeafe"; stroke: "#2563eb"; font-color: "#1e3a8a" } }
+  ok: { style: { fill: "#dcfce7"; stroke: "#16a34a"; font-color: "#14532d" } }
+  mute: { style: { fill: "#f1f5f9"; stroke: "#94a3b8"; font-color: "#334155" } }
+}
+
+source: "원본\nSamba app-users · api-admins" { class: mute }
+federation: "Federation\nLDAP group mapper" { class: key }
+model: "Keycloak 모델\ngroup + role mapping" { class: key }
+token: "Token\ngroups + realm_access.roles" { class: key }
+consumer: "소비자\nAPI 정책의 403 · 200" { class: ok }
+
+source -> federation: member DN 조회
+federation -> model: fedToKeycloak sync
+model -> token: protocol mapper
+token -> consumer: signature · iss · aud · exp 검증 뒤 인가
+```
+
+## 이 장에서 답할 질문
+
+- 외부 group이 token에 오기까지 어느 경계를 지나는가?
+- group과 role claim은 어떻게 나누는가?
+- 두 사용자의 API 결과로 전체 사슬을 어떻게 검증하는가?
+
+## 원본에서 Keycloak 모델까지
+
+`lab-groups` LDAP mapper는 `CN=Users,...` 아래의 `app-users`와 `api-admins`만 filter하고 `member`
+DN을 읽는다. `READ_ONLY`이므로 membership을 Samba에 쓰지 않는다. `fedToKeycloak` sync 뒤 alice는
+두 group, bob은 `app-users` 하나의 구성원이어야 한다.
+
+Keycloak 모델에서 `/app-users`에는 `app-user`, `/api-admins`에는 `api-admin` Realm Role을 연결한다.
+이 role mapping은 group membership을 업무 권한 라벨로 바꾸는 정책이며 token 출력 설정이 아니다.
+
+## 모델에서 token까지
+
+Group Membership protocol mapper는 full path를 access token의 `groups` 배열에 싣는다. 기본 Realm
+Role mapper는 group에서 상속한 role을 `realm_access.roles`에 싣는다. Audience mapper는 별도로
+`lab-api`를 `aud`에 추가한다. 세 mapper의 목적을 합치지 않는다.
+
+## Token에서 API까지
+
+| 사용자 | Keycloak group | access token | API 결과 |
+|---|---|---|---|
+| alice | `/app-users`, `/api-admins` | `app-user`, `api-admin`, `aud=lab-api` | `/user` 200, `/admin` 200 |
+| bob | `/app-users` | `app-user`, `aud=lab-api` | `/user` 200, `/admin` 403 |
+
+P08은 각 단계의 Admin API 상태, 실제 RS256 token의 `iss`·`aud`·`exp`·claim, 앱 A에서 API로 보낸
+결과를 모두 확인했다. 어느 한 단계의 UI만 보고 끝내지 않았다.
+
+:::tip[문제는 왼쪽부터 찾는다]
+원본 membership → Federation provider → LDAP mapper → Keycloak group/role → protocol mapper → token →
+소비자 정책 순서로 확인하면 같은 "권한 없음"도 끊긴 경계를 찾을 수 있다.
+:::
+
+## 요약
+
+- LDAP group mapper와 OIDC protocol mapper는 서로 다른 경계다.
+- group의 role mapping은 조직 membership을 앱이 이해할 권한 라벨로 바꾼다.
+- audience도 권한 claim과 별도로 API가 자기 token인지 확인하게 해야 한다.
+- Admin 모델, 실제 token, 최종 API 403/200까지 이어서 검증한다.

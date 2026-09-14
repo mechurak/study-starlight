@@ -60,8 +60,7 @@ export default {
 		},
 		{
 			"id": "directory",
-			"label": "외부 디렉터리",
-			"allowEmpty": true
+			"label": "외부 디렉터리"
 		},
 		{
 			"id": "integrations",

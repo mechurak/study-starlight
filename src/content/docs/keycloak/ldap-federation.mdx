@@ -1,0 +1,76 @@
+---
+title: "LDAP User Federation"
+description: "READ_ONLY provider로 외부 계정을 찾고 password를 디렉터리에서 검증하며 import·sync·cache를 구분하는 방법"
+aliases: [User Federation, LDAP provider, READ_ONLY, import users, LDAP sync, user cache]
+reviewedAt: 2026-09-14
+deckGroup: directory
+sidebar:
+  order: 1120
+---
+
+import Thesis from '../../../components/docs/Thesis.astro';
+import TermIntro from '../../../components/docs/TermIntro.astro';
+
+<Thesis>READ_ONLY Federation은 외부 디렉터리를 사용자·password 원본으로 유지하면서 Keycloak 모델에 필요한 데이터를 가져온다.</Thesis>
+
+외부 사용자가 Keycloak 로그인 화면을 사용해도 계정 원본이 Keycloak로 이동한 것은 아니다. provider는
+사용자를 찾고 password 검증을 LDAP에 맡기며, import·sync·cache는 각기 다른 복사와 갱신 시점을 다룬다.
+
+<TermIntro
+  terms={[
+    ['User Federation provider', '', 'Keycloak의 공통 사용자 모델 뒤에 LDAP 같은 외부 저장소를 연결하는 구성 요소.'],
+    ['edit mode', '', 'Keycloak에서 바꾼 사용자 데이터가 외부 저장소에 쓰일 수 있는지를 정하는 정책. READ_ONLY는 쓰기를 막는다.'],
+    ['import', '', '외부 사용자의 일부 데이터를 Keycloak DB에 로컬 표현으로 만드는 동작. password 원본 이동과 같지 않다.'],
+    ['sync', '', '외부 원본의 사용자·group 변화를 명시적으로 Keycloak 모델에 반영하는 작업. cache clear와 별개다.'],
+  ]}
+/>
+
+## 큰 그림
+
+`로그인 ID로 사용자 탐색 → LDAP user entry 확인 → 제출 password로 bind → Keycloak user/session 생성 →
+token 발급` 순서다. provider가 중단되면 외부 password 검증이 필요한 새 로그인과 이미 만들어진 session은
+다르게 움직일 수 있다.
+
+## 이 장에서 답할 질문
+
+- READ_ONLY·import enabled는 무엇을 보장하는가?
+- full sync와 cache는 어떻게 다른가?
+- 외부 사용자 로그인의 성공과 실패를 무엇으로 확인하는가?
+
+## 원본 소유권을 정한다
+
+이 실습의 `samba-ad` provider는 `READ_ONLY`, `importEnabled=true`, `syncRegistrations=false`다.
+Keycloak에서 LDAP 사용자 password나 원본 속성을 수정하지 않는다. 계정 생성·비활성화·group membership의
+원본 변경은 Samba에서 수행한다.
+
+import는 사용자 표현과 mapper 결과를 Keycloak DB에 두어 session·token 처리에 쓸 수 있게 한다. 그러나
+LDAP password를 Keycloak credential로 복사했다는 뜻은 아니다. 정상 alice/bob password는 실제 LDAP
+bind로 검증했고 오답은 실패했다.
+
+## Sync와 cache를 나눈다
+
+| 동작 | 바꾸는 것 | 바꾸지 않는 것 |
+|---|---|---|
+| full user sync | 외부 사용자 표현의 import/update | group mapper의 membership 전체 |
+| `fedToKeycloak` group sync | LDAP group membership을 Keycloak group 모델로 반영 | 이미 발급된 token |
+| user cache clear | 현재 node가 이전 사용자 값을 재사용하지 않게 함 | 외부 원본·DB 설정 |
+
+이 실습은 주기 sync를 끄고 변화를 관찰할 때 명시적으로 실행한다. P09에서 group sync 직후에도
+`DEFAULT` cache가 이전 membership을 반환해 공식 user-cache clear를 추가했다. 이를 import DB와 같은
+것으로 설명하거나 provider를 즉석에서 `NO_CACHE`로 바꾸지 않는다.
+
+## 성공과 실패를 확인한다
+
+P08은 directory CA가 있는 LDAPS-only provider에서 full user sync 뒤 alice와 bob의 Authorization Code
++ PKCE 로그인을 성공시켰다. 연결은 StartTLS·Kerberos를 끄고, Keycloak service만 directory CA를
+truststore로 읽었다. 잘못된 password와 CA 경로는 별도 음성 검증으로 실패했다.
+
+[Keycloak LDAP 문서](https://www.keycloak.org/docs/26.7.0/server_admin/#_ldap)은 edit mode, import,
+sync와 cache policy의 동작을 설명한다.
+
+## 요약
+
+- READ_ONLY는 외부 디렉터리를 원본으로 유지하며 Keycloak의 LDAP 쓰기를 막는다.
+- import된 사용자 표현과 password 원본은 다르다.
+- user sync·group mapper sync·cache clear는 서로 다른 상태를 갱신한다.
+- 새 외부 로그인 성공은 실제 LDAP bind와 OIDC callback까지 확인해야 한다.
