@@ -322,3 +322,63 @@ Supabase 8개 workload의 전후 fingerprint/state가 같았다. P08 상세 산�
 
 P08의 macOS/Colima 결과도 네이티브 Ubuntu의 P03 또는 P08 결과로 일반화하지 않는다. Ubuntu 24.04 +
 rootful Docker Engine의 기존 P03 플랫폼 검증은 계속 미실행이며 별도 실행 결과가 필요하다.
+
+## P09 변경·장애 시나리오
+
+| 환경 | 상태 | 실제 범위 |
+|---|---|---|
+| macOS 26.6.2 arm64 + Colima 0.10.3 | 비브라우저 자동 검증 통과 | Keycloak 26.7.3, Samba 4.19.5 AD 호환 대역, 앱 A·API, Authorization Code + PKCE |
+| 네이티브 Ubuntu 24.04 + rootful Docker Engine | 미실행 | Ubuntu P03 플랫폼 검증과 함께 별도 실행해야 함 |
+
+P05·P06의 macOS browser CA trust·로그인과 Ubuntu P03 플랫폼 검증은 기존 `blocked`/보류 상태를
+유지했다. P09는 그 항목을 선행 차단으로 쓰지 않았으며 password grant나 TLS 검증 우회로 사용자
+browser flow를 대체하지 않았다. 일회성 관리 service의 기존 bootstrap 인증과 사용자용 Authorization
+Code + PKCE를 분리했다. credential·cookie·authorization code·token은 stdout이나 검증 파일에 남기지
+않았고 access/refresh token과 두 종류 cookie는 진단 process memory에서만 보관했다.
+
+실행 직전 P08의 alice/bob 로그인, group/role/claim과 API 결과가 모두 정상임을 다시 확인했다. 여섯
+service가 healthy였고 두 named volume, domain SID
+`S-1-5-21-2785298756-3808558117-572789873`, 두 CA와 기존 secret·P03~P08 기록이 남아 있었다.
+Colima는 4 CPU/8,307,167,232 bytes였고 최종 성공 실행 시작 시 `MemAvailable`은 5,874,328 KiB,
+Docker data disk 여유는 79,887,776 KiB였다. 별도 Supabase container 8개도 이전과 같은
+running/health/mount 상태였다.
+
+다음을 실행해 P09 범위만 검증했다.
+
+```bash
+cd labs/keycloak
+./scripts/verify-p09.sh
+```
+
+공통 관찰 조건은 provider `READ_ONLY`, import enabled, cache `DEFAULT`, full/changed periodic sync `-1`,
+MSAD account-control mapper의 always-read-enabled `true`였다. realm은 access token lifespan 300초,
+SSO idle/max 1,800/36,000초, client session override 0, refresh-token revocation `false`였다. source 변경
+뒤 명시적 full/group sync와 user cache clear를 완료하고 Admin API 상태가 기대값이 된 시점에만 진단을
+진행했다. 관찰 순서는 기존 JWT, 새 로그인 전 refresh, 새 로그인, 별도 기존 refresh, 앱 session이었다.
+
+| 독립 시나리오 | 변경 반영 조건·경과 | 새 로그인 | refresh | 기존 JWT | 앱 A session |
+|---|---|---|---|---|---|
+| `api-admins`에서 alice 제거 | group sync + cache clear 뒤 Keycloak alice=`app-users`; 조건 대기 1,432 ms, 전체 진단 2초 | 성공. groups=`/app-users`, role=`app-user`; `/user` 200, `/admin` 403 | 새 로그인 전후 모두 200. 새 token도 같은 group/role과 API 200/403 | 만료까지 298초 남은 token으로 `/user`·`/admin` 200 | authenticated 유지. session의 기존 token으로 `/user`·`/admin` 200 |
+| alice 계정 disable | Samba UAC disabled + full sync + cache clear 뒤 Keycloak enabled=false; 조건 대기 1,426 ms, 전체 진단 2초 | credential 제출 응답 HTTP 200에서 거부, callback/code 없음 | 새 로그인 전후 모두 HTTP 400 `invalid_grant` | 만료까지 299초 남은 token으로 `/user`·`/admin` 200 | authenticated 유지. session의 기존 token으로 `/user`·`/admin` 200 |
+| Samba 중단 | exact container stopped 확인; 조건 대기 710 ms, LDAP 실패를 포함한 전체 진단 5초 | HTTP 400으로 거부, callback/code 없음 | 실패 로그인 전후 모두 200. 새 token에 `/app-users`,`/api-admins`와 `app-user`,`api-admin`; API 200/200 | 만료까지 294초 남은 token으로 `/user`·`/admin` 200 | authenticated 유지. session의 기존 token으로 `/user`·`/admin` 200 |
+
+group 변경 중 bob의 새 token과 API도 직접 확인했다. bob은 groups=`/app-users`, role=`app-user`,
+`/user` 200과 `/admin` 403으로 기존 판정이 유지됐다. group sync만 한 최초 시도에서는 `DEFAULT` user
+cache 때문에 Admin API가 이전 alice membership을 반환했다. source를 즉시 복구한 뒤 공식 user-cache
+clear를 sync 뒤 수행하도록 고쳤으며 최종 실행에서는 기대 membership을 조건으로 확인했다.
+
+초기 구현의 두 시도는 source 변경 전 진단 준비 marker를 UID 1000 container가 host 임시 디렉터리에
+쓰지 못해 중단됐다. 두 경우 모두 종료 trap이 membership·enabled·Samba health와 Keycloak 상태를
+확인해 정상화했다. marker를 container의 제한된 tmpfs에 두고 container state로 기다리도록 바꿨다.
+group cache를 발견한 중간 실패까지 포함해 모든 실패 경로에서 같은 복구 postcondition을 통과했다.
+
+각 성공 시나리오 뒤 alice enabled, `api-admins(alice)`, Samba healthy, Keycloak의 alice/bob membership을
+복구했다. 마지막 P08 범위 재검증은 시작 전 결과와 byte-for-byte 같았다: alice는 group/role 두 개와
+API 200/200, bob은 `app-users`/`app-user`와 API 200/403, local-user는 P07 API 200/403이었다. 여섯
+service는 최종 healthy이고 두 volume, SID, CA·secret, P03~P08 기록과 Supabase 8개 workload의 전후
+fingerprint/state도 같았다. P09 상세 산출물은 비밀값을 제외한 `.state/verification/p09/`에 있다.
+
+### Ubuntu P03 플랫폼 검증 보류 유지
+
+P09의 macOS/Colima 결과도 네이티브 Ubuntu의 P03 또는 P09 결과로 일반화하지 않는다. Ubuntu 24.04 +
+rootful Docker Engine의 기존 P03 플랫폼 검증은 계속 미실행이며 별도 실행 결과가 필요하다.

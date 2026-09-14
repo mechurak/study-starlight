@@ -329,6 +329,39 @@ services:
     cpus: 0.25
     mem_limit: 256m
 
+  p09-admin:
+    image: keycloak-lab-app:node24
+    build:
+      context: ./app
+      args:
+        NODE_IMAGE: node:24.21.0-bookworm-slim@sha256:2fe369e969550cde8e867afc3fe370b260140cab4a23d467074295b42163d553
+    profiles:
+      - p09
+    entrypoint:
+      - node
+      - seed-p09.mjs
+    user: node
+    read_only: true
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    secrets:
+      - keycloak_bootstrap_admin_password
+    volumes:
+      - ./.state/web-ca/ca.crt:/run/keycloak-lab/web-ca/ca.crt:ro
+    tmpfs:
+      - /tmp:size=16m,mode=1777
+    networks:
+      - keycloak-lab
+    depends_on:
+      keycloak:
+        condition: service_healthy
+    environment:
+      NODE_EXTRA_CA_CERTS: /run/keycloak-lab/web-ca/ca.crt
+    cpus: 0.25
+    mem_limit: 256m
+
   app-b:
     image: keycloak-lab-app:node24
     build:
@@ -503,6 +536,41 @@ services:
       app-a:
         condition: service_healthy
       app-b:
+        condition: service_healthy
+      api:
+        condition: service_healthy
+    cpus: 0.25
+    mem_limit: 256m
+
+  p09-diagnostic:
+    image: keycloak-lab-app:node24
+    profiles:
+      - p09
+    entrypoint:
+      - node
+      - /opt/keycloak-lab-app/verify-p09.mjs
+    user: node
+    read_only: true
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    environment:
+      NODE_EXTRA_CA_CERTS: /run/keycloak-lab/web-ca/ca.crt
+    secrets:
+      - samba_alice_password
+      - samba_bob_password
+    volumes:
+      - ./scripts/verify-p09.mjs:/opt/keycloak-lab-app/verify-p09.mjs:ro
+      - ./.state/web-ca/ca.crt:/run/keycloak-lab/web-ca/ca.crt:ro
+    tmpfs:
+      - /tmp:size=16m,mode=1777
+    networks:
+      - keycloak-lab
+    depends_on:
+      keycloak:
+        condition: service_healthy
+      app-a:
         condition: service_healthy
       api:
         condition: service_healthy

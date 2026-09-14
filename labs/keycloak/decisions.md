@@ -437,6 +437,43 @@ P05-C는 배포하지 않고 공식 문서와 현재 runtime을 읽기 전용으
   지원을 대조했다. `GroupMembershipMapper` source에서는 full group path를 access token claim으로
   출력하는 설정을 확인했다.
 
+## 2026-09-14 P09 변경·장애 관찰 결정
+
+P09는 provider 설정을 바꾸지 않고 P08의 `READ_ONLY`, `importEnabled=true`, `cachePolicy=DEFAULT`,
+`fullSyncPeriod=-1`, `changedSyncPeriod=-1`을 관찰 조건으로 고정한다. 주기 sync가 모두 꺼져 있으므로
+Samba 변경 뒤에는 full user sync 또는 `fedToKeycloak` group mapper sync를 명시적으로 호출한다.
+26.7 가이드가 설명하는 import DB와 user cache를 같은 것으로 취급하지 않는다. 실제 26.7.3에서 group
+sync 직후 현재 노드의 Admin API가 이전 membership을 반환한 것을 확인했으므로, P09 관리 절차는 sync가
+성공한 뒤 공식 `POST /admin/realms/study/clear-user-cache`를 호출하고 기대한 user/group 상태를 조건으로
+확인한다. 이는 provider를 `NO_CACHE`로 바꾸는 설계 변경이 아니다.
+
+Samba `userAccountControl`은 자동 생성된 `msad-user-account-control-mapper`가 읽는다. 현재 mapper의
+`always.read.enabled.value.from.ldap=true`를 확인했고, Samba에서 alice를 disable한 뒤 full sync와 cache
+clear로 Keycloak `enabled=false`가 된 경우만 비활성화 시나리오 관찰을 시작한다. 26.7.3 mapper source는
+import 시 `ACCOUNTDISABLE`을 Keycloak enabled 값에 반영한다. refresh 경로의 `TokenManager`는 현재
+session user가 disabled면 `invalid_grant`를 반환한다. 반면 API가 이미 발급된 JWT의 서명·issuer·audience·
+expiration만 로컬 검증하는 P07 계약은 바꾸지 않으므로, 계정 disable 자체가 기존 JWT를 회수한다고
+서술하지 않는다.
+
+관찰 당시 realm 값은 access token 300초, SSO session idle 1,800초/max 36,000초, client session
+idle/max override 0, refresh-token revocation/rotation false였다. P09 진단 client는 Authorization Code +
+PKCE로 얻은 access/refresh token을 process memory에만 보관한다. 앱 A는 P06/P07 설계대로 refresh token을
+저장하지 않고 memory session에 access token을 보관하므로, 앱 `/session`의 로그인 상태와 그 session이
+기존 token으로 호출한 API 결과를 따로 기록한다.
+
+Samba 중단 시나리오는 정확한 `keycloak-lab-samba` container만 stop하고 stopped 조건을 확인한다.
+고정 26.7.3와 위 `DEFAULT` cache 구성에서는 LDAP 비밀번호 검증이 필요한 새 로그인은 실패했지만,
+중단 전에 만들어진 두 client session의 refresh는 실패한 새 로그인 전후 모두 성공했고 기존
+group/role claim을 다시 발급했다. 이 결과는 단일 Keycloak node와 Samba 4.19.5 AD 호환 실습 대역에서
+관찰한 cache/session 동작이며 Microsoft AD DS, 다른 cache policy, cache eviction 뒤 또는 다중 node의
+일반 보장이 아니다.
+
+각 시나리오는 별도 변경 전 token·refresh·앱 session을 만들고, source/Keycloak 조건 확인 뒤
+`기존 JWT → refresh → 새 로그인 → 별도 기존 refresh → 앱 session` 순서로 관찰한다. 성공 여부와 무관하게
+Samba health, alice enabled, `api-admins(alice)`, full/group sync와 user cache clear까지 복구한 뒤 다음
+시나리오를 시작한다. 고정 sleep은 readiness나 state 결과로 사용하지 않고 health·container state·
+명시적 marker와 Admin API 상태를 deadline 안에서 poll하는 데만 사용한다.
+
 ## 공식 근거
 
 - Keycloak: [26.7.3 release](https://github.com/keycloak/keycloak/releases/tag/26.7.3),
@@ -451,7 +488,10 @@ P05-C는 배포하지 않고 공식 문서와 현재 runtime을 읽기 전용으
   [26.7 LDAP/AD](https://www.keycloak.org/docs/26.7.0/server_admin/#_ldap),
   [26.7.3 LDAP provider factory](https://github.com/keycloak/keycloak/blob/26.7.3/federation/ldap/src/main/java/org/keycloak/storage/ldap/LDAPStorageProviderFactory.java),
   [26.7.3 LDAP group mapper factory](https://github.com/keycloak/keycloak/blob/26.7.3/federation/ldap/src/main/java/org/keycloak/storage/ldap/mappers/membership/group/GroupLDAPStorageMapperFactory.java),
+  [26.7.3 MSAD account control mapper](https://github.com/keycloak/keycloak/blob/26.7.3/federation/ldap/src/main/java/org/keycloak/storage/ldap/mappers/msad/MSADUserAccountControlStorageMapper.java),
   [26.7.3 OIDC group mapper](https://github.com/keycloak/keycloak/blob/26.7.3/services/src/main/java/org/keycloak/protocol/oidc/mappers/GroupMembershipMapper.java),
+  [26.7.3 refresh validation](https://github.com/keycloak/keycloak/blob/26.7.3/services/src/main/java/org/keycloak/protocol/oidc/TokenManager.java),
+  [Admin REST user cache clear](https://www.keycloak.org/docs-api/latest/rest-api/index.html#_post_adminrealmsrealmclear_user_cache),
   [26.7.3 user-storage Admin client paths](https://github.com/keycloak/keycloak/blob/26.7.3/js/libs/keycloak-admin-client/src/resources/userStorageProvider.ts)
 - kind/Kubernetes: [kind v0.33.0 release](https://github.com/kubernetes-sigs/kind/releases/tag/v0.33.0),
   [kind quick start](https://kind.sigs.k8s.io/docs/user/quick-start/),
