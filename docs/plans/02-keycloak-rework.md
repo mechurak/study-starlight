@@ -2,8 +2,8 @@
 
 작성일: 2026-09-14
 상태: 진행 중
-지금 위치: Compose 중심으로 계획 전환 완료 · P04 kind 검증 기록 보존 · 다음 P05-C → P05
-실행 범위: 계획 문서 갱신만 — 기본 실습을 Docker Compose로 전환하고 Kubernetes는 후속 선택 실습으로 둔다. 구현·실행 환경 변경은 이번 범위에 포함하지 않는다.
+지금 위치: P05-C Compose 계약 정리 완료 · P04 kind 검증 기록 보존 · 다음 Compose 기반 P05
+실행 범위: P05-C만 완료 — decisions·Keycloak baseline·계획 기록의 Compose 계약을 갱신했다. 배포 파일·본문·실행 환경 변경은 이번 범위에 포함하지 않는다.
 보류: Ubuntu P03 플랫폼 검증 보류 — macOS/Colima 결과를 Ubuntu 결과로 일반화하지 않는다.
 
 [계획 관리 규칙](README.md)의 번호·상태·갱신·완료 절차를 따른다.
@@ -23,8 +23,9 @@ Samba는 AD 호환 디렉터리 실습에 사용한다. 결과를 Microsoft AD D
 검증한 것으로 서술하지 않는다. LDAP/LDAPS 연동을 본선으로 하고 Kerberos/SPNEGO를 이용한
 데스크톱 SSO는 심화 범위로 남긴다.
 
-이번에는 합의한 Compose 전환을 계획에만 반영한다. 인증·SSO·API 인가·LDAP 연동을 Compose에서 먼저
-완성하고, Kubernetes 배포·kubectl OIDC는 기본 실습 완료 후 별도 요청으로 실행하는 선택 실습으로 둔다.
+P05-C에서 합의한 Compose 전환을 decisions와 baseline의 계약에 반영했다. 인증·SSO·API 인가·LDAP
+연동을 Compose에서 먼저 완성하고, Kubernetes 배포·kubectl OIDC는 기본 실습 완료 후 별도 요청으로
+실행하는 선택 실습으로 둔다.
 P04의 kind 검증은 당시 결과로 보존하며 Compose 경로의 검증을 대신하지 않는다. 네이티브 Ubuntu P03은
 사용자가 나중에 별도로 수행한다. macOS/Colima P03 통과를 바탕으로 Compose 후속 작업은 진행할 수 있다.
 작업은 **작업 ID 하나씩 맡길 수 있도록** 분리했다. 후속 요청이 한 작업이면 그 작업까지,
@@ -44,8 +45,8 @@ P04의 kind 검증은 당시 결과로 보존하며 Compose 경로의 검증을 
 
 계획 문서는 계획 번호를 붙인다. 학습 페이지는 번호 없는 이름을 사용하며, 기존 CKA 개편 계획의
 학습 페이지 번호 명명·커밋·전체 브라우저 순회 절차를 가져오지 않는다.
-P01에서 정한 인증/인가·두 단계 매핑·세션/토큰·issuer 구분은 유지한다. 현재 baseline과 decisions의
-kind 배치 계약은 아직 이전 설계이므로 P05-C에서 Compose 설계와 맞춘 후 P05를 구현한다.
+P01에서 정한 인증/인가·두 단계 매핑·세션/토큰·issuer 구분은 유지한다. P05-C에서 baseline과
+decisions를 Compose 설계에 맞췄으므로 다음 작업은 Compose 기반 P05 구현·검증이다.
 
 ## 완료 조건
 
@@ -57,7 +58,7 @@ kind 배치 계약은 아직 이전 설계이므로 P05-C에서 Compose 설계�
 - [ ] 기존 내용의 주요 절마다 이관 목적지가 있고 옛 URL·절 북마크의 처리 결과가 남는다.
 - [ ] 사이트 검사와 실제 실습 검증을 구분하고, 실행하지 못한 실습을 성공으로 기록하지 않는다.
 
-## 기본 설계와 미확정 사항
+## 확정한 기본 설계와 미검증 사항
 
 ```text
 macOS / Colima / Docker 또는 Ubuntu / Docker Engine
@@ -69,44 +70,47 @@ macOS / Colima / Docker 또는 Ubuntu / Docker Engine
 ```
 
 기존 Compose project·bridge `keycloak-lab`, Samba 주소·domain·named volume·CA·secret은 보존한다.
-P05-C에서 Compose의 주소·포트·DNS·인증서 mount·DB volume 계약을 먼저 확정한다. 호스트의 기존
-클러스터·DNS·CA 설정을 덮어쓰지 않는다.
+P05-C에서 Compose의 주소·포트·DNS·인증서 mount·DB volume·자원 계약과 P04 node 처리 절차를
+확정했다. 호스트의 기존 cluster·DNS·CA 설정을 덮어쓰지 않는다.
 
 | 항목 | 기본 방향 | 확정 작업 |
 |---|---|---|
 | 지원 환경 | macOS + Colima와 Ubuntu + Docker Engine. 실제 OS/runtime/CPU 아키텍처를 기록하고 환경별 검증 결과를 구분 | P02, P03 |
 | Samba 이미지 | 출처·유지 상태·아키텍처·권한 요구를 확인. 적합한 이미지가 없으면 Ubuntu 패키지 기반 Dockerfile 작성 | P02, P03 |
-| 버전 | Keycloak·PostgreSQL·Samba·앱의 P02 고정값 유지. kind/node는 선택 실습용으로 보존. `latest` 사용 금지 | P02, P05-C |
-| 네트워크 | Compose 전용 bridge에서 서비스 이름·alias로 통신. 진단 container에서 Samba DNS·LDAPS 경로 확인 | P05-C, P05 |
-| 주소 | 공개 Keycloak issuer 하나를 브라우저와 container에서 동일하게 사용. callback·내부 listener·host publish 포트를 함께 확정 | P05-C, P05 |
-| TLS | HTTPS와 LDAPS의 분리 CA와 검증 유지. 로컬 secret·인증서의 Compose mount 방식 확정 | P05-C, P05 |
+| 버전 | Keycloak·PostgreSQL·Samba·앱의 P02 고정값 유지. kind/node는 선택 실습용으로 보존. `latest` 사용 금지 | P02, P05-C 완료 |
+| 네트워크 | Compose bridge의 유일한 service alias 사용. Samba `.10`, Keycloak `.20`; DB·API·Samba host publish 없음 | P05-C 완료, P05 검증 |
+| 주소 | issuer `https://keycloak.keycloak.test:30080/realms/study`. host는 loopback, container는 alias로 같은 FQDN·port 사용 | P05-C 완료, P05 검증 |
+| TLS | web/directory CA 분리. public cert/CA는 read-only, private key·비밀번호는 service별 Compose secret mount | P05-C 완료, P05 검증 |
 | 배포 | 단일 Keycloak + PostgreSQL을 Compose로 실행. Kubernetes·Operator는 운영 설명 및 후속 선택 실습 | P05 |
 | 테스트 앱 | 검증된 OIDC 라이브러리를 쓰는 최소 앱 하나를 A/B 두 Client로 실행하고 API 인가 확인 | P06 |
-| 영속성 | Samba와 DB 데이터의 위치·수명·초기화 대상을 명시 | P03, P05, P10 |
+| 영속성 | Samba `keycloak-lab-samba-data`; PostgreSQL 18은 `keycloak-lab-postgres-data`를 `/var/lib/postgresql`에 mount | P03, P05-C 완료, P05·P10 검증 |
+| 자원 | 4 CPU/8 GiB, 시작 전 가용 memory 5 GiB, disk 여유 20 GiB. service limit 합계 4 CPU/4.5 GiB | P05-C 완료, P05·P11 실측 |
 
-현재 P03 Samba와 P04 kind-to-Samba 경로는 macOS/Colima에서 검증했다. Compose의 Keycloak·앱 경로와
-네이티브 Ubuntu는 아직 검증하지 않았다. 불가능한 환경 조건을 만나면 이유와 다음 조치를 기록하며,
-사용자 합의 없이 VM을 추가하거나 Samba를 다른 제품으로 바꾸지 않는다.
+현재 P03 Samba와 P04 kind-to-Samba 경로는 macOS/Colima에서 검증했다. P05-C의 Compose 값은 문서
+계약이며 Compose의 Keycloak·앱 경로와 네이티브 Ubuntu는 아직 검증하지 않았다. 불가능한 환경 조건을
+만나면 이유와 다음 조치를 기록하며, 사용자 합의 없이 VM을 추가하거나 Samba를 다른 제품으로 바꾸지 않는다.
 
 ### Compose 전환 계약과 기존 환경 처리
 
-P05-C는 다음 변경을 `labs/keycloak/decisions.md`와 Keycloak baseline에 반영하는 계약 정리 작업이다.
-이번 계획 수정에서는 두 파일과 실행 환경을 변경하지 않는다.
+P05-C는 다음 변경을 `labs/keycloak/decisions.md`와 Keycloak baseline에 반영한 계약 정리 작업이다.
+이번 작업은 두 계약 문서와 이 계획만 변경했고 실행 환경은 변경하지 않았다.
 
-- 현재 공개 URL·issuer·callback 이름은 우선 유지한다. Compose DNS alias와 container listener를 어떻게
-  연결할지 확정해 브라우저와 container에서 같은 URL·포트로 TLS 검증 및 discovery/JWKS 접근이 가능해야 한다.
-  host port만 바꿔 연결하고 container 내부에서는 다른 issuer를 쓰는 구성으로 해결하지 않는다.
+- 현재 공개 URL·issuer·callback 이름을 유지했다. host loopback/hosts와 Compose DNS alias를 나누고
+  container listener를 같은 번호로 맞춰 브라우저와 container가 같은 URL·port로 TLS 검증 및
+  discovery/JWKS에 접근하게 한다. container 내부용 issuer는 따로 만들지 않는다.
 - CoreDNS·NodePort·ClusterIP·PVC·Kubernetes Secret 전제를 Compose 서비스 DNS·loopback publish·
-  named volume·로컬 파일 기반 secret/인증서 mount 계약으로 바꾼다. DB·API·Samba는 host에 publish하지 않는다.
-- P04 node가 점유하는 `.20`과 host `30080`~`30082`를 조사한다. 해당 주소·포트를 Compose에 재사용한다면
-  P05 실행 시 이 실습 소유 node의 연결·포트를 먼저 해제하는 절차와 데이터 보존 범위를 확정한다.
-  node 중단만으로 bridge IP까지 해제된다고 가정하지 않는다. 이번 계획 수정으로 cluster를 중단·삭제하지 않는다.
+  named volume·로컬 파일 기반 secret/인증서 mount 계약으로 바꿨다. DB·API·Samba는 host에 publish하지 않는다.
+- P04 node가 실제 점유한 `.20`과 host `30080`~`30082`는 P05에서 재사용한다. 단순 stop이 아니라 label·
+  image·주소·port를 확인한 `keycloak-lab` 하나만 `kind delete cluster --name ... --kubeconfig ...`로
+  삭제하고, `.20` owner와 port가 비었으며 Samba·volume·CA·secret·P03/P04 기록이 유지됐는지 확인한
+  뒤 Compose를 시작한다. P05-C에서는 cluster를 중단·삭제하지 않았다.
 - 기존 `kind.yaml`, `kind/`, 진단 Pod와 P04 기록은 선택 실습 참고로 보존한다. 기본 시작·검증·초기화는
   이 파일이나 실행 중인 kind cluster에 의존하지 않아야 한다. 향후 정확한 실습 cluster를 정리해도
   Samba named volume·로컬 CA·secret은 유지하며, 전역 prune이나 Colima 초기화는 하지 않는다.
-- Colima 2 CPU/2 GiB와 동시 실행 Supabase를 기준으로 Compose 전체 자원을 다시 산정한다. 기존
-  4 CPU/8 GiB 권장은 출발점이며, kind 제외만으로 2 GiB가 충분하다고 판정하지 않는다. 증설·runtime
-  변경 시 다른 workload의 중단 및 데이터 영향을 확인하고 필요한 사용자 결정을 기록한다.
+- 실측한 Colima 2 CPU/2 GiB·가용 memory 약 278 MiB는 P05 계약을 충족하지 않는다. 기본 경로는 사용자와
+  중단 시간을 합의한 별도 작업에서 default profile을 4 CPU/8 GiB로 증설하고 기존 named volume과 bind
+  mount를 보존하는 것이다. 실행 중 Supabase 8개는 약 720 MiB를 쓰고 limit이 없으므로 증설 뒤에도
+  가용 memory 5 GiB를 다시 확인한다. 다른 workload를 사용자 승인 없이 중단하지 않는다.
 
 ### Ubuntu P03 플랫폼 검증 보류
 
@@ -164,8 +168,8 @@ src/content/docs/keycloak/
 ## 선행 구현 작업
 
 모든 작업은 시작 전 공통 지침을 읽는다. 아래 입력은 추가로 필요한 파일/기록이다.
-P01~P04의 기록은 보존한다. 남은 기본 작업은 P05-C → P05~P11 순서로 실행한다.
-P05-C/P05는 macOS P03 검증 결과를 입력으로 사용하며 P04 cluster 실행을 선행 조건으로 두지 않는다.
+P01~P04와 P05-C의 기록은 보존한다. 남은 기본 작업은 P05~P11 순서로 실행한다.
+P05는 macOS P03 검증 결과와 P05-C 계약을 입력으로 사용하며 P04 cluster 실행을 선행 조건으로 두지 않는다.
 각 작업의 계획 기록 수정은 항상 범위에 포함된다.
 
 | ID | 입력 | 수정 범위와 작업 | 완료 판정 |
@@ -343,27 +347,24 @@ Astro/호스팅 구성을 먼저 확인하고 필요한 [배포 지침](../deplo
 | 작업 | 상태 | 변경 파일 | 검증 결과/근거 | 결정·잔여 문제 | 다음 작업 |
 |---|---|---|---|---|---|
 | Compose 전환 계획 | done | 이 문서만 | 기존 diff·P01~P04 기록·baseline·decisions 대조, `git diff --check`와 참조 경로 확인 | 사용자 합의에 따라 기본 실습을 Compose로 전환. P04 실행 기록은 당시 결과로 보존하며 위 기록의 다음 작업은 이 행으로 갱신. decisions/baseline 및 실습 구현은 아직 이전 계약이므로 P05-C에서 먼저 정리. 실행 중인 cluster와 기존 파일·volume·CA·secret에는 변경 없음. Ubuntu P03 플랫폼 검증 보류 유지 | P05-C → P05 |
-| P05-C | todo | 예정: decisions, Keycloak baseline, 계획 기록 | 미실행 | Compose 주소·listener·DNS·CA·DB volume·자원과 P04 node의 주소/포트 충돌 처리 계약 확정 필요 | P05 |
+| P05-C | done | `labs/keycloak/decisions.md`, `src/content/docs/keycloak/_baseline.md`, 이 문서 | 2026-09-14 공식 Keycloak hostname/TLS/truststore/container·Docker Compose alias/port/secret/volume/down·PostgreSQL 18 volume·kind delete 문서 및 로컬 kind help 대조. Git 초기 상태 clean. P04 node/network/port, Colima 자원·disk·memory, 실행 중 Supabase와 mount/limit을 읽기 전용 조사. `git diff --check`, 변경 diff와 내부·공식 참조 경로 확인. 배포·cluster/Colima 변경·실습 검증은 미실행 | issuer와 내부 listener를 `keycloak.keycloak.test:30080` 하나로 통일하고 host loopback/hosts와 Compose alias를 분리. web/directory CA, service별 secret mount, Samba/PG18 named volume, 4 CPU/8 GiB·가용 memory 5 GiB·disk 20 GiB 계약 확정. P04 node의 `.20`·`30080`~`30082` 점유를 확인하고 exact cluster 하나의 삭제 전후 보존 절차를 기록. 현재 2 CPU/2 GiB와 Supabase 무제한 workload 때문에 P05 실제 기동 전 사용자 승인 아래 Colima 중단·증설 필요. file-backed secret의 실제 image UID read와 Compose 전체 값은 P05에서 검증. Ubuntu P03 플랫폼 검증 보류 유지 | Compose 기반 P05 |
 
 새 세션에 넘길 요청 예시:
 
 ```text
 AGENTS.md와 docs/plans/README.md를 읽고,
-docs/plans/02-keycloak-rework.md의 P05-C만 실행해줘.
+docs/plans/02-keycloak-rework.md의 Compose 기반 P05만 실행해줘.
 
-현재 git 상태와 P01~P04 실행 기록, Keycloak baseline, labs/keycloak/decisions.md,
-labs/keycloak/verification.md와 Compose 전환 계획 기록을 먼저 확인해.
+현재 git 상태와 P01~P05-C 실행 기록, Keycloak baseline, labs/keycloak/decisions.md,
+labs/keycloak/verification.md와 현재 compose/kind/Samba 파일을 먼저 확인해.
 Ubuntu P03 플랫폼 검증은 보류 상태이며 macOS 결과를 Ubuntu 결과로 일반화하지 마.
 
-기본 실습을 kind·kubectl 없이 Compose로 실행하도록 decisions와 baseline의 계약을 먼저 맞춰줘.
-필요한 공식 Compose·Keycloak 문서를 확인하고, 동일 issuer의 브라우저/container 접근,
-DNS alias·내부 listener·host port·분리 CA·secret mount·named volume·자원을 확정해.
-P04 node가 점유한 주소와 포트를 조사해 Compose 전환 시 필요한 정확한 처리 절차를 기록해.
-Samba named volume·domain·CA·secret은 보존하고 Colima의 다른 workload 영향을 확인해.
-P04 기록과 파일은 보존하되 기본 실습의 선행 조건에서 제외해.
-
-이번에는 계약 문서와 계획 기록만 수정하고 서비스 배포·cluster 중단/삭제·Colima 자원 변경·본문 개편은 하지 마.
-diff와 참조를 확인하고 계획에 실제 결정과 미해결 사항을 남겨줘.
-P05-C가 끝나면 다음 작업은 Compose 기반 P05로 두고 Ubuntu P03 플랫폼 검증 보류를 계속 표시해.
+P05-C 계약대로 PostgreSQL·Keycloak·진단 container와 Realm/로컬 계정·web CA 준비를 Compose에 구현해.
+P04 exact cluster를 정리하거나 Colima를 증설해 다른 workload를 중단해야 하기 전에는 현재 상태와
+보존 대상을 다시 확인하고 사용자 승인을 받아. 전역 prune/reset은 하지 말고 Samba named volume·domain·
+directory CA·secret과 P03/P04 기록을 보존해. 브라우저와 container가 같은 issuer로 TLS 검증과
+discovery/JWKS에 접근하고, Samba LDAPS 양/음성 경로와 P03 상태 유지, Keycloak/DB 재생성 후 상태를 검증해.
+file-backed secret을 실제 service UID가 읽는지도 확인해. P05 결과와 미실행 사항을 verification과 계획에
+기록하고, Ubuntu P03 플랫폼 검증 보류를 계속 표시해. 본문 개편은 하지 마.
 커밋·푸시는 하지 마.
 ```

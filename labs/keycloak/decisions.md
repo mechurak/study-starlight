@@ -3,23 +3,25 @@
 확인일: **2026-09-14**
 
 이 문서는 P03 이후 구현이 임의로 바꾸지 않을 실습 환경 계약이다. 원격 배포물 가용성과 실제 실행
-결과를 구분하며, 환경별 실행 결과와 미검증 사항은 `labs/keycloak/verification.md`에 남긴다.
+결과를 구분하며, 환경별 실행 결과와 미검증 사항은 `labs/keycloak/verification.md`에 남긴다. P05-C에서
+기본 실습을 Docker Compose로 확정했고, P04 Kubernetes 파일과 결과는 후속 선택 실습의 기록으로 보존한다.
 
 ## 지원 범위
 
 - 개인 환경은 **64-bit macOS + Colima의 Docker runtime**, 회사 환경은 **64-bit Ubuntu 24.04 LTS +
   rootful Docker Engine**을 지원한다. Docker Desktop, Ubuntu 파생 배포판, rootless Docker,
   Windows/WSL은 기본 지원 범위가 아니다.
-- CPU 아키텍처는 **linux/amd64**와 **linux/arm64**만 지원한다. macOS에서도 container와 kind node는
-  Colima Linux VM의 아키텍처를 사용한다. 한 환경의 모든 이미지는 runtime과 같은 아키텍처를 쓰며
+- CPU 아키텍처는 **linux/amd64**와 **linux/arm64**만 지원한다. macOS에서도 container는 Colima Linux
+  VM의 아키텍처를 사용한다. 한 환경의 모든 이미지는 runtime과 같은 아키텍처를 쓰며
   에뮬레이션은 지원 경로로 두지 않는다.
-- 클러스터 이름은 `keycloak-lab`, kubectl context는 `kind-keycloak-lab`, Kubernetes namespace는
-  `keycloak-lab`로 고정한다. 기존 cluster와 current context를 재사용하지 않는다.
+- 기본 실습은 Compose project와 bridge 이름을 모두 `keycloak-lab`으로 고정하고 kind·kubectl을 요구하지
+  않는다. P04의 cluster `keycloak-lab`, context `kind-keycloak-lab`, namespace `keycloak-lab`는 후속
+  Kubernetes 선택 실습에서만 다시 사용하며 기존 cluster나 host current context를 재사용하지 않는다.
 - 공통 `lab-environment` 덱은 macOS 기본 경로를 Colima, Ubuntu 기본 경로를 Docker Engine으로 둔다.
   Docker의 Ubuntu 설치 문서는 Ubuntu 24.04와 amd64/arm64를 지원한다. kind v0.33.0 릴리스도 node
   이미지의 amd64/arm64 지원과 runtime과 같은 플랫폼 사용을 명시한다.
-- Keycloak의 비 OpenShift Kubernetes 지원은 best-effort다. 이 kind 환경은 학습·장애 관찰용이며
-  Keycloak의 운영 지원 또는 HA를 검증하는 환경이 아니다.
+- 단일 Keycloak·PostgreSQL Compose 환경은 학습·장애 관찰용이며 운영 지원이나 HA를 검증하지 않는다.
+  Keycloak의 비 OpenShift Kubernetes 지원은 best-effort이므로 P04 kind 결과도 운영 보증으로 쓰지 않는다.
 
 호스트 도구는 다음 버전을 재현 기준으로 삼는다. macOS의 Compose는 전역 설치 대신 checksum을 고정한
 공식 standalone binary를 `.state/tools/`에 받는다. Ubuntu 설치 자체는 이 디렉터리에서 자동화하지
@@ -34,9 +36,9 @@
 | Ubuntu | Docker Engine / CLI | `29.8.0` (`5:29.8.0-1~ubuntu.24.04~noble`) | 2026-09-14 Docker 공식 stable apt 저장소에서 amd64/arm64 모두 확인 |
 | Ubuntu | containerd.io | `2.3.5-1~ubuntu.24.04~noble` | 위 Docker 패키지와 같은 공식 저장소의 현재 묶음 |
 | Ubuntu | Docker Compose plugin | `5.5.1-1~ubuntu.24.04~noble` | P03의 Compose 실행 기준 |
-| 공통 | kind | `v0.33.0` | 현재 stable tagged release |
-| 공통 | kubectl | `v1.35.8` | cluster patch와 일치시켜 version skew 변수를 없앰 |
-| 공통 | Kubernetes node | `v1.35.8` | 저장소의 Kubernetes v1.35 학습 기준을 유지하면서 kind v0.33.0이 제공하는 최신 1.35 patch 사용 |
+| 선택 실습 | kind | `v0.33.0` | P04 재현용 고정값. Compose 기본 실습에는 미사용 |
+| 선택 실습 | kubectl | `v1.35.8` | P04 cluster patch와 일치시킨 고정값. Compose 기본 실습에는 미사용 |
+| 선택 실습 | Kubernetes node | `v1.35.8` | P04와 후속 Kubernetes 선택 실습용 고정값 |
 
 ## 이미지와 패키지 고정
 
@@ -87,74 +89,144 @@ Ubuntu snapshot 서비스는 snapshot을 최소 2년 보존할 방침이라고 �
 |---|---|---|
 | Docker bridge | `keycloak-lab`, `172.30.0.0/24` | 이 실습 전용. 생성 전 기존 route/network와 겹치면 중단하고 decisions부터 변경 |
 | Samba DC | container `keycloak-lab-samba`, `172.30.0.10`, `dc1.ad.keycloak.test` | bridge 내부만. host port publish 없음 |
-| kind control plane의 bridge 주소 | `172.30.0.20` | P04에서 node container를 전용 bridge에 연결. 기존 주소 충돌 시 중단 |
+| Keycloak | service/container `keycloak` / `keycloak-lab-keycloak`, `172.30.0.20`, alias `keycloak.keycloak.test` | HTTPS `30080`을 host `127.0.0.1:30080`에 같은 번호로 publish |
 | AD realm / NetBIOS / base DN | `AD.KEYCLOAK.TEST` / `KEYCLOAK` / `DC=ad,DC=keycloak,DC=test` | Samba와 LDAP Federation 공통 |
 | Keycloak realm | `study` | `master`는 bootstrap/admin 전용 |
-| 공개 issuer | `https://keycloak.keycloak.test:30080/realms/study` | browser와 Pod가 반드시 같은 문자열 사용 |
-| 앱 A | `https://app-a.keycloak.test:30081`, callback `/callback` | host loopback에만 publish |
-| 앱 B | `https://app-b.keycloak.test:30082`, callback `/callback` | host loopback에만 publish |
-| API | service `lab-api.keycloak-lab.svc.cluster.local:3000`, audience `lab-api` | ClusterIP만, browser에는 직접 노출하지 않음 |
+| 공개 issuer | `https://keycloak.keycloak.test:30080/realms/study` | browser와 모든 Compose container가 같은 문자열 사용 |
+| 앱 A | alias와 URL `app-a.keycloak.test:30081`, callback `https://app-a.keycloak.test:30081/callback` | HTTPS `30081`을 host loopback의 같은 번호에만 publish |
+| 앱 B | alias와 URL `app-b.keycloak.test:30082`, callback `https://app-b.keycloak.test:30082/callback` | HTTPS `30082`을 host loopback의 같은 번호에만 publish |
+| API | service/alias `api:3000`, audience `lab-api` | Compose bridge 내부만, browser와 host에는 publish하지 않음 |
 | LDAP | `ldap://dc1.ad.keycloak.test:389` | bridge 내부 진단 전용. 완성 Federation에는 사용하지 않음 |
 | LDAPS | `ldaps://dc1.ad.keycloak.test:636` | Keycloak Federation의 유일한 완성 경로 |
-| PostgreSQL | service `postgres.keycloak-lab.svc.cluster.local:5432` | ClusterIP만 |
+| PostgreSQL | service/alias `postgres:5432` | Compose bridge 내부만, host port publish 없음 |
 
-`kind.yaml`은 control-plane의 container port `30080`~`30082`를 같은 host port로 매핑하고
-`listenAddress: 127.0.0.1`로 제한한다. Kubernetes Service도 같은 번호를 명시적 NodePort로 쓴다.
-세 번호는 기본 NodePort 범위의 정적 할당 band(`30000`~`30085`) 안에 있다. ingress controller나
-host-wide reverse proxy를 추가하지 않는다.
+macOS와 Ubuntu host의 `/etc/hosts`에는 관리되는 한 블록으로 세 웹 이름을 `127.0.0.1`에 연결한다.
+기존 항목과 충돌하면 덮어쓰지 않고 중단한다. Compose에서는 각 웹 service에 동일한 FQDN을 유일한
+network alias로 둔다. Docker의 network-scoped alias를 쓰므로 container의
+`keycloak.keycloak.test`는 Keycloak service IP로, host browser의 같은 이름은 loopback으로 해석된다.
+`localhost`나 `host.docker.internal`을 issuer로 섞지 않는다.
 
-macOS 또는 Ubuntu host의 `/etc/hosts`에는 세 웹 이름을 `127.0.0.1`로 연결한다. 전용 cluster의 CoreDNS에는
-세 웹 이름을 `172.30.0.20`, DC 이름을 `172.30.0.10`으로 연결한다. 그 결과 browser와 Pod는 같은
-Keycloak URL과 issuer를 사용하고, Pod의 token/discovery/JWKS 요청은 node의 NodePort로 돌아온다.
-Docker container 이름이 Pod DNS에서 자동으로 해석된다고 가정하지 않는다. P04는 DNS, route,
-NodePort hairpin, LDAPS를 각각 검증해야 한다.
+Keycloak은 TLS를 직접 종료하고 내부 HTTPS listener도 `30080`으로 바꾼다. Compose long port syntax의
+`target: 30080`, `published: "30080"`, `host_ip: 127.0.0.1`을 사용한다. `KC_HOSTNAME`은
+`https://keycloak.keycloak.test:30080`, `KC_HTTPS_PORT`는 `30080`으로 고정한다. HTTP listener,
+reverse proxy, `proxy-headers`, `hostname-backchannel-dynamic=true`, `hostname-strict=false`는 사용하지
+않는다. 앱 A/B도 각각 내부 HTTPS listener와 host publish를 `30081`/`30082`로 같게 맞춘다. 따라서
+browser와 container는 URL을 다시 쓰지 않고 같은 discovery/JWKS endpoint와 issuer를 사용한다.
+Keycloak management endpoint는 bridge 내부 healthcheck에만 사용하고 host에 publish하지 않는다.
 
-`KC_HOSTNAME`은 공개 issuer의 base인 `https://keycloak.keycloak.test:30080` 전체 URL로 고정하고
-`hostname-backchannel-dynamic`과 `hostname-strict=false`는 사용하지 않는다. `KC_HOSTNAME`은 listener
-port를 바꾸지 않으므로 Keycloak Pod는 TLS `8443`, Service는 `8443`을 NodePort `30080`으로 전달한다.
+### P04 kind 점유 상태와 Compose 전환
+
+2026-09-14 P05-C의 읽기 전용 조사에서 실행 중인 `keycloak-lab-control-plane`은 Compose 소유 bridge의
+`172.30.0.20`과 host loopback `30080`~`30082`를 모두 점유했다. node는 kind bridge의
+`172.19.0.2`에도 연결되어 있었다. 단순 `docker stop`은 host listener는 내리지만 stopped container의
+network endpoint와 `172.30.0.20` 예약을 없애지 않으므로 Compose 전환 절차로 쓰지 않는다.
+
+P05에서 Compose service를 만들기 전에 다음 순서를 지킨다. 이번 P05-C에서는 어느 단계도 실행하지 않았다.
+
+1. 정확한 node가 `io.x-k8s.kind.cluster=keycloak-lab` label, 고정 node image, bridge 주소 `.20`, loopback
+   port mapping을 가진 단일 P04 node인지 확인한다. Samba가 `.10`에서 healthy이고
+   `keycloak-lab-samba-data`, `.state/directory-ca/`, `.state/secrets/`, `.state/verification/p03/`과
+   `.state/verification/p04/`가 존재하는지도 먼저 확인한다.
+2. 다른 이름의 cluster나 전역 대상을 건드리지 않고 아래 명령으로 **P04 cluster 하나만** 삭제한다.
+
+   ```bash
+   KIND_EXPERIMENTAL_PROVIDER=docker \
+     ./labs/keycloak/.state/tools/kind-0.33.0 delete cluster \
+     --name keycloak-lab \
+     --kubeconfig ./labs/keycloak/.state/kubeconfig
+   ```
+
+3. `keycloak-lab-control-plane`과 kind cluster 이름이 사라지고, `172.30.0.20`의 owner가 없으며,
+   `127.0.0.1:30080`~`30082`가 비었는지 확인한다. 동시에 Compose bridge, Samba container `.10`,
+   Samba named volume, directory CA와 Samba secret, P03/P04 verification 파일이 그대로인지 확인한다.
+   P03 기준 파일과 `verify-directory` 결과도 다시 비교한다.
+4. 위 postcondition이 모두 맞을 때만 Keycloak service가 `.20`과 세 host port를 사용한다. 실패하면
+   container 강제 삭제, network disconnect, prune, Colima 초기화로 우회하지 않고 원인을 기록한다.
+
+`kind.yaml`, `kind/`, `k8s/directory-diagnostic.yaml`과 P04 verification 기록은 그대로 남긴다. 이 파일,
+kind·kubectl, 실행 중 cluster는 Compose 시작·검증·중단·초기화의 선행 조건이 아니다. 후속 Kubernetes
+선택 실습은 Compose 기본 실습이 끝난 뒤 주소·포트 소유권을 다시 조정하는 별도 작업으로만 재개한다.
 
 ## HTTPS와 LDAPS 신뢰
 
 HTTPS와 LDAPS를 같은 스위치로 취급하지 않는다. 로컬 초기화 때 서로 다른 두 root CA를 만들고,
-정상적인 중단·재시작이나 Pod/container 재생성에서는 다시 만들지 않는다.
+정상적인 중단·재시작이나 container 재생성에서는 다시 만들지 않는다.
 
 | CA | leaf | 신뢰시키는 대상 |
 |---|---|---|
-| `keycloak-lab-web-ca` | `keycloak.keycloak.test`, `app-a.keycloak.test`, `app-b.keycloak.test` 각각의 server certificate | macOS/Ubuntu host browser·CLI와 앱 A/B의 Node runtime |
-| `keycloak-lab-directory-ca` | SAN `DNS:dc1.ad.keycloak.test`, EKU `serverAuth` | Keycloak truststore와 LDAPS 진단 client |
+| `keycloak-lab-web-ca` | `keycloak.keycloak.test`, `app-a.keycloak.test`, `app-b.keycloak.test` 각각의 server certificate | macOS/Ubuntu host browser·CLI, 앱 A/B·API·진단 container |
+| `keycloak-lab-directory-ca` | SAN `DNS:dc1.ad.keycloak.test`, EKU `serverAuth` | Keycloak truststore와 LDAPS 진단 container |
 
 - root CA 유효기간은 3650일, server leaf는 365일로 고정한다. 시작·검증 스크립트는 만료와 SAN을
   확인하며, 만료가 가까워도 묵시적으로 재발급하지 않는다.
 - CA private key, leaf private key, bootstrap password, client secret은
   `labs/keycloak/.state/` 아래 로컬 산출물로 만들고 Git에서 제외한다. directory는 mode `0700`,
-  private key와 secret 파일은 `0600`으로 둔다. 공개 CA certificate만 ConfigMap/host trust에 복사하고
-  private key는 ConfigMap이나 이미지 layer에 넣지 않는다.
-- Keycloak의 HTTPS leaf/key는 Kubernetes Secret으로 mount하고 Keycloak이 직접 TLS를 종료한다.
-  앱 A/B도 각 HTTPS Secret을 사용한다. `curl -k`, browser 경고 무시, TLS 검증 비활성화는 성공
-  판정에 사용하지 않는다.
-- Keycloak에는 directory CA certificate를 별도 truststore path로 mount한다. Samba는 `tls certfile`,
-  `tls keyfile`, `tls cafile`에 명시적 파일을 사용한다. 기본 자동 생성 self-signed certificate에
-  의존하지 않는다.
+  private key와 secret source 파일은 `0600`으로 둔다. 공개 CA certificate만 host trust와 필요한
+  container에 복사하거나 read-only mount하고, private key는 이미지 layer나 Compose environment에
+  넣지 않는다.
+- 비밀번호와 leaf private key는 top-level `secrets.file`에서 가져와 필요한 service에만 명시적으로
+  부여하고 `/run/secrets/<이름>`에 read-only mount한다. Compose의 file-backed secret은 `uid`·`gid`·
+  `mode` remapping을 지원하지 않으므로 P05는 실제 service UID가 source mode를 우회하지 않고 읽을 수
+  있는지 macOS/Colima에서 확인한다. 값은 `compose.yaml`, `.env`, `docker inspect`의 container environment,
+  image layer에 넣지 않는다.
+- PostgreSQL은 공식 이미지의 `POSTGRES_PASSWORD_FILE`로 secret을 직접 읽는다. Keycloak은 공식
+  이미지가 일반 `_FILE` 규약을 제공한다고 가정하지 않고, 추적하는 좁은 entrypoint wrapper가
+  `/run/secrets/`의 DB·bootstrap 비밀번호를 process 시작 직전에 읽어 environment에 넣은 뒤
+  `kc.sh start`를 `exec`한다. secret 값은 command argument나 로그에 출력하지 않는다. 앱은 필요한
+  client/session secret 파일을 직접 읽는다.
+- Keycloak은 PEM leaf certificate와 private key secret을 각각 `KC_HTTPS_CERTIFICATE_FILE`과
+  `KC_HTTPS_CERTIFICATE_KEY_FILE`의 절대 경로로 읽고 직접 TLS를 종료한다. 앱 A/B도 자기 HTTPS key만
+  부여받는다. Samba의 기존 `dc1.key`도 source 파일은 보존한 채 Compose secret mount로 옮긴다.
+  `curl -k`, browser 경고 무시, TLS 검증 비활성화는 성공 판정에 사용하지 않는다.
+- Keycloak에는 directory CA certificate 하나만 별도 `KC_TRUSTSTORE_PATHS`의 PEM 경로로 read-only
+  mount한다. 앱·API에는 web CA만 신뢰시킨다. Samba는 `tls certfile`, `tls keyfile`, `tls cafile`에
+  명시적 파일을 사용한다. 서로의 CA private key를 service에 mount하거나 기본 자동 생성 self-signed
+  certificate에 의존하지 않는다.
+
+P05에서 먼저 만드는 secret과 mount 이름은 다음으로 고정한다. 같은 DB credential은 PostgreSQL과
+Keycloak 두 service에만 부여하고, Samba administrator/user password는 Keycloak에 주지 않는다.
+
+| Compose secret | `.state` source | 허용 service와 target |
+|---|---|---|
+| `keycloak_db_password` | `secrets/keycloak-db-password` | PostgreSQL·Keycloak `/run/secrets/keycloak_db_password` |
+| `keycloak_bootstrap_admin_password` | `secrets/keycloak-bootstrap-admin-password` | Keycloak `/run/secrets/keycloak_bootstrap_admin_password` |
+| `keycloak_https_key` | `web-ca/keycloak.key` | Keycloak `/run/secrets/keycloak_https_key` |
+| `samba_tls_key` | 기존 `directory-ca/dc1.key` | Samba `/run/secrets/samba_tls_key` |
+| `samba_admin_password` | 기존 `secrets/samba-admin-password` | Samba와 일회성 directory 진단 container |
+| `samba_alice_password` / `samba_bob_password` | 기존 `secrets/samba-alice-password` / `samba-bob-password` | Samba와 일회성 directory 진단 container |
+
+공개 `web-ca/ca.crt`·`web-ca/keycloak.crt`, `directory-ca/ca.crt`·`directory-ca/dc1.crt`는 secret으로
+가장하지 않고 필요한 service에만 명시적 read-only bind mount한다. Keycloak의 directory CA target은
+`/opt/keycloak/conf/truststores/directory-ca.crt`, HTTPS leaf target은
+`/run/keycloak-lab/certs/keycloak.crt`다. 앱 A/B key와 client/session secret 이름은 P06/P07에서 같은
+원칙으로 추가한다.
 
 ## 데이터와 볼륨 수명
 
-| 상태 | 저장 위치 | Pod/container 재생성 | kind cluster 삭제 | 명시적 전체 초기화 |
+| 상태 | 저장 위치 | container 재생성 / 기본 `compose down` | P04 kind 삭제 | 명시적 전체 초기화 |
 |---|---|---|---|---|
-| Samba domain DB·SYSVOL | Docker named volume `keycloak-lab-samba-data` → `/var/lib/samba` | 유지 | 유지 | 삭제 |
+| Samba domain DB·SYSVOL | Docker named volume `keycloak-lab-samba-data` → `/var/lib/samba` | 유지 | 유지 | 명시적 확인 뒤 삭제 |
 | Samba 설정 | image/template에서 생성, domain 생성 후 volume 상태와 일치 여부 확인 | 재생성 | 영향 없음 | 재생성 |
-| PostgreSQL / Keycloak 상태 | PVC `keycloak-postgres-data` | 유지 | 삭제 | 삭제 |
-| 앱 A/B session | Pod memory | 삭제 | 삭제 | 삭제 |
-| CA·leaf·로컬 secret 원본 | `labs/keycloak/.state/` | 유지 | 유지 | 삭제 |
-| Kubernetes Secret/ConfigMap | 전용 namespace | 유지 | 삭제 | 삭제 |
+| PostgreSQL / Keycloak 상태 | Docker named volume `keycloak-lab-postgres-data` → `/var/lib/postgresql` | 유지 | 영향 없음 | 명시적 확인 뒤 삭제 |
+| 앱 A/B session | 각 app container memory | 삭제 | 영향 없음 | 삭제 |
+| CA·leaf·로컬 secret 원본 | `labs/keycloak/.state/` | 유지 | 유지 | 명시적 확인 뒤 삭제 |
+| Compose secret mount | `.state` source에서 service별 read-only `/run/secrets/` mount | container와 함께 재생성 | 영향 없음 | source 삭제 때 소멸 |
+| P04 파일·검증 기록 | 추적한 `kind.yaml`·`kind/`·`k8s/`와 `.state/verification/p04/` | 영향 없음 | 유지 | 기본 Compose 초기화 대상 아님 |
 
-일시 중단은 Docker Engine 또는 실습 container를 멈출 뿐 volume과 `.state`를 지우지 않는다.
-`docker compose down`은 `--volumes` 없이 사용한다. 전체 초기화만 cluster, 위 이름의 Samba volume,
-전용 network, `.state`를 삭제하며, 실행 전에 정확한 대상 목록을 출력한다. `docker system prune`,
-`kind delete clusters --all`, 이름 없는 volume 일괄 삭제는 사용하지 않는다.
+PostgreSQL 18 official image는 기본 `PGDATA`가 `/var/lib/postgresql/18/docker`이고 image volume root가
+`/var/lib/postgresql`로 바뀌었으므로 named volume은 반드시 parent `/var/lib/postgresql`에 mount한다.
+`/var/lib/postgresql/data`나 version 하위만 임의로 mount해 anonymous volume을 만들지 않는다.
+
+일시 중단은 Docker Engine 또는 실습 container를 멈출 뿐 named volume과 `.state`를 지우지 않는다.
+`docker compose down`은 `--volumes` 없이 사용한다. `down --volumes`, `docker system prune`,
+`kind delete clusters --all`, 이름 없는 volume 일괄 삭제는 금지한다. 전체 초기화는 실행 전 정확한
+project/container/network와 `keycloak-lab-postgres-data`, `keycloak-lab-samba-data`, `.state`를 각각
+출력하고 사용자가 선택한 상태만 삭제한다. Compose 기본 초기화는 P04 파일·검증 기록을 삭제하지 않는다.
 
 Samba의 핵심 상태는 `/var/lib/samba`에 유지하고 `/var/cache/samba`와 log는 재생성 가능 상태로 본다.
-P03은 container 재생성 뒤 domain SID와 seed 사용자·그룹이 같은지 확인해 이 경계가 충분한지 검증한다.
-부족하면 새 volume을 추가하기 전에 실제 변경 파일을 확인해 이 표를 고친다.
+P03은 container 재생성 뒤 domain SID와 seed 사용자·그룹이 같은지 확인해 이 경계가 충분한지 검증했다.
+P04 kind 삭제 전후에도 같은 결과를 확인하며, 부족하면 새 volume을 추가하기 전에 실제 변경 파일을
+확인해 이 표를 고친다.
 
 ## Samba 테스트 디렉터리
 
@@ -183,7 +255,7 @@ Samba container는 Compose의 기본 capability 집합에 위에서 확인한 `S
 | Node.js | `24.21.0` LTS | Web Crypto와 fetch를 제공하는 runtime |
 | `openid-client` | `6.8.8` | discovery, Authorization Code callback, PKCE S256, state·nonce 검증, token 요청 |
 | `express` | `5.2.1` | 앱 A/B와 작은 API의 HTTP routing |
-| `express-session` | `1.19.0` | code verifier/state/nonce와 앱 session. 단일 Pod memory store는 실습 전용 |
+| `express-session` | `1.19.0` | code verifier/state/nonce와 앱 session. 단일 container memory store는 실습 전용 |
 | `jose` | `6.2.12` | API의 고정 discovery `jwks_uri` 기반 서명과 `iss`, `aud`, `exp` 검증 |
 
 P06은 매 로그인마다 `openid-client`로 PKCE verifier/challenge, state, nonce를 생성해 server-side session에
@@ -194,28 +266,44 @@ P07 API는 신뢰한 issuer의 discovery/JWKS만 사용하고 access token의 �
 
 `package.json`은 exact version을 쓰고 `package-lock.json`을 추적하며 image build는 `npm ci`를 사용한다.
 두 앱의 session과 secret은 서로 분리한다. memory session store는 재시작 때 로그인 상태가 사라지는 것을
-의도한 단일 Pod 실습 선택이며 운영 권장으로 서술하지 않는다.
+의도한 단일 container 실습 선택이며 운영 권장으로 서술하지 않는다.
 
 ## 자원 예산
 
-아래 값은 **P02 설계 추정치**이며 실측이 아니다. 호스트 권장은 4 logical CPU, RAM 8 GiB,
-사용 가능 disk 20 GiB다. Keycloak 공식 sizing의 base memory 1250 MB와 container memory limit의 70%를
-heap으로 쓰는 동작을 하한 근거로 삼되, 공식 수치는 대규모 운영 sizing 출발점이지 이 실습의 측정값이
-아니다.
+기본 Compose runtime 계약은 **4 logical CPU, RAM 8 GiB, 시작 직전 사용 가능 memory 5 GiB 이상,
+Docker data filesystem의 사용 가능 disk 20 GiB 이상**이다. 각 service에는 Compose `cpus`와
+`mem_limit`을 실제 container limit으로 둔다. Keycloak 공식 container가 limit의 70%를 max heap으로
+계산하고 작은 production-ready 배포에 2 GiB limit을 권하는 점을 Keycloak 값의 근거로 삼는다.
 
-| 구성요소 | request 또는 예상 하한 | limit 또는 예산 | 구분 |
+| 구성요소 | `cpus` | `mem_limit` | 구분 |
 |---|---:|---:|---|
-| Keycloak 1 Pod | CPU `500m`, memory `1250Mi` | CPU `1500m`, memory `2Gi` | 공식 memory 하한을 반영한 실습 설정안, 미실측 |
-| PostgreSQL 1 Pod | CPU `100m`, memory `256Mi` | CPU `500m`, memory `512Mi` | 소량 realm/session용 추정, 미실측 |
-| 앱 A/B/API 각 1 Pod | CPU `50m`, memory `64Mi` | CPU `250m`, memory `256Mi` | 최소 Node 앱 추정, 미실측 |
-| Samba container | CPU 약 `100m`, memory 약 `256Mi` idle 예상 | CPU 1, memory `1Gi` 예산 | 추정, 미실측 |
-| kind control plane·system Pod | CPU `0.5`~`1`, memory `0.8`~`1.5Gi` 예상 | 별도 container limit 없음 | 추정, 미실측 |
+| Keycloak 1 container | `1.5` | `2g` | 공식 memory 권장 반영, Compose 실측 전 |
+| PostgreSQL 1 container | `0.5` | `512m` | 소량 realm/session용 추정, Compose 실측 전 |
+| 앱 A/B/API 각 1 container | 각 `0.25` | 각 `256m` | 최소 Node 앱 추정, P06/P07 실측 전 |
+| Samba container | `1.0` | `1g` | P03에 적용해 macOS/Colima 통과; 관찰 idle 약 184 MiB |
+| 일회성 진단 container | `0.25` | `256m` | 실행할 때만 사용, P05 실측 전 |
+| 합계 | `4.0` | `4.5 GiB` | hard limit 합계. 동시에 항상 사용하는 양이라는 뜻은 아님 |
 
-P11에서는 macOS/Colima와 Ubuntu 중 실행한 환경과 아키텍처를 명시하고 idle 안정화 뒤와
-로그인/refresh/LDAP sync 시나리오 중에 `docker stats --no-stream`, Pod별 CPU·memory, image/volume disk
-사용량을 기록한다. metrics-server가
-실제로 설치된 경우에만 `kubectl top` 결과를 쓴다. 이 표의 추정치와 관찰값을 나란히 남기며, 한
-아키텍처의 결과를 다른 아키텍처 실측으로 일반화하지 않는다.
+2026-09-14 P05-C 조사 당시 default Colima는 2 CPU/2 GiB, swap 0, 사용 가능 memory 약 278 MiB,
+Docker data disk 여유 약 77 GiB였다. 실행 중인 P04 node는 약 541 MiB, Samba는 약 184 MiB였다.
+별도 Supabase container 8개가 약 720 MiB를 사용했고 모두 CPU·memory limit이 없었다. Supabase의
+PostgreSQL·Storage named volume과 Studio bind mount도 존재한다. 따라서 disk는 기준을 만족하지만 현재
+CPU·memory는 P05를 시작할 수 있는 계약을 만족하지 않는다.
+
+P05 실제 기동 전에 P04 cluster를 위 절차로 정리하고 default Colima를 4 CPU/8 GiB로 증설하는 것이
+기본 경로다. Colima stop/start는 Samba와 Supabase를 함께 중단시키므로 사용자의 중단 시간 승인을 받은
+별도 작업에서만 수행하고 `colima delete`, volume 삭제, reset은 하지 않는다. 재시작 뒤 Samba·Supabase
+named volume과 bind mount가 유지됐는지 확인한다. 다른 profile/runtime을 쓰려면 Samba volume과
+`.state`를 검증 가능한 방식으로 이관하는 새 결정이 필요하므로 P05에서 즉석 우회하지 않는다.
+
+증설 뒤에도 P05/P11 시작 직전에 실행 중인 다른 workload와 `MemAvailable`을 다시 확인한다. Supabase가
+실행 중이어도 5 GiB 가용 memory 조건을 만족하면 진행할 수 있지만, limit이 없어 조건을 만족하지 못하거나
+검증 중 압박이 생기면 사용자 승인 없이 중단하지 않는다. 해당 workload의 유지/일시 중단을 결정받거나
+P05를 blocked로 기록한다.
+
+P11에서는 실행한 환경과 아키텍처를 명시하고 idle 안정화 뒤와 로그인/refresh/LDAP sync 시나리오 중에
+`docker stats --no-stream`, `/proc/meminfo`의 `MemAvailable`, image/volume disk 사용량을 기록한다. 이 표의
+추정치와 관찰값을 나란히 남기며 한 아키텍처나 macOS 결과를 Ubuntu 실측으로 일반화하지 않는다.
 
 ## 2026-09-14 가용성 확인
 
@@ -247,6 +335,28 @@ digest와 platform을 조회한 정확한 metadata endpoint는
 [Ubuntu tag](https://hub.docker.com/v2/repositories/library/ubuntu/tags/24.04),
 [Node tag](https://hub.docker.com/v2/repositories/library/node/tags/24.21.0-bookworm-slim)이다.
 
+## 2026-09-14 P05-C 계약 근거 확인
+
+P05-C는 배포하지 않고 공식 문서와 현재 runtime을 읽기 전용으로 대조했다.
+
+- Docker Compose의 network alias는 같은 network의 다른 container가 service의 대체 hostname으로
+  사용하며, long port syntax는 `host_ip`, `published`, `target`을 분리한다. 이를 근거로 host와 bridge에서
+  같은 FQDN·port를 쓰는 계약을 정했다.
+- Compose secret은 service별로 부여되어 `/run/secrets/`에 read-only file로 mount된다. file source의
+  `uid`·`gid`·`mode` remapping 제한은 P05의 실제 image UID 검증 항목으로 남겼다.
+- named volume은 custom `name`을 그대로 사용하며, 일반 `docker compose down`은 named volume을
+  지우지 않고 `--volumes`가 명시됐을 때 삭제한다. PostgreSQL 18 official image의 volume root 변경도
+  확인해 DB volume target을 `/var/lib/postgresql`로 확정했다.
+- Keycloak의 full `hostname` URL은 frontend URL을 고정하지만 listener port를 바꾸지 않는다. 따라서
+  `KC_HOSTNAME`과 별도로 `KC_HTTPS_PORT=30080`을 정했고, PEM certificate/key와 추가 PEM truststore path를
+  공식 옵션으로 사용한다.
+- kind 공식 삭제 명령과 로컬 v0.33.0 help의 `--name`·`--kubeconfig`를 대조했다. 현재 node의 실제 label,
+  network endpoint와 port binding을 확인해 P04 하나만 대상으로 한 전환 명령과 전후 검사를 정했다.
+- 현재 Docker context는 `colima`, client/server는 29.6.1/29.5.2였고 default profile은 2 CPU/2 GiB였다.
+  P04 node와 Samba, 별도 Supabase 8개가 실행 중이었으며 어떤 container, cluster, network, volume,
+  Colima 설정도 변경하지 않았다. host `/etc/hosts`에는 아직 세 웹 이름이 없으므로 P05에서 기존 항목
+  충돌 검사와 관리 block 추가·복구 절차가 필요하다.
+
 ## 공식 근거
 
 - Keycloak: [26.7.3 release](https://github.com/keycloak/keycloak/releases/tag/26.7.3),
@@ -254,8 +364,10 @@ digest와 platform을 조회한 정확한 metadata endpoint는
   [container](https://www.keycloak.org/server/containers),
   [supported configurations](https://www.keycloak.org/server/supported-configurations),
   [hostname](https://www.keycloak.org/server/hostname),
+  [TLS](https://www.keycloak.org/server/enabletls),
   [production](https://www.keycloak.org/server/configuration-production),
   [truststore](https://www.keycloak.org/server/keycloak-truststore),
+  [database](https://www.keycloak.org/server/db),
   [LDAP/AD](https://www.keycloak.org/docs/latest/server_admin/#_ldap)
 - kind/Kubernetes: [kind v0.33.0 release](https://github.com/kubernetes-sigs/kind/releases/tag/v0.33.0),
   [kind quick start](https://kind.sigs.k8s.io/docs/user/quick-start/),
@@ -263,6 +375,10 @@ digest와 platform을 조회한 정확한 metadata endpoint는
   [Kubernetes v1.35.8 release](https://github.com/kubernetes/kubernetes/releases/tag/v1.35.8),
   [NodePort](https://kubernetes.io/docs/concepts/services-networking/service/#type-nodeport)
 - Ubuntu/Docker/Samba: [Docker Engine on Ubuntu](https://docs.docker.com/engine/install/ubuntu/),
+  [Compose services·network alias·port·자원](https://docs.docker.com/reference/compose-file/services/),
+  [Compose secrets](https://docs.docker.com/compose/how-tos/use-secrets/),
+  [Compose named volumes](https://docs.docker.com/reference/compose-file/volumes/),
+  [Compose down](https://docs.docker.com/reference/cli/docker/compose/down/),
   [image digests](https://docs.docker.com/engine/containers/run/#image-digests),
   [Ubuntu image](https://hub.docker.com/_/ubuntu),
   [Ubuntu snapshot service](https://snapshot.ubuntu.com/),

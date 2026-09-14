@@ -12,8 +12,8 @@
 3. Samba AD DC를 외부 사용자·그룹 원본으로 붙여 User Federation의 책임 경계를 확인한다.
 4. LDAP mapper가 외부 그룹을 Keycloak 모델로, protocol mapper가 그룹·역할을 token claim으로
    옮기는 두 단계를 추적한다.
-5. 앱·oauth2-proxy·kube-apiserver가 claim을 읽어 자기 권한 모델로 바꾸고, 계정·그룹 변경과
-   장애의 영향이 세션과 토큰의 수명에 따라 달라짐을 확인한다.
+5. 기본 Compose 앱과 API가 claim을 읽어 자기 권한 모델로 바꾸고, 계정·그룹 변경과 장애의 영향이
+   세션과 토큰의 수명에 따라 달라짐을 확인한다. oauth2-proxy·kube-apiserver는 후속 선택 경로다.
 
 이 흐름을 마치면 독자는 Keycloak이 인증 시스템에서 맡는 자리, 로컬 사용자와 외부 디렉터리의
 차이, OIDC 로그인과 최종 인가의 경계, 그룹이 API 권한이 되는 두 단계, 로그아웃·계정 변경·LDAP
@@ -30,24 +30,36 @@ Keycloak 전체에서의 자리와 선택 기준을 설명하고, 별도 실습�
 ## 컨테이너 실습의 기준과 경계
 
 - 개인 macOS에서는 **Colima + Docker**, 회사 Ubuntu에서는 **Docker Engine**을 기본 runtime으로 쓴다.
-  두 환경 모두 Keycloak·PostgreSQL·테스트 앱 A/B·API는 전용 kind 클러스터에, Samba AD DC는
-  같은 Docker runtime의 별도 컨테이너에 둔다.
+  두 환경 모두 Keycloak·PostgreSQL·테스트 앱 A/B·API·Samba AD DC를 같은 runtime의 전용
+  **Docker Compose project와 bridge**에 둔다. 기본 실습은 kind·kubectl을 요구하지 않는다.
 - 실습은 로컬 계정 로그인 → 앱 A/B SSO → API의 401/403/200 → Samba 계정 로그인 → 외부 그룹의
   Keycloak·token·API 권한 반영 순서로 진행한다.
 - 외부 디렉터리 본선은 LDAP/LDAPS User Federation이다. Kerberos/SPNEGO 데스크톱 SSO는 심화
   지도로 남기며 기본 재현 범위에 넣지 않는다.
 - Samba는 **AD 호환 디렉터리 실습 대역**이다. 이 결과를 Microsoft AD DS나 Windows 도메인에서
   검증한 것으로 일반화하지 않는다.
-- 별도 VM과 Windows Server는 요구하지 않는다. Samba를 kind Pod로 옮기거나 OpenLDAP으로
+- 별도 VM과 Windows Server는 요구하지 않는다. Samba를 Kubernetes Pod로 옮기거나 OpenLDAP으로
   바꾸는 것도 기본 구현이 아니다.
-- 단일 kind 환경은 학습·장애 관찰용이다. 이를 운영 HA 검증으로 서술하지 않으며, 운영 배포의
+- 단일 Compose 환경은 학습·장애 관찰용이다. 이를 운영 HA 검증으로 서술하지 않으며, 운영 배포의
   hostname·TLS·Secret·DB·캐시·백업 경계는 별도로 설명한다.
+- browser와 Compose container는 `https://keycloak.keycloak.test:30080/realms/study` 하나만 issuer로
+  사용한다. host는 loopback publish와 hosts 항목, container는 Compose DNS alias와 Keycloak의 같은
+  내부 TLS port `30080`으로 접근한다. 내부 전용 issuer나 TLS 검증 우회는 만들지 않는다.
+- web HTTPS CA와 Samba LDAPS directory CA를 분리한다. 비밀번호·private key는 Git 제외 `.state`에서
+  만들고 필요한 service에만 read-only Compose secret으로 mount한다. Samba 상태는
+  `keycloak-lab-samba-data`, Keycloak 상태는 PostgreSQL 18의 `/var/lib/postgresql`에 mount한
+  `keycloak-lab-postgres-data` named volume에 보존한다.
+- 기본 runtime 계약은 4 logical CPU, RAM 8 GiB, 시작 직전 사용 가능 memory 5 GiB 이상, Docker data
+  disk 여유 20 GiB 이상이다. service별 `cpus`·`mem_limit`과 실측값은
+  `labs/keycloak/decisions.md`·`verification.md`에서 관리한다.
 - 실습 명령과 설정의 원본은 `labs/keycloak/`에 둔다. 본문은 검증된 결과와 필요한 부분만 설명하고,
   사이트 검사 통과를 컨테이너 실습 성공으로 취급하지 않는다.
 
-Samba 단독 P03은 macOS/Colima에서 검증됐지만 네이티브 Ubuntu와 kind 이후 전체 시나리오는 아직
-검증되지 않았다. 각 환경에서 실제로 재현한 범위를 구분하고, 예정된 명령이나 동작을 성공한 사실처럼
-쓰지 않는다.
+Samba 단독 P03과 P04 kind-to-Samba 경로는 macOS/Colima에서만 검증됐다. P04 파일과 당시 결과는
+Kubernetes 후속 선택 실습용으로 보존하되 Compose 기본 실습의 선행 조건이나 검증 근거로 사용하지
+않는다. Compose의 Keycloak·앱 경로와 네이티브 Ubuntu는 아직 검증되지 않았다. **Ubuntu P03 플랫폼
+검증 보류**를 유지하고 macOS 결과를 Ubuntu 결과로 일반화하지 않는다. 각 환경에서 실제로 재현한
+범위를 구분하며 예정된 명령이나 동작을 성공한 사실처럼 쓰지 않는다.
 
 ## 다른 덱과의 경계
 
@@ -55,7 +67,7 @@ Samba 단독 P03은 macOS/Colima에서 검증됐지만 네이티브 Ubuntu와 ki
   이론으로 넓히지 않는다.
 - Samba AD DC의 사용자·그룹 seed와 LDAPS 연결은 이 덱의 실습 범위지만, Samba 자체 운영과
   Windows 도메인 관리는 다루지 않는다.
-- 쿠버네티스 연동에서는 **Keycloak client·claim mapping·kube-apiserver 인증**을 맡는다.
+- 후속 쿠버네티스 연동에서는 **Keycloak client·claim mapping·kube-apiserver 인증**을 맡는다.
   일반 RBAC·인증서 발급은 [cka 덱](/cka/)으로 넘긴다.
 - Keycloak의 Operator·hostname·캐시·세션·백업은 이 덱이 맡는다. PostgreSQL 자체의 설치·HA와
   온프렘 공통 제약은 [onprem 덱](/onprem/), 리눅스 운영은 [server 덱](/server/)으로 넘긴다.
@@ -66,12 +78,13 @@ Samba 단독 P03은 macOS/Colima에서 검증됐지만 네이티브 Ubuntu와 ki
 
 ## 기준 시점과 확인한 사실
 
-**2026년 8월** 기준이다. 아래는 2026-08-12에 공식 출처로 확인했다.
-버전이나 현재/과거 판단을 고칠 때는 표의 출처를 다시 조회한다.
+**2026년 8월**의 Keycloak 26.7 문서 계열 기준이다. 개념 기본값은 2026-08-12, 실습의 26.7.3 patch와
+Compose 계약은 2026-09-14에 공식 출처로 확인했다. 버전이나 현재/과거 판단을 고칠 때는 표의 출처를
+다시 조회한다.
 
 | 항목 | 현재 기준 | 쓰면 안 되는 옛 기본값·과장 | 출처 |
 |---|---|---|---|
-| Keycloak Server | **26.7.0**, Quarkus 배포판 | WildFly·`standalone.xml` 중심 설명 | `keycloak.org/docs/26.7.0/release_notes` · 다운로드 페이지 |
+| Keycloak Server | **26.7 문서 계열**, 실습 image **26.7.3**, Quarkus 배포판 | WildFly·`standalone.xml` 중심 설명 | `keycloak.org/docs/26.7.0/release_notes` · `github.com/keycloak/keycloak/releases/tag/26.7.3` |
 | 기본 URL | `/realms/{realm}` — `/auth` 없음 | 모든 설치가 `/auth/realms/{realm}`라는 전제 | `keycloak.org/migration/migrating-to-quarkus` |
 | Operator CR | `k8s.keycloak.org/v2beta1` | 현재 예제에 `v2alpha1` 사용 | `keycloak.org/operator/basic-deployment` |
 | Realm Import CR | 새 realm **생성용**. 기존 realm을 update/delete하지 않음 | 선언을 계속 동기화하는 GitOps CR이라는 설명 | `keycloak.org/operator/realm-import` |
