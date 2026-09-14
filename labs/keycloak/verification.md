@@ -382,3 +382,65 @@ fingerprint/state도 같았다. P09 상세 산출물은 비밀값을 제외한 `
 
 P09의 macOS/Colima 결과도 네이티브 Ubuntu의 P03 또는 P09 결과로 일반화하지 않는다. Ubuntu 24.04 +
 rootful Docker Engine의 기존 P03 플랫폼 검증은 계속 미실행이며 별도 실행 결과가 필요하다.
+
+## P10 Compose lifecycle
+
+| 환경 | 상태 | 실제 범위 |
+|---|---|---|
+| macOS 26.6.2 arm64 + Colima 0.10.3 | 보존 중단·재개와 서비스별 기동 통과 | Docker client 29.6.1/server 29.5.2, Compose 5.5.1 |
+| 네이티브 Ubuntu 24.04 + rootful Docker Engine | 미실행 | Ubuntu P03 플랫폼 검증과 함께 별도 실행해야 함 |
+
+P05·P06의 macOS browser CA trust·로그인은 기존 `blocked`, Ubuntu P03 플랫폼 검증은 보류 상태를
+유지했다. P10은 이 항목을 선행 차단으로 사용하지 않았고 browser trust, kind·kubectl, Colima 설정이나
+다른 workload를 변경하지 않았다. Samba는 Microsoft AD DS가 아닌 Samba 4.19.5 AD 호환 실습 대역이다.
+
+실행 전 여섯 상시 service가 모두 healthy였고 project/network/volume의 Compose label과
+`172.30.0.0/24`를 확인했다. SID는 `S-1-5-21-2785298756-3808558117-572789873`였으며 P03 디렉터리
+기준과 byte-for-byte 같았다. 두 named volume, 두 CA와 기존 secret, P03~P09 검증 기록의 fingerprint도
+존재했다. Colima는 4 CPU/8,307,167,232 bytes, `MemAvailable` 5,908,540 KiB, Docker data disk 여유
+79,887,640 KiB였다. P09와 같은 비교 방식으로 실행 중인 Supabase container 8개의 health·mount 상태도
+확인했다. 별도 exited Supabase container 하나는 P09의 실행 중 workload 비교 대상이 아니며 변경하지
+않았다.
+
+중단 전 P08/P09 정상 상태를 먼저 확인했다. alice/bob의 Authorization Code + PKCE 로그인, alice
+groups/roles=`app-users,api-admins`/`app-user,api-admin`, bob=`app-users`/`app-user`, API alice
+200/200·bob 200/403·local-user 200/403이 통과했다. P09 inspect도 alice enabled, bob enabled,
+`READ_ONLY` provider와 기존 cache/sync/session 설정을 확인했다.
+
+다음을 실행해 P10 범위만 검증했다.
+
+```bash
+cd labs/keycloak
+./scripts/verify-p10.sh
+```
+
+실제 확인 결과는 다음과 같다.
+
+- `status.sh`는 여섯 service를 모두 `running/healthy`로 판정했다. `stop.sh`는 exact
+  `keycloak-lab` project에 `compose down`을 volume option 없이 실행했고, 이후 여섯 container와 project
+  network는 없지만 두 named volume과 `.state`는 남은 조건을 확인했다.
+- `resume.sh`는 기존 두 volume과 CA/secret을 요구한 뒤 `compose up --detach --wait`로 재개했다.
+  Samba·PostgreSQL·Keycloak과 앱 A/B·API가 모두 healthcheck를 통과한 뒤 반환했다. 고정 sleep이나
+  kind·kubectl은 사용하지 않았다.
+- 재개 후 SID와 P03 디렉터리 결과, volume mount 이름이 중단 전과 같았다. P08 로그인·group/role/claim·
+  API 결과와 P09 inspect 출력도 중단 전과 byte-for-byte 같았다. P03~P09 기록과 CA/secret fingerprint,
+  두 volume의 label, Supabase 8개 running workload의 health·mount 상태도 전후 같았다.
+- 서비스별 경로는 정확한 API container를 stopped 조건으로 만든 뒤
+  `./scripts/service.sh start api`를 실행했다. Compose가 PostgreSQL·Keycloak dependency health와 API
+  health를 기다렸고 API만 요청 service로 `running/healthy`가 됐다. 직후 P08 진단 결과도 중단 전과
+  같았다. 최초 시도에서 POSIX shell 공통 함수가 요청 이름을 `app-b`로 덮어쓰는 문제를 발견했으며,
+  상태 삭제 없이 요청 변수를 분리해 위 최종 결과로 다시 확인했다.
+- `reset.sh --dry-run`은 project의 정확한 container/network, 두 volume과 삭제할 `.state` 항목을 먼저
+  출력하고 아무것도 지우지 않았다. 확인 인자 없는 실행은 같은 목록을 출력한 뒤 exit 2로 거부됐고
+  resource/state fingerprint가 그대로였다. 실제 확인 문자열 경로, volume 삭제, `.state` 삭제는
+  실행하지 않았다. P04의 kind 파일·도구·검증 기록은 reset 제외 목록에 남았다.
+
+P10 상세 산출물은 비밀값을 제외한 `.state/verification/p10/`에 있다. 최종 여섯 service는 healthy이며
+마지막 자원 기록은 4 CPU/8,307,167,232 bytes, `MemAvailable` 5,913,376 KiB, Docker data disk 여유
+79,888,052 KiB다. 빈 volume에서의 최초 시작과 실제 전체 초기화는 현재 상태 삭제를 금지한 P10 범위에서
+실행하지 않았으며 P11의 명시적 빈 상태 전체 재현에서 검증해야 한다.
+
+### Ubuntu P03 플랫폼 검증 보류 유지
+
+P10의 macOS/Colima 결과도 네이티브 Ubuntu의 P03 또는 P10 결과로 일반화하지 않는다. Ubuntu 24.04 +
+rootful Docker Engine의 기존 P03 플랫폼 검증은 계속 미실행이며 별도 실행 결과가 필요하다.

@@ -474,6 +474,35 @@ Samba health, alice enabled, `api-admins(alice)`, full/group sync와 user cache 
 시나리오를 시작한다. 고정 sleep은 readiness나 state 결과로 사용하지 않고 health·container state·
 명시적 marker와 Admin API 상태를 deadline 안에서 poll하는 데만 사용한다.
 
+## 2026-09-14 P10 Compose lifecycle 결정
+
+기본 lifecycle은 `compose.yaml`과 project name `keycloak-lab`을 항상 함께 지정한다. 상시 service는
+`samba`, `postgres`, `keycloak`, `api`, `app-a`, `app-b` 여섯 개로 고정하며, lifecycle 전에는 같은
+이름의 container·network·volume이 Compose label과 기대 service/subnet을 소유하는지 확인한다. 알 수 없는
+project container나 이름만 같은 외부 resource가 있으면 자동 정리하지 않고 중단한다. kind·kubectl은
+Compose 시작·상태·중단·재개의 입력이나 정리 대상으로 사용하지 않는다.
+
+최초 시작은 두 named volume과 project network가 없을 때만 허용한다. 분리 CA와 file-backed secret을
+기존 prepare script로 만든 뒤 Samba·PostgreSQL·Keycloak의 health를 기다리고, P06~P08의 멱등 seed를
+적용한 다음 앱 A/B·API health까지 기다린다. 기존 volume이 있으면 새 identity로 덮어쓰지 않고 보존
+재개 경로를 사용한다. 단, 최초 시작 도중 실패하면 `.state/lifecycle/first-start-in-progress` marker가
+있는 exact project만 같은 명령으로 이어서 멱등 초기화할 수 있고 성공 뒤 marker를 제거한다. 최초 빈
+상태 재현은 현재 P03~P09 상태 삭제가 필요한 P11 범위이므로 P10에서는 구현과 Compose config/shell
+검증만 하고 실행하지 않는다.
+
+보존 중단은 exact project의 `compose down`을 `--volumes` 없이 실행한다. container와 project network는
+제거하지만 `keycloak-lab-samba-data`, `keycloak-lab-postgres-data`와 `.state`는 남긴다. 재개와 서비스별
+기동은 `compose up --detach --wait`를 사용하며, 별도 고정 sleep 없이 Compose healthcheck가 readiness를
+판정한다. 서비스별 기동은 여섯 이름만 받고 선언된 Compose 의존성까지 올린다. 앱의 memory session은
+container와 함께 사라지지만 Samba SID와 Keycloak DB/Federation은 volume에 보존된다.
+
+명시적 Compose 전체 초기화는 실행 전에 project label이 일치하는 정확한 container, `keycloak-lab`
+network, 두 named volume과 삭제할 `.state` entry를 모두 출력한다. P04 선택 실습의 추적 파일과
+`.state/coredns`, `.state/kubeconfig`, `.state/tools`, `.state/verification/p04`는 이 초기화 대상에서
+제외한다. dry-run은 출력만 하고, 실제 삭제는 고정 확인 문자열
+`DELETE-keycloak-lab-compose-state`가 있어야 진행한다. 일반 중단에는 이 경로를 사용하지 않으며
+`down --volumes`, 전역 prune/삭제, Colima reset/delete, kind 조작은 lifecycle에 넣지 않는다.
+
 ## 공식 근거
 
 - Keycloak: [26.7.3 release](https://github.com/keycloak/keycloak/releases/tag/26.7.3),
