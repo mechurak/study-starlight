@@ -1,28 +1,30 @@
 # 2. Keycloak 덱 재구성 실행 계획
 
 작성일: 2026-09-14
-상태: 진행 중
-지금 위치: P02 완료 · 실습 환경 구현과 본문 개편 미착수 · 다음 P03
-실행 범위: P02만 — 공식 자료에 근거한 실습 환경 결정 작성. P03 이후와 본문 개편은 제외한다.
+상태: 차단
+지금 위치: P03 macOS/Colima 검증 완료 · 네이티브 Ubuntu 검증 미실행 · 다음 P03 검증 재개
+실행 범위: P03만 — Samba 단독 환경 구현과 검증. P04 이후와 본문 개편은 제외한다.
+차단 해제 조건: Ubuntu 24.04의 지원 아키텍처(amd64 또는 arm64) + rootful Docker/Compose 고정 버전 환경에서
+`labs/keycloak/samba/verify-p03.sh`가 끝까지 통과해야 한다.
 
 [계획 관리 규칙](README.md)의 번호·상태·갱신·완료 절차를 따른다.
 
 ## 목표와 합의한 범위
 
-Keycloak 전반을 이해하고, Ubuntu의 컨테이너 환경에서 외부 디렉터리 계정으로 앱에 로그인하고
-권한을 부여하는 과정을 직접 재현하는 스터디 덱으로 바꾼다. 개념을 설명한 뒤 작은 실습으로
+Keycloak 전반을 이해하고, macOS/Colima와 Ubuntu/Docker Engine 환경에서 외부 디렉터리 계정으로
+앱에 로그인하고 권한을 부여하는 과정을 직접 재현하는 스터디 덱으로 바꾼다. 개념을 설명한 뒤 작은 실습으로
 확인하고, 나중에는 증상·개념·작업 이름으로 찾아볼 수 있어야 한다.
 
-사용자와 합의한 기본 환경은 **Ubuntu + Docker + kind + Samba AD DC**다.
-Keycloak·PostgreSQL·테스트 앱·API는 kind 안에, Samba는 같은 Ubuntu 머신의 별도 Docker
-컨테이너에 둔다. 별도 VM과 Windows Server는 요구하지 않는다. Samba를 kind Pod로 옮기거나
-OpenLDAP으로 대체하는 것은 이 계획의 기본 구현이 아니다.
+개인 환경은 **macOS + Colima**, 회사 환경은 **Ubuntu + Docker Engine**이다.
+Keycloak·PostgreSQL·테스트 앱·API는 kind 안에, Samba는 같은 Docker runtime의 별도
+컨테이너에 둔다. Colima가 관리하는 Linux VM 외에 별도 VM과 Windows Server는 요구하지 않는다.
+Samba를 kind Pod로 옮기거나 OpenLDAP으로 대체하는 것은 이 계획의 기본 구현이 아니다.
 
 Samba는 AD 호환 디렉터리 실습에 사용한다. 결과를 Microsoft AD DS와 Windows 도메인 환경에서
 검증한 것으로 서술하지 않는다. LDAP/LDAPS 연동을 본선으로 하고 Kerberos/SPNEGO를 이용한
 데스크톱 SSO는 심화 범위로 남긴다.
 
-이번 실행 범위는 P02까지다. P03 이후의 실습 환경 구현과 본문 개편은 후속 실행 요청에서 수행한다.
+이번 실행 범위는 P03까지다. P04 이후의 kind 연동·Keycloak/PostgreSQL·앱과 본문 개편은 시작하지 않는다.
 작업은 **작업 ID 하나씩 맡길 수 있도록** 분리했다. 후속 요청이 한 작업이면 그 작업까지,
 전체 완료이면 의존 순서로 이어서 실행한다. 이 문서는 서브에이전트 생성이나 병렬 실행을 요구하지 않는다.
 
@@ -44,7 +46,7 @@ Samba는 AD 호환 디렉터리 실습에 사용한다. 결과를 Microsoft AD D
 
 ## 완료 조건
 
-- [ ] Ubuntu에서 별도 VM 없이 문서의 명령으로 전체 환경을 생성할 수 있다.
+- [ ] macOS에서는 Colima, Ubuntu에서는 Docker Engine으로 문서의 명령을 사용해 전체 환경을 생성할 수 있다.
 - [ ] 로컬 계정 로그인 → 두 앱 SSO → API 인가 → Samba 계정 로그인 → 그룹 매핑을 재현한다.
 - [ ] 그룹 변경·계정 비활성화·LDAP 장애의 영향을 새 로그인/refresh/기존 JWT/앱 세션으로 구분한다.
 - [ ] 중단·재시작·초기화를 구분하고, 빈 상태에서 다시 만들어 같은 결과를 얻는다.
@@ -55,7 +57,7 @@ Samba는 AD 호환 디렉터리 실습에 사용한다. 결과를 Microsoft AD D
 ## 기본 설계와 미확정 사항
 
 ```text
-Ubuntu / Docker
+macOS / Colima / Docker 또는 Ubuntu / Docker Engine
 ├─ kind: keycloak-lab (context: kind-keycloak-lab)
 │  ├─ Keycloak ── PostgreSQL
 │  ├─ 앱 A / 앱 B ── API
@@ -70,7 +72,7 @@ Ubuntu / Docker
 
 | 항목 | 기본 방향 | 확정 작업 |
 |---|---|---|
-| 지원 환경 | Ubuntu + Docker Engine 우선. 실제 CPU 아키텍처를 기록하고 미검증 환경을 지원한다고 쓰지 않음 | P02 |
+| 지원 환경 | macOS + Colima와 Ubuntu + Docker Engine. 실제 OS/runtime/CPU 아키텍처를 기록하고 환경별 검증 결과를 구분 | P02, P03 |
 | Samba 이미지 | 출처·유지 상태·아키텍처·권한 요구를 확인. 적합한 이미지가 없으면 Ubuntu 패키지 기반 Dockerfile 작성 | P02, P03 |
 | 버전 | Keycloak·PostgreSQL·kind/node·Samba·앱 의존성을 고정. `latest` 사용 금지 | P02 |
 | 네트워크 | Docker 네트워크에서 kind 노드와 Samba 통신. Pod에서의 DNS와 라우팅은 별도로 검증 | P04 |
@@ -80,7 +82,8 @@ Ubuntu / Docker
 | 테스트 앱 | 검증된 OIDC 라이브러리를 쓰는 최소 앱 하나를 A/B 두 Client로 실행하고 API 인가 확인 | P06 |
 | 영속성 | Samba와 DB 데이터의 위치·수명·초기화 대상을 명시 | P03, P05, P10 |
 
-아직 실제 컨테이너 연동은 검증하지 않았다. 특히 Docker 컨테이너 이름이 Pod에서도 자동으로
+현재 P03 Samba 파일은 macOS/Colima에서 실제 image build·provision·LDAPS·영속성을 검증했다.
+네이티브 Ubuntu에서는 아직 실행하지 않았다. 특히 Docker 컨테이너 이름이 Pod에서도 자동으로
 해석된다고 가정하지 않는다. 불가능한 환경 조건을 만나면 이유와 다음 조치를 기록하며,
 사용자 합의 없이 VM을 추가하거나 Samba를 다른 제품으로 바꾸지 않는다.
 
@@ -126,7 +129,7 @@ src/content/docs/keycloak/
 문서 페이지 추가만으로 브라우저를 띄우지 않는다. 실제 앱 로그인·SSO·MFA 검증은 화면 동작
 확인이 필요한 경우이므로 테스트 앱 A/B와 해당 Keycloak 설정으로 범위를 제한한다.
 
-자동화 환경에 Ubuntu/Docker/브라우저가 없으면 정적 검사 결과와 미실행 검증 명령을 기록하고
+자동화 환경에 지원 대상 Docker runtime이나 필요한 브라우저가 없으면 정적 검사 결과와 미실행 검증 명령을 기록하고
 `blocked`로 둔다. 특히 P11을 통과하기 전에는 실습 본문을 검증 완료 상태로 작성하지 않는다.
 내용과 무관한 변경을 되돌리거나 임의로 커밋하지 않는다.
 
@@ -290,19 +293,32 @@ Astro/호스팅 구성을 먼저 확인하고 필요한 [배포 지침](../deplo
 
 작업 상태는 `todo`, `doing`, `blocked`, `done` 중 하나다. `done`은 완료 조건과 검증을 모두 충족한
 경우에만 사용한다. 아래 표에 매번 한 행을 추가하고 문서 맨 위의 다음 작업을 갱신한다.
-첫 실행은 P01이며, 현재 어떤 구현도 완료한 것으로 간주하지 않는다.
+첫 실행은 P01이었다. 미실행 실습은 구현 파일이 존재하더라도 완료한 것으로 간주하지 않는다.
 
 | 작업 | 상태 | 변경 파일 | 검증 결과/근거 | 결정·잔여 문제 | 다음 작업 |
 |---|---|---|---|---|---|
 | 계획 작성 | done | 이 문서 | diff·참조 경로 확인 | 컨테이너 실행 미착수 | P01 |
 | P01 | done | `src/content/docs/keycloak/_baseline.md`, 이 문서, `docs/plans/README.md` | `git diff --check`; 계획·baseline 링크와 원본/목표 slug 대조 | 합의한 학습 순서와 Ubuntu 컨테이너 경계를 baseline에 반영. 기존 index와 00~12의 주요 절 목적지 확정. 버전 유지, 실습·본문 미착수 | P02 |
 | P02 | done | `labs/keycloak/decisions.md`, 이 문서 | 2026-09-14 공식 release/registry/package metadata 조회, 지정 download HTTP 200, amd64/arm64 manifest 확인; 추적 파일 `git diff --check`와 새 파일 `git diff --no-index --check`; 문서 내 공식 URL HTTP 확인. image pull·container 실행·자원 실측은 미실행 | Ubuntu 24.04와 amd64/arm64, Keycloak 26.7.3·PostgreSQL 18.6·kind v0.33.0/Kubernetes v1.35.8·Ubuntu Samba 4.19.5·Node 24 의존성을 digest/snapshot/lockfile로 고정. 동일 공개 issuer, loopback NodePort, 분리 CA, volume 수명과 추정 자원 확정. P03에서 Samba 단독 동작과 권한·volume 경계를 실제 검증 | P03 |
+| P03 | blocked | `.gitignore`, `labs/keycloak/compose.yaml`, `labs/keycloak/decisions.md`, `labs/keycloak/verification.md`, `labs/keycloak/samba/`, `src/content/docs/keycloak/_baseline.md`, 이 문서, `docs/plans/README.md` | Ubuntu Samba 공식 provision·사용자 흐름과 Ubuntu snapshot/package를 대조. macOS 26.6.2 arm64 + Colima 0.10.3(Ubuntu 24.04.4 VM)에서 빈 volume으로 `verify-p03.sh` 전체 통과: arm64 image build와 Samba `2:4.19.5+dfsg-4ubuntu9.7`, AD provision, LDAPS 조회·alice/bob bind, seed 2회 재실행 결과 동일, force recreate 전후 domain SID·사용자·그룹 동일, healthy 확인. Compose config, shell 구문·실행 비트, ignore, whitespace, 금지 설정·host port 부재 검사 통과. 네이티브 Ubuntu는 **미실행** | `lab-environment` 덱대로 macOS/Colima와 Ubuntu/Docker Engine을 지원 범위로 분리. 기본 capability provision은 SYSVOL ACL `NT_STATUS_ACCESS_DENIED`로 실패했고 `security.*` xattr 근거를 decisions에 먼저 기록한 뒤 최소 `SYS_ADMIN`만 추가. `privileged=false`, 전용 bridge, Docker socket·host port 없음 확인. 네이티브 Ubuntu에서 같은 스크립트가 통과할 때까지 P03은 완료 아님 | P03 네이티브 Ubuntu 검증 재개; 통과 후에만 P04 |
 
 새 세션에 넘길 요청 예시:
 
 ```text
-docs/plans/02-keycloak-rework.md를 읽고 다음 미완료 작업 ID 하나만 실행해줘.
-선행 작업 결과와 관련 지침을 확인하고, 지정 범위의 수정과 검증까지 완료해.
-실행하지 못한 검증은 성공으로 쓰지 말고, 계획의 실행 기록과 다음 작업을 갱신해.
+AGENTS.md와 docs/plans/README.md를 읽고,
+docs/plans/02-keycloak-rework.md의 P03 Ubuntu 검증만 재개해줘.
+
+현재 git 상태와 P01~P03 실행 기록, labs/keycloak/decisions.md,
+labs/keycloak/verification.md를 먼저 확인해. Ubuntu 24.04의 rootful Docker Engine에서
+고정된 Docker·Compose 버전과 실제 아키텍처를 확인한 뒤, 빈 Samba volume으로
+labs/keycloak/samba/verify-p03.sh를 끝까지 실행해.
+
+image build와 AD provision, LDAPS 조회·alice/bob bind, seed 멱등성,
+컨테이너 재생성 뒤 domain SID·사용자·그룹 유지, privileged·host network·Docker socket·
+host port 부재를 실제 결과로 검증해. 지원 환경이나 버전이 맞지 않으면 성공으로 기록하지 마.
+
+검증 결과를 labs/keycloak/verification.md와 계획의 상태·실행 기록·다음 작업에 반영해.
+Ubuntu 검증까지 통과하면 P03만 done으로 바꾸고 계획 전체는 진행 중, 다음 작업은 P04로 둬.
+이번에는 P04 구현이나 Keycloak 본문 개편을 시작하지 마.
 커밋·푸시는 하지 마.
 ```

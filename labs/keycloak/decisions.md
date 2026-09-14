@@ -2,35 +2,41 @@
 
 확인일: **2026-09-14**
 
-이 문서는 P03 이후 구현이 임의로 바꾸지 않을 실습 환경 계약이다. 아직 컨테이너를 만들거나
-실행하지 않았으며, 아래의 가용성 확인은 원격 공식 배포처에 한정된다. 실제 기동 결과와 자원 실측은
-`labs/keycloak/verification.md`에 별도로 남긴다.
+이 문서는 P03 이후 구현이 임의로 바꾸지 않을 실습 환경 계약이다. 원격 배포물 가용성과 실제 실행
+결과를 구분하며, 환경별 실행 결과와 미검증 사항은 `labs/keycloak/verification.md`에 남긴다.
 
 ## 지원 범위
 
-- 실행 호스트는 **64-bit Ubuntu 24.04 LTS + rootful Docker Engine**이다. Ubuntu 파생 배포판,
-  rootless Docker, Docker Desktop, macOS, Windows/WSL은 기본 지원 범위가 아니다.
-- CPU 아키텍처는 **linux/amd64**와 **linux/arm64**만 지원한다. 한 환경의 모든 이미지와 kind node는
-  호스트와 같은 아키텍처를 사용하며 에뮬레이션은 지원 경로로 두지 않는다.
+- 개인 환경은 **64-bit macOS + Colima의 Docker runtime**, 회사 환경은 **64-bit Ubuntu 24.04 LTS +
+  rootful Docker Engine**을 지원한다. Docker Desktop, Ubuntu 파생 배포판, rootless Docker,
+  Windows/WSL은 기본 지원 범위가 아니다.
+- CPU 아키텍처는 **linux/amd64**와 **linux/arm64**만 지원한다. macOS에서도 container와 kind node는
+  Colima Linux VM의 아키텍처를 사용한다. 한 환경의 모든 이미지는 runtime과 같은 아키텍처를 쓰며
+  에뮬레이션은 지원 경로로 두지 않는다.
 - 클러스터 이름은 `keycloak-lab`, kubectl context는 `kind-keycloak-lab`, Kubernetes namespace는
   `keycloak-lab`로 고정한다. 기존 cluster와 current context를 재사용하지 않는다.
-- Docker의 Ubuntu 설치 문서는 Ubuntu 24.04와 amd64/arm64를 지원한다. kind v0.33.0 릴리스도 node
-  이미지의 amd64/arm64 지원과 호스트와 같은 플랫폼 사용을 명시한다.
+- 공통 `lab-environment` 덱은 macOS 기본 경로를 Colima, Ubuntu 기본 경로를 Docker Engine으로 둔다.
+  Docker의 Ubuntu 설치 문서는 Ubuntu 24.04와 amd64/arm64를 지원한다. kind v0.33.0 릴리스도 node
+  이미지의 amd64/arm64 지원과 runtime과 같은 플랫폼 사용을 명시한다.
 - Keycloak의 비 OpenShift Kubernetes 지원은 best-effort다. 이 kind 환경은 학습·장애 관찰용이며
   Keycloak의 운영 지원 또는 HA를 검증하는 환경이 아니다.
 
-호스트 도구는 다음 버전을 P11의 재현 기준으로 삼는다. Ubuntu 설치 자체를 이 디렉터리에서 자동화하지
-않으며, 실제 설치 버전은 P11 시작 때 다시 기록한다.
+호스트 도구는 다음 버전을 재현 기준으로 삼는다. macOS의 Compose는 전역 설치 대신 checksum을 고정한
+공식 standalone binary를 `.state/tools/`에 받는다. Ubuntu 설치 자체는 이 디렉터리에서 자동화하지
+않으며, 두 환경의 실제 버전은 P11 시작 때 다시 기록한다.
 
-| 도구 | 고정 버전 | 선택 이유 |
-|---|---|---|
-| Ubuntu | 24.04 LTS, 최신 보안 업데이트 적용 | Ubuntu의 AD DC 절과 Docker Engine이 함께 지원하는 LTS |
-| Docker Engine / CLI | `29.8.0` (`5:29.8.0-1~ubuntu.24.04~noble`) | 2026-09-14 Docker 공식 stable apt 저장소에서 amd64/arm64 모두 확인 |
-| containerd.io | `2.3.5-1~ubuntu.24.04~noble` | 위 Docker 패키지와 같은 공식 저장소의 현재 묶음 |
-| Docker Compose plugin | `5.5.1-1~ubuntu.24.04~noble` | P03의 Compose 실행 기준 |
-| kind | `v0.33.0` | 현재 stable tagged release |
-| kubectl | `v1.35.8` | cluster patch와 일치시켜 version skew 변수를 없앰 |
-| Kubernetes node | `v1.35.8` | 저장소의 Kubernetes v1.35 학습 기준을 유지하면서 kind v0.33.0이 제공하는 최신 1.35 patch 사용 |
+| 환경 | 도구 | 고정 버전 | 선택 이유 |
+|---|---|---|---|
+| macOS | macOS / Colima | `26.6.2` / `0.10.3` | 현재 개인 Apple Silicon 환경. Colima의 Docker runtime 사용 |
+| macOS | Docker CLI / Colima VM Engine | `29.6.1` / `29.5.2` | 현재 Colima 프로필에서 확인한 client와 Ubuntu 24.04 VM daemon |
+| macOS | Docker Compose standalone | `5.5.1`; darwin arm64 `sha256:998735c9b6fe68a4f05895e6ea73d71ad06f9fc7046383ad89e47346781b6af5`, x86_64 `sha256:a264d61e824bf08a78867e59cdf32eb09f0aee9ecdf9f6ebfa43f76dc52880f1` | 공식 GitHub release asset을 lab 로컬에 받아 checksum 검증 |
+| Ubuntu | Ubuntu | 24.04 LTS, 최신 보안 업데이트 적용 | Ubuntu의 AD DC 절과 Docker Engine이 함께 지원하는 LTS |
+| Ubuntu | Docker Engine / CLI | `29.8.0` (`5:29.8.0-1~ubuntu.24.04~noble`) | 2026-09-14 Docker 공식 stable apt 저장소에서 amd64/arm64 모두 확인 |
+| Ubuntu | containerd.io | `2.3.5-1~ubuntu.24.04~noble` | 위 Docker 패키지와 같은 공식 저장소의 현재 묶음 |
+| Ubuntu | Docker Compose plugin | `5.5.1-1~ubuntu.24.04~noble` | P03의 Compose 실행 기준 |
+| 공통 | kind | `v0.33.0` | 현재 stable tagged release |
+| 공통 | kubectl | `v1.35.8` | cluster patch와 일치시켜 version skew 변수를 없앰 |
+| 공통 | Kubernetes node | `v1.35.8` | 저장소의 Kubernetes v1.35 학습 기준을 유지하면서 kind v0.33.0이 제공하는 최신 1.35 patch 사용 |
 
 ## 이미지와 패키지 고정
 
@@ -61,7 +67,10 @@ Samba 프로젝트가 유지하고 Ubuntu AD DC 절과 버전·권한을 함께 
   --dns-backend=SAMBA_INTERNAL` 흐름을 container entrypoint에 옮긴다. systemd를 흉내 내지 않고
   `samba --foreground --no-process-group`을 PID 1로 실행한다.
 - 컨테이너는 root로 시작하지만 `privileged`, host network, Docker socket mount는 허용하지 않는다.
-  P03에서 추가 capability가 실제로 필요하면 실패 근거와 최소 capability를 이 문서에 먼저 반영한다.
+  2026-09-14 Colima에서 기본 capability만 사용한 최초 provision은 SYSVOL ACL의
+  `set_nt_acl_conn: fset_nt_acl returned NT_STATUS_ACCESS_DENIED`에서 실패했다. Linux `xattr(7)`은 Samba가
+  쓰는 `security.*` extended attribute의 쓰기 권한에 `CAP_SYS_ADMIN`이 필요하다고 명시한다. 따라서
+  이 실패를 해결하기 위한 추가 권한은 `SYS_ADMIN` 하나로 제한한다.
 - 이 이미지는 Microsoft AD DS가 아니라 Samba AD 호환 디렉터리 대역이다. 파일 서버와 Windows domain
   join은 범위 밖이다.
 
@@ -94,7 +103,7 @@ Ubuntu snapshot 서비스는 snapshot을 최소 2년 보존할 방침이라고 �
 세 번호는 기본 NodePort 범위의 정적 할당 band(`30000`~`30085`) 안에 있다. ingress controller나
 host-wide reverse proxy를 추가하지 않는다.
 
-Ubuntu host의 `/etc/hosts`에는 세 웹 이름을 `127.0.0.1`로 연결한다. 전용 cluster의 CoreDNS에는
+macOS 또는 Ubuntu host의 `/etc/hosts`에는 세 웹 이름을 `127.0.0.1`로 연결한다. 전용 cluster의 CoreDNS에는
 세 웹 이름을 `172.30.0.20`, DC 이름을 `172.30.0.10`으로 연결한다. 그 결과 browser와 Pod는 같은
 Keycloak URL과 issuer를 사용하고, Pod의 token/discovery/JWKS 요청은 node의 NodePort로 돌아온다.
 Docker container 이름이 Pod DNS에서 자동으로 해석된다고 가정하지 않는다. P04는 DNS, route,
@@ -111,7 +120,7 @@ HTTPS와 LDAPS를 같은 스위치로 취급하지 않는다. 로컬 초기화 �
 
 | CA | leaf | 신뢰시키는 대상 |
 |---|---|---|
-| `keycloak-lab-web-ca` | `keycloak.keycloak.test`, `app-a.keycloak.test`, `app-b.keycloak.test` 각각의 server certificate | Ubuntu host browser/CLI와 앱 A/B의 Node runtime |
+| `keycloak-lab-web-ca` | `keycloak.keycloak.test`, `app-a.keycloak.test`, `app-b.keycloak.test` 각각의 server certificate | macOS/Ubuntu host browser·CLI와 앱 A/B의 Node runtime |
 | `keycloak-lab-directory-ca` | SAN `DNS:dc1.ad.keycloak.test`, EKU `serverAuth` | Keycloak truststore와 LDAPS 진단 client |
 
 - root CA 유효기간은 3650일, server leaf는 365일로 고정한다. 시작·검증 스크립트는 만료와 SAN을
@@ -146,6 +155,23 @@ HTTPS와 LDAPS를 같은 스위치로 취급하지 않는다. 로컬 초기화 �
 Samba의 핵심 상태는 `/var/lib/samba`에 유지하고 `/var/cache/samba`와 log는 재생성 가능 상태로 본다.
 P03은 container 재생성 뒤 domain SID와 seed 사용자·그룹이 같은지 확인해 이 경계가 충분한지 검증한다.
 부족하면 새 volume을 추가하기 전에 실제 변경 파일을 확인해 이 표를 고친다.
+
+## Samba 테스트 디렉터리
+
+P03의 seed는 실제 개인정보 대신 아래 고정된 시험용 이름만 만든다. 비밀번호는
+`labs/keycloak/.state/secrets/`에 최초 한 번 무작위로 생성하며 seed를 다시 실행하거나 container를
+재생성할 때 바꾸지 않는다.
+
+| 개체 | 고정값 | 용도 |
+|---|---|---|
+| 사용자 | `alice` (`Alice Admin`) | `app-users`, `api-admins` 구성원. 로그인과 관리자 API 권한 경로 확인 |
+| 사용자 | `bob` (`Bob Reader`) | `app-users` 구성원. 로그인은 되지만 관리자 API 권한은 없는 경로 확인 |
+| 그룹 | `app-users` | 두 외부 사용자의 앱 로그인 허용 그룹 |
+| 그룹 | `api-admins` | `alice`만 속하는 API 관리자 역할 원본 |
+
+Samba container는 Compose의 기본 capability 집합에 위에서 확인한 `SYS_ADMIN`만 추가한다.
+`privileged`, host network, Docker socket mount는 사용하지 않는다. 검증 스크립트는 실제 container의
+`Privileged=false`, 전용 network와 `CapAdd=[CAP_SYS_ADMIN]`, Docker socket 부재를 확인한다.
 
 ## 테스트 앱과 API
 
@@ -185,15 +211,16 @@ heap으로 쓰는 동작을 하한 근거로 삼되, 공식 수치는 대규모 
 | Samba container | CPU 약 `100m`, memory 약 `256Mi` idle 예상 | CPU 1, memory `1Gi` 예산 | 추정, 미실측 |
 | kind control plane·system Pod | CPU `0.5`~`1`, memory `0.8`~`1.5Gi` 예상 | 별도 container limit 없음 | 추정, 미실측 |
 
-P11에서는 amd64 또는 arm64 Ubuntu 호스트를 명시하고 idle 안정화 뒤와 로그인/refresh/LDAP sync 시나리오
-중에 `docker stats --no-stream`, Pod별 CPU·memory, image/volume disk 사용량을 기록한다. metrics-server가
+P11에서는 macOS/Colima와 Ubuntu 중 실행한 환경과 아키텍처를 명시하고 idle 안정화 뒤와
+로그인/refresh/LDAP sync 시나리오 중에 `docker stats --no-stream`, Pod별 CPU·memory, image/volume disk
+사용량을 기록한다. metrics-server가
 실제로 설치된 경우에만 `kubectl top` 결과를 쓴다. 이 표의 추정치와 관찰값을 나란히 남기며, 한
 아키텍처의 결과를 다른 아키텍처 실측으로 일반화하지 않는다.
 
 ## 2026-09-14 가용성 확인
 
-아래 확인은 원격 배포물의 존재와 metadata를 확인한 것이다. image pull/build, Ubuntu container 실행,
-Samba provision, Keycloak 로그인은 실행하지 않았다.
+아래 확인은 P02에서 원격 배포물의 존재와 metadata를 확인한 것이다. P03의 macOS/Colima 실제 Samba
+결과는 `verification.md`에 분리했으며, 네이티브 Ubuntu와 Keycloak 로그인은 아직 실행하지 않았다.
 
 - Keycloak GitHub release API의 latest가 `26.7.3`(2026-08-31)이었고 tarball URL은 HTTP 200,
   SHA-256은 `77657f30b7e90d70f727712ce1c967f430fd6a5e9f458d32d8c6df0635345f47`이었다. Quay manifest는
@@ -241,7 +268,10 @@ digest와 platform을 조회한 정확한 metadata endpoint는
   [Ubuntu snapshot service](https://snapshot.ubuntu.com/),
   [Ubuntu Samba AD DC](https://ubuntu.com/server/docs/how-to/samba/provision-samba-ad-controller/),
   [noble-updates Samba package](https://packages.ubuntu.com/noble-updates/samba),
+  [Ubuntu xattr(7)](https://manpages.ubuntu.com/manpages/noble/man7/xattr.7.html),
   [Samba TLS parameters](https://www.samba.org/samba/docs/current/man-html/smb.conf.5.html)
+- macOS runtime: [Colima](https://github.com/abiosoft/colima),
+  [Docker Compose v5.5.1](https://github.com/docker/compose/releases/tag/v5.5.1)
 - PostgreSQL/Node/app: [PostgreSQL 18.6 release](https://www.postgresql.org/docs/release/18.6/),
   [PostgreSQL official image](https://hub.docker.com/_/postgres),
   [Node release status](https://nodejs.org/en/about/previous-releases),

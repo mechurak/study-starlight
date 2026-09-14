@@ -28,5 +28,8 @@ __pycache__/
 .env
 .env.production
 
+# Keycloak lab private keys, passwords, and verification output
+/labs/keycloak/.state/
+
 # macOS-specific files
 .DS_Store

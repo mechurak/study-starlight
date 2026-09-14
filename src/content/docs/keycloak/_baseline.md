@@ -29,8 +29,9 @@ Keycloak 전체에서의 자리와 선택 기준을 설명하고, 별도 실습�
 
 ## 컨테이너 실습의 기준과 경계
 
-- 기본 환경은 **Ubuntu + Docker + kind + Samba AD DC**다. Keycloak·PostgreSQL·테스트 앱 A/B·API는
-  전용 kind 클러스터에, Samba AD DC는 같은 Ubuntu 머신의 별도 Docker 컨테이너에 둔다.
+- 개인 macOS에서는 **Colima + Docker**, 회사 Ubuntu에서는 **Docker Engine**을 기본 runtime으로 쓴다.
+  두 환경 모두 Keycloak·PostgreSQL·테스트 앱 A/B·API는 전용 kind 클러스터에, Samba AD DC는
+  같은 Docker runtime의 별도 컨테이너에 둔다.
 - 실습은 로컬 계정 로그인 → 앱 A/B SSO → API의 401/403/200 → Samba 계정 로그인 → 외부 그룹의
   Keycloak·token·API 권한 반영 순서로 진행한다.
 - 외부 디렉터리 본선은 LDAP/LDAPS User Federation이다. Kerberos/SPNEGO 데스크톱 SSO는 심화
@@ -44,8 +45,9 @@ Keycloak 전체에서의 자리와 선택 기준을 설명하고, 별도 실습�
 - 실습 명령과 설정의 원본은 `labs/keycloak/`에 둔다. 본문은 검증된 결과와 필요한 부분만 설명하고,
   사이트 검사 통과를 컨테이너 실습 성공으로 취급하지 않는다.
 
-현재 컨테이너 실습은 아직 구축·검증되지 않았다. 빈 상태에서 전체 시나리오를 재현하기 전에는
-예정된 명령이나 동작을 성공한 사실처럼 쓰지 않는다.
+Samba 단독 P03은 macOS/Colima에서 검증됐지만 네이티브 Ubuntu와 kind 이후 전체 시나리오는 아직
+검증되지 않았다. 각 환경에서 실제로 재현한 범위를 구분하고, 예정된 명령이나 동작을 성공한 사실처럼
+쓰지 않는다.
 
 ## 다른 덱과의 경계
 

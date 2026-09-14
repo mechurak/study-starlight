@@ -1,0 +1,70 @@
+name: keycloak-lab
+
+services:
+  samba:
+    image: keycloak-lab-samba:4.19.5-ubuntu24.04
+    build:
+      context: ./samba
+      args:
+        UBUNTU_IMAGE: ubuntu:24.04@sha256:224a1869083a311ef3f13648a154ba79832fbef6364d31493642ca03082da254
+        SAMBA_PACKAGE_VERSION: 2:4.19.5+dfsg-4ubuntu9.7
+    container_name: keycloak-lab-samba
+    hostname: dc1
+    domainname: ad.keycloak.test
+    environment:
+      SAMBA_REALM: AD.KEYCLOAK.TEST
+      SAMBA_DOMAIN: KEYCLOAK
+      SAMBA_HOST_NAME: DC1
+      SAMBA_DNS_FORWARDER: 127.0.0.11
+    cap_add:
+      - SYS_ADMIN
+    secrets:
+      - samba_admin_password
+      - samba_alice_password
+      - samba_bob_password
+    volumes:
+      - keycloak-lab-samba-data:/var/lib/samba
+      - ./.state/directory-ca/ca.crt:/run/keycloak-lab/certs/ca.crt:ro
+      - ./.state/directory-ca/dc1.crt:/run/keycloak-lab/certs/dc1.crt:ro
+      - ./.state/directory-ca/dc1.key:/run/keycloak-lab/certs/dc1.key:ro
+    networks:
+      keycloak-lab:
+        ipv4_address: 172.30.0.10
+        aliases:
+          - dc1.ad.keycloak.test
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - >-
+          LDAPTLS_CACERT=/run/keycloak-lab/certs/ca.crt
+          ldapsearch -LLL -x -H ldaps://dc1.ad.keycloak.test:636
+          -D Administrator@AD.KEYCLOAK.TEST
+          -w "$$(cat /run/secrets/samba_admin_password)"
+          -b '' -s base defaultNamingContext >/dev/null
+      interval: 5s
+      timeout: 5s
+      retries: 24
+      start_period: 20s
+    cpus: 1.0
+    mem_limit: 1g
+    stop_grace_period: 30s
+
+networks:
+  keycloak-lab:
+    name: keycloak-lab
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.30.0.0/24
+
+volumes:
+  keycloak-lab-samba-data:
+    name: keycloak-lab-samba-data
+
+secrets:
+  samba_admin_password:
+    file: ./.state/secrets/samba-admin-password
+  samba_alice_password:
+    file: ./.state/secrets/samba-alice-password
+  samba_bob_password:
+    file: ./.state/secrets/samba-bob-password
