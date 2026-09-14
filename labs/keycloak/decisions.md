@@ -288,15 +288,39 @@ bridge 내부 `http://api:3000`으로 전달한다. browser나 host에 token end
 Keycloak에는 bearer-only client `lab-api`, realm role `app-user`·`api-admin`, 앱 A/B 각각의
 `oidc-audience-mapper`를 둔다. mapper는 access token의 `aud`에 `lab-api`만 추가하고 ID token audience를
 바꾸지 않는다. P07의 로컬 기준 사용자는 `app-user`만 부여받아 `/user`는 200, `/admin`은 403이 된다.
-P08에서 Samba 그룹을 이 역할로 옮기는 단계는 아직 구현하지 않는다. API는 `jose`의 고정 RS256 remote
-JWKS 검증에 `issuer=https://keycloak.keycloak.test:30080/realms/study`, `audience=lab-api`를 넘기고 숫자
-`exp` claim도 필수로 확인한다. API는 Compose bridge에만 두고 host port를 publish하지 않는다.
+P08은 Samba 그룹을 이 역할로 옮기고 별도 `groups` claim mapper를 추가한다. API는 `jose`의 고정 RS256
+remote JWKS 검증에 `issuer=https://keycloak.keycloak.test:30080/realms/study`, `audience=lab-api`를
+넘기고 숫자 `exp` claim도 필수로 확인한다. API는 Compose bridge에만 두고 host port를 publish하지 않는다.
 
 P07 seed는 Node의 단일 프로세스에서 master realm의 built-in `admin-cli`로 bootstrap 관리자 인증을 한
 뒤 Admin REST를 호출한다. 관리자 password와 짧은 access token은 process memory에만 있고 출력·파일로
 남기지 않는다. 앱 B/API client, 역할, 역할 할당, audience mapper는 존재 수를 확인해 생성하거나 정확한
 추적값으로 갱신하며 두 번 연속 실행 결과가 같아야 한다. 이 관리자 bootstrap 흐름은 앱 A/B의 Direct
 Access Grants를 켜는 것이 아니다.
+
+P08 User Federation은 provider `samba-ad` 하나를 `READ_ONLY`, `importEnabled=true`,
+`syncRegistrations=false`로 둔다. 연결 URL은 `ldaps://dc1.ad.keycloak.test:636` 하나이며 StartTLS와
+Kerberos를 끈다. Keycloak service의 기존 `KC_TRUSTSTORE_PATHS`가 directory CA만 읽으므로 LDAP
+certificate 검증을 우회하거나 web CA와 섞지 않는다. bind credential은 기존 Samba Administrator
+password를 일회성 P08 seed에만 mount해 Admin REST로 저장하고, 실행 중 Keycloak·앱·API container에는
+그 source secret을 mount하지 않는다.
+
+provider의 `vendor=ad`, `sAMAccountName`, `objectGUID`, `group`·`member` 설정은 Samba AD DC가 제공하는
+AD 호환 LDAP schema를 선택하기 위한 값이다. 이 실습은 Samba 대역에서만 검증하며 Microsoft AD DS나
+Windows domain에서 같은 결과를 확인했다는 뜻이 아니다. 26.7.3 provider factory가 provider 생성 시
+기본 attribute mapper를 추가하는 동작도 그대로 사용한다.
+
+LDAP `lab-groups` mapper는 `CN=Users,DC=ad,DC=keycloak,DC=test`에서 `app-users`와 `api-admins`만
+filter하고 `member`의 DN membership을 `READ_ONLY`로 읽는다. 두 그룹은 최상위 Keycloak group으로
+동기화하며 `app-users`에는 realm role `app-user`, `api-admins`에는 `api-admin`을 연결한다. LDAP group을
+Keycloak 모델로 가져오는 이 단계와 token claim 출력은 분리한다. 후자는 앱 A/B와 P08 진단 client의
+`oidc-group-membership-mapper`가 access token `groups`에 full path를 싣고, 기본 realm role mapper가
+group에 연결된 역할을 `realm_access.roles`에 싣는다. 기존 P07 audience mapper의 `lab-api`는 유지한다.
+
+P08 seed는 provider·LDAP mapper·두 group role mapping·세 client의 protocol mapper를 이름과 provider
+종류로 하나만 찾고 생성 또는 갱신한다. 이어서 공식 Admin REST의 full user sync와
+`fedToKeycloak` mapper sync를 호출하며, 두 번 연속 실행 결과가 같아야 한다. 관리자 password·bind
+credential·관리 token은 process memory에만 두고 출력이나 검증 파일에 기록하지 않는다.
 
 앱 A Client seed는 별도 일회성 Compose service가 Keycloak의 HTTPS 관리 API에 web CA truststore를
 명시하고 적용한다. confidential client `app-a`는 정확한 callback 하나만 허용하고 Standard Flow와
@@ -398,6 +422,21 @@ P05-C는 배포하지 않고 공식 문서와 현재 runtime을 읽기 전용으
   Colima 설정도 변경하지 않았다. host `/etc/hosts`에는 아직 세 웹 이름이 없으므로 P05에서 기존 항목
   충돌 검사와 관리 block 추가·복구 절차가 필요하다.
 
+## 2026-09-14 P08 LDAP·mapper 근거 확인
+
+- Keycloak 26.7 Server Administration Guide는 LDAP provider의 `READ_ONLY` edit mode에서 mapped user
+  attribute와 password update를 허용하지 않고, LDAPS URL에는 server-side truststore가 필요하다고
+  설명한다. `Import Users`가 켜지면 최초 조회·로그인이나 full sync로 사용자를 로컬 DB에 가져오되
+  인증 때 LDAP password를 검증한다.
+- 같은 26.7 guide는 Group Mapper가 LDAP group과 user-group membership을 Keycloak group 모델로
+  전파하고, realm role은 기본적으로 access token의 `realm_access` claim에 들어간다고 구분한다.
+- 고정 26.7.3 `LDAPStorageProviderFactory` source에서 `useTruststoreSpi` 기본값 `always`, `READ_ONLY`
+  기본 처리, provider 생성 시 attribute mapper 생성, full sync 전 mapper sync 동작을 대조했다.
+- 고정 26.7.3 `GroupLDAPStorageMapperFactory` source에서 import-enabled parent의 `READ_ONLY` mode가 LDAP와
+  DB group mapping을 읽되 새 join을 LDAP에 쓰지 않는 동작, `member` query 전략, `fedToKeycloak` sync
+  지원을 대조했다. `GroupMembershipMapper` source에서는 full group path를 access token claim으로
+  출력하는 설정을 확인했다.
+
 ## 공식 근거
 
 - Keycloak: [26.7.3 release](https://github.com/keycloak/keycloak/releases/tag/26.7.3),
@@ -409,7 +448,11 @@ P05-C는 배포하지 않고 공식 문서와 현재 runtime을 읽기 전용으
   [production](https://www.keycloak.org/server/configuration-production),
   [truststore](https://www.keycloak.org/server/keycloak-truststore),
   [database](https://www.keycloak.org/server/db),
-  [LDAP/AD](https://www.keycloak.org/docs/latest/server_admin/#_ldap)
+  [26.7 LDAP/AD](https://www.keycloak.org/docs/26.7.0/server_admin/#_ldap),
+  [26.7.3 LDAP provider factory](https://github.com/keycloak/keycloak/blob/26.7.3/federation/ldap/src/main/java/org/keycloak/storage/ldap/LDAPStorageProviderFactory.java),
+  [26.7.3 LDAP group mapper factory](https://github.com/keycloak/keycloak/blob/26.7.3/federation/ldap/src/main/java/org/keycloak/storage/ldap/mappers/membership/group/GroupLDAPStorageMapperFactory.java),
+  [26.7.3 OIDC group mapper](https://github.com/keycloak/keycloak/blob/26.7.3/services/src/main/java/org/keycloak/protocol/oidc/mappers/GroupMembershipMapper.java),
+  [26.7.3 user-storage Admin client paths](https://github.com/keycloak/keycloak/blob/26.7.3/js/libs/keycloak-admin-client/src/resources/userStorageProvider.ts)
 - kind/Kubernetes: [kind v0.33.0 release](https://github.com/kubernetes-sigs/kind/releases/tag/v0.33.0),
   [kind quick start](https://kind.sigs.k8s.io/docs/user/quick-start/),
   [kind configuration](https://kind.sigs.k8s.io/docs/user/configuration/),

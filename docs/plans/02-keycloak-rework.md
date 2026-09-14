@@ -2,8 +2,8 @@
 
 작성일: 2026-09-14
 상태: 진행 중
-지금 위치: P07 앱 B·API 구현과 비브라우저 SSO·인가 검증 완료 · P05·P06 macOS browser 확인은 blocked 유지 · 다음 P08
-실행 범위: Compose 기반 P07만 — 앱 B·API·역할/audience seed 구현과 비브라우저 검증·기록. P08 이후와 본문 개편은 포함하지 않는다.
+지금 위치: P08 LDAP Federation·group→role→claim 구현과 비브라우저 검증 완료 · P05·P06 macOS browser 확인은 blocked 유지 · 다음 P09
+실행 범위: Compose 기반 P08만 — LDAPS READ_ONLY Federation·mapper/role/claim seed 구현과 비브라우저 검증·기록. P09 이후와 본문 개편은 포함하지 않는다.
 보류: Ubuntu P03 플랫폼 검증 보류 — macOS/Colima 결과를 Ubuntu 결과로 일반화하지 않는다.
 
 [계획 관리 규칙](README.md)의 번호·상태·갱신·완료 절차를 따른다.
@@ -354,30 +354,37 @@ Astro/호스팅 구성을 먼저 확인하고 필요한 [배포 지침](../deplo
 | P05 | blocked | `labs/keycloak/compose.yaml`, `labs/keycloak/keycloak/`, `labs/keycloak/scripts/`, `labs/keycloak/samba/entrypoint.sh`, `labs/keycloak/decisions.md`, `labs/keycloak/verification.md`, 이 문서 | 사용자 승인 뒤 exact P04 cluster만 삭제하고 보존 상태 대조, default Colima를 삭제 없이 4 CPU/8 GiB로 증설. Supabase 8개 mount·health 복귀 확인. `verify-p05.sh` 전체 통과: PostgreSQL/Keycloak/Samba healthy, 동일 issuer의 container discovery/JWKS와 web CA, LDAPS 양/음성, P03 동일성, UID 1000/999/65534 secret read·read-only mount, inspect env 비노출, PG18 volume, DB/Keycloak 강제 재생성 뒤 realm·진단 유지. host `--cacert` discovery/JWKS와 local-user Authorization Code form 성공. browser는 미실행 | `study` startup import와 local-user를 추가하고 기존 realm은 skip하여 DB 상태를 보존. Samba의 보존 `smb.conf`는 private key를 새 secret target으로 idempotent하게 갱신. 2026-09-14 사용자 결정으로 macOS 관리자 인증과 Chrome Admin Console/local-user 로그인은 후속 보류. Ubuntu P03 플랫폼 검증 보류 유지, macOS 결과로 일반화하지 않음 | 후속 요청에서 macOS CA trust 승인 뒤 browser 2경로 확인; 현재 P05 범위 종료 |
 | P06 | blocked | `labs/keycloak/app/`, `labs/keycloak/compose.yaml`, `labs/keycloak/keycloak/seed-app-a.sh`, `labs/keycloak/scripts/prepare-p06-state.sh`, `app-a-leaf.ext`, `verify-app-a.mjs`, `verify-p06.sh`, `labs/keycloak/decisions.md`, `labs/keycloak/verification.md`, 이 문서 | 고정 Node 24.21.0 image와 exact lockfile build·npm audit 취약점 0. 일회성 HTTPS Client seed와 재실행 일치, 앱 UID 1000·read-only secret·inspect env 비노출·loopback 30081 확인. `verify-p06.sh`에서 Authorization Code + PKCE S256 local-user 로그인과 앱 session 통과; 오답 password, 변조 state/nonce, 미등록 redirect 실패 통과. web CA를 명시해 TLS 검증 유지. 실제 Chrome은 미실행 | P05 browser 보류가 P06 구현 착수를 막지 않는다고 명시하고 앱에 bootstrap credential을 주지 않는 별도 seed service를 사용. `openid-client`가 discovery, code 교환, state·nonce·redirect 검증을 담당하며 password grant와 인증서 우회 없음. macOS keychain이 web CA를 신뢰하지 않고 root trust에는 사용자 관리자 인증이 필요하므로 browser 확인 전까지 blocked. P05도 blocked 유지. Ubuntu P03/P06 미실행 유지, macOS 결과로 일반화하지 않음 | 사용자 승인 범위에서 web CA trust 뒤 P05 browser 2경로와 P06 Chrome 앱 로그인 확인; P07은 미착수 |
 | P07 | done | `labs/keycloak/app/`, `labs/keycloak/compose.yaml`, `labs/keycloak/scripts/app-b-leaf.ext`, `prepare-p07-state.sh`, `verify-p07.mjs`, `verify-p07.sh`, `labs/keycloak/decisions.md`, `labs/keycloak/verification.md`, 이 문서 | `verify-p07.sh` 전체 통과: exact `jose@6.2.12` build/audit 0, P07 seed 2회 동일, 앱 A credential 1회 뒤 앱 B password 재입력 없는 SSO, API 무토큰·malformed 401/권한 부족 403/허용 200. RS256·고정 iss/aud·필수 exp 검증, 앱 B HTTPS/secret/container hardening과 API host port·secret 부재 확인 | 앱 A/B는 같은 source image와 분리 client/session/TLS secret 사용. `lab-api` audience와 `app-user`/`api-admin` realm role을 seed하고 local-user에는 app-user만 부여. 최초 Keycloak CLI seed는 image에 없는 `awk`로 실패해 생성 객체를 보존한 채 단일 Node Admin REST seed로 교체하고 전체 재검증. 기존 두 named volume·domain·CA·secret·P03~P06 기록과 Supabase 8개 workload 상태 동일. P05·P06 browser와 Ubuntu P03은 blocked 유지하며 macOS 결과로 일반화하지 않음 | P08은 미착수; 요청된 P07 범위 종료 |
+| P08 | done | `labs/keycloak/app/Dockerfile`, `seed-p08.mjs`, `labs/keycloak/compose.yaml`, `labs/keycloak/scripts/verify-p08.mjs`, `verify-p08.sh`, `labs/keycloak/decisions.md`, `labs/keycloak/verification.md`, 이 문서 | Keycloak 26.7 guide와 26.7.3 LDAP/group/OIDC mapper source·Admin sync path 대조. `verify-p08.sh` 전체 통과: LDAPS-only READ_ONLY provider와 group mapper/role/claim seed 2회 동일, alice/bob Keycloak Code+PKCE 로그인, Keycloak membership, RS256·iss·aud·exp 검증 token의 groups/realm roles, 앱 A→API alice user/admin 200·bob user 200/admin 403, 무토큰 401 | `vendor=ad`는 Samba AD 호환 schema 선택이며 Microsoft AD DS 검증이 아님. 첫 실행은 seed 뒤 진단 script mount의 Node module 탐색 실패; 데이터 삭제 없이 mount target만 고쳐 전체 재실행 통과. 직접 영향받는 local-user 앱 A→API 200/403만 재검증하고 전체 P07 SSO는 반복하지 않음. 두 volume·SID·CA·secret·P03~P07 기록과 Supabase 8개 상태 동일. P05·P06 browser와 Ubuntu P03 blocked/보류 유지 | P09는 미착수; 요청된 P08 범위 종료 |
 
 새 세션에 넘길 요청 예시:
 
 ```text
 AGENTS.md와 docs/plans/README.md를 읽고,
-docs/plans/02-keycloak-rework.md의 Compose 기반 P08만 실행해줘.
+docs/plans/02-keycloak-rework.md의 Compose 기반 P09만 실행해줘.
 
-현재 git 상태와 P07 구현·실행 기록, Keycloak baseline, labs/keycloak/decisions.md,
-labs/keycloak/verification.md, compose와 P03/P05~P07 scripts를 먼저 확인해. 실행 중인 앱 A/B·API·
+현재 git 상태와 P08 구현·실행 기록, Keycloak baseline, labs/keycloak/decisions.md,
+labs/keycloak/verification.md, compose와 P03/P05~P08 scripts를 먼저 확인해. 실행 중인 앱 A/B·API·
 Keycloak·PostgreSQL·Samba, 두 named volume, domain/SID, 두 CA와 기존 secret·검증 기록, Colima 자원,
 Supabase workload가 이전 기록과 같은지도 읽기 전용으로 확인해.
 
 P05·P06의 macOS browser CA trust·로그인과 Ubuntu P03 플랫폼 검증은 blocked/보류 상태로 유지하되
-P08 착수를 막지 않게 해. Keycloak 26.7의 공식 LDAP Federation·mapper 문서를 고정 버전 동작과
-대조하고, Samba는 Microsoft AD DS가 아닌 AD 호환 실습 대역이라는 경계를 유지해.
+P09 착수를 막지 않게 해. Keycloak 26.7의 공식 LDAP Federation sync/cache, 사용자 비활성화,
+세션·refresh token 동작을 고정 26.7.3 동작과 대조하고, Samba는 Microsoft AD DS가 아닌 AD 호환
+실습 대역이라는 경계를 유지해.
 
-LDAPS만 사용하는 READ_ONLY User Federation과 필요한 mapper·역할/claim seed를 멱등하게 구현해.
-Samba alice/bob 로그인이 성공하는지, LDAP `app-users`·`api-admins`가 Keycloak 모델로 들어오는 단계와
-token의 역할/claim으로 나가는 단계, 앱/API가 이를 소비해 alice 허용과 bob 권한 부족을 판정하는 단계를
-각각 구분해 검증해. password grant나 TLS 검증 우회로 browser flow를 대체하지 말고, 비브라우저
-Authorization Code + PKCE 자동화가 필요하면 P06/P07처럼 credential·cookie·code·token을 기록하지 마.
+P08 정상 상태를 먼저 확인하고, 그룹 변경·계정 비활성화·LDAP 장애를 서로 독립된 시나리오로 구현해.
+각 시나리오에서 새 로그인, refresh, 이미 발급된 JWT, 앱 session을 한 덩어리로 취급하지 말고 각각의
+결과와 관찰 시점·관련 설정값·경과 시간을 기록해. `api-admins` membership 변경은 token role/claim과
+alice/bob API 판정까지 추적하고, 계정 비활성화와 Samba 중단은 새 인증·refresh·기존 token·앱 session의
+차이를 확인해. 고정 sleep으로 결과를 추측하지 말고 readiness와 명시적 조건으로 기다려.
 
-기존 로컬 사용자와 P07 SSO/API 동작, volume·domain·CA·secret·검증 기록과 다른 workload를 보존해.
-변경으로 직접 영향받는 P07 시나리오만 필요한 만큼 재검증하고 이미 통과한 전체 검사를 이유 없이
-반복하지 마. P08 구현·가능한 비브라우저 검증·decisions/verification/계획 기록까지 완료해.
-본문 개편, P09 이후, 보류 중인 browser/Ubuntu 검증, 커밋·푸시는 하지 마.
+password grant나 TLS 검증 우회로 browser flow를 대체하지 말고, 비브라우저 Authorization Code + PKCE
+자동화에서도 credential·cookie·code·token을 stdout이나 검증 기록에 남기지 마. 장애·변경을 만든 각
+시나리오는 성공 여부와 무관하게 원래 membership·계정 enabled 상태·Samba health로 복구하고, 마지막에
+P08 alice/bob 로그인·group/role/claim·API 정상 상태를 필요한 범위만 재검증해.
+
+기존 로컬 사용자와 P07/P08 동작, volume·domain/SID·CA·secret·P03~P08 검증 기록과 다른 workload를
+보존해. 변경으로 직접 영향받는 시나리오만 재검증하고 이미 통과한 전체 검사를 이유 없이 반복하지 마.
+P09 구현·가능한 비브라우저 검증·decisions/verification/계획 기록까지 완료해.
+본문 개편, P10 이후, 보류 중인 browser/Ubuntu 검증, 커밋·푸시는 하지 마.
 ```

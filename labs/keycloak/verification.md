@@ -263,3 +263,62 @@ P06 실제 Chrome 검증을 대신하지 않으며 두 작업의 상태는 계�
 
 P07의 macOS/Colima 결과도 네이티브 Ubuntu의 P03 또는 P07 결과로 일반화하지 않는다. Ubuntu 24.04 +
 rootful Docker Engine의 기존 P03 플랫폼 검증은 계속 미실행이며 별도 실행 결과가 필요하다.
+
+## P08 Samba User Federation과 group→role→claim
+
+| 환경 | 상태 | 실제 범위 |
+|---|---|---|
+| macOS 26.6.2 arm64 + Colima 0.10.3 | 비브라우저 자동 검증 통과 | Keycloak 26.7.3 LDAP provider/group mapper, Authorization Code + PKCE, 앱 A·API |
+| 네이티브 Ubuntu 24.04 + rootful Docker Engine | 미실행 | Ubuntu P03 플랫폼 검증과 함께 별도 실행해야 함 |
+
+P05·P06의 macOS browser CA trust·로그인과 Ubuntu P03 플랫폼 검증은 기존 `blocked`/보류 상태를
+유지했다. P08은 그 항목을 선행 차단으로 쓰지 않고 web CA를 명시적으로 신뢰하는 Compose 진단 client와
+실제 앱 A/API로 확인했다. Samba는 Microsoft AD DS가 아니라 AD 호환 실습 대역이며, 아래 결과도 Samba
+4.19.5 container에서만 검증했다.
+
+실행 전 앱 A/B·API·Keycloak·PostgreSQL·Samba가 모두 healthy였고, 두 named volume, domain SID
+`S-1-5-21-2785298756-3808558117-572789873`, 두 CA와 기존 secret·P03~P07 검증 기록이 남아 있었다.
+Colima는 4 CPU/8,307,167,232 bytes였고 시작 직전 `MemAvailable`은 5,947,492 KiB, Docker data disk
+여유는 79,888,972 KiB였다. 최종 성공 실행이 기록한 값은 각각 5,949,100 KiB와 79,888,552 KiB였다.
+별도 Supabase container 8개도 실행 중이며 health·mount 상태가 이전 기록과
+같았다.
+
+다음을 실행해 P08 범위만 검증했다.
+
+```bash
+cd labs/keycloak
+./scripts/verify-p08.sh
+```
+
+첫 실행에서 Federation seed 두 번은 성공했지만 진단 스크립트를 `/run` 아래에 mount해 Node가 이미지의
+`jose`와 `openid-client` package를 찾지 못했다. 기존 데이터나 설정을 삭제하지 않고 mount target을 앱
+workdir 아래로 고친 뒤 같은 P08 검증을 처음부터 다시 실행해 전체 통과했다.
+
+실제 확인 결과를 원본→federation→mapper→token→소비자 순서로 나누면 다음과 같다.
+
+1. Samba 원본은 P03 기준과 동일하게 `app-users(alice,bob)`·`api-admins(alice)`였고 alice/bob LDAPS
+   bind 및 domain SID가 유지됐다.
+2. `samba-ad` provider는 `READ_ONLY`, import enabled, sync registration disabled였다. 연결은
+   `ldaps://dc1.ad.keycloak.test:636` 하나이고 StartTLS·Kerberos는 껐다. directory CA가 Keycloak
+   truststore에 있는 상태에서 full user sync가 성공했고 alice/bob의 실제 Keycloak 로그인도 성공했다.
+3. `READ_ONLY` LDAP group mapper의 `fedToKeycloak` sync 뒤 Keycloak 모델에서 alice는
+   `app-users`·`api-admins`, bob은 `app-users` 구성원이었다. 각 group에는 `app-user`·`api-admin` realm
+   role을 따로 연결했다. seed를 연속 두 번 실행해 중복 provider/client/mapper 없이 같은 출력이 났다.
+4. 별도 public 진단 client가 password grant가 아닌 Authorization Code + PKCE S256, state, nonce를
+   사용했다. RS256 서명·고정 issuer·`lab-api` audience·숫자 `exp`를 검증한 access token에서 alice는
+   `groups=[/app-users,/api-admins]`, `realm_access.roles=[app-user,api-admin]`; bob은
+   `groups=[/app-users]`, `realm_access.roles=[app-user]`의 실습 관련 값만 확인했다.
+5. 실제 앱 A 로그인과 bridge 내부 API 소비 경로에서 alice는 `/user`와 `/admin` 모두 200, bob은
+   `/user` 200과 `/admin` 403이었다. 무토큰 API 요청은 401이었다. credential·cookie·authorization
+   code·token은 stdout이나 검증 파일에 기록하지 않았다.
+
+P08이 직접 건드린 client mapper/token 경계를 확인하기 위해 기존 `local-user`의 앱 A→API 경로만 다시
+실행했고 `/user` 200, `/admin` 403이 유지됐다. 이미 통과한 앱 A→앱 B SSO와 P05/P06 전체 검사는
+반복하지 않았다. 최종 여섯 service는 모두 healthy이며 두 volume, SID, CA·secret, P03~P07 기록과
+Supabase 8개 workload의 전후 fingerprint/state가 같았다. P08 상세 산출물은 비밀값을 제외한
+`.state/verification/p08/`에 있다.
+
+### Ubuntu P03 플랫폼 검증 보류 유지
+
+P08의 macOS/Colima 결과도 네이티브 Ubuntu의 P03 또는 P08 결과로 일반화하지 않는다. Ubuntu 24.04 +
+rootful Docker Engine의 기존 P03 플랫폼 검증은 계속 미실행이며 별도 실행 결과가 필요하다.
