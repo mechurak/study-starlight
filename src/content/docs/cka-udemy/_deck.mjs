@@ -410,6 +410,19 @@ export default {
 		},
 		{
 			"label": "Cluster Architecture",
+			"title": "설치된 CRD로 Custom Resource 만들기",
+			"href": "/cka-udemy/custom-resource/",
+			"desc": "API discovery · CRD 스키마 · scope·타입 · server dry-run · 저장값 검증",
+			"items": [
+				[
+					"CKA CRD — 새로운 API 리소스 정의",
+					"/cka/crd/"
+				]
+			],
+			"tone": "zone"
+		},
+		{
+			"label": "Cluster Architecture",
 			"title": "kubeadm 설치와 CNI",
 			"href": "/cka-udemy/cluster-lifecycle/",
 			"desc": "노드 사전 조건 · init/join · CNI·CoreDNS · Service·NodePort 검증",
