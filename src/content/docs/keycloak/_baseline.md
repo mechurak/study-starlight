@@ -20,8 +20,8 @@
 장애가 새 로그인과 기존 접근에 미치는 차이를 설명하고 재현할 수 있어야 한다.
 
 사용자 관리, 로그인 정책과 MFA, 앱 연결, 외부 디렉터리, 운영은 각각 다시 찾을 수 있는 문서로
-나눈다. 기본 실습에 포함되지 않는 brokering·SAML·service account·oauth2-proxy·Kubernetes OIDC는
-Keycloak 전체에서의 자리와 선택 기준을 설명하고, 별도 실습을 실제로 검증한 항목만 재현 절차로 쓴다.
+나눈다. brokering과 service account는 격리된 보조 실습 결과를 재현 절차로 쓰고, SAML·oauth2-proxy·
+Kubernetes OIDC는 Keycloak 전체에서의 자리와 선택 기준만 설명한다.
 
 외부 계정·그룹 문제가 생기면 **원본 → federation → mapper → token → 소비자** 순서로 확인한다.
 같은 이유로 로그아웃·권한 회수도 **Keycloak 세션**, **이미 발급된 token**, **앱 자체 세션**을
@@ -122,5 +122,5 @@ Compose 계약은 2026-09-14에 공식 출처로 확인했다. 버전이나 현�
 - 버전·기본값·deprecated·preview·보안 경계 주장은 공식 Keycloak·Kubernetes·표준 문서를 붙인다.
 - 설정 예시는 production 전제를 흐리지 않는다. `start-dev`, H2, 넓은 redirect URI, 전달 헤더
   무조건 신뢰를 운영 권장처럼 쓰지 않는다.
-- 한 장을 고치면 [용어집](/keycloak/11-glossary/)과 [마무리](/keycloak/12-wrapup/)의 요약도
+- 한 장을 고치면 [용어집](/keycloak/glossary/)과 [마무리](/keycloak/wrapup/)의 요약도
   어긋나지 않는지 확인한다.

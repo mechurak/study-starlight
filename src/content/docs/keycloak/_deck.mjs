@@ -13,7 +13,7 @@ export default {
 		"IdP",
 		"AD 인증"
 	],
-	"description": "사내 AD를 사용자 저장소로 빌려 쓰는 SSO 허브 — 토큰, 연동, 배포까지 관리자 관점.",
+	"description": "인증 중앙화부터 로컬 SSO·API 인가·외부 디렉터리·운영 복구까지 경계별로 익히는 Keycloak.",
 	"category": "infra",
 	"tags": [
 		"auth",
@@ -77,51 +77,57 @@ export default {
 	],
 	"map": [
 		{
-			"label": "0~1장",
-			"href": "/keycloak/00-intro/",
-			"title": "왜 SSO인가",
+			"label": "큰 그림과 실습",
+			"href": "/keycloak/keycloak-overview/",
+			"title": "Keycloak의 자리부터 재현 환경까지",
 			"tone": "key",
-			"desc": "범위 · Keycloak의 자리",
-			"note": "AD가 이미 있는데 Keycloak은 왜 필요한가"
+			"desc": "인증·인가 경계 · Compose 환경 · Realm과 사용자",
+			"note": "무엇을 중앙화하고 어떤 결과까지 실제 확인했나",
+			"items": [["실습 환경", "/keycloak/lab-setup/"], ["Realm과 사용자", "/keycloak/realm-and-users/"]]
 		},
 		{
-			"label": "2장",
-			"href": "/keycloak/02-oauth-oidc/",
-			"title": "OAuth 2.0 · OIDC",
+			"label": "로그인과 접근",
+			"href": "/keycloak/oauth-oidc/",
+			"title": "로그인에서 최종 API 권한까지",
 			"tone": "warn",
-			"desc": "토큰의 문법",
-			"note": "토큰 세 종류는 각각 무엇이고 누가 검증하는가"
+			"desc": "Code+PKCE · SSO · token 검증 · group/role · MFA · logout",
+			"note": "token은 누가 무엇을 검증하고 401·403·200은 어디서 갈리나",
+			"items": [["Client와 SSO", "/keycloak/clients-and-sso/"], ["Token 검증", "/keycloak/token-validation/"], ["인증 Flow", "/keycloak/authentication-flows/"]]
 		},
 		{
-			"label": "3~5장",
-			"href": "/keycloak/03-structure/",
-			"title": "Keycloak 들여다보기",
+			"label": "외부 디렉터리",
+			"href": "/keycloak/ad-and-ldap/",
+			"title": "AD 호환 원본에서 API claim까지",
 			"tone": "ok",
-			"desc": "realm · client · AD 연동 · 세션",
-			"note": "AD 그룹이 앱의 토큰까지 어떻게 오는가"
+			"desc": "Samba · LDAPS Federation · 두 mapper · 변경과 장애",
+			"note": "외부 group과 계정 상태는 언제 새 token에 반영되나",
+			"items": [["LDAP Federation", "/keycloak/ldap-federation/"], ["Group Mapping", "/keycloak/directory-group-mapping/"], ["변경과 장애", "/keycloak/directory-changes/"]]
 		},
 		{
-			"label": "6~7장",
-			"href": "/keycloak/06-k8s-oidc/",
-			"title": "연동",
+			"label": "다른 연동",
+			"href": "/keycloak/identity-brokering/",
+			"title": "외부 IdP·서비스·비네이티브 앱",
 			"tone": "key",
-			"desc": "k8s API 서버 · 사내 앱",
-			"note": "kubectl과 사내 앱이 어떻게 SSO를 타는가"
+			"desc": "OIDC Brokering · SAML · Service Account · proxy · Kubernetes",
+			"note": "사용자 redirect와 machine identity, API server 인증은 어떻게 다른가",
+			"items": [["Service Accounts", "/keycloak/service-accounts/"], ["oauth2-proxy", "/keycloak/oauth2-proxy/"], ["Kubernetes OIDC", "/keycloak/kubernetes-oidc/"]]
 		},
 		{
-			"label": "8~10장",
-			"href": "/keycloak/08-deploy/",
-			"title": "배포와 운영",
+			"label": "운영",
+			"href": "/keycloak/deployment/",
+			"title": "배포·상태·관찰·복구",
 			"tone": "ok",
-			"desc": "온프렘 배포 · 운영 · 트러블슈팅",
-			"note": "온프렘 k8s에서 Keycloak 자체를 어떻게 돌리는가"
+			"desc": "hostname/TLS · DB/cache · events/metrics · backup/upgrade · keys",
+			"note": "실습의 보존 재시작과 운영 HA·복구 보장은 어디서 갈리나",
+			"items": [["저장소와 가용성", "/keycloak/storage-and-availability/"], ["백업과 업그레이드", "/keycloak/backup-and-upgrade/"], ["관리 권한과 키", "/keycloak/administration-and-keys/"]]
 		},
 		{
-			"label": "11~12장",
-			"href": "/keycloak/11-glossary/",
-			"title": "마무리",
+			"label": "문제 해결과 마무리",
+			"href": "/keycloak/troubleshooting/",
+			"title": "증상에서 경계를 찾고 범위를 확인한다",
 			"tone": "mute",
-			"desc": "용어 사전 · 마무리"
+			"desc": "진단 지도 · 용어 사전 · 통과/보류 범위",
+			"items": [["용어 사전", "/keycloak/glossary/"], ["학습 마무리", "/keycloak/wrapup/"]]
 		}
 	]
 };

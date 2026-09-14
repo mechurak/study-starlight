@@ -2,7 +2,7 @@
 
 작성일: 2026-09-14
 상태: 진행 중
-지금 위치: D02~D28와 필수 보조 랩 완료 · 다음 F01~F04 이관 마감 · Ubuntu P03·P11과 P05·P06 macOS browser는 blocked/보류 유지
+지금 위치: F01 완료 · 다음 F02-a~m 옛 페이지 이관 · Ubuntu P03·P11과 P05·P06 macOS browser는 blocked/보류 유지
 실행 범위: 사용자 요청에 따른 D02~D28, D09-L·D16-L·D18-L·D24-L, F01~F04 전체 완료. D19·D20 추가 실행 실습과 Kubernetes OIDC 선택 실습은 제외한다.
 보류: Ubuntu P03 플랫폼 검증 보류 — macOS/Colima 결과를 Ubuntu 결과로 일반화하지 않는다.
 
@@ -374,3 +374,4 @@ Astro/호스팅 구성을 먼저 확인하고 필요한 [배포 지침](../deplo
 | D24-L | done | `labs/keycloak/scripts/verify-d24.sh`, `labs/keycloak/README.md`, `decisions.md`, `verification.md`, 이 문서 | shell syntax 확인. live PostgreSQL custom dump 생성·archive 검사, network-none 임시 PostgreSQL에 `pg_restore --exit-on-error`, source/restore realm·client·user 수 일치와 `study/app-a`, `study/d18-worker`, `d16-upstream/study-broker` 확인. 임시 container·volume 제거와 상시 6 service healthy 확인 | live DB·volume과 Keycloak 연결을 바꾸지 않는 격리 복원. dump는 credential을 포함할 수 있어 ignore된 mode 0700 증거 디렉터리에만 보관. realm export는 이 복구를 대신하지 않음 | D21 |
 | D21~D25 | done | `src/content/docs/keycloak/deployment.mdx`, `storage-and-availability.mdx`, `observability.mdx`, `backup-and-upgrade.mdx`, `administration-and-keys.mdx`, `_deck.mjs`, 이 문서 | Keycloak 26.7 deployment/hostname/container/cache/health/metrics/import-export/update/admin 공식 문서와 D24-L 결과 대조. 첫 `pnpm check`는 MDX 줄 시작 `export`를 문법으로 해석해 실패했고 표현 수정 후 통과: 콘텐츠 규칙, 469개 page build·Pagefind, 38,473개 내부 페이지·anchor 링크 | Compose와 운영 HA, DB/cache/app 상태, event/management signal, DB backup과 export, 위임 관리와 signing key 수명주기를 분리. `operations` 첫 페이지에 따라 `allowEmpty` 제거. Kubernetes/HA/rolling upgrade는 실행 성공으로 쓰지 않음 | D26 |
 | D26~D28 | done | `src/content/docs/keycloak/troubleshooting.mdx`, `glossary.mdx`, `wrapup.mdx`, `_deck.mjs`, `scripts/check-content.mjs`, `docs/content-authoring.md`, 이 문서 | P09·P11·D09-L·D16-L·D18-L·D24-L 실제 결과와 공식 Keycloak hostname/health/admin 문서 대조. 첫 `pnpm check`는 번호 없는 `glossary`/`wrapup`을 TermIntro 예외로 인식하지 못해 실패; 검사와 작성 규칙이 exact 또는 suffix slug를 허용하도록 맞춘 뒤 통과: 콘텐츠 규칙, 472개 page build·Pagefind, 38,905개 내부 페이지·anchor 링크 | 증상→마지막 성공 경계→복구 지도, 새 페이지 링크 중심 용어집, 검증/미실행 범위를 분리한 마무리 작성. `reference`의 `allowEmpty` 제거. browser·Ubuntu·실제 AD/IdP·proxy/Kubernetes·HA는 재개 조건과 함께 미실행으로 유지 | F01 |
+| F01 | done | `src/content/docs/keycloak/index.mdx`, `_deck.mjs`, `_baseline.md`, 이 문서 | final map의 모든 href가 실제 topic route인지 loader 검사. `pnpm check` 통과: 콘텐츠 규칙, 472개 page build·Pagefind, 38,928개 내부 페이지·anchor 링크 | 이관 중 안내와 번호 표시를 제거하고 큰 그림→로그인/접근→디렉터리→다른 연동→운영→문제 해결 map으로 교체. index 탐색 표를 새 질문 중심 URL로 전환하고 baseline의 Brokering/Service Account 실제 보조 실습과 참조-only 범위를 수정 | F02-a |
