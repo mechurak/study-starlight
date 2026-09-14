@@ -111,7 +111,7 @@ P03 또는 Ubuntu P04의 실제 결과로 사용하지 않는다.
 
 | 환경 | 상태 | 실제 범위 |
 |---|---|---|
-| macOS 26.6.2 arm64 + Colima 0.10.3 | 자동 검증 통과, browser 사용자 보류 | Colima 4 CPU/8 GiB, Docker client 29.6.1/server 29.5.2, Compose 5.5.1 |
+| macOS 26.6.2 arm64 + Colima 0.10.3 | 자동 검증·실제 Chrome 통과 | Colima 4 CPU/8 GiB, Docker client 29.6.1/server 29.5.2, Compose 5.5.1, Chrome 153.0.8010.36 |
 | 네이티브 Ubuntu 24.04 + rootful Docker Engine | 미실행 | Ubuntu P03 플랫폼 검증과 함께 별도 실행해야 함 |
 
 사용자 승인 뒤 label·고정 image·`.20` 주소·loopback `30080`~`30082` mapping이 모두 일치한 P04
@@ -144,10 +144,17 @@ named volume과 Studio bind mount로 복귀했고 healthcheck 대상은 모두 h
   container를 강제 재생성한 뒤에도 `study` realm, discovery/JWKS, 진단 결과와 P03 상태가 유지됐다.
 
 상세 자동 검증 산출물은 `.state/verification/p05/`에 있다. host SecureTransport는 `--cacert`로 web CA를
-명시했을 때 discovery/JWKS와 issuer를 검증했다. macOS login keychain의 root trust 설정에는 사용자
-인증이 필요하다. 2026-09-14 사용자 결정으로 관리자 인증과, 인증서 오류 우회 없이 Chrome에서 Admin
-Console·`local-user` account 화면에 로그인하는 검증은 후속으로 보류했으며 현재 **미실행**이다. 따라서
-P05 작업 상태는 browser 확인 전까지 `blocked`로 유지한다.
+명시했을 때 discovery/JWKS와 issuer를 검증했다. 후속 검증에서는 `/etc/hosts`의 세 이름을 loopback에
+연결하고 현재 `.state/web-ca/ca.crt`를 macOS login keychain의 SSL trust root로 승인했다.
+`security verify-cert -p ssl`과 CA 옵션 없는 host `curl`이 통과한 상태에서 실제 Google Chrome
+153.0.8010.36으로 `lab-admin`의 Admin Console 로그인을 확인했다.
+
+첫 `local-user` Account Console 확인은 account REST 두 요청이 401을 반환했다. import 사용자에게
+`default-roles-study`가 없고 `app-user`만 직접 매핑된 것이 원인이었다. `study-realm.json`에 기본 realm
+role을 명시하고 P05 자동 검사에 container 재생성 전후의 직접 매핑 검사를 추가했다. 보존 DB에도 같은
+role을 멱등하게 적용한 뒤 새 Chrome session에서 Account Management의 `Personal info` 화면과 오류 0개를
+확인했다. 별도 임시 realm의 fresh import에서도 대응하는 `default-roles-<realm>` 매핑이 생김을 확인하고
+임시 realm을 제거했다. 이 결과로 macOS P05는 `done`이며 Ubuntu 결과로 일반화하지 않는다.
 
 ### Ubuntu P03 플랫폼 검증 보류 유지
 
@@ -158,7 +165,7 @@ rootful Docker Engine에서 `./samba/verify-p03.sh`를 실행하는 기존 보�
 
 | 환경 | 상태 | 실제 범위 |
 |---|---|---|
-| macOS 26.6.2 arm64 + Colima 0.10.3 | 비브라우저 자동 검증 통과, browser 사용자 보류 | Node.js 24.21.0 image, `openid-client` 6.8.8, Express 5.2.1, `express-session` 1.19.0 |
+| macOS 26.6.2 arm64 + Colima 0.10.3 | 비브라우저 자동 검증·실제 Chrome 통과 | Node.js 24.21.0 image, `openid-client` 6.8.8, Express 5.2.1, `express-session` 1.19.0, Chrome 153.0.8010.36 |
 | 네이티브 Ubuntu 24.04 + rootful Docker Engine | 미실행 | Ubuntu P03 플랫폼 검증과 함께 별도 실행해야 함 |
 
 P05의 Compose 자동 검증 결과에 영향을 주는 기존 service 설정은 바꾸지 않았다. 실행 전에 Samba,
@@ -201,12 +208,15 @@ cd labs/keycloak
 비밀번호·private key·cookie·authorization code·token을 제외한 상세 산출물은
 `.state/verification/p06/`에 있다.
 
-macOS login/system keychain에는 현재 CA certificate 항목이 있지만 `security verify-cert -p ssl`은
-`labs/keycloak/.state/web-ca/ca.crt`를 신뢰된 SSL root로 판정하지 않는다. root trust 변경에는 사용자
-관리자 인증이 필요하며 2026-09-14의 P05 보류 결정 범위를 넘는다. 따라서
-인증서 오류를 무시하지 않는 실제 Chrome에서 앱 A → Keycloak → 앱 A 로그인을 확인하지 않았고 P06은
-browser 확인 전까지 **blocked**다. 이 보류는 구현과 위 CA 명시 비브라우저 검증을 막지 않았으며,
-P05도 기존 browser 확인 전까지 blocked 상태를 유지한다.
+P05에서 현재 web CA를 macOS login keychain의 SSL trust root로 승인한 뒤 새 실제 Chrome session에서
+앱 A의 `Sign in with Keycloak`을 시작했다. authorization request의 `response_type=code`, 정확한 callback,
+`code_challenge_method=S256`, state, nonce를 browser URL에서 확인했고 `local-user` credential을 한 번
+제출한 뒤 앱 A의 `Signed in as local-user` 화면으로 돌아왔다. 인증서 경고나 TLS 검증 우회는 사용하지
+않았다. 기존 자동 검증의 오답 password·변조 state/nonce·미등록 redirect 실패 결과와 합쳐 macOS P06은
+`done`이며 Ubuntu 결과로 일반화하지 않는다.
+
+아래 P07~D09 기록의 P05·P06 browser 보류 문구는 각 작업을 실행한 당시의 상태다. 현재 상태는 위
+후속 Chrome 결과가 대신하며, D09 OTP 화면 자체의 Chrome 실행 여부와는 구분한다.
 
 ### Ubuntu P03 플랫폼 검증 보류 유지
 
@@ -526,7 +536,7 @@ source/destination을 비교하는 수정본으로 경고 없이 전체 통과�
 | 환경 | 상태 | 실제 범위 |
 |---|---|---|
 | macOS 26.6.2 arm64 + Colima 0.10.3 | 비브라우저 HTML form 검증 통과 | Keycloak 26.7.3, 복제 browser flow, TOTP/HMAC-SHA1/6자리/30초 |
-| 실제 macOS Chrome | 미실행 | P05·P06의 CA trust/browser 보류를 유지 |
+| 실제 macOS Chrome | D09 화면 미실행 | P05·P06 대표 로그인은 통과했지만 OTP 등록·오답·복구 화면은 다시 실행하지 않음 |
 | 네이티브 Ubuntu 24.04 + rootful Docker Engine | 미실행 | Ubuntu P03 플랫폼 검증 뒤 별도 실행 필요 |
 
 2026-09-14에 기존 여섯 Compose service가 healthy이고 Docker가 4 CPU·8,307,167,232 bytes를 노출하며

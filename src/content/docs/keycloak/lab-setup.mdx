@@ -128,13 +128,13 @@ docker info --format '{{.OSType}} {{.Architecture}}'
 Samba 사용자 로그인·그룹 매핑, 보존 중단·재개를 kind·kubectl 없이 재현했다. curl과 진단 client는
 web CA를 명시해 검증했다.
 
-macOS keychain에 CA를 신뢰 root로 등록해야 하는 실제 Chrome Admin Console·앱 로그인은 보류다.
-네이티브 Ubuntu의 Samba P03과 전체 P11도 미실행이다. 따라서 명령이 존재한다는 사실과 해당 환경에서
-성공했다는 기록을 구분한다.
+후속 검증에서는 현재 web CA를 macOS login keychain의 신뢰 root로 승인하고 실제 Chrome에서 Admin
+Console·Account Console과 앱 A Authorization Code + PKCE 로그인까지 확인했다. 네이티브 Ubuntu의
+Samba P03과 전체 P11은 미실행이다. 따라서 macOS 결과와 Ubuntu에서 성공했다는 기록을 구분한다.
 
 ## 요약
 
 - 본선 환경은 하나의 `keycloak-lab` Compose project이며 kind·kubectl이 필요 없다.
 - host와 container는 같은 issuer를 쓰고, 내부 DB·API·Samba는 host에 publish하지 않는다.
 - 일반 중단은 데이터를 보존하고, 확인이 필요한 reset만 실습 데이터와 `.state`를 지운다.
-- macOS 비브라우저 재현은 통과했지만 macOS Chrome과 네이티브 Ubuntu 검증은 보류다.
+- macOS 비브라우저 재현과 대표 Chrome 로그인을 통과했지만 네이티브 Ubuntu 검증은 보류다.

@@ -188,6 +188,13 @@ if [ "$first_local_user" != 'local-user|local-user@keycloak.test' ]; then
   echo "local-user profile is not ready before container recreation: $first_local_user" >&2
   exit 1
 fi
+first_local_user_default_role=$(docker exec --user postgres keycloak-lab-postgres \
+  psql --username=keycloak --tuples-only --no-align --dbname=keycloak \
+  --command="select count(*) from user_role_mapping urm join user_entity u on u.id = urm.user_id join realm r on r.id = u.realm_id join keycloak_role kr on kr.id = urm.role_id where r.name = 'study' and u.username = 'local-user' and kr.name = 'default-roles-study' and kr.realm_id = r.id;")
+if [ "$first_local_user_default_role" != 1 ]; then
+  echo "local-user is missing the study realm default role before container recreation" >&2
+  exit 1
+fi
 
 "$compose_command" up --detach --wait --force-recreate postgres keycloak
 
@@ -205,6 +212,13 @@ if [ "$recreated_local_user" != 'local-user|local-user@keycloak.test' ]; then
   echo "local-user profile did not survive container recreation: $recreated_local_user" >&2
   exit 1
 fi
+recreated_local_user_default_role=$(docker exec --user postgres keycloak-lab-postgres \
+  psql --username=keycloak --tuples-only --no-align --dbname=keycloak \
+  --command="select count(*) from user_role_mapping urm join user_entity u on u.id = urm.user_id join realm r on r.id = u.realm_id join keycloak_role kr on kr.id = urm.role_id where r.name = 'study' and u.username = 'local-user' and kr.name = 'default-roles-study' and kr.realm_id = r.id;")
+if [ "$recreated_local_user_default_role" != 1 ]; then
+  echo "local-user default role did not survive container recreation" >&2
+  exit 1
+fi
 
 "$compose_command" --profile diagnostic run --rm --no-deps diagnostic \
   >"$verification_directory/compose-diagnostic-after-recreate.txt"
@@ -218,7 +232,7 @@ cmp "$p03_result" "$verification_directory/samba-after-recreate.txt"
 printf 'runtime_cpus=%s\nruntime_memory_bytes=%s\nmem_available_kib=%s\ndocker_disk_available_kib=%s\n' \
   "$runtime_cpus" "$runtime_memory_bytes" "$available_memory_kib" "$available_disk_kib" \
   >"$verification_directory/resources.txt"
-printf 'issuer=%s\npostgres_volume=%s\nstudy_realm=preserved\nlocal_user_profile=preserved\np03_state=unchanged\n' \
+printf 'issuer=%s\npostgres_volume=%s\nstudy_realm=preserved\nlocal_user_profile=preserved\nlocal_user_default_role=preserved\np03_state=unchanged\n' \
   "$issuer" "$postgres_volume" \
   >"$verification_directory/persistence.txt"
 printf 'keycloak_uid=1000\nkeycloak_secret_files=readable_read_only\npostgres_uid=999\npostgres_secret_file=readable_read_only\ndiagnostic_uid=65534\ndiagnostic_secret_files=readable_read_only\ninspect_environment_secret_values=absent\n' \

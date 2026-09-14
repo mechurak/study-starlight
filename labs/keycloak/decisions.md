@@ -216,6 +216,8 @@ DB에 있으면 Keycloak의 startup import 규칙대로 건너뛰므로 containe
 않는다. bootstrap 관리자는 `lab-admin`, 학습용 로컬 사용자는 `local-user`
 (`local-user@keycloak.test`)다. 두 password는 JSON에 넣지 않고 Keycloak UID 1000의 wrapper가 각각의
 file-backed secret을 읽어 process 환경으로 넘기며, 추적 JSON에는 환경 변수 placeholder만 둔다.
+import에 포함한 `local-user`에는 `default-roles-study`를 명시한다. 이 composite가 제공하는 account
+client의 기본 역할이 없으면 OIDC 앱 로그인은 성공해도 Account Console REST가 401을 반환한다.
 
 ## 데이터와 볼륨 수명
 
