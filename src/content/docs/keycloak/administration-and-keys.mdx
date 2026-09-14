@@ -1,0 +1,80 @@
+---
+title: "관리 권한과 서명 키"
+description: "master 관리자 의존을 줄이고 위임 역할·Admin REST·서명 키 교체를 안전하게 운영"
+aliases: [realm-management, delegated admin, Admin REST API, key rollover, active key, passive key]
+reviewedAt: 2026-09-14
+deckGroup: operations
+sidebar:
+  order: 1240
+---
+
+import Thesis from '../../../components/docs/Thesis.astro';
+import TermIntro from '../../../components/docs/TermIntro.astro';
+
+<Thesis>관리 권한과 token 서명 키는 모두 강한 권한이지만, 관리자는 변경 주체이고 키는 검증 신뢰의 뿌리이므로 수명주기와 교체 절차를 따로 운영한다.</Thesis>
+
+bootstrap 또는 master realm 관리자를 일상 작업과 자동화에 공유하면 누가 무엇을 바꿨는지 구분하기
+어렵고 한 credential 유출의 영향이 모든 realm으로 넓어진다. realm별 위임, 전용 service account와
+관리 event를 조합한다.
+
+<TermIntro
+  terms={[
+    ['realm-management', '', '특정 realm 안의 사용자·client·event 등을 관리하도록 나뉜 built-in client role 집합.'],
+    ['fine-grained admin permissions', '', '관리 대상 resource와 허용 operation을 더 좁게 위임하는 관리 권한 모델.'],
+    ['active signing key', '', '새 token 서명에 현재 사용하는 우선 키. JWKS에는 검증이 필요한 다른 키도 함께 있을 수 있다.'],
+    ['key rollover', '', '새 키를 서명에 사용하면서 옛 token의 검증 기간 동안 이전 public key를 함께 제공하는 교체.'],
+  ]}
+/>
+
+## 이 장에서 답할 질문
+
+- master 관리자 대신 realm 작업을 어떻게 위임하는가?
+- Admin REST 자동화는 어떤 identity와 감사를 사용해야 하는가?
+- 서명 키는 왜 즉시 삭제가 아니라 겹침 기간을 두고 교체하는가?
+
+## 관리 주체를 작업별로 나눈다
+
+| 작업 | 권한 방향 |
+|---|---|
+| 사용자 조회·지원 | 대상 realm의 query/view 역할부터 시작 |
+| 사용자 변경 | manage-users를 별도 그룹에 위임하고 event 감사 |
+| client 설정 | manage-clients를 제한된 관리자/자동화에만 부여 |
+| realm 전체 변경 | 소수 운영자와 승인 절차, 일상 계정과 분리 |
+| 자동화 | 사람 token 대신 전용 service account와 최소 관리 역할 |
+
+[Keycloak 관리 권한 문서](https://www.keycloak.org/docs/26.7.0/server_admin/#administering-the-admin-console)는
+master realm과 realm별 관리자의 범위를 설명한다. broad role부터 주지 말고 필요한 조회·변경 작업으로
+나눠 실제 허용/거부를 시험한다. fine-grained admin permissions는 사용하는 Keycloak 버전의 지원 상태와
+resource 범위를 확인한다.
+
+Admin REST 호출은 고정 endpoint, 짧은 token과 명시적 timeout을 사용하고 멱등한 read-before-write로
+작성한다. 전용 client·관리 역할, 호출 주체와 변경 resource를 admin event에 남긴다. bootstrap admin
+password를 일반 자동화 secret으로 쓰지 않는다.
+
+## 서명 키를 겹쳐 교체한다
+
+새 key provider를 추가하고 우선순위를 높여 새 token이 새 키로 서명되게 한다. 이전 public key는 그 키로
+서명된 access/ID token이 모두 만료되고 verifier의 JWKS cache가 갱신될 시간까지 verification 용도로
+남긴다. 이후에야 이전 private key와 provider를 제거한다.
+
+```text
+준비: JWKS = old, 서명 = old
+전환: JWKS = old + new, 서명 = new
+정리: 옛 token 만료 + JWKS cache 갱신 확인 -> old 제거
+```
+
+API는 `kid`를 보고 JWKS에서 public key를 고르되 허용 algorithm, issuer, audience와 expiration도 계속
+검증한다. key rollover는 client secret rotation, 사용자 session 종료 또는 이미 발급된 token의 즉시
+폐기와 같은 작업이 아니다.
+
+## 비상 변경의 영향 범위를 안다
+
+키 유출 의심 때는 정상 겹침보다 빠른 제거가 필요할 수 있지만 아직 유효한 token이 대량으로 401이 될 수
+있다. token 수명, verifier JWKS refresh, session/not-before 정책과 서비스별 복구 순서를 함께 판단한다.
+private key backup은 DB backup과 별도 secret/HSM 경계에 있을 수 있으므로 복구 훈련에서 둘 다 확인한다.
+
+## 요약
+
+- master 관리자를 공유하지 말고 realm·작업별 역할과 전용 자동화 identity로 위임한다.
+- Admin REST 변경은 최소 권한, 멱등성, timeout과 admin event 감사를 갖춘다.
+- 서명 키는 새 키 전환 뒤 옛 token·JWKS cache 기간을 보장하고 이전 키를 제거한다.

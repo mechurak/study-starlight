@@ -1,0 +1,71 @@
+---
+title: "저장소와 가용성"
+description: "재시작·인스턴스 장애·DB 장애에서 남는 상태와 단일 실습 및 HA의 경계를 구분"
+aliases: [Keycloak HA, persistent sessions, Infinispan, jdbc-ping, database availability]
+reviewedAt: 2026-09-14
+deckGroup: operations
+sidebar:
+  order: 1210
+---
+
+import Thesis from '../../../components/docs/Thesis.astro';
+import TermIntro from '../../../components/docs/TermIntro.astro';
+
+<Thesis>Keycloak instance를 다시 띄울 수 있는 것과 인증 서비스가 장애 중에도 계속 동작하는 것은 다른 보장이다.</Thesis>
+
+realm·client·사용자와 persistent session의 원본은 DB에 있고, 실행 instance의 cache는 빠른 처리를 돕는다.
+따라서 container 재생성 성공만으로 DB 장애, replica 장애와 무중단 rollout을 견딘다고 말할 수 없다.
+
+<TermIntro
+  terms={[
+    ['persistent session', '', '로그인 세션을 DB에 지속해 instance 재시작 뒤 복구할 수 있게 하는 상태. 브라우저 앱 cookie나 이미 발급된 JWT와는 다르다.'],
+    ['distributed cache', '', '여러 Keycloak instance가 hot data와 invalidation을 공유하는 Infinispan cache. DB 백업을 대신하지 않는다.'],
+    ['cluster discovery', '', 'Keycloak instance가 같은 cache cluster의 구성원을 찾는 절차. 기본 embedded cache 구성은 DB 기반 `jdbc-ping`을 사용한다.'],
+    ['failure domain', '', '한 장애가 동시에 영향을 미칠 수 있는 node·rack·zone·전원·storage의 범위.'],
+  ]}
+/>
+
+## 이 장에서 답할 질문
+
+- 어떤 상태가 PostgreSQL, Keycloak cache, browser/app에 있는가?
+- 단일 instance 재시작과 HA 장애 전환은 무엇이 다른가?
+- replica 수만 늘려도 가용성이 생기지 않는 이유는 무엇인가?
+
+## 상태의 원본을 찾는다
+
+| 상태 | 주된 위치 | 장애 때 보이는 현상 |
+|---|---|---|
+| realm·client·role·import 사용자 | PostgreSQL | DB를 잃으면 설정과 계정을 잃음 |
+| persistent Keycloak session | PostgreSQL + cache | DB가 살아 있으면 instance 재시작 뒤 복구 가능 |
+| hot cache·로그인 진행 상태 | instance 간 Infinispan | node 전환 때 cache miss나 진행 중 flow 영향 가능 |
+| 앱 session cookie/data | 각 앱 | Keycloak 복구와 별도로 앱이 유지·종료 결정 |
+| 이미 발급된 JWT | client/API | 만료 전까지 local 검증 가능하나 신규 로그인·JWKS 갱신은 영향 |
+
+현재 Compose의 named volume은 `stop`/`resume`과 container 재생성에서 PostgreSQL 데이터를 보존했다.
+그 결과는 disk·VM 손실, volume corruption, DB failover 또는 동시 Keycloak instance를 검증한 것이 아니다.
+
+## Keycloak과 DB를 각각 중복화한다
+
+Keycloak replica를 둘 이상 두고 [distributed cache](https://www.keycloak.org/server/caching)를 구성하면
+instance 하나의 장애와 rollout을 견딜 여지가 생긴다. 현재 기본 embedded cache stack의 member discovery는
+공용 DB를 쓰는 `jdbc-ping`이다. ingress affinity는 cache locality와 진행 중 인증 흐름에 도움이 되지만
+죽은 node를 복구하거나 DB를 중복화하지 않는다.
+
+PostgreSQL은 별도의 HA, backup, WAL/PITR와 failover 검증이 필요하다. Keycloak replica가 모두 같은 단일
+DB에 의존하면 DB는 여전히 단일 장애점이다. instance와 DB replica를 같은 failure domain에 몰아 두지 않는다.
+
+## 실패 단위를 시험한다
+
+- Keycloak instance 하나 종료: readiness에서 빠지고 새 로그인·기존 session이 다른 instance에서 이어지는가
+- rolling upgrade: 구·신 버전이 허용된 기간에 cache와 DB schema를 함께 사용할 수 있는가
+- DB primary 장애: 쓰기·로그인 복구 시간과 데이터 손실 지점은 어디인가
+- 전체 site 장애: DNS·LB·DB·secret·key까지 다른 위치에서 복구되는가
+
+[Keycloak production 가이드](https://www.keycloak.org/server/configuration-production)와 버전별 cache 문서를
+기준으로 시험한다. 이 덱은 단일 Compose만 실제 검증했으므로 위 HA 시나리오는 미실행이다.
+
+## 요약
+
+- DB 원본, distributed cache, 앱 session과 JWT는 서로 다른 생명주기를 가진다.
+- Keycloak replica만 늘리면 단일 DB와 failure domain 문제는 남는다.
+- 현재 실습은 보존 재시작을 검증했지만 failover·무중단 upgrade·site 복구를 검증하지 않았다.

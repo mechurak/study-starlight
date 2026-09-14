@@ -1,0 +1,72 @@
+---
+title: "인증 흐름 관찰하기"
+description: "사용자 이벤트·관리 이벤트·로그·health·metrics를 실패 경계별로 연결하는 방법"
+aliases: [Keycloak events, admin events, health endpoint, Keycloak metrics, login failure]
+reviewedAt: 2026-09-14
+deckGroup: operations
+sidebar:
+  order: 1220
+---
+
+import Thesis from '../../../components/docs/Thesis.astro';
+import TermIntro from '../../../components/docs/TermIntro.astro';
+
+<Thesis>인증 장애를 빠르게 찾으려면 사용자 결과, Keycloak event, 서버 상태와 의존성 신호를 같은 시간축에 놓되 credential과 token은 수집하지 않아야 한다.</Thesis>
+
+브라우저의 “로그인 실패” 한 줄은 redirect 오류, password 거부, LDAP 장애, token 검증 실패 또는 앱 권한
+부족을 구분하지 못한다. 신호는 각 경계의 질문에 맞게 켜고 보존한다.
+
+<TermIntro
+  terms={[
+    ['user event', '', 'LOGIN, LOGIN_ERROR, LOGOUT처럼 사용자 인증·계정 동작에서 생기는 realm 이벤트.'],
+    ['admin event', '', '관리 콘솔·Admin REST가 realm 설정을 조회하거나 바꾼 기록.'],
+    ['readiness', '', 'instance가 현재 요청을 받을 준비가 됐는지 나타내는 상태. process 생존을 보는 liveness와 다르다.'],
+    ['cardinality', '', 'metric label 값 조합의 수. client·IdP·오류 같은 label을 무제한 넣으면 시계열 비용이 급증한다.'],
+  ]}
+/>
+
+## 이 장에서 답할 질문
+
+- 로그인 401/403과 LDAP 장애를 어떤 신호로 구분하는가?
+- health와 metrics endpoint는 어디에 노출해야 하는가?
+- 관찰성을 높이면서 password·token·개인정보 노출은 어떻게 줄이는가?
+
+## 경계별 신호를 연결한다
+
+| 경계 | 먼저 볼 신호 | 다음 확인 |
+|---|---|---|
+| browser→Keycloak | user LOGIN_ERROR, client ID, redirect URI | client 설정, flow, IdP/LDAP 로그 |
+| 관리자 변경 | admin event의 actor·resource·operation | 승인 변경인지, 영향 client/realm |
+| Keycloak process | `/health/ready`, JVM·HTTP metrics, server log | DB·cache·thread·GC·certificate |
+| Keycloak→LDAP/IdP | connection/TLS error, upstream latency | DNS, CA, bind, upstream event |
+| API | token 401과 role 403 분리 | iss/aud/exp/JWKS 또는 claim/RBAC |
+
+사용자 이벤트와 관리 이벤트는 realm별로 명시적으로 켜고 저장 기간과 listener를 정한다.
+[Keycloak event 문서](https://www.keycloak.org/docs/26.7.0/server_admin/#configuring-auditing-to-track-events)는
+user/admin event 설정과 조회 범위를 설명한다. 관리 event representation을 저장하면 변경 내용을 더
+자세히 볼 수 있지만 secret·개인정보 보존 범위를 먼저 검토한다.
+
+## health와 metrics를 내부에 둔다
+
+[Keycloak health 문서](https://www.keycloak.org/observability/health)는 `/health`, `/health/live`,
+`/health/ready`, `/health/started`를 설명한다. [metrics 문서](https://www.keycloak.org/observability/configuration-metrics)는
+Prometheus 형식의 `/metrics`를 제공한다. 둘 다 build/runtime 옵션으로 활성화하며 기본 management
+interface를 사용한다.
+
+현재 Compose는 health와 metrics를 켰고 bridge 내부 port 9000의 readiness만 healthcheck에 사용한다.
+management port는 host에 publish하지 않았다. 운영에서도 probe/scraper network만 접근시키고 일반
+사용자 ingress와 분리한다.
+
+## 안전한 진단 문맥을 남긴다
+
+- correlation/request ID, realm, client ID, IdP alias, event type, 결과와 latency를 남긴다.
+- password, authorization code, cookie, client secret, access/refresh/ID token 원문은 남기지 않는다.
+- username·email·IP는 목적, 접근 주체와 보존 기간을 정하고 필요한 경우 가명화한다.
+- metric label은 realm·결과 같은 작은 집합부터 시작하고 사용자 ID를 label로 만들지 않는다.
+- 시간 동기화가 어긋나면 token 만료와 여러 로그의 순서를 잘못 판단하므로 node·DB·IdP 시간을 확인한다.
+
+## 요약
+
+- user/admin event, server log, health/metrics와 API 결과를 같은 시간축에서 경계별로 본다.
+- management endpoint는 활성화하되 내부 probe·scraper에만 노출한다.
+- 진단에 필요한 문맥은 남기고 credential, code, cookie와 token 원문은 수집하지 않는다.

@@ -68,8 +68,7 @@ export default {
 		},
 		{
 			"id": "operations",
-			"label": "운영",
-			"allowEmpty": true
+			"label": "운영"
 		},
 		{
 			"id": "reference",

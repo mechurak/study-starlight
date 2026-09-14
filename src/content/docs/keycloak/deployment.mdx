@@ -1,0 +1,75 @@
+---
+title: "Keycloak 배포 설계"
+description: "Compose 학습 환경과 운영 배포의 차이를 DB·주소·TLS·secret·자동화 기준으로 구분"
+aliases: [Keycloak deployment, Keycloak Operator, production mode, KC_HOSTNAME, reverse proxy]
+reviewedAt: 2026-09-14
+deckGroup: operations
+sidebar:
+  order: 1200
+---
+
+import Thesis from '../../../components/docs/Thesis.astro';
+import TermIntro from '../../../components/docs/TermIntro.astro';
+
+<Thesis>운영 Keycloak 배포는 컨테이너를 띄우는 일이 아니라 고정된 공개 주소, 외부 DB, TLS 신뢰 경계와 secret 수명주기를 함께 보장하는 일이다.</Thesis>
+
+이 덱의 Compose는 한 컴퓨터에서 인증 흐름을 재현하는 학습 환경이다. PostgreSQL과 production mode,
+고정 HTTPS issuer를 사용하지만 단일 Keycloak·단일 DB이므로 운영 가용성이나 Kubernetes 배포를 검증하지 않는다.
+
+<TermIntro
+  terms={[
+    ['production mode', '', 'hostname·TLS 등 운영 전제를 명시하고 `start`로 기동하는 Keycloak 모드. `start-dev`와 구분된다.'],
+    ['Keycloak Operator', '', 'Keycloak CR을 바탕으로 Kubernetes 배포와 롤링 변경을 관리하는 공식 controller.'],
+    ['reverse proxy boundary', '', 'TLS 종료와 forwarded header 작성자를 신뢰할 수 있도록 직접 접근을 제한한 네트워크 경계.'],
+    ['realm import', '', '초기 realm 구성을 JSON에서 넣는 부트스트랩 도구. 지속 DB 백업이나 일반 변경 관리와 같지 않다.'],
+  ]}
+/>
+
+## 이 장에서 답할 질문
+
+- 현재 Compose 결과를 운영 보장으로 일반화하면 안 되는 이유는 무엇인가?
+- Kubernetes에서 Operator와 직접 배포 중 무엇을 맡아야 하는가?
+- hostname·proxy header·TLS 설정은 왜 token 검증과 연결되는가?
+
+## 학습 배포와 운영 배포를 구분한다
+
+| 항목 | 현재 Compose 실습 | 운영에서 추가할 답 |
+|---|---|---|
+| Keycloak | 단일 instance | replica, failure domain, rollout 검증 |
+| PostgreSQL | 단일 container + named volume | 별도 HA·backup/PITR·복원 훈련 |
+| 공개 주소 | host와 container에서 같은 고정 issuer | DNS·LB·인증서 갱신과 내부 접근까지 일치 |
+| secret | 로컬 ignore 파일 + Compose secret | secret manager, 접근 감사, rotation |
+| 배포 변경 | 고정 image와 script | 선언형 설정, staged upgrade, rollback 기준 |
+
+운영 Kubernetes에서는 [공식 Keycloak Operator](https://www.keycloak.org/operator/installation)를 우선
+검토한다. Operator는 Keycloak CR의 instance·DB·hostname·HTTP/TLS 구성을 해석하고 롤링 변경을 돕는다.
+직접 Deployment를 작성하면 image build, probe, cache discovery, rollout과 schema upgrade 순서를 모두
+직접 소유한다. 이번 범위에서는 둘 중 어느 방식도 cluster에 실행하지 않았다.
+
+## 공개 URL을 프로토콜 계약으로 다룬다
+
+`KC_HOSTNAME`은 redirect URL과 discovery, token `iss`의 기준이다. 브라우저·API·Keycloak 자체가 같은
+공개 HTTPS URL을 해석하고 인증서를 신뢰해야 한다. 내부용 issuer를 별도로 만들면 검증자마다 다른
+token 계약이 생긴다. [Keycloak hostname 문서](https://www.keycloak.org/server/hostname)가 frontend와
+backchannel URL 계산의 기준이다.
+
+TLS를 ingress에서 끝내고 뒤를 HTTP로 연결한다면 HTTP 허용과 proxy header 처리를 명시한다.
+`KC_PROXY_HEADERS=xforwarded` 같은 설정은 아무 요청의 header나 믿겠다는 뜻이 아니다. ingress만
+Keycloak에 닿도록 제한하고 ingress가 외부 `X-Forwarded-*`를 제거·재작성해야 한다.
+
+## image와 secret을 분리한다
+
+[Keycloak container 가이드](https://www.keycloak.org/server/containers)는 build-time 설정을 적용한
+최적화 image와 runtime 설정을 구분한다. image에는 기능·provider 같은 재현 가능한 산출물을 넣고 DB
+password, TLS private key, client secret은 runtime secret으로 주입한다. tag만 믿지 않고 검증한 digest와
+업그레이드 기록을 남긴다.
+
+realm import는 빈 환경을 부트스트랩하거나 선언된 구성을 옮기는 데 유용하지만 실행 중 DB의 전체 상태,
+세션, credential과 변경 이력을 복구하는 수단은 아니다. 초기 import가 매 기동마다 운영 변경을 덮어쓰지
+않도록 일회성 작업과 상시 서버를 분리한다.
+
+## 요약
+
+- Compose 실습 통과는 단일 환경의 기능 재현이며 운영 HA나 Kubernetes 검증이 아니다.
+- 공개 hostname, TLS 종료점과 proxy header 신뢰는 issuer·redirect 검증의 일부다.
+- Operator 또는 직접 배포가 맡을 범위를 정하고 image와 runtime secret, import와 DB 복구를 분리한다.
