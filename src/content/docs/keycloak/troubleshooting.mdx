@@ -1,0 +1,81 @@
+---
+title: "Keycloak 문제 진단"
+description: "로그인·디렉터리·토큰·권한·운영 증상에서 실패 경계와 복구 순서를 찾는 지도"
+aliases: [Keycloak troubleshooting, invalid audience, unknown kid, issuer mismatch, redirect_uri, LDAP login error]
+reviewedAt: 2026-09-14
+deckGroup: reference
+sidebar:
+  order: 1250
+---
+
+import Thesis from '../../../components/docs/Thesis.astro';
+import TermIntro from '../../../components/docs/TermIntro.astro';
+
+<Thesis>인증 문제는 credential을 반복 입력하기보다 마지막으로 성공한 경계를 찾아 한 단계씩 내려가야 빠르고 안전하게 풀린다.</Thesis>
+
+먼저 사용자가 Keycloak 로그인 화면에 도달했는지, Keycloak이 token을 발급했는지, API가 token을
+인증했는지와 역할을 허용했는지를 나눈다. 401과 403, 새 로그인과 기존 session을 섞지 않는다.
+
+<TermIntro
+  terms={[
+    ['clock skew', '', '발급자와 검증자 사이의 시계 차이. 새 token도 `iat`·`nbf`·`exp` 검증에서 실패하게 할 수 있다.'],
+    ['kid', 'Key ID', 'JWT header에서 JWKS의 검증 public key를 고르는 식별자.'],
+    ['correlation ID', '', '브라우저·proxy·Keycloak·API 로그에서 같은 요청을 연결하는 비밀값이 아닌 식별자.'],
+    ['boundary test', '', '전체 흐름 대신 DNS, TLS, discovery, bind, token, API처럼 한 경계의 입력·출력만 검사하는 진단.'],
+  ]}
+/>
+
+## 이 장에서 답할 질문
+
+- 로그인 실패가 client, Keycloak, LDAP/IdP 중 어디에서 났는가?
+- token 401과 권한 403을 어떻게 나누는가?
+- 기존 token/session이 살아 있을 때 무엇부터 복구해야 하는가?
+
+## 마지막 성공 지점을 찾는다
+
+| 마지막 성공 | 다음 실패 | 좁은 확인 |
+|---|---|---|
+| Keycloak 화면도 안 뜸 | DNS/TLS/route | 공개 URL resolve, CA chain, proxy route |
+| 화면은 뜸 | client/redirect/flow | realm, client ID, 정확한 redirect URI, event |
+| 로컬 로그인만 됨 | LDAP/IdP | provider connection, LDAPS CA/bind, upstream redirect |
+| token은 발급됨 | API 401 | access token, iss/aud/exp/alg/kid, JWKS |
+| API가 token 인증 | API 403 | token role/group과 endpoint 요구 권한 |
+| 신규 요청은 정상 | 기존 browser만 실패 | 앱 cookie, Keycloak session, stale cache |
+
+discovery 문서를 먼저 열어 issuer와 endpoint가 기대한 공개 URL인지 확인한다. 실제 token payload를 로컬에서
+볼 수는 있지만 decode는 서명 검증이 아니며 token을 외부 웹 decoder에 붙여 넣지 않는다. event와
+category별 server log를 짧게 올리고 진단 후 원래 수준으로 돌린다.
+
+## 증상별로 한 경계를 고친다
+
+| 증상 | 먼저 확인 | 기대 결과 | 복구 방향 |
+|---|---|---|---|
+| `Invalid parameter: redirect_uri` | authorization request와 client 등록값 | scheme/host/port/path 정확히 일치 | 필요한 URI만 등록, 넓은 wildcard 금지 |
+| issuer 불일치 | discovery `issuer`, token `iss`, API 설정 | 모두 같은 realm HTTPS URL | hostname/DNS/proxy header 경계 수정 |
+| `unknown kid` | JWT `kid`, 현재 JWKS, verifier cache | old/new 키가 겹침 기간 동안 조회됨 | JWKS refresh 후 키 rollover 상태 확인 |
+| 방금 받은 token 만료 | Keycloak/API/node 시간과 `exp` | 허용 skew 안에서 동기화 | NTP와 timezone이 아닌 실제 epoch 확인 |
+| LDAP 사용자만 로그인 실패 | LDAPS TLS, bind, user enabled, event | CA 검증·검색·사용자 bind 순서대로 성공 | source 복구 뒤 cache/sync를 명시적으로 갱신 |
+| group 변경이 바로 안 보임 | LDAP sync, user cache, 새 token | 새 token claim에 새 membership | sync→cache clear→새 로그인/refresh 순서 확인 |
+| 무토큰과 권한 부족 혼동 | API status/body | 무효 token 401, 유효 token 권한 부족 403 | token 검증과 role 검사를 분리 |
+
+디렉터리 변경의 실제 시간축은 [디렉터리 변경과 장애](/keycloak/directory-changes/)를 따른다. 이 실습에서
+group 제거는 새/refresh token에 반영됐지만 기존 JWT와 앱 session token은 만료 전 유지됐다. 계정 disable은
+새 로그인과 refresh를 막았고, LDAP outage 중 기존 imported user의 refresh가 성공한 관찰도 있었다.
+제품·cache 설정에 따라 달라질 수 있으므로 현재 환경에서 다시 측정한다.
+
+## 운영 장애는 의존성부터 복구한다
+
+readiness 실패 때 process 재시작만 반복하지 말고 PostgreSQL, cache cluster, DNS·certificate와 memory를
+확인한다. DB 복구가 필요하면 [백업과 업그레이드](/keycloak/backup-and-upgrade/)의 격리 복원 결과와
+runbook을 사용한다. 복구 뒤에는 discovery/JWKS, 대표 로컬 로그인, Federation 로그인, token/API 순으로
+좁은 smoke test를 한다.
+
+[Keycloak hostname 문서](https://www.keycloak.org/server/hostname),
+[health 문서](https://www.keycloak.org/observability/health),
+[서버 관리 문서](https://www.keycloak.org/docs/26.7.0/server_admin/)를 버전별 기준으로 삼는다.
+
+## 요약
+
+- 마지막 성공 경계에서 DNS/TLS→client→identity source→token→API 순으로 좁힌다.
+- 401은 token 인증, 403은 인증된 주체의 권한 문제로 분리한다.
+- 변경·장애는 새 로그인, refresh, 기존 JWT와 앱 session의 시간축을 따로 관찰한다.

@@ -72,8 +72,7 @@ export default {
 		},
 		{
 			"id": "reference",
-			"label": "문제 해결과 마무리",
-			"allowEmpty": true
+			"label": "문제 해결과 마무리"
 		}
 	],
 	"map": [

@@ -121,7 +121,7 @@ for (const file of mdxFiles) {
 		legacyThesisPages++;
 	}
 
-	if (deck.termIntro === 'required' && !/-(?:glossary|wrapup)$/u.test(page) && !hasComponent(source, 'TermIntro')) {
+	if (deck.termIntro === 'required' && !/(?:^|-)(?:glossary|wrapup)$/u.test(page) && !hasComponent(source, 'TermIntro')) {
 		errors.push(`${relative(file)}: 필수 <TermIntro>가 없습니다.`);
 	}
 }

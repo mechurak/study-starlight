@@ -1,0 +1,69 @@
+---
+title: "Keycloak 용어 사전"
+description: "인증·토큰·디렉터리·연동·운영 용어를 역할별로 다시 찾는 색인"
+aliases: [Keycloak glossary, OAuth glossary, OIDC glossary, LDAP glossary, 인증 용어]
+reviewedAt: 2026-09-14
+deckGroup: reference
+sidebar:
+  order: 1260
+---
+
+import Thesis from '../../../components/docs/Thesis.astro';
+
+<Thesis>비슷해 보이는 인증 용어는 누가 만들고 누가 소비하며 어느 경계에서 검증하는지를 기준으로 구분한다.</Thesis>
+
+## 신원과 로그인
+
+| 용어 | 뜻 | 자세히 |
+|---|---|---|
+| authentication / authorization | 누구인지 확인 / 무엇을 허용할지 판단 | [Keycloak의 역할](/keycloak/keycloak-overview/) |
+| IdP | 사용자를 인증하고 신원 결과를 제공하는 주체 | [Identity Brokering](/keycloak/identity-brokering/) |
+| realm | 사용자·client·role·정책을 격리한 Keycloak 영역 | [Realm과 사용자](/keycloak/realm-and-users/) |
+| SSO | 한 realm 로그인 session을 여러 client가 재사용하는 경험 | [Client와 SSO](/keycloak/clients-and-sso/) |
+| MFA / TOTP | password 외 요소 / 시간 기반 일회용 code | [인증 Flow와 OTP](/keycloak/authentication-flows/) |
+| Identity Brokering | browser를 외부 IdP로 보내 인증 결과를 local user에 연결 | [Identity Brokering](/keycloak/identity-brokering/) |
+| User Federation | LDAP 같은 외부 사용자 저장소를 Keycloak user model로 연결 | [LDAP Federation](/keycloak/ldap-federation/) |
+
+## OAuth·OIDC와 token
+
+| 용어 | 뜻 | 자세히 |
+|---|---|---|
+| OAuth 2.0 / OIDC | 권한 위임 framework / 그 위의 인증 layer | [OAuth와 OIDC](/keycloak/oauth-oidc/) |
+| client | Keycloak에 등록되어 protocol flow와 token을 사용하는 앱·서비스 | [Client와 SSO](/keycloak/clients-and-sso/) |
+| public / confidential client | secret을 안전하게 못 보관하는 client / credential로 자신을 인증하는 client | [Client와 SSO](/keycloak/clients-and-sso/) |
+| Authorization Code + PKCE | browser code flow와 code 탈취 방지 verifier/challenge | [OAuth와 OIDC](/keycloak/oauth-oidc/) |
+| ID / access / refresh token | 로그인 결과 / API 권한 / 새 token을 받는 credential | [Token 검증](/keycloak/token-validation/) |
+| JWT / claim | 서명 가능한 token 형식 / 그 안의 값 하나 | [Token 검증](/keycloak/token-validation/) |
+| issuer / subject / audience / expiration | 발급자 / 주체 / 소비 대상 / 만료 시각 | [Token 검증](/keycloak/token-validation/) |
+| JWKS / kid | 공개 검증 키 집합 / 그중 한 키의 식별자 | [Token 검증](/keycloak/token-validation/) |
+| scope / protocol mapper | 요청 범위 / Keycloak 값을 token claim으로 만드는 규칙 | [Scope와 Mapper](/keycloak/scopes-and-mappers/) |
+| client credentials | 사용자 없이 client가 자기 access token을 받는 grant | [Service Accounts](/keycloak/service-accounts/) |
+
+## 디렉터리와 권한
+
+| 용어 | 뜻 | 자세히 |
+|---|---|---|
+| AD / Samba AD DC | Microsoft 디렉터리 제품 / 실습의 AD 호환 대역 | [AD와 LDAP](/keycloak/ad-and-ldap/), [Samba 디렉터리](/keycloak/samba-directory/) |
+| LDAP / LDAPS | 디렉터리 접근 protocol / TLS로 보호한 LDAP | [AD와 LDAP](/keycloak/ad-and-ldap/) |
+| bind DN | LDAP 검색 또는 사용자 password 확인에 쓰는 identity의 DN | [AD와 LDAP](/keycloak/ad-and-ldap/) |
+| DN / CN / OU / DC | directory object 경로와 이름·조직·domain 구성요소 | [AD와 LDAP](/keycloak/ad-and-ldap/) |
+| group / realm role / client role | 사용자 묶음 / realm 공통 권한 / 특정 client 권한 | [Group과 Role](/keycloak/groups-and-roles/) |
+| LDAP mapper / protocol mapper | 외부 directory→Keycloak / Keycloak→token 변환 | [디렉터리 Group Mapping](/keycloak/directory-group-mapping/) |
+
+## 연동과 운영
+
+| 용어 | 뜻 | 자세히 |
+|---|---|---|
+| SAML assertion / metadata | XML 기반 인증 결과 / endpoint·key 교환 문서 | [SAML](/keycloak/saml/) |
+| oauth2-proxy | OIDC를 모르는 upstream 앞에서 로그인을 처리하는 proxy | [oauth2-proxy](/keycloak/oauth2-proxy/) |
+| AuthenticationConfiguration | kube-apiserver JWT issuer·claim 규칙 설정 | [Kubernetes OIDC](/keycloak/kubernetes-oidc/) |
+| persistent session / distributed cache | DB에 지속한 로그인 상태 / instance 간 hot data 공유 | [저장소와 가용성](/keycloak/storage-and-availability/) |
+| realm export / DB backup | 구성 이관 snapshot / 영속 상태 복구 원본 | [백업과 업그레이드](/keycloak/backup-and-upgrade/) |
+| key rollover | 새 서명 키 전환과 옛 public key 검증의 겹침 교체 | [관리 권한과 서명 키](/keycloak/administration-and-keys/) |
+| user event / admin event | 사용자 인증 동작 / 관리자 조회·변경의 감사 신호 | [인증 흐름 관찰](/keycloak/observability/) |
+
+## 요약
+
+- 인증과 인가, Federation과 Brokering, LDAP mapper와 protocol mapper를 서로 다른 경계로 본다.
+- ID/access/refresh token은 소비자와 목적이 다르며 JWT라는 형식만으로 안전해지지 않는다.
+- 용어의 실제 설정과 검증 절차는 표의 질문 중심 페이지에서 다시 확인한다.
