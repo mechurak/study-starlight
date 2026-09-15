@@ -35,8 +35,17 @@ guided `base`에는 realm과 local-user만 있고 app-a client나 앱 service는
    ```
 
 4. Admin Console의 **Clients → app-a → Settings**에서 Client authentication, Standard flow,
-   Valid redirect URIs를 공개 JSON과 대조한다. 앱 A에서 local-user로 로그인하고 `/session`이
-   `authenticated: true`와 `username: local-user`를 반환하는지 확인한다.
+   Valid redirect URIs를 공개 JSON과 대조한다.
+5. 브라우저에서 앱 A `https://app-a.keycloak.test:30081/`를 열고 **Sign in with Keycloak**을 누른다.
+   Keycloak 로그인 화면에 `local-user`와 아래 파일의 비밀번호를 넣는다.
+
+   ```bash
+   cat .state/secrets/keycloak-local-user-password   # labs/keycloak에서
+   ```
+
+   로그인 뒤 앱 A 화면에 token claims·User API·Admin API 링크가 보이고,
+   `https://app-a.keycloak.test:30081/session`이 `authenticated: true`와 `username: local-user`를
+   반환하면 성공이다.
 </Steps>
 
 검사는 정상 password와 오답을 각각 새 cookie jar로 제출하며 Code, PKCE S256, state, nonce, callback,

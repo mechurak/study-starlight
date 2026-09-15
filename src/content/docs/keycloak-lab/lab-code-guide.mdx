@@ -58,8 +58,10 @@ role로 403과 200을 가른다. `/claims`는 검증 뒤 `iss`, `aud`, `exp`, `g
 | `internal/seed/` | 기존 완성 환경·선택 실습 호환 조합 | 과거 P/D ID별 후처리 |
 | `internal/verify/` | 실제 Code+PKCE 로그인과 상세 회귀 | HTML form cookie jar와 과거 evidence 비교 |
 
-공개 진입점은 `scripts/first-start.sh`, `apply.sh`, `verify.sh`, `status.sh`, `stop.sh`, `resume.sh`다.
-처음에는 이 스크립트의 사용법만 알면 되고, 학습 결과가 예상과 다를 때 해당 내부 경계를 연다.
+공개 진입점은 `scripts/first-start.sh`, `apply.sh`, `verify.sh`, `status.sh`, `stop.sh`, `resume.sh`, `service.sh`,
+`reset.sh`다. 각각의 역할과 실행 순서는 환경 준비 장의
+[실습 진행 순서와 스크립트](/keycloak-lab/lab-setup/#실습-진행-순서와-스크립트)에 정리돼 있다. 처음에는 그 표만 알면
+되고, 학습 결과가 예상과 다를 때 해당 내부 경계를 연다.
 
 ## 요약
 
