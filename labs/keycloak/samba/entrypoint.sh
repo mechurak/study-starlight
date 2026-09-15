@@ -8,7 +8,11 @@ set -eu
 
 admin_password_file=/run/secrets/samba_admin_password
 certificate_directory=/run/keycloak-lab/certs
-tls_key_file=/run/secrets/samba_tls_key
+tls_key_secret=/run/secrets/samba_tls_key
+# Samba only accepts a TLS key that is root-owned and 0600. The Compose file secret keeps the
+# host owner on Docker Engine, so the key is copied to a root-owned runtime file at every start.
+tls_key_directory=/run/keycloak-lab/tls
+tls_key_file=$tls_key_directory/dc1.key
 persisted_config=/var/lib/samba/etc/smb.conf
 domain_database=/var/lib/samba/private/sam.ldb
 
@@ -16,13 +20,17 @@ for required_file in \
   "$admin_password_file" \
   "$certificate_directory/ca.crt" \
   "$certificate_directory/dc1.crt" \
-  "$tls_key_file"
+  "$tls_key_secret"
 do
   if [ ! -s "$required_file" ]; then
     echo "required Samba input is missing or empty: $required_file" >&2
     exit 1
   fi
 done
+
+mkdir -p "$tls_key_directory"
+chmod 0700 "$tls_key_directory"
+install -m 0600 -o root -g root "$tls_key_secret" "$tls_key_file"
 
 if [ ! -e "$domain_database" ]; then
   if find /var/lib/samba -mindepth 1 -maxdepth 1 -print -quit | grep -q .; then

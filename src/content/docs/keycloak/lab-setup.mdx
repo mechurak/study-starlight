@@ -50,11 +50,15 @@ AD DS가 아니라 AD 호환 디렉터리 대역이다.
 <TabItem label="macOS">
 
 Colima와 Docker client·Compose plugin을 준비한다. 이 저장소에서 검증한 profile은 4 logical CPU,
-8 GiB RAM이며 시작 직전 가용 memory 5 GiB와 Docker data disk 20 GiB 이상을 확인했다.
+8 GiB RAM이며 시작 직전 가용 memory 5 GiB와 Docker data disk 20 GiB 이상을 확인했다. 로컬 image
+build가 BuildKit secret을 쓰므로 Homebrew의 `docker` CLI에는 `docker-buildx` plugin을 따로 연결한다.
 
 ```bash
+brew install docker-buildx
+ln -sfn "$(brew --prefix)/opt/docker-buildx/bin/docker-buildx" ~/.docker/cli-plugins/docker-buildx
 colima status
 docker version
+docker buildx version
 docker compose version
 ```
 
@@ -66,8 +70,19 @@ Ubuntu에서의 P03·전체 P11 실행은 아직 보류이므로 macOS 결과를
 
 ```bash
 docker version
+docker buildx version
 docker compose version
 docker info --format '{{.OSType}} {{.Architecture}}'
+```
+
+회사 프록시 뒤라면 image pull은 `/etc/docker/daemon.json`의 `proxies`가 맡지만, build 안의 `apt-get`과
+`npm ci`는 시작한 shell의 `HTTP_PROXY`·`HTTPS_PROXY`·`NO_PROXY`를 그대로 넘겨받는다. TLS를 다시 서명하는
+proxy라면 그 CA의 PEM 경로를 `CORP_CA_FILE`로 지정한다. 복사본은 `.state/build/`에 남고 build 단계만
+신뢰하며 완성 image에는 들어가지 않는다.
+
+```bash
+export CORP_CA_FILE=/path/to/corporate-proxy-ca.crt
+./scripts/first-start.sh --guided
 ```
 
 </TabItem>

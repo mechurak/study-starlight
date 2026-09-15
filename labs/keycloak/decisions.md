@@ -38,6 +38,17 @@
   이미지의 amd64/arm64 지원과 runtime과 같은 플랫폼 사용을 명시한다.
 - 단일 Keycloak·PostgreSQL Compose 환경은 학습·장애 관찰용이며 운영 지원이나 HA를 검증하지 않는다.
   Keycloak의 비 OpenShift Kubernetes 지원은 best-effort이므로 P04 kind 결과도 운영 보증으로 쓰지 않는다.
+- 회사 Ubuntu의 HTTPS inspection proxy를 지원한다. image pull은 daemon `proxies`, 로컬 build의
+  `apt-get`·`npm ci`는 shell의 `HTTP_PROXY`·`HTTPS_PROXY`·`NO_PROXY`를 null build arg로 전달받는다
+  (미설정이면 생략). proxy CA는 `CORP_CA_FILE` → `.state/build/corporate-proxy-ca.crt` 복사본을 BuildKit
+  secret `corporate_proxy_ca`로 모든 build에 mount한다. 파일 secret은 image history·layer에 남지 않고,
+  Samba build는 `apt-get` 뒤 `update-ca-certificates --fresh`로 OS trust에서 제거하며, 앱 build는
+  `update-ca-certificates`가 없는 slim base라 `NODE_EXTRA_CA_CERTS`로만 읽는다. 빈 파일은 "CA 없음"이다.
+  이 때문에 두 환경 모두 `docker buildx` plugin이 필요하다. Docker config `proxies`로 container env에
+  proxy를 주입하는 방식은 Compose 내부 issuer·API 호출이 proxy로 새는 위험이 있어 쓰지 않는다.
+- Samba는 `tls keyfile`이 root 소유 0600이어야 한다. Docker Engine의 file secret은 host 소유자를
+  유지하므로 entrypoint가 시작마다 `/run/keycloak-lab/tls/dc1.key`로 root 소유 복사본을 만들고 smb.conf는
+  그 경로를 가리킨다. Colima에서는 mount가 root로 보여 드러나지 않던 차이다.
 
 호스트 도구는 다음 버전을 재현 기준으로 삼는다. macOS의 Compose는 전역 설치 대신 checksum을 고정한
 공식 standalone binary를 `.state/tools/`에 받는다. Ubuntu 설치 자체는 이 디렉터리에서 자동화하지
@@ -47,6 +58,7 @@
 |---|---|---|---|
 | macOS | macOS / Colima | `26.6.2` / `0.10.3` | 현재 개인 Apple Silicon 환경. Colima의 Docker runtime 사용 |
 | macOS | Docker CLI / Colima VM Engine | `29.6.1` / `29.5.2` | 현재 Colima 프로필에서 확인한 client와 Ubuntu 24.04 VM daemon |
+| macOS | docker-buildx plugin | Homebrew `0.37.1`, `~/.docker/cli-plugins/docker-buildx` 링크 | Homebrew `docker` CLI에 BuildKit secret build용 plugin이 없어 추가 |
 | macOS | Docker Compose standalone | `5.5.1`; darwin arm64 `sha256:998735c9b6fe68a4f05895e6ea73d71ad06f9fc7046383ad89e47346781b6af5`, x86_64 `sha256:a264d61e824bf08a78867e59cdf32eb09f0aee9ecdf9f6ebfa43f76dc52880f1` | 공식 GitHub release asset을 lab 로컬에 받아 checksum 검증 |
 | Ubuntu | Ubuntu | 24.04 LTS, 최신 보안 업데이트 적용 | Ubuntu의 AD DC 절과 Docker Engine이 함께 지원하는 LTS |
 | Ubuntu | Docker Engine / CLI | `29.8.0` (`5:29.8.0-1~ubuntu.24.04~noble`) | 2026-09-14 Docker 공식 stable apt 저장소에서 amd64/arm64 모두 확인 |

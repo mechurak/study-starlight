@@ -12,6 +12,8 @@ umask 077
 mkdir -p "$secret_directory" "$ca_directory"
 chmod 0700 "$state_directory" "$secret_directory" "$ca_directory"
 
+"$lab_directory/samba/prepare-state.sh" --proxy-ca-only
+
 require_file() {
   if [ ! -s "$1" ]; then
     echo "required preserved P05 state is missing or empty: $1" >&2

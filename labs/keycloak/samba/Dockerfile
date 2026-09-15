@@ -23,7 +23,15 @@ RUN printf '%s  %s\n' \
 
 COPY ubuntu.sources /etc/apt/sources.list.d/ubuntu.sources
 
-RUN apt-get update \
+# The corporate proxy CA (empty file when none) is trusted only inside this build step and removed
+# from the OS trust store again before the layer is committed.
+RUN --mount=type=secret,id=corporate_proxy_ca,target=/run/secrets/corporate-proxy-ca.crt \
+    if [ -s /run/secrets/corporate-proxy-ca.crt ]; then \
+      install -m 0644 /run/secrets/corporate-proxy-ca.crt \
+        /usr/local/share/ca-certificates/corporate-proxy-ca.crt \
+      && update-ca-certificates; \
+    fi \
+    && apt-get update \
     && apt-get install --yes --no-install-recommends \
       bind9-dnsutils \
       ca-certificates=20260601~24.04.1 \
@@ -35,7 +43,9 @@ RUN apt-get update \
       samba-common-bin="${SAMBA_PACKAGE_VERSION}" \
     && rm -rf /var/lib/apt/lists/* \
     && rm -rf /var/lib/samba/* \
-    && rm -f /etc/samba/smb.conf
+    && rm -f /etc/samba/smb.conf \
+    && rm -f /usr/local/share/ca-certificates/corporate-proxy-ca.crt \
+    && update-ca-certificates --fresh
 
 COPY entrypoint.sh /usr/local/bin/keycloak-lab-samba-entrypoint
 COPY seed-directory.sh /usr/local/bin/seed-directory

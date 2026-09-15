@@ -34,7 +34,10 @@ compose --profile guided run --rm stage-inspector "$required_stage"
 printf 'Applying %s from:\n' "$requested_step"
 for config_path in $config_paths; do printf '  %s\n' "$config_path"; done
 compose --profile guided run --rm "$seed_service"
-if [ -n "$started_service" ]; then compose up --detach --wait --build "$started_service"; fi
+if [ -n "$started_service" ]; then
+  prepare_build_state
+  compose up --detach --wait --build "$started_service"
+fi
 
 if [ "$mode" = guided ] && [ -f "$stage_file" ] && \
    [ "$(stage_rank "$requested_step")" -gt "$(stage_rank "$stage")" ]; then

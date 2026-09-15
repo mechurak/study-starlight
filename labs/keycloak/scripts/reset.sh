@@ -30,6 +30,7 @@ state_reset_roots() {
     "$state_directory/directory-ca" \
     "$state_directory/web-ca" \
     "$state_directory/secrets" \
+    "$state_directory/build" \
     "$state_directory/lifecycle"
   for reset_name in p03 p05 p06 p07 p08 p09 p10 p11 d09 d16 d18 d24 guided; do
     printf '%s\n' "$state_directory/verification/$reset_name"

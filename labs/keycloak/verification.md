@@ -37,6 +37,23 @@ API와 LDAP가 없었고, api/ldap에서도 각각 뒤 단계 객체가 없음�
 원래 volume과 CA·secret·검증 기록을 복원한 뒤 archive 직접 비교와 실제 로그인을 모두 통과시켰다.
 사이트 검사 결과를 이 실제 환경 결과의 대체 근거로 사용하지 않았다.
 
+## 2026-09-15 회사 프록시 build 준비
+
+회사 Ubuntu의 HTTPS inspection proxy를 위해 build proxy arg·BuildKit secret·Samba root 소유 key 복사를
+추가했다. macOS/Colima에서 확인한 범위는 다음과 같고, **실제 proxy 뒤 Ubuntu 실행은 미실행**이다.
+
+| 검사 | 상태 | 실제 결과 |
+|---|---|---|
+| `compose config` proxy arg | 통과 | 변수 없음 → build arg 생략, `HTTP_PROXY`·`no_proxy` 설정 → 12개 build 모두에 전달 |
+| `prepare-state.sh --proxy-ca-only` | 통과 | 미설정 → 빈 0600 파일, 비PEM → 거부, PEM → 0600 복사, 재실행 시 기존 복사본 유지 |
+| 앱 image build | 통과 | 빈 secret과 stand-in CA 양쪽에서 `npm ci` 성공, Node의 extra cert 경고 없음 |
+| Samba image build | 통과 | stand-in CA로 `apt-get` 뒤 OS trust에서 제거됨을 image에서 확인 |
+| Samba entrypoint key 복사 | 통과 | 재생성한 container에서 `/run/keycloak-lab/tls/dc1.key`가 root 0600, healthy |
+
+macOS Homebrew `docker` CLI에는 buildx가 없어 classic builder로 떨어지며 secret build가 실패했다.
+`docker-buildx` 0.37.1을 설치하고 `~/.docker/cli-plugins`에 연결한 뒤 통과했으며 `require_docker`가
+이를 검사한다.
+
 아래 P03~P24 기록은 당시 실행 이력이다. P04의 추적된 kind/Kubernetes 자산은 2026-09-15 제거됐고
 현재 Compose 실행·검증의 선행 조건이나 선택 경로가 아니다. 비공개 과거 산출물은 변경하지 않았다.
 

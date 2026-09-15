@@ -5,10 +5,45 @@ script_directory=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 state_directory=$(CDPATH= cd -- "$script_directory/.." && pwd)/.state
 secret_directory=$state_directory/secrets
 ca_directory=$state_directory/directory-ca
+build_directory=$state_directory/build
+proxy_ca_file=$build_directory/corporate-proxy-ca.crt
 
 umask 077
-mkdir -p "$secret_directory" "$ca_directory"
-chmod 0700 "$state_directory" "$secret_directory" "$ca_directory"
+mkdir -p "$secret_directory" "$ca_directory" "$build_directory"
+chmod 0700 "$state_directory" "$secret_directory" "$ca_directory" "$build_directory"
+
+# Corporate HTTPS-inspection proxies re-sign TLS, so image builds (apt-get, npm ci) must trust the
+# proxy CA. The PEM named by CORP_CA_FILE is copied into private .state and handed to every local
+# image build as the BuildKit secret `corporate_proxy_ca` (see compose.yaml). Without CORP_CA_FILE an
+# existing copy is kept and a missing copy becomes an empty file, which the Dockerfiles treat as
+# "no proxy CA". Delete the copy or run scripts/reset.sh to drop a previously copied CA.
+prepare_proxy_ca() {
+  if [ -n "${CORP_CA_FILE:-}" ]; then
+    if [ ! -s "$CORP_CA_FILE" ]; then
+      echo "CORP_CA_FILE is not a readable non-empty file: $CORP_CA_FILE" >&2
+      exit 1
+    fi
+    if ! openssl x509 -noout -in "$CORP_CA_FILE" >/dev/null 2>&1; then
+      echo "CORP_CA_FILE is not a PEM certificate: $CORP_CA_FILE" >&2
+      exit 1
+    fi
+    proxy_ca_tmp=$proxy_ca_file.tmp.$$
+    cp "$CORP_CA_FILE" "$proxy_ca_tmp"
+    chmod 0600 "$proxy_ca_tmp"
+    mv "$proxy_ca_tmp" "$proxy_ca_file"
+    printf 'copied corporate proxy CA %s to %s\n' "$CORP_CA_FILE" "$proxy_ca_file"
+  elif [ -s "$proxy_ca_file" ]; then
+    printf 'keeping existing corporate proxy CA in %s (CORP_CA_FILE is unset)\n' "$proxy_ca_file"
+  else
+    : >"$proxy_ca_file"
+    chmod 0600 "$proxy_ca_file"
+  fi
+}
+
+prepare_proxy_ca
+if [ "${1:-}" = --proxy-ca-only ]; then
+  exit 0
+fi
 
 require_pair() {
   first_path=$1

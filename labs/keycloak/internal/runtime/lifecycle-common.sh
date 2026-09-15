@@ -87,6 +87,12 @@ compose() {
   "$compose_wrapper" --project-name "$project_name" --file "$compose_file" "$@"
 }
 
+# Every local image build mounts the corporate proxy CA secret file, so it must exist (possibly
+# empty) before any `compose ... --build`. first-start covers this through prepare-p05-state.sh.
+prepare_build_state() {
+  "$lab_directory/samba/prepare-state.sh" --proxy-ca-only
+}
+
 container_name_for_service() {
   case $1 in
     samba) printf '%s\n' keycloak-lab-samba ;;
@@ -123,6 +129,11 @@ require_docker() {
   lifecycle_compose_version=$(compose version --short)
   if [ "$lifecycle_compose_version" != 5.5.1 ]; then
     echo "Docker Compose 5.5.1 is required; found $lifecycle_compose_version" >&2
+    exit 1
+  fi
+  if ! docker buildx version >/dev/null 2>&1; then
+    echo 'the docker buildx CLI plugin is required: local image builds mount the corporate proxy CA as a BuildKit secret' >&2
+    echo 'macOS Homebrew: brew install docker-buildx && ln -sfn "$(brew --prefix)/opt/docker-buildx/bin/docker-buildx" ~/.docker/cli-plugins/docker-buildx' >&2
     exit 1
   fi
 }

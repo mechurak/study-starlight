@@ -1,13 +1,35 @@
 name: keycloak-lab
 
+# Local image builds forward the host shell's proxy settings (null args resolve from the environment
+# and are omitted when unset) and receive the corporate proxy CA prepared by samba/prepare-state.sh
+# as a BuildKit secret. An empty secret file means "no proxy CA"; see the Dockerfiles.
+x-build-proxy-args: &build-proxy-args
+  HTTP_PROXY:
+  HTTPS_PROXY:
+  NO_PROXY:
+  http_proxy:
+  https_proxy:
+  no_proxy:
+
+x-app-build: &app-build
+  context: ./app
+  args:
+    <<: *build-proxy-args
+    NODE_IMAGE: node:24.21.0-bookworm-slim@sha256:2fe369e969550cde8e867afc3fe370b260140cab4a23d467074295b42163d553
+  secrets:
+    - corporate_proxy_ca
+
 services:
   samba:
     image: keycloak-lab-samba:4.19.5-ubuntu24.04
     build:
       context: ./samba
       args:
+        <<: *build-proxy-args
         UBUNTU_IMAGE: ubuntu:24.04@sha256:224a1869083a311ef3f13648a154ba79832fbef6364d31493642ca03082da254
         SAMBA_PACKAGE_VERSION: 2:4.19.5+dfsg-4ubuntu9.7
+      secrets:
+        - corporate_proxy_ca
     container_name: keycloak-lab-samba
     hostname: dc1
     domainname: ad.keycloak.test
@@ -173,10 +195,7 @@ services:
 
   app-a-seed:
     image: keycloak-lab-app:node24
-    build:
-      context: ./app
-      args:
-        NODE_IMAGE: node:24.21.0-bookworm-slim@sha256:2fe369e969550cde8e867afc3fe370b260140cab4a23d467074295b42163d553
+    build: *app-build
     profiles:
       - p06
       - guided
@@ -323,10 +342,7 @@ services:
 
   app-a:
     image: keycloak-lab-app:node24
-    build:
-      context: ./app
-      args:
-        NODE_IMAGE: node:24.21.0-bookworm-slim@sha256:2fe369e969550cde8e867afc3fe370b260140cab4a23d467074295b42163d553
+    build: *app-build
     container_name: keycloak-lab-app-a
     environment:
       APP_NAME: App A
@@ -383,10 +399,7 @@ services:
 
   p07-seed:
     image: keycloak-lab-app:node24
-    build:
-      context: ./app
-      args:
-        NODE_IMAGE: node:24.21.0-bookworm-slim@sha256:2fe369e969550cde8e867afc3fe370b260140cab4a23d467074295b42163d553
+    build: *app-build
     profiles:
       - p07
     entrypoint:
@@ -421,10 +434,7 @@ services:
 
   p08-seed:
     image: keycloak-lab-app:node24
-    build:
-      context: ./app
-      args:
-        NODE_IMAGE: node:24.21.0-bookworm-slim@sha256:2fe369e969550cde8e867afc3fe370b260140cab4a23d467074295b42163d553
+    build: *app-build
     profiles:
       - p08
     entrypoint:
@@ -460,10 +470,7 @@ services:
 
   p09-admin:
     image: keycloak-lab-app:node24
-    build:
-      context: ./app
-      args:
-        NODE_IMAGE: node:24.21.0-bookworm-slim@sha256:2fe369e969550cde8e867afc3fe370b260140cab4a23d467074295b42163d553
+    build: *app-build
     profiles:
       - p09
     entrypoint:
@@ -494,10 +501,7 @@ services:
 
   d09-seed:
     image: keycloak-lab-app:node24
-    build:
-      context: ./app
-      args:
-        NODE_IMAGE: node:24.21.0-bookworm-slim@sha256:2fe369e969550cde8e867afc3fe370b260140cab4a23d467074295b42163d553
+    build: *app-build
     profiles:
       - d09
     entrypoint:
@@ -560,10 +564,7 @@ services:
 
   d16-seed:
     image: keycloak-lab-app:node24
-    build:
-      context: ./app
-      args:
-        NODE_IMAGE: node:24.21.0-bookworm-slim@sha256:2fe369e969550cde8e867afc3fe370b260140cab4a23d467074295b42163d553
+    build: *app-build
     profiles:
       - d16
     entrypoint: [node, /opt/keycloak-lab/internal/seed/seed-d16.mjs]
@@ -614,10 +615,7 @@ services:
 
   d18-seed:
     image: keycloak-lab-app:node24
-    build:
-      context: ./app
-      args:
-        NODE_IMAGE: node:24.21.0-bookworm-slim@sha256:2fe369e969550cde8e867afc3fe370b260140cab4a23d467074295b42163d553
+    build: *app-build
     profiles: [d18]
     entrypoint: [node, /opt/keycloak-lab/internal/seed/seed-d18.mjs]
     user: node
@@ -666,10 +664,7 @@ services:
 
   app-b:
     image: keycloak-lab-app:node24
-    build:
-      context: ./app
-      args:
-        NODE_IMAGE: node:24.21.0-bookworm-slim@sha256:2fe369e969550cde8e867afc3fe370b260140cab4a23d467074295b42163d553
+    build: *app-build
     container_name: keycloak-lab-app-b
     environment:
       APP_NAME: App B
@@ -726,10 +721,7 @@ services:
 
   api:
     image: keycloak-lab-app:node24
-    build:
-      context: ./app
-      args:
-        NODE_IMAGE: node:24.21.0-bookworm-slim@sha256:2fe369e969550cde8e867afc3fe370b260140cab4a23d467074295b42163d553
+    build: *app-build
     container_name: keycloak-lab-api
     command:
       - node
@@ -994,6 +986,8 @@ volumes:
     name: keycloak-lab-postgres-data
 
 secrets:
+  corporate_proxy_ca:
+    file: ./.state/build/corporate-proxy-ca.crt
   samba_admin_password:
     file: ./.state/secrets/samba-admin-password
   samba_alice_password:

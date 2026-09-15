@@ -25,6 +25,30 @@ cd labs/keycloak
 인자 없는 `./scripts/first-start.sh`는 새 빈 상태에서 아래 단계를 모두 적용해 기존과 같은 완성 환경을
 만드는 호환 경로다. 기존 자원이 있으면 자동 초기화하지 않고 `resume.sh`를 안내한다.
 
+## 회사 프록시 환경에서 시작하기
+
+image pull은 Docker daemon의 `/etc/docker/daemon.json` `proxies` 설정을 따르지만, 로컬 image build 안의
+`apt-get`(Samba)과 `npm ci`(앱)는 그 설정을 받지 않는다. 그래서 `compose.yaml`의 모든 build는 명령을
+실행한 shell에 이미 있는 `HTTP_PROXY`·`HTTPS_PROXY`·`NO_PROXY`(소문자 포함)를 build arg로 넘기고,
+변수가 없으면 아무것도 넘기지 않는다. 회사 shell에 평소 proxy 변수가 잡혀 있다면 따로 export할 것은
+없다. TLS를 다시 서명하는 HTTPS inspection proxy라면 build 단계가 그 proxy CA도 신뢰해야 하므로
+PEM 파일 경로만 `CORP_CA_FILE`로 알려 준다.
+
+```bash
+export CORP_CA_FILE=/path/to/corporate-proxy-ca.crt
+./scripts/first-start.sh --guided
+```
+
+`samba/prepare-state.sh`의 `prepare_proxy_ca`가 그 PEM을 Git 제외 `.state/build/corporate-proxy-ca.crt`로
+복사하고, 모든 로컬 build가 이를 BuildKit secret `corporate_proxy_ca`로 받는다. Samba build는 `apt-get`
+동안만 OS trust에 넣었다가 layer를 남기기 전에 다시 제거하고, slim base라 `update-ca-certificates`가 없는
+앱 build는 `NODE_EXTRA_CA_CERTS`로 그 파일을 직접 읽는다. 완성 image와 실행 container는 proxy CA를
+신뢰하지 않는다. 프록시가 없는 환경(맥미니)에서는 변수 없이 그냥 시작하면 빈 파일이 만들어져 CA 단계가
+건너뛰어진다. 변수 없이 다시 실행해도 이미 복사한 CA는 유지되며, 지우려면 그 파일을 삭제하거나
+`reset.sh`를 쓴다. BuildKit secret을 쓰므로 `docker buildx`가 필요하다. Ubuntu의 Docker apt 저장소는
+buildx plugin을 함께 설치하고, macOS Homebrew는 `brew install docker-buildx` 뒤
+`~/.docker/cli-plugins/docker-buildx` 링크가 필요하다.
+
 ## guided 학습 순서
 
 각 단계에서 먼저 공개 JSON을 읽고 `apply`한 뒤 `verify`한다. `apply`는 앞 단계를 몰래 적용하지 않고,
