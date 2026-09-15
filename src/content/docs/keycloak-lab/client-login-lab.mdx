@@ -51,6 +51,10 @@ guided `base`에는 realm과 local-user만 있고 app-a client나 앱 service는
 검사는 정상 password와 오답을 각각 새 cookie jar로 제출하며 Code, PKCE S256, state, nonce, callback,
 앱 session을 확인한다. client secret은 브라우저에 보내지 않는다.
 
+:::caution[키를 지우면 되돌아가지 않는다]
+`apply.sh`는 JSON에 적힌 키만 Keycloak에 덮어쓰므로, JSON에서 키를 지워도 이전 값이 남는다. 설정을 끄려면 키를 지우지 말고 값을 바꾼다.
+:::
+
 ## redirect를 일부러 깨뜨린다
 
 1. `keycloak/clients/app-a.json`의 `redirectUris`에서 `/callback`을 `/wrong-callback`으로 바꾼다.

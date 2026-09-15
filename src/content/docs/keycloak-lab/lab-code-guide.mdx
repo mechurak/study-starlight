@@ -63,6 +63,10 @@ role로 403과 200을 가른다. `/claims`는 검증 뒤 `iss`, `aud`, `exp`, `g
 [실습 진행 순서와 스크립트](/keycloak-lab/lab-setup/#실습-진행-순서와-스크립트)에 정리돼 있다. 처음에는 그 표만 알면
 되고, 학습 결과가 예상과 다를 때 해당 내부 경계를 연다.
 
+`apply.sh`는 공개 JSON을 원본으로 두고 Admin REST로 멱등하게 적용하는, 실습 규모의 설정 코드화다. 운영에서는
+이런 스크립트를 새로 만들기보다 Terraform Keycloak provider나 keycloak-config-cli 같은 도구를 쓴다. 두 도구의
+차이와 선택 기준은 [설정을 코드로 관리한다](/keycloak/administration-and-keys/#설정을-코드로-관리한다)에 있다.
+
 ## 요약
 
 - 직접 바꿀 원본은 `keycloak/` JSON이고 앱의 신뢰 경계는 `app/server.mjs`, `app/api.mjs`에 있다.

@@ -75,7 +75,8 @@ required action은 비밀번호 검증 뒤에도 로그인 흐름을 멈출 수 
 
 콘솔은 개념과 현재 상태를 살피기에 좋지만 재현 가능한 원본은 아니다. 실습의 realm JSON과 seed
 script는 `labs/keycloak/keycloak/` 및 `labs/keycloak/scripts/`에 둔다. seed는 같은 realm이 있으면
-무작정 덮어쓰지 않고, 관리 credential도 앱 container에 전달하지 않는다.
+무작정 덮어쓰지 않고, 관리 credential도 앱 container에 전달하지 않는다. 운영에서 같은 역할을 맡는
+도구와 선택 기준은 [설정을 코드로 관리한다](/keycloak/administration-and-keys/#설정을-코드로-관리한다)에 있다.
 
 :::caution[bootstrap 관리자를 업무 사용자로 쓰지 않는다]
 bootstrap credential은 서버를 처음 관리할 진입점이다. 일반 앱 로그인, API 권한, 자동화 service

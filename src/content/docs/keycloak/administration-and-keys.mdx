@@ -1,7 +1,7 @@
 ---
 title: "관리 권한과 서명 키"
-description: "master 관리자 의존을 줄이고 위임 역할·Admin REST·서명 키 교체를 안전하게 운영"
-aliases: [realm-management, delegated admin, Admin REST API, key rollover, active key, passive key]
+description: "master 관리자 의존을 줄이고 위임 역할·설정 코드화·Admin REST·서명 키 교체를 안전하게 운영"
+aliases: [realm-management, delegated admin, Admin REST API, Terraform Keycloak provider, keycloak-config-cli, 설정 코드화, key rollover, active key, passive key]
 reviewedAt: 2026-09-14
 deckGroup: operations
 sidebar:
@@ -21,6 +21,7 @@ bootstrap 또는 master realm 관리자를 일상 작업과 자동화에 공유�
   terms={[
     ['realm-management', '', '특정 realm 안의 사용자·client·event 등을 관리하도록 나뉜 built-in client role 집합.'],
     ['fine-grained admin permissions', '', '관리 대상 resource와 허용 operation을 더 좁게 위임하는 관리 권한 모델.'],
+    ['IaC', 'Infrastructure as Code', '설정 원본을 Git의 코드로 두고 리뷰 뒤 도구가 실제 시스템에 반영하는 방식. 콘솔 수동 변경의 이력 부재와 환경 간 차이를 막는다.'],
     ['active signing key', '', '새 token 서명에 현재 사용하는 우선 키. JWKS에는 검증이 필요한 다른 키도 함께 있을 수 있다.'],
     ['key rollover', '', '새 키를 서명에 사용하면서 옛 token의 검증 기간 동안 이전 public key를 함께 제공하는 교체.'],
   ]}
@@ -30,6 +31,7 @@ bootstrap 또는 master realm 관리자를 일상 작업과 자동화에 공유�
 
 - master 관리자 대신 realm 작업을 어떻게 위임하는가?
 - Admin REST 자동화는 어떤 identity와 감사를 사용해야 하는가?
+- 운영 realm 설정은 콘솔 대신 어떤 도구로 관리하는가?
 - 서명 키는 왜 즉시 삭제가 아니라 겹침 기간을 두고 교체하는가?
 
 ## 관리 주체를 작업별로 나눈다
@@ -50,6 +52,37 @@ resource 범위를 확인한다.
 Admin REST 호출은 고정 endpoint, 짧은 token과 명시적 timeout을 사용하고 멱등한 read-before-write로
 작성한다. 전용 client·관리 역할, 호출 주체와 변경 resource를 admin event에 남긴다. bootstrap admin
 password를 일반 자동화 secret으로 쓰지 않는다.
+
+## 설정을 코드로 관리한다
+
+Admin Console에서 client·role·mapper를 직접 바꾸면 누가 왜 바꿨는지 리뷰 기록이 남지 않고, 개발·스테이징·운영
+realm이 조금씩 달라진다. 운영에서는 IaC로 설정 원본을 Git에 두고, 리뷰를 거친 자동화가 Admin REST로 반영한다.
+콘솔은 현재 상태 확인과 긴급 조치에 쓴다.
+
+| 방식 | 원본 형태 | 이미 있는 realm | 설정에서 뺀 리소스 |
+|---|---|---|---|
+| Terraform Keycloak provider | Terraform 리소스 선언 | plan으로 차이를 본 뒤 적용 | state에 있던 리소스를 삭제 |
+| keycloak-config-cli | realm export와 같은 형태의 JSON·YAML | 파일을 Admin REST로 다시 적용 | 기본은 자신이 만든 리소스만 삭제 |
+| 시작 시 `--import-realm`·Operator realm import | realm JSON | 건너뜀 | 반영하지 않음 |
+
+[Terraform Keycloak provider](https://github.com/keycloak/terraform-provider-keycloak)는 Keycloak 프로젝트가 넘겨받아
+관리하며 최신 세 minor 버전을 지원 대상으로 둔다. 팀이 다른 인프라를 이미 Terraform으로 관리한다면 같은 리뷰와
+plan 흐름에 넣기 쉽고, 콘솔에서 바꾼 값도 다음 plan에 차이로 드러난다. 다만
+[Terraform은 설정에 넣은 secret을 state와 plan 파일에 저장](https://developer.hashicorp.com/terraform/language/manage-sensitive-data)하므로
+client secret이나 LDAP bind credential을 다루면 암호화된 원격 state와 접근 제어가 필요하다.
+
+[keycloak-config-cli](https://github.com/adorsys/keycloak-config-cli)는 Keycloak의 realm export 필드 이름을 그대로 쓰는
+파일을 Admin REST로 적용한다. Terraform state 파일 없이 자신이 만든 리소스를 추적하고, secret은 변수 치환으로 넣는다.
+[설정에서 빠진 리소스의 삭제](https://github.com/adorsys/keycloak-config-cli/blob/main/docs/MANAGED.md)는 리소스 종류별로
+`no-delete`로 끌 수 있다. Keycloak 표현을 그대로 읽고 싶거나 Terraform을 쓰지 않는 팀에 맞는다.
+
+[시작 시 realm import는 realm이 이미 있으면 건너뛰고](https://www.keycloak.org/server/importExport), Operator의
+[realm import CR](https://www.keycloak.org/operator/realm-import)도 새 realm 생성용이다. 둘은 빈 환경의 첫 구성에
+쓰고 계속되는 변경 관리 도구로 쓰지 않는다.
+
+코드에는 client·role·mapper·인증 흐름·Federation 설정과 group-role 연결을 둔다. 직원 계정과 group 소속은 보통
+코드에 넣지 않고 LDAP Federation이나 brokering으로 원본 디렉터리에서 가져온다. 어느 도구든 적용 identity는 위 표의
+전용 service account와 최소 관리 역할을 쓴다.
 
 ## 서명 키를 겹쳐 교체한다
 
@@ -77,4 +110,5 @@ private key backup은 DB backup과 별도 secret/HSM 경계에 있을 수 있으
 
 - master 관리자를 공유하지 말고 realm·작업별 역할과 전용 자동화 identity로 위임한다.
 - Admin REST 변경은 최소 권한, 멱등성, timeout과 admin event 감사를 갖춘다.
+- 운영 설정은 Terraform provider나 keycloak-config-cli로 Git 원본에서 반영하고, 시작 시 realm import는 첫 구성에만 쓴다.
 - 서명 키는 새 키 전환 뒤 옛 token·JWKS cache 기간을 보장하고 이전 키를 제거한다.
