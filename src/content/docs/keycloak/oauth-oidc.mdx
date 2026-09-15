@@ -1,8 +1,8 @@
 ---
 title: "OAuth 2.0과 OpenID Connect 로그인"
 description: "Authorization Code와 PKCE로 로그인하고 access·ID·refresh token의 역할을 구분하는 흐름"
-aliases: [OAuth 2.0, OIDC, Authorization Code, PKCE, ID token, access token, refresh token]
-reviewedAt: 2026-09-14
+aliases: [OAuth 2.0, OIDC, Authorization Code, PKCE, BFF, Backend for Frontend, ID token, access token, refresh token]
+reviewedAt: 2026-09-15
 deckGroup: login
 sidebar:
   order: 1030
@@ -35,23 +35,33 @@ classes: {
 }
 
 browser: 브라우저 { class: mute }
-app: 앱 { class: ok }
+appsrv: "앱 server\nconfidential client" { class: ok }
 kc: Keycloak { class: key }
 
-browser -> app: ① 로그인 시작
-app -> browser: ② authorization URL\nstate · nonce · PKCE challenge
+appsrv -> browser: ⑧ 앱 session
+browser -> appsrv: ① 로그인 시작
+appsrv -> browser: ② authorization URL\nstate · nonce · PKCE challenge
 browser -> kc: ③ 인증 요청
 kc -> browser: ④ 로그인 · 동의
-browser -> app: ⑤ callback\ncode · state
-app -> kc: ⑥ code + PKCE verifier
-kc -> app: ⑦ ID · access · refresh token
-app -> browser: ⑧ 앱 session
+browser -> appsrv: "⑤ callback: code · state"
+appsrv -> kc: ⑥ code + PKCE verifier\n+ client secret {
+  style.stroke-dash: 3
+}
+kc -> appsrv: ⑦ ID · access ·\nrefresh token {
+  style.stroke-dash: 3
+}
 ```
+
+여기서 "앱"은 브라우저 속 화면이 아니라 서버다. ①~⑤는 브라우저 redirect로 오가므로 code가
+잠깐 브라우저를 지나지만, 점선 ⑥·⑦은 앱 server가 Keycloak을 직접 호출하는 구간이라 client secret과
+token은 브라우저에 나타나지 않는다. 브라우저가 받는 것은 앱 자체 session cookie뿐이다.
 
 ## 이 장에서 답할 질문
 
 - OAuth 2.0과 OIDC는 무엇이 다른가?
-- Authorization Code + PKCE에서 브라우저와 앱은 무엇을 주고받는가?
+- Authorization Code + PKCE에서 브라우저와 앱 server는 무엇을 주고받는가?
+- 서버 없는 SPA는 같은 흐름을 어떻게 수행하는가?
+- frontend와 backend가 나뉜 앱은 누가 client가 되는가?
 - ID·access·refresh token은 누가 어디에 쓰는가?
 
 ## OAuth 위에 인증을 얹는다
@@ -76,6 +86,82 @@ discovery 문서에서 읽는다.
 public client는 secret을 안전하게 숨길 수 없으므로 PKCE가 특히 중요하다. confidential server-side
 앱도 PKCE를 함께 쓰면 code 탈취 방어가 더 명확해진다. 이 실습의 앱 A/B는 confidential client지만
 `S256`을 요구한다.
+
+## SPA라면 브라우저가 직접 교환한다
+
+HTML·CSS·JS 정적 파일로만 배포되는 SPA(Single Page Application)는 서버가 없어 secret을 숨길 곳이
+없다. 그래서 public client로 등록하고, 위 흐름에서 앱 server가 하던 일 — authorization URL 생성,
+code 교환, token 보관 — 을 브라우저의 JS가 직접 한다. 흐름은 같은 Code+PKCE지만 client secret이
+없고 PKCE만으로 code 탈취를 막는다.
+
+```d2 layout=elk pad=40 title="서버 없는 SPA가 client secret 없이 PKCE만으로 code를 token으로 교환하는 흐름"
+direction: down
+
+classes: {
+  key: { style: { fill: "#dbeafe"; stroke: "#2563eb"; font-color: "#1e3a8a" } }
+  mute: { style: { fill: "#f1f5f9"; stroke: "#94a3b8"; font-color: "#334155" } }
+}
+
+spa: "브라우저의 SPA JS\npublic client" { class: mute }
+kc: Keycloak { class: key }
+
+spa -> kc: ① 인증 요청 redirect\nstate · nonce · PKCE challenge
+kc -> spa: ② 로그인 뒤 callback\ncode
+spa -> kc: ③ code + PKCE verifier\nclient secret 없음
+kc -> spa: ④ token — 브라우저가 보관
+```
+
+대신 token이 브라우저에 저장되므로 페이지에 낀 악성 script(XSS)가 token을 읽을 수 있는 노출면이
+생기고, refresh token 수명도 짧게 잡는다. 이 실습의 앱 A/B는 서버가 있으므로 이 경로를 쓰지 않고,
+token을 서버 session에 두는 confidential client를 쓴다. 두 유형의 선택 기준은
+[Client 연결과 SSO](/keycloak/clients-and-sso/)에 있다.
+
+## frontend와 backend가 나뉘면 누가 client인가
+
+React 같은 SPA frontend와 별도 backend API로 나뉜 앱도 새 흐름이 필요한 것이 아니다. 둘 중 누가
+OIDC client가 되는지를 고르면 위 두 다이어그램 중 하나로 정확히 환원된다. 갈리는 것은 token이
+어디에 사는가와 backend의 역할 두 가지다.
+
+| | backend가 client (BFF) | frontend가 client (SPA) |
+|---|---|---|
+| client 유형 | confidential — 위 첫 다이어그램 | public — 위 SPA 다이어그램 |
+| token 위치 | backend session | 브라우저 |
+| 브라우저→backend 인증 | session cookie | Bearer access token |
+| backend의 역할 | OIDC client + API 대리 호출 | resource server — 검증·인가만 |
+
+BFF(Backend For Frontend)는 backend가 confidential client로 로그인을 대신 처리하고 token을 자기
+session에만 두는 구조다. frontend 정적 파일은 로그인에 관여하지 않고, 브라우저는 session cookie로
+backend를 호출한다.
+
+```d2 layout=elk pad=40 title="BFF 구조에서 브라우저는 session cookie만 쓰고 backend가 token을 보관하는 관계"
+direction: down
+
+classes: {
+  key: { style: { fill: "#dbeafe"; stroke: "#2563eb"; font-color: "#1e3a8a" } }
+  ok: { style: { fill: "#dcfce7"; stroke: "#16a34a"; font-color: "#14532d" } }
+  mute: { style: { fill: "#f1f5f9"; stroke: "#94a3b8"; font-color: "#334155" } }
+}
+
+browser: "브라우저\nfrontend 정적 파일 실행" { class: mute }
+bff: "backend (BFF)\nconfidential client" { class: ok }
+kc: Keycloak { class: key }
+
+browser -> bff: 로그인 시작 · API 요청\nsession cookie만 사용
+bff -> kc: 위 confidential 흐름 그대로\ncode 교환 · token 보관 {
+  style.stroke-dash: 3
+}
+bff -> browser: 결과만 응답\ntoken은 내려보내지 않음
+```
+
+token이 브라우저에 전혀 없으므로 XSS로 token을 잃는 노출면이 사라진다.
+[IETF의 브라우저 기반 앱 보안 지침(RFC 10017, BCP 212)](https://datatracker.ietf.org/doc/draft-ietf-oauth-browser-based-apps/)은
+세 구조를 보안이 강한 순서로 나열하며 BFF를 첫째로 두고, 업무·민감·개인정보 앱에 강하게 권장한다.
+이 실습의 앱 A는 HTML까지 직접 주는 server 앱이지만 역할은 BFF와 같다 — access token을 자기
+session에 두고 [대신 API를 호출](/keycloak-lab/sso-api-lab/)한다.
+
+frontend가 client가 되는 쪽을 고르면 backend는 로그인에 관여하지 않는 resource server가 된다.
+브라우저가 Bearer로 보낸 access token의 서명·issuer·audience·만료를 검증하고 role로 인가만 하며,
+검증 항목은 [Access Token 검증](/keycloak/token-validation/)이 다룬다.
 
 ## 세 token의 역할
 
@@ -103,3 +189,4 @@ Authorization Code + PKCE를 앱 코드와 실제 callback으로 확인하려면
 - Authorization Code 흐름에서 code는 짧게 브라우저를 지나고, 앱이 PKCE verifier로 token을 교환한다.
 - state·nonce·redirect URI·PKCE는 서로 다른 공격 경계를 막는다.
 - 로그인에는 ID token, API에는 access token, 갱신에는 refresh token을 쓴다.
+- frontend·backend 분리 앱은 backend를 confidential client로 쓰는 BFF가 우선 선택지다.
