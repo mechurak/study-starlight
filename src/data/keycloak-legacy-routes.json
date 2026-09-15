@@ -173,7 +173,7 @@
     "anchors": {
       "전체-지도": "/keycloak/wrapup/#전체-흐름",
       "장별-핵심-한-문장": "/keycloak/wrapup/#다시-찾는-지도",
-      "구축-체크리스트--처음-세울-때": "/keycloak/lab-setup/",
+      "구축-체크리스트--처음-세울-때": "/keycloak-lab/lab-setup/",
       "사고-대응-카드--급할-때-이-순서": "/keycloak/troubleshooting/",
       "여기서-더-파려면": "/keycloak/wrapup/#아직-검증하지-않은-범위",
       "마지막-한-장": "/keycloak/wrapup/#요약"

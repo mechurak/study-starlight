@@ -10,9 +10,9 @@ import DeckMap from '../../../components/docs/DeckMap.astro';
 > 앱은 디렉터리 password를 받지 않고, Keycloak이 증명한 신원을 검증해 자기 권한을 결정한다.
 
 이 덱은 디렉터리·IdP 제품·로그인 프로토콜의 종류를 먼저 구분하고 Keycloak의 자리와 OIDC를 이해한 뒤,
-Docker Compose에서 로컬 사용자 SSO와 API 인가를 재현한다. 이어서 Samba AD 호환 디렉터리를 LDAPS
-Federation으로 연결하고 group이 token claim과 API 역할이 되는 두 매핑을 추적한다. 마지막에는
-brokering·서비스 계정과 배포·관찰·복구 경계를 다룬다.
+로컬 사용자 SSO와 API 인가, Samba AD 호환 디렉터리의 LDAPS Federation, group이 token claim과
+API 역할이 되는 두 매핑을 개념으로 정리한다. 마지막에는 brokering·서비스 계정과 배포·관찰·복구
+경계를 다룬다. Docker Compose에서 같은 흐름을 직접 재현하는 절차는 [Keycloak 실습 덱](/keycloak-lab/)에 있다.
 
 실습 기준은 Keycloak 26.7.3, PostgreSQL 18.6, Samba 4.19.5와 Node 24다. macOS/Colima 비브라우저
 기본 흐름과 macOS의 대표 Chrome 로그인을 검증했지만 네이티브 Ubuntu, Microsoft AD DS, 운영 HA는 미검증이다.
@@ -21,9 +21,9 @@ brokering·서비스 계정과 배포·관찰·복구 경계를 다룬다.
 <LinkButton href="/keycloak/authentication-landscape/" icon="right-arrow">큰 그림부터 읽기</LinkButton>
 
 <LinkCard
-  title="Compose guided 실습 시작"
-  description="기반 환경부터 Client·SSO·API·LDAP·group 권한까지 하나씩 설정하고 결과를 확인한다."
-  href="/keycloak/lab-setup/"
+  title="Keycloak 실습 덱"
+  description="Compose 환경에서 Client·SSO·API·LDAP·group 권한까지 하나씩 설정하고 결과를 확인한다."
+  href="/keycloak-lab/"
 />
 
 ## 구성
@@ -48,11 +48,11 @@ Keycloak이 개인키로 서명한 토큰을, 각자가 공개키(JWKS)로 검�
 
 | 찾는 것 | 먼저 볼 장 | 바로 확인할 것 |
 |---|---|---|
-| 실습을 처음부터 재현 | [실습 환경](/keycloak/lab-setup/) | runtime·자원·DNS/CA·secret 준비 |
-| 로컬 로그인·앱 두 개 SSO | [Client 로그인 실습](/keycloak/client-login-lab/), [SSO·API 실습](/keycloak/sso-api-lab/) | client별 redirect/secret과 realm session |
+| 실습을 처음부터 재현 | [Keycloak 실습 덱](/keycloak-lab/) | runtime·자원·DNS/CA·secret 준비 |
+| 로컬 로그인·앱 두 개 SSO | [Client 로그인 실습](/keycloak-lab/client-login-lab/), [SSO·API 실습](/keycloak-lab/sso-api-lab/) | client별 redirect/secret과 realm session |
 | API token 401·403·200 | [Token 검증](/keycloak/token-validation/) | access token의 서명·iss·aud·exp와 role |
-| AD 로그인이 안 됨 · LDAPS 오류 | [외부 계정 로그인 실습](/keycloak/directory-login-lab/) | CA, bind, READ_ONLY, import/sync/cache |
-| group이 token/API 권한에 없음 | [외부 Group 권한 실습](/keycloak/directory-permissions-lab/) | LDAP mapper와 protocol mapper를 따로 확인 |
+| AD 로그인이 안 됨 · LDAPS 오류 | [외부 계정 로그인 실습](/keycloak-lab/directory-login-lab/) | CA, bind, READ_ONLY, import/sync/cache |
+| group이 token/API 권한에 없음 | [외부 Group 권한 실습](/keycloak-lab/directory-permissions-lab/) | LDAP mapper와 protocol mapper를 따로 확인 |
 | 변경·disable·장애가 언제 반영됨 | [디렉터리 변경과 장애](/keycloak/directory-changes/) | 새 로그인/refresh/기존 JWT/app session |
 | 다른 IdP·SAML·서비스 인증 | [Identity Brokering](/keycloak/identity-brokering/), [SAML](/keycloak/saml/), [Service Accounts](/keycloak/service-accounts/) | redirect trust와 machine identity를 구분 |
 | Operator · DB · HA · 관찰 | [배포 설계](/keycloak/deployment/), [저장소와 가용성](/keycloak/storage-and-availability/), [인증 흐름 관찰](/keycloak/observability/) | 실습과 운영 보장을 분리 |

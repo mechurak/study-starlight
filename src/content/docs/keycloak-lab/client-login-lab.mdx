@@ -3,9 +3,9 @@ title: "Client를 연결하고 로그인 확인하기"
 description: "app-a 공개 설정을 적용하고 redirect URI 오류와 복구를 통해 Authorization Code 로그인을 확인하는 실습"
 aliases: [app-a client lab, redirect URI 실습, PKCE 로그인 실습]
 reviewedAt: 2026-09-15
-deckGroup: login
+deckGroup: local
 sidebar:
-  order: 1045
+  order: 1030
 ---
 
 import { Steps } from '@astrojs/starlight/components';
@@ -69,4 +69,4 @@ wildcard를 넓히거나 HTTPS 검증을 끄는 것은 복구가 아니다. 설�
 - app-a를 적용하기 전에는 client와 앱 service가 없고, 적용 성공 뒤에만 stage가 올라간다.
 - redirect 실패는 wildcard나 TLS 우회가 아니라 공개 JSON을 원래 callback으로 복구해 해결한다.
 
-다음은 [두 앱 SSO와 API 권한 실습](/keycloak/sso-api-lab/)에서 별도 client의 SSO와 API 인가를 붙인다.
+다음은 [두 앱 SSO와 API 권한 실습](/keycloak-lab/sso-api-lab/)에서 별도 client의 SSO와 API 인가를 붙인다.

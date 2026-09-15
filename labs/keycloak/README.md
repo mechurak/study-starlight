@@ -262,7 +262,7 @@ MFA, OIDC Brokering, Service Account, DB 격리 복원은 기본 guided 순서 �
 
 ## 더 읽기
 
-- 사이트: [Compose 실습 환경](../../src/content/docs/keycloak/lab-setup.mdx),
-  [실습 코드에서 읽을 것](../../src/content/docs/keycloak/lab-code-guide.mdx)
+- 사이트: [Compose 실습 환경](../../src/content/docs/keycloak-lab/lab-setup.mdx),
+  [실습 코드에서 읽을 것](../../src/content/docs/keycloak-lab/lab-code-guide.mdx)
 - 결정: [decisions.md](decisions.md)
 - 실제 검증 결과와 미실행 범위: [verification.md](verification.md)

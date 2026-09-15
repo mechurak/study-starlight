@@ -3,9 +3,9 @@ title: "두 앱 SSO와 API 권한 실습"
 description: "app-b SSO를 확인하고 audience·realm role을 적용해 API 401·403·200을 구분하는 실습"
 aliases: [Keycloak SSO lab, API role lab, audience mapper 실습]
 reviewedAt: 2026-09-15
-deckGroup: access
+deckGroup: local
 sidebar:
-  order: 1075
+  order: 1040
 ---
 
 import Thesis from '../../../components/docs/Thesis.astro';
@@ -75,4 +75,4 @@ request와 code 교환, 자기 session 생성은 수행하지만 Keycloak은 기
 - API는 서명·issuer·audience·expiration 검증 뒤 role로 403과 200을 가른다.
 - role 변경은 이미 발급된 token을 고쳐 쓰지 않으므로 새 로그인의 결과와 구분한다.
 
-다음은 [외부 디렉터리 계정 로그인 실습](/keycloak/directory-login-lab/)에서 password 원본을 LDAP로 바꾼다.
+다음은 [외부 디렉터리 계정 로그인 실습](/keycloak-lab/directory-login-lab/)에서 password 원본을 LDAP로 바꾼다.

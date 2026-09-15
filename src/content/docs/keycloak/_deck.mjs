@@ -13,7 +13,7 @@ export default {
 		"IdP",
 		"AD 인증"
 	],
-	"description": "인증 중앙화부터 로컬 SSO·API 인가·외부 디렉터리·운영 복구까지 경계별로 익히는 Keycloak.",
+	"description": "인증 중앙화부터 로컬 SSO·API 인가·외부 디렉터리·운영 복구까지 경계별로 익히는 Keycloak 개념. Compose 재현은 Keycloak 실습 덱.",
 	"category": "infra",
 	"tags": [
 		"auth",
@@ -53,13 +53,13 @@ export default {
 	],
 	"map": [
 		{
-			"label": "큰 그림과 실습",
+			"label": "큰 그림",
 			"href": "/keycloak/authentication-landscape/",
-			"title": "인증 생태계에서 Keycloak의 자리와 실습까지",
+			"title": "인증 생태계에서 Keycloak의 자리",
 			"tone": "key",
-			"desc": "디렉터리·IdP·프로토콜 · Keycloak 역할 · Compose 환경",
+			"desc": "디렉터리·IdP·프로토콜 · Keycloak 역할 · realm과 로컬 사용자",
 			"note": "비슷한 인증 용어는 어떤 종류이고 어디에서 이어지나",
-			"items": [["Keycloak의 역할", "/keycloak/keycloak-overview/"], ["실습 환경", "/keycloak/lab-setup/"]]
+			"items": [["Keycloak의 역할", "/keycloak/keycloak-overview/"], ["Realm과 로컬 사용자", "/keycloak/realm-and-users/"]]
 		},
 		{
 			"label": "로그인과 접근",

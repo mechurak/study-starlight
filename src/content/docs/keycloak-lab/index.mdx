@@ -1,0 +1,43 @@
+---
+title: Keycloak 실습 지도
+description: Docker Compose 한 환경에서 client 로그인·SSO·API 권한·LDAP 로그인·외부 group 권한을 순서대로 재현하는 실습 경로
+reviewedAt: 2026-09-15
+---
+
+import { LinkCard, LinkButton } from '@astrojs/starlight/components';
+import DeckMap from '../../../components/docs/DeckMap.astro';
+
+> 설정 하나를 적용하고 로그인·token·API 결과가 어떻게 달라지는지 직접 확인한다.
+
+이 덱은 [Keycloak 덱](/keycloak/)의 개념을 `labs/keycloak/`의 Compose 환경에서 guided stage 순서대로
+재현한다. 환경을 준비하고 읽을 코드를 구분한 뒤, 로컬 사용자로 client 로그인과 두 앱 SSO·API 권한을
+확인하고, Samba AD 호환 디렉터리를 LDAPS로 연결해 외부 계정 로그인과 group 권한까지 이어 간다.
+개념 설명은 늘리지 않고 각 실습이 해당 Keycloak 덱 장을 링크한다.
+
+실습 기준은 Keycloak 26.7.3, PostgreSQL 18.6, Samba 4.19.5와 Node 24다. macOS/Colima에서 검증했고
+네이티브 Ubuntu, Microsoft AD DS, 운영 HA는 미검증이다. 검증 범위는 각 페이지와
+[Keycloak 학습 마무리](/keycloak/wrapup/)에서 구분한다.
+
+<LinkButton href="/keycloak-lab/lab-setup/" icon="right-arrow">환경 준비부터 시작</LinkButton>
+
+## 구성
+
+<DeckMap deck="keycloak-lab" />
+
+## 실습 순서와 개념 장
+
+| stage | 실습 | 먼저 읽을 개념 |
+|---|---|---|
+| base | [Compose 실습 환경 준비](/keycloak-lab/lab-setup/), [실습 코드에서 읽을 것](/keycloak-lab/lab-code-guide/) | [Keycloak의 역할](/keycloak/keycloak-overview/), [Realm과 로컬 사용자](/keycloak/realm-and-users/) |
+| app-a | [Client를 연결하고 로그인 확인하기](/keycloak-lab/client-login-lab/) | [OAuth 2.0과 OIDC 로그인](/keycloak/oauth-oidc/), [Client 연결과 SSO](/keycloak/clients-and-sso/) |
+| app-b · api | [두 앱 SSO와 API 권한 실습](/keycloak-lab/sso-api-lab/) | [Access Token 검증](/keycloak/token-validation/), [Group과 Role](/keycloak/groups-and-roles/) |
+| ldap | [Samba 테스트 디렉터리](/keycloak-lab/samba-directory/), [외부 디렉터리 계정으로 로그인하기](/keycloak-lab/directory-login-lab/) | [AD와 LDAP 연결 읽기](/keycloak/ad-and-ldap/), [LDAP User Federation](/keycloak/ldap-federation/) |
+| groups | [외부 Group을 Token과 API 권한으로 연결하기](/keycloak-lab/directory-permissions-lab/) | [디렉터리 Group 매핑](/keycloak/directory-group-mapping/), [Client Scope와 Protocol Mapper](/keycloak/scopes-and-mappers/) |
+
+실습 중 나타나는 오류 문구는 [Keycloak 문제 진단](/keycloak/troubleshooting/)에서 경계별로 찾는다.
+
+<LinkCard
+  title="Keycloak 덱으로 돌아가기"
+  description="인증 생태계의 큰 그림부터 로그인·접근 제어·디렉터리·연동·운영 개념을 읽는다."
+  href="/keycloak/"
+/>
