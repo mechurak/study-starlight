@@ -10,9 +10,11 @@ export default {
 		"로컬 실습",
 		"개발 환경 준비",
 		"kind 설치",
-		"Helm 설치"
+		"Helm 설치",
+		"Docker Compose 준비",
+		"로컬 CA 등록"
 	],
-	"description": "여러 덱에서 다시 쓰는 kind·kubectl·Helm 환경 준비와 정리 — 운영체제별 설치부터 cleanup까지.",
+	"description": "여러 덱에서 다시 쓰는 kind·kubectl·Helm·Docker Compose 환경 준비와 정리 — 운영체제별 설치부터 브라우저 확인·cleanup까지.",
 	"category": "infra",
 	"tags": [
 		"k8s",
@@ -23,6 +25,10 @@ export default {
 		{
 			"id": "kind",
 			"label": "Kubernetes"
+		},
+		{
+			"id": "compose",
+			"label": "Docker Compose"
 		}
 	],
 	"map": [
@@ -41,6 +47,22 @@ export default {
 			"tone": "warn",
 			"desc": "운영체제별 공식 설치 페이지 · version · context 연결",
 			"note": "여러 Kubernetes 실습이 공유하는 chart client를 어떻게 준비하나"
+		},
+		{
+			"label": "Compose",
+			"href": "/lab-environment/docker-compose/",
+			"title": "Docker Compose 실습 환경",
+			"tone": "ok",
+			"desc": "Compose·buildx plugin 확인 · 회사 프록시의 pull/build 구분 · build 전용 CA trust",
+			"note": "kind 없는 실습이 공통으로 요구하는 runtime 준비는 무엇인가"
+		},
+		{
+			"label": "브라우저",
+			"href": "/lab-environment/local-https-browser/",
+			"title": "로컬 HTTPS 실습을 브라우저로 보기",
+			"tone": "key",
+			"desc": "hosts 항목 · 브라우저 프록시 예외 · 로컬 CA 등록과 제거",
+			"note": "실습 화면이 안 열릴 때 이름·프록시·인증서 중 어디를 보나"
 		}
 	]
 };

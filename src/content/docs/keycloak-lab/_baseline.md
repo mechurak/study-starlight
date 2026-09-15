@@ -26,6 +26,9 @@ keycloak-lab:  Compose 환경 준비 · 코드 지도 · client 로그인 · SSO
 - 정답 설정만 보여 주지 않고 무엇을 적용했을 때 로그인·token·API 결과가 어떻게 달라지는지를 남긴다.
 - 실습 명령과 설정의 원본은 `labs/keycloak/`이다. 본문은 검증된 결과와 필요한 부분만 설명하고,
   사이트 검사 통과를 컨테이너 실습 성공으로 취급하지 않는다.
+- Docker runtime·Compose·buildx 준비, 회사 프록시의 pull/build 구분, 브라우저의 hosts 항목·프록시 예외·CA
+  등록·삭제 절차는 [lab-environment 덱](/lab-environment/)이 정본이다. 이 덱은 그 장을 링크하고 실습 값
+  (hostname, port, CA 파일 경로, nickname, `CORP_CA_FILE`)과 자원 계약·검증 범위만 남긴다.
 - 페이지를 나누거나 이름을 바꾸면 Keycloak 덱의 "이어 간다" 링크와 `labs/keycloak/README.md`의
   사이트 링크, `src/data/keycloak-legacy-routes.json`의 target도 함께 확인한다.
 

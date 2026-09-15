@@ -47,18 +47,19 @@ AD DS가 아니라 AD 호환 디렉터리 대역이다.
 
 ## 준비 조건
 
+runtime·Compose plugin·buildx plugin 준비와 확인 명령은
+[Docker Compose 실습 환경](/lab-environment/docker-compose/)을 따른다. 이 실습이 추가로 요구하는 것은 자원
+계약과 검증 범위다.
+
 <Tabs syncKey="operating-system">
 <TabItem label="macOS">
 
-Colima와 Docker client·Compose plugin을 준비한다. 이 저장소에서 검증한 profile은 4 logical CPU,
-8 GiB RAM이며 시작 직전 가용 memory 5 GiB와 Docker data disk 20 GiB 이상을 확인했다. 로컬 image
-build가 BuildKit secret을 쓰므로 Homebrew의 `docker` CLI에는 `docker-buildx` plugin을 따로 연결한다.
+Colima + Docker CLI가 기본 경로다. 이 저장소에서 검증한 profile은 4 logical CPU, 8 GiB RAM이며 시작 직전
+가용 memory 5 GiB와 Docker data disk 20 GiB 이상을 확인했다. 로컬 image build가 BuildKit secret을 쓰므로
+buildx plugin이 연결돼 있어야 한다.
 
 ```bash
-brew install docker-buildx
-ln -sfn "$(brew --prefix)/opt/docker-buildx/bin/docker-buildx" ~/.docker/cli-plugins/docker-buildx
 colima status
-docker version
 docker buildx version
 docker compose version
 ```
@@ -66,20 +67,13 @@ docker compose version
 </TabItem>
 <TabItem label="Ubuntu">
 
-Ubuntu 24.04의 rootful Docker Engine과 Compose plugin을 준비한다. 명령 경로는 제공하지만 네이티브
+Ubuntu 24.04의 rootful Docker Engine과 Compose plugin이 기본 경로다. 명령 경로는 제공하지만 네이티브
 Ubuntu에서의 P03·전체 P11 실행은 아직 보류이므로 macOS 결과를 Ubuntu 결과로 읽으면 안 된다.
 
-```bash
-docker version
-docker buildx version
-docker compose version
-docker info --format '{{.OSType}} {{.Architecture}}'
-```
-
-회사 프록시 뒤라면 image pull은 `/etc/docker/daemon.json`의 `proxies`가 맡지만, build 안의 `apt-get`과
-`npm ci`는 시작한 shell의 `HTTP_PROXY`·`HTTPS_PROXY`·`NO_PROXY`를 그대로 넘겨받는다. TLS를 다시 서명하는
-proxy라면 그 CA의 PEM 경로를 `CORP_CA_FILE`로 지정한다. 복사본은 `.state/build/`에 남고 build 단계만
-신뢰하며 완성 image에는 들어가지 않는다.
+회사 프록시 뒤에서 pull과 build가 다른 설정을 보는 이유는 Compose 환경 장의
+[프록시 절](/lab-environment/docker-compose/#회사-프록시-뒤에서-pull과-build-구분하기)에 있다. TLS를 다시
+서명하는 proxy라면 이 실습은 그 CA의 PEM 경로를 `CORP_CA_FILE`로 받는다. 복사본은 `.state/build/`에 남고
+build 단계만 신뢰하며 완성 image에는 들어가지 않는다.
 
 ```bash
 export CORP_CA_FILE=/path/to/corporate-proxy-ca.crt
@@ -126,47 +120,17 @@ export CORP_CA_FILE=/path/to/corporate-proxy-ca.crt
 ## 브라우저로 확인하기
 
 `status.sh`는 container가 healthy인지만 보고, `verify.sh <단계>`는 지나온 단계의 실제 로그인을 자동으로
-수행한다. 같은 결과를 화면에서 직접 보려면 host에서 한 번만 다음을 준비한다.
+수행한다. 같은 결과를 화면에서 직접 보려면 host에서 한 번만
+[로컬 HTTPS 실습을 브라우저로 보기](/lab-environment/local-https-browser/)의 세 준비를 이 실습 값으로 한다.
 
-<Steps>
-1. `/etc/hosts`에 세 이름을 loopback으로 연결한다.
+| 준비 | 이 실습의 값 |
+|---|---|
+| hosts 항목 | `127.0.0.1 keycloak.keycloak.test app-a.keycloak.test app-b.keycloak.test` |
+| 브라우저 프록시 예외 | `*.keycloak.test` (터미널 `curl`은 `NO_PROXY`에 `.keycloak.test`) |
+| 로컬 CA 등록 (선택) | 파일 `labs/keycloak/.state/web-ca/ca.crt`, nickname `keycloak-lab-web-ca` |
 
-   ```text
-   127.0.0.1 keycloak.keycloak.test app-a.keycloak.test app-b.keycloak.test
-   ```
-
-2. 브라우저가 회사 프록시나 PAC를 쓰면 `*.keycloak.test`를 프록시 예외에 넣는다. 예외가 없으면 요청이
-   회사 프록시로 나가 loopback의 실습 환경에 닿지 못한다. Ubuntu GNOME은 설정 → 네트워크 → 프록시의
-   Ignored Hosts에 추가한다.
-
-3. 선택 사항으로 `labs/keycloak/.state/web-ca/ca.crt`를 브라우저에 등록하고 브라우저를 다시 시작한다.
-   등록하지 않아도 host별로 한 번씩 인증서 경고를 넘기면 모든 실습이 동작한다. 경고 없이 보고 싶을 때만
-   아래 운영체제 탭을 따른다.
-</Steps>
-
-<Tabs syncKey="operating-system">
-<TabItem label="macOS">
-
-login keychain에 SSL trust root로 등록한다. 실행하면 암호 확인 창이 뜬다.
-
-```bash
-security add-trusted-cert -r trustRoot -p ssl \
-  -k ~/Library/Keychains/login.keychain-db .state/web-ca/ca.crt
-```
-
-</TabItem>
-<TabItem label="Ubuntu">
-
-Chrome·Chromium은 OS 인증서 저장소가 아니라 사용자별 NSS(Network Security Services) DB를 본다.
-Firefox는 설정의 인증서 관리자에서 같은 파일을 가져온다.
-
-```bash
-sudo apt-get install --yes libnss3-tools
-certutil -d sql:$HOME/.pki/nssdb -A -t 'C,,' -n keycloak-lab-web-ca -i .state/web-ca/ca.crt
-```
-
-</TabItem>
-</Tabs>
+CA를 등록하지 않아도 host별로 한 번씩 인증서 경고를 넘기면 모든 실습이 동작한다. 등록·삭제 명령은 위 장의
+운영체제 탭에 있으며, 이 CA는 web HTTPS 전용이고 Samba LDAPS CA는 브라우저에 등록하지 않는다.
 
 | 화면 | 주소 | 계정 | 열리는 단계 |
 |---|---|---|---|
@@ -239,15 +203,9 @@ docker exec keycloak-lab-samba samba-tool group listmembers app-users
    ./scripts/status.sh
    ```
 
-4. web CA를 브라우저에 등록했었다면 옛 `keycloak-lab-web-ca`를 지운 뒤
-   [브라우저로 확인하기](#브라우저로-확인하기)의 3번으로 새 파일을 다시 등록한다. 등록하지 않았다면 건너뛴다.
-
-   ```bash
-   # macOS
-   security delete-certificate -c keycloak-lab-web-ca ~/Library/Keychains/login.keychain-db
-   # Ubuntu Chrome/Chromium
-   certutil -d sql:$HOME/.pki/nssdb -D -n keycloak-lab-web-ca
-   ```
+4. web CA를 브라우저에 등록했었다면 옛 `keycloak-lab-web-ca`를
+   [등록한 CA 지우기](/lab-environment/local-https-browser/#등록한-ca-지우기)대로 지운 뒤 새
+   `.state/web-ca/ca.crt`를 다시 등록한다. 등록하지 않았다면 건너뛴다.
 </Steps>
 
 reset은 정확히 나열한 Compose의 PostgreSQL·Samba 데이터와 로컬 CA·secret·검증 산출물만 삭제한다. 다른
@@ -268,6 +226,6 @@ Samba P03과 전체 P11, Ubuntu 브라우저의 NSS DB 등록은 미실행이다
 
 - 본선 환경은 하나의 `keycloak-lab` Compose project이며 kind·kubectl이 필요 없다.
 - host와 container는 같은 issuer를 쓰고, 내부 DB·API·Samba는 host에 publish하지 않는다.
-- 브라우저 확인에는 hosts 항목과 프록시 예외가 필요하고, web CA 등록은 선택이다. Samba는 웹 콘솔 없이 `samba-tool`로 본다.
+- runtime·plugin 준비와 브라우저의 hosts·프록시 예외·CA 등록은 실습 환경 덱을 따르고, 이 실습은 값만 지정한다. Samba는 웹 콘솔 없이 `samba-tool`로 본다.
 - 일반 중단은 현재 stage의 데이터를 보존한다. 처음부터 다시 시작할 때는 `.state`만 지우지 말고 `reset.sh`를 쓴다.
 - macOS 비브라우저 재현과 대표 Chrome 로그인을 통과했지만 네이티브 Ubuntu 검증은 보류다.

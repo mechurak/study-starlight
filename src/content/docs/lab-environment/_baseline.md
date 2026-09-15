@@ -40,9 +40,25 @@
 - Helm 명령에는 가능한 한 `--kube-context`를 붙여 대상 cluster를 고정한다.
 - Helm CLI 삭제와 cluster의 `helm uninstall`을 구분한다. 일반 cleanup에서 다른 release를 함께 지우지 않는다.
 
+## Docker Compose와 브라우저 확인의 기준과 안전 경계
+
+**2026년 9월** 기준이며 2026-09-15에 keycloak-lab에서 검증된 절차를 일반화했다.
+
+- Compose 장은 runtime·Compose plugin·buildx plugin 준비 확인과 회사 프록시 대응만 다룬다. 실습별 자원
+  계약, project 이름, 시작·중단·초기화 스크립트, `CORP_CA_FILE` 같은 변수의 실제 처리 방식은 각 실습 덱이 맡는다.
+- 회사 프록시는 image pull(daemon `proxies`)과 image build(shell 프록시 변수)를 구분해 설명하고, TLS 재서명
+  proxy의 CA는 build 단계에만 신뢰시키며 완성 image에 넣지 않는 원칙을 유지한다.
+- 브라우저 장은 hosts 항목·프록시 예외·로컬 CA 등록·제거를 다루며, hostname·port·CA 파일 경로·nickname은
+  예시 값(`example.test`, `example-lab-ca`)으로 두고 실습 덱이 실제 값을 지정한다.
+- CA 등록은 선택으로 서술한다. 인증서 경고를 넘기면 동작한다는 사실을 지우지 않는다.
+- 검증 범위: macOS의 Colima·buildx 준비, keychain 등록·삭제, Chrome 로그인은 keycloak-lab에서 실제 확인했다.
+  Ubuntu의 NSS DB 등록·삭제는 명령 경로만 제공하며 미실행이다. Ubuntu에서는 회사 프록시 예외 추가 뒤
+  브라우저 접속만 확인했다.
+
 ## 서술 규칙
 
 - 각 본문 장 첫머리에 `<TermIntro>`를 둔다.
+- Compose·브라우저 장의 운영체제 탭도 `<Tabs syncKey="operating-system">`와 `macOS`·`Ubuntu` label을 그대로 쓴다.
 - kind 장의 목차는 **Docker → Colima(macOS) → kubectl → kind**처럼 다시 찾기 쉬운 도구 이름으로 구성하고,
   각 도구 안에서는 설치 → 준비 확인 순서를 지킨다. 이후 생성 → 확인 → 사용 → 운영체제별 중단 탭 → 정리 → 정리 확인으로 이어 간다.
 - 복사해서 실행하는 명령은 대상을 이름으로 제한한다. 광범위한 삭제와 암묵적인 current context를 피한다.

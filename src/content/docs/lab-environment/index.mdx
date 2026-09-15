@@ -12,8 +12,10 @@ import DeckMap from '../../../components/docs/DeckMap.astro';
 **설치할 공식 문서 → 실행 준비 → 생성 → 확인 → 정리**를 한 흐름으로 제공하고, macOS와 Ubuntu의
 차이는 각 소제목의 탭에서 나란히 보여 준다. 개별 기술 덱에는 그 실습의 자원 요구량과 실행 시나리오만 남긴다.
 
-현재는 첫 환경으로 **kind를 이용한 로컬 Kubernetes 실습**을 다룬다. 덱 이름을 Kubernetes에
-가두지 않은 이유는 앞으로 데이터베이스, 메시징, AI 같은 다른 실습 환경도 이곳에 모으기 위해서다.
+지금은 **kind를 이용한 로컬 Kubernetes 실습**과 **Docker Compose 실습**의 두 환경을 다룬다. Compose 쪽에는
+runtime·plugin 준비와 함께, 로컬 HTTPS 실습을 브라우저에서 열 때 반복되는 hosts 항목·프록시 예외·CA 등록도
+모았다. 덱 이름을 Kubernetes에 가두지 않은 이유는 앞으로 데이터베이스, 메시징, AI 같은 다른 실습 환경도
+이곳에 모으기 위해서다.
 
 <LinkButton href="/lab-environment/01-kind/" icon="right-arrow">kind 환경 준비하기</LinkButton>
 
@@ -31,8 +33,18 @@ kagent를 연습할 때도 이 덱에서 Docker·kind·kubectl과 [Helm CLI](/la
 [kagent 실습 1장](/kagent-lab/01-install/)으로 넘어간다. kagent CLI와 전용 cluster 이름·설치·Agent
 시나리오·cleanup은 그 덱이 맡는다.
 
+Keycloak 실습처럼 kind가 필요 없는 실습은 [Docker Compose 실습 환경](/lab-environment/docker-compose/)에서
+runtime과 plugin을 확인하고, 브라우저 확인은 [로컬 HTTPS 실습을 브라우저로 보기](/lab-environment/local-https-browser/)를
+따른 뒤 [Keycloak 실습 환경 준비](/keycloak-lab/lab-setup/)로 넘어간다. 그 실습의 자원 계약·issuer·CA 분리·
+스크립트는 그 덱이 맡는다.
+
 <LinkCard
   title="1. kind 실습 환경"
   description="운영체제에 맞는 runtime과 CLI를 준비하고 kind 클러스터를 만든다."
   href="/lab-environment/01-kind/"
+/>
+<LinkCard
+  title="Docker Compose 실습 환경"
+  description="Compose·buildx plugin을 확인하고 회사 프록시 뒤의 pull·build 설정을 구분한다."
+  href="/lab-environment/docker-compose/"
 />

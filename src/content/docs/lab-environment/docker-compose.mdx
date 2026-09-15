@@ -1,0 +1,152 @@
+---
+title: "Docker Compose 실습 환경"
+description: "macOS와 Ubuntu에서 Docker Compose 실습에 필요한 runtime·Compose·buildx plugin을 준비하고 회사 프록시 뒤의 pull·build 설정을 구분한다"
+aliases: [Docker Compose 준비, Colima Compose, docker buildx, 회사 프록시 Docker]
+reviewedAt: 2026-09-15
+deckGroup: compose
+sidebar:
+  order: 30
+---
+
+import { LinkCard, Tabs, TabItem } from '@astrojs/starlight/components';
+import ExternalLink from '../../../components/docs/ExternalLink.astro';
+import Thesis from '../../../components/docs/Thesis.astro';
+import TermIntro from '../../../components/docs/TermIntro.astro';
+
+<Thesis>Compose 실습은 kind 없이 Docker runtime·Compose plugin·buildx plugin 세 가지만 있으면 시작할 수 있고, 회사 프록시 설정은 pull과 build가 다른 경로를 탄다</Thesis>
+
+<TermIntro
+  terms={[
+    ['Compose project', 'Docker Compose project', '여러 container·network·volume을 하나의 이름으로 묶어 함께 만들고 지우는 단위. 실습마다 전용 project 이름을 둔다.'],
+    ['buildx', 'Docker Buildx', 'BuildKit 기반의 image build plugin. build 중 secret mount처럼 예전 builder에 없는 기능을 쓸 때 필요하다.'],
+    ['TLS 재서명 proxy', 'TLS inspection proxy', '회사 프록시가 HTTPS 연결을 중간에서 풀어 보고 자체 CA로 다시 서명하는 방식. 그 CA를 모르는 프로그램은 인증서 오류를 낸다.'],
+  ]}
+/>
+
+Keycloak처럼 Kubernetes가 필요 없는 실습은 Docker Compose 한 project로 여러 service를 올린다.
+이 장은 그런 실습이 공통으로 요구하는 runtime 준비와 회사 프록시 대응을 모은다. 실습별 자원 요구량,
+project 이름, 시작·중단 스크립트는 각 실습 덱이 설명한다.
+
+## 큰 그림
+
+```text
+macOS   → Colima 또는 Docker Desktop의 Linux VM → Docker → Compose project의 container들
+Ubuntu  → Docker Engine                         → Docker → Compose project의 container들
+```
+
+runtime 선택과 설치는 [kind 실습 환경](/lab-environment/01-kind/)의 Docker·Colima 절과 같다. Compose 실습이
+더 요구하는 것은 두 가지다.
+
+| 필요한 것 | 왜 필요한가 |
+|---|---|
+| Compose plugin (`docker compose`) | 여러 service·network·volume을 한 project로 관리 |
+| buildx plugin (`docker buildx`) | 로컬 image build에서 BuildKit secret·cache 기능 사용 |
+
+## 이 장에서 답할 질문
+
+- Compose 실습을 시작하기 전에 어떤 명령이 성공해야 하는가?
+- 회사 프록시 뒤에서 image pull과 image build는 왜 따로 설정하는가?
+- TLS를 다시 서명하는 프록시라면 CA를 어디까지 신뢰시키는가?
+
+## 준비 확인
+
+<Tabs syncKey="operating-system">
+<TabItem label="macOS">
+
+[kind 실습 환경의 Colima 절](/lab-environment/01-kind/#colima-macos)대로 Colima와 Docker client를 준비한다.
+Homebrew의 `docker` CLI는 buildx plugin을 함께 설치하지 않으므로 따로 설치해 CLI plugin 경로에 연결한다.
+
+```bash
+brew install docker-buildx
+ln -sfn "$(brew --prefix)/opt/docker-buildx/bin/docker-buildx" ~/.docker/cli-plugins/docker-buildx
+```
+
+Compose plugin은 Colima의 Docker runtime 안내에 함께 있다. 네 명령이 모두 성공하면 준비가 끝난다.
+
+```bash
+colima status
+docker version
+docker buildx version
+docker compose version
+```
+
+Docker Desktop을 쓴다면 buildx와 Compose plugin이 함께 설치되므로 `colima status`만 빼고 같은 명령으로 확인한다.
+
+</TabItem>
+<TabItem label="Ubuntu">
+
+[kind 실습 환경의 Docker 절](/lab-environment/01-kind/#docker)대로 Docker Engine을 apt 저장소에서 설치한다.
+공식 안내의 `docker-buildx-plugin`·`docker-compose-plugin` package를 함께 설치하면 두 plugin이 갖춰진다.
+
+```bash
+docker version
+docker buildx version
+docker compose version
+docker info --format '{{.OSType}} {{.Architecture}}'
+```
+
+마지막 명령은 `linux amd64`처럼 runtime의 OS와 CPU 아키텍처를 보여 준다. 실습 image가 그 아키텍처를
+제공하는지 판단할 때 쓴다.
+
+</TabItem>
+</Tabs>
+
+## 회사 프록시 뒤에서 pull과 build 구분하기
+
+회사 프록시 뒤에서는 같은 "이미지 준비"라도 두 경로가 다른 설정을 본다. 하나만 맞추면 pull은 되는데
+build가 멈추거나 그 반대가 된다.
+
+| 경로 | 누가 네트워크에 나가나 | 프록시 주소를 읽는 곳 |
+|---|---|---|
+| `docker pull`·Compose의 image pull | Docker daemon | daemon 설정의 `proxies` |
+| `docker build` 안의 `apt-get`·`npm ci` 등 | build container | build를 시작한 shell의 `HTTP_PROXY`·`HTTPS_PROXY`·`NO_PROXY` |
+
+daemon 쪽은 <ExternalLink href="https://docs.docker.com/engine/daemon/proxy/">Docker Engine — Daemon proxy configuration</ExternalLink>을
+따라 `/etc/docker/daemon.json`에 둔다. build 쪽은 별도 설정 없이 shell 환경 변수가 build argument로
+넘어가므로, build를 실행하는 터미널에 프록시 변수가 있는지 확인한다.
+
+```bash
+env | grep -i _proxy
+docker info --format 'HTTP={{.HTTPProxy}} HTTPS={{.HTTPSProxy}} NO={{.NoProxy}}'
+```
+
+`NO_PROXY`에는 실습이 loopback으로 접근하는 hostname 접미사도 넣는다. 그렇지 않으면 터미널의 `curl`이
+로컬 실습 주소를 회사 프록시로 보낸다. 브라우저 쪽 예외는
+[로컬 HTTPS 실습을 브라우저로 보기](/lab-environment/local-https-browser/)에서 다룬다.
+
+## TLS 재서명 proxy의 CA를 build에만 신뢰시키기
+
+프록시가 HTTPS를 다시 서명하면 build container 안의 `apt-get`·`npm`이 registry 인증서를 믿지 못해
+`certificate verify failed` 같은 오류로 멈춘다. 이때는 프록시 CA의 PEM 파일을 build 단계에만 넘긴다.
+
+- **build 단계만 신뢰한다.** CA를 완성 image에 굽지 않는다. 실습 image가 회사 밖에서 쓰이거나 공유될
+  때 회사 CA가 딸려 가면 안 되기 때문이다.
+- **파일 경로를 환경 변수로 받는다.** 각 실습 스크립트는 `CORP_CA_FILE` 같은 변수로 PEM 경로를 받아
+  BuildKit secret이나 build context 사본으로 넘긴다. 변수 이름과 사본 위치는 실습 덱이 정한다.
+- **초기화하면 다시 지정한다.** 실습을 처음부터 다시 시작해 사본이 지워지면 변수도 다시 지정해야 한다.
+
+:::caution[CA trust와 프록시 주소는 다른 문제다]
+CA를 신뢰시켜도 연결 timeout이 계속되면 위 절의 프록시 주소 설정을 본다. 반대로 프록시 주소가 맞아도
+인증서 오류가 나면 이 절의 CA trust 문제다. 둘을 한 번에 고치려 하지 말고 오류 메시지로 구분한다.
+kind 노드 안의 containerd에 같은 CA를 넣는 방법은
+[kind 실습 환경](/lab-environment/01-kind/#사내-프록시의-ca를-신뢰해야-할-때)에 있다.
+:::
+
+## 다음에 다시 쓸 때
+
+Compose project는 `docker compose stop`으로 container만 멈추고 named volume을 남길 수 있다. 실습 덱이
+전용 stop·resume 스크립트를 제공하면 그것을 쓴다. 다른 project의 자원까지 지우는 `docker system prune`이나
+Colima 전체 삭제는 일반 정리 방법으로 쓰지 않는다.
+
+## 요약
+
+- Compose 실습의 준비 확인은 `docker version`·`docker buildx version`·`docker compose version`이 모두 성공하는 것이다.
+- macOS Homebrew의 Docker CLI는 buildx plugin을 따로 설치해 연결한다.
+- 회사 프록시 뒤에서 pull은 daemon 설정을, build는 shell의 프록시 변수를 본다.
+- TLS 재서명 proxy의 CA는 build 단계에만 넘기고 완성 image에는 넣지 않는다.
+
+<LinkCard
+  title="로컬 HTTPS 실습을 브라우저로 보기"
+  description="hosts 항목·프록시 예외·로컬 CA 등록으로 실습 화면을 경고 없이 연다."
+  href="/lab-environment/local-https-browser/"
+/>
