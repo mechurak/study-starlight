@@ -150,6 +150,9 @@ JWT에는 `sub`(사용자 UUID), `role`, `email`,
 이 JWT가 이후 모든 요청에 `Authorization: Bearer`로 실려 다니고,
 **PostgREST가 그걸 풀어 Postgres 세션 변수에 넣는다.**
 
+역할로 보면 GoTrue는 [keycloak 덱의 인증 생태계 계층](/keycloak/authentication-landscape/)에서
+IdP(Identity Provider) 층에 해당한다 — Supabase 백엔드 전용의 작은 IdP다.
+
 :::tip[핵심]
 **JWT의 `sub` 클레임 = SQL의 `auth.uid()`**
 

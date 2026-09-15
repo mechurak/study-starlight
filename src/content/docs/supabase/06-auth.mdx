@@ -25,6 +25,7 @@ import { Steps, Card, CardGrid, LinkCard } from '@astrojs/starlight/components';
 Google Cloud에서 **우리 앱을 OAuth 클라이언트로 등록**해야 한다. 여기서 받은 Client ID와 Secret을 Supabase에 전달한다.
 
 Supabase는 Google의 로그인 결과를 받아 자기 세션으로 바꾸고, 앱은 그 세션만 사용한다.
+이 중개 구조는 keycloak 덱의 [Identity Brokering](/keycloak/identity-brokering/)과 같은 자리다.
 </Card>
 </CardGrid>
 

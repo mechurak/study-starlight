@@ -42,6 +42,10 @@ OIDC provider에는 alias, upstream issuer와 authorization/token/UserInfo/JWKS 
 credential, signature 검증, first login flow와 sync mode를 설정한다. 이 실습은 `syncMode=IMPORT`로
 최초 profile을 가져오고 upstream token은 저장하지 않는다.
 
+이 등록에서 역할이 뒤집힌다. 내부 앱에게 IdP인 Keycloak이 upstream IdP에게는 client다. 앱 A를
+realm에 client로 등록하고 credential을 받았듯, Keycloak broker를 외부 IdP에 client로 등록하고
+받은 client ID·credential을 위 설정에 넣는다. IdP는 제품 종류가 아니라 관계마다 정해지는 역할이다.
+
 [Keycloak Identity Brokering 가이드](https://www.keycloak.org/docs/26.7.0/server_admin/#_identity_broker)는
 브라우저 redirect, 외부 응답 검증, 사용자 import/link와 내부 client token 발급을 순서대로 설명한다.
 `kc_idp_hint`를 쓰면 login page의 provider 선택을 건너뛰되 client별 허용 정책은 별도로 둔다.

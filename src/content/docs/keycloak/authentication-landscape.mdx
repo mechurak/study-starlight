@@ -1,8 +1,8 @@
 ---
 title: "인증 생태계의 큰 그림"
 description: "인증·인가의 필요성과 AD·LDAP·IdP·OIDC·SAML·PKCE를 계층별로 구분하는 큰 그림"
-aliases: [인증 큰 그림, 인증과 인가, authentication, authorization, AD FS, AD DS, 인증 프로토콜, federation]
-reviewedAt: 2026-09-14
+aliases: [인증 큰 그림, 인증과 인가, authentication, authorization, AD FS, AD DS, 인증 프로토콜, federation, 관리형 IdP, Firebase Auth, Supabase Auth]
+reviewedAt: 2026-09-15
 deckGroup: foundations
 sidebar:
   order: 990
@@ -104,6 +104,15 @@ LDAP를 쓰고 앱과 로그인 결과를 주고받을 때는 OIDC를 쓸 수 �
 할 수 있다. 사용자를 인증하고 세션을 관리하며 앱이 검증할 수 있는 결과를 제공한다. AD FS는
 AD DS와 이름이 비슷하지만, 사용자·그룹을 저장하는 디렉터리와는 다른 Windows Server 역할이다.
 
+직접 운영하는 서버만 이 층에 있는 것은 아니다. Entra ID·Auth0 같은 관리형 서비스, 그리고
+[Firebase Auth](https://firebase.google.com/docs/auth)나 Supabase의
+[GoTrue 기반 Auth](https://supabase.com/docs/guides/auth)처럼 BaaS 플랫폼에 내장된 인증 모듈도
+같은 층의 대안이다 — 사용자를 인증하고 서명된 token을 발급한다는 뼈대가 같다. 차이는 목적이다.
+Keycloak은 여러 무관한 앱 앞에 세우는 범용 OIDC/SAML 제공자라 realm·client 등록·관리 위임 층이
+두껍고, BaaS 내장형은 자기 플랫폼 백엔드(Supabase면 RLS)에 로그인시키는 것이 목적이라 그 층이
+얇은 대신 앱 하나를 만들 때 간단하다. [supabase 덱의 Auth 장](/supabase/06-auth/)에서 쓰는
+로그인이 바로 이 층의 BaaS 내장형이다.
+
 ### 앱 로그인 프로토콜
 
 [OIDC](https://openid.net/specs/openid-connect-core-1_0-18.html)와
@@ -165,6 +174,7 @@ PKCE를 붙인다. SAML을 선택하면 code나 PKCE 없이 별도의 assertion 
 - LDAP는 디렉터리 조회·bind 프로토콜이지 브라우저 SSO 프로토콜이 아니다.
 - OAuth 2.0 자체를 로그인 프로토콜이라고 설명하지 않는다. 사용자 인증에는 OIDC 같은 계층이 필요하다.
 - PKCE는 OIDC의 대안이 아니라 Authorization Code 흐름에 붙는 code 보호 장치다.
+- IdP는 제품 종류가 아니라 관계 속 역할이다. brokering에서 Keycloak은 내부 앱에게 IdP이면서 동시에 외부 IdP의 client가 된다.
 - 인증 성공은 사용자를 확인했다는 뜻이다. 그 사용자가 API 작업을 해도 되는지는 별도의 인가 판단이다.
 :::
 
@@ -173,9 +183,12 @@ PKCE를 붙인다. SAML을 선택하면 code나 PKCE 없이 별도의 assertion 
 회사에 AD와 AD FS가 모두 있어도 Keycloak을 연결하는 경로는 하나로 고정되지 않는다. 자격 증명을
 검증하는 주체와 브라우저가 이동하는 위치를 보면 두 경로를 가를 수 있다.
 여기서 federation은 서로 다른 신원 시스템을 연결해 신원 정보를 이어 쓰는 관계를 넓게 가리킨다.
+비교 기준으로 외부 연결이 전혀 없는 로컬 사용자를 먼저 놓으면 두 경로에서 무엇이 밖으로
+넘어가는지가 보인다.
 
 | 경로 | 실제 연결 | 인증하는 곳 | 브라우저 이동 | 선택 결과 |
 |---|---|---|---|---|
+| (기준) Keycloak 로컬 사용자 | 외부 연결 없음 | Keycloak이 자체 저장소의 credential 확인 | Keycloak 로그인 경로 안에 머묾 | realm 안에서 인증이 완결됨 |
 | Keycloak User Federation | Keycloak → AD/AD DS | Keycloak이 LDAP/LDAPS로 사용자를 찾고 사용자 bind를 요청 | Keycloak 로그인 경로 안에 머묾 | 디렉터리 계정이 Keycloak 사용자 모델로 연결됨 |
 | Keycloak Identity Brokering | Keycloak → AD FS | AD FS가 사용자를 인증하고 OIDC 또는 SAML 결과를 Keycloak에 반환 | Keycloak에서 AD FS 로그인 화면으로 이동 | 외부 IdP 신원이 Keycloak realm 사용자와 연결됨 |
 
