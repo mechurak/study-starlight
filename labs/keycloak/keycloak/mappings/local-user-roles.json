@@ -1,0 +1,1 @@
+{ "username": "local-user", "grant": ["app-user"], "revoke": ["api-admin"] }

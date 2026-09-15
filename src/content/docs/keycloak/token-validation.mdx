@@ -78,6 +78,9 @@ P07의 API는 host port 없이 Compose bridge 안에서만 실행되고 `jose` r
 
 ## 요약
 
+검증된 claim과 API 401·403·200을 직접 비교하려면
+[두 앱 SSO와 API 권한 실습](/keycloak/sso-api-lab/)으로 이어 간다.
+
 - decode는 검증이 아니며, signature·issuer·audience·expiration을 모두 확인해야 한다.
 - discovery와 JWKS를 쓰면 endpoint와 공개키 교체를 표준 경로로 따라갈 수 있다.
 - ID token은 client의 로그인 확인용, access token은 API 호출용이다.

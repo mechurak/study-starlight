@@ -1,0 +1,69 @@
+---
+title: "실습 코드에서 읽을 것"
+description: "공개 Keycloak 설정과 앱 코드는 읽고, 환경 준비와 검증 자동화는 역할만 구분하는 코드 지도"
+aliases: [Keycloak lab code, 실습 코드 구조, guided lab]
+reviewedAt: 2026-09-15
+deckGroup: foundations
+sidebar:
+  order: 1015
+---
+
+import Thesis from '../../../components/docs/Thesis.astro';
+import TermIntro from '../../../components/docs/TermIntro.astro';
+
+<Thesis>Keycloak 설정과 앱의 신뢰 경계는 직접 읽고, 인증서·secret·Admin REST·로그인 자동화는 무엇을 대신하는지만 알면 된다.</Thesis>
+
+실습 코드가 많아 보여도 모두 학습 대상은 아니다. `keycloak/`의 공개 JSON이 무엇을 설정하는지,
+`app/`이 token을 어떻게 받고 검증하는지를 먼저 읽는다. `internal/`은 같은 결과를 반복 가능하게 만드는
+준비·적용·검증 장치다.
+
+<TermIntro
+  terms={[
+    ['공개 설정', '', '학습자가 읽고 일부러 바꾼 뒤 다시 적용하는 Keycloak 표현 JSON.'],
+    ['적용 자동화', '', 'secret과 서버 ID를 주입하고 공개 설정을 Admin REST에 멱등하게 반영하는 내부 코드.'],
+    ['검증 자동화', '', '브라우저 흐름을 따라 로그인·token·API 결과를 확인하지만 설정은 고치지 않는 내부 코드.'],
+  ]}
+/>
+
+## 먼저 읽을 다섯 묶음
+
+| 질문 | 읽을 원본 | 여기서 이해할 것 |
+|---|---|---|
+| 앱 A/B는 어떻게 다른가 | [`clients/`](https://github.com/mechurak/study-starlight/tree/main/labs/keycloak/keycloak/clients) | 별도 client ID·callback·secret, 공통 Code+PKCE |
+| API 권한은 어디서 생기나 | [`roles/`](https://github.com/mechurak/study-starlight/tree/main/labs/keycloak/keycloak/roles), [`mappings/`](https://github.com/mechurak/study-starlight/tree/main/labs/keycloak/keycloak/mappings) | role 정의와 사용자/group 부여를 분리 |
+| token에는 무엇이 실리나 | [`mappers/`](https://github.com/mechurak/study-starlight/tree/main/labs/keycloak/keycloak/mappers) | audience와 groups claim은 서로 다른 mapper |
+| 외부 계정과 group은 어떻게 들어오나 | [`federation/`](https://github.com/mechurak/study-starlight/tree/main/labs/keycloak/keycloak/federation) | LDAP provider와 group mapper, user sync와 group sync의 차이 |
+| 앱과 API는 무엇을 믿나 | [`server.mjs`](https://github.com/mechurak/study-starlight/blob/main/labs/keycloak/app/server.mjs), [`api.mjs`](https://github.com/mechurak/study-starlight/blob/main/labs/keycloak/app/api.mjs) | callback 검증·앱 session·JWT 검증·role 인가 |
+
+`mappings/*.json`은 Keycloak에 그대로 import하는 포맷이 아니라 username/group path로 대상을 찾는
+이 lab의 입력이다. secret, LDAP parent ID, client UUID는 공개 JSON에 넣지 않는다.
+
+## 앱 흐름에서 찾을 함수
+
+[`server.mjs`](https://github.com/mechurak/study-starlight/blob/main/labs/keycloak/app/server.mjs)의
+`/login`은 state·nonce·PKCE transaction을 앱 session에 저장한다. `/callback`은 code를 교환하고 검증된
+subject와 access token을 session에 둔다. `/api/:permission`은 그 access token을 API에 전달한다.
+
+[`api.mjs`](https://github.com/mechurak/study-starlight/blob/main/labs/keycloak/app/api.mjs)의
+`authenticate`는 RS256 서명·issuer·audience·expiration을 확인한다. `requireRealmRole`은 인증된 token의
+role로 403과 200을 가른다. `/claims`는 검증 뒤 `iss`, `aud`, `exp`, `groups`, `realm_access.roles`만
+보여 주며 원문 token이나 개인정보를 반환하지 않는다.
+
+## 자동화에서 건너뛸 것
+
+| 내부 위치 | 맡은 일 | 처음에는 건너뛸 구현 |
+|---|---|---|
+| `internal/runtime/` | CA·인증서·secret 준비, 단계/서비스 수명 주기 | OpenSSL 확장 파일과 host 자원 검사 세부 |
+| `internal/keycloak/` | 관리자 인증, 객체 검색, 공개 JSON 적용, sync | REST endpoint별 중복 방지와 오류 포맷 |
+| `internal/seed/` | 기존 완성 환경·선택 실습 호환 조합 | 과거 P/D ID별 후처리 |
+| `internal/verify/` | 실제 Code+PKCE 로그인과 상세 회귀 | HTML form cookie jar와 과거 evidence 비교 |
+
+공개 진입점은 `scripts/first-start.sh`, `apply.sh`, `verify.sh`, `status.sh`, `stop.sh`, `resume.sh`다.
+처음에는 이 스크립트의 사용법만 알면 되고, 학습 결과가 예상과 다를 때 해당 내부 경계를 연다.
+
+## 요약
+
+- 직접 바꿀 원본은 `keycloak/` JSON이고 앱의 신뢰 경계는 `app/server.mjs`, `app/api.mjs`에 있다.
+- secret과 서버 생성 ID는 학습 설정이 아니므로 `internal/keycloak/`이 주입한다.
+- `verify.sh`는 설정을 복구하지 않으며 로그인으로 새 session/event만 만든다.
+- 과거 P/D ID는 호환·검증 이력에 남지만 기본 학습 순서를 이해하는 데 필요 없다.

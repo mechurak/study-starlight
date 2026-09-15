@@ -1,0 +1,4 @@
+[
+  { "group": "/app-users", "roles": ["app-user"] },
+  { "group": "/api-admins", "roles": ["api-admin"] }
+]

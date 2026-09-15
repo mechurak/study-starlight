@@ -1,0 +1,12 @@
+{
+  "clientId": "lab-api",
+  "name": "Keycloak Lab API",
+  "enabled": true,
+  "protocol": "openid-connect",
+  "bearerOnly": true,
+  "publicClient": false,
+  "standardFlowEnabled": false,
+  "implicitFlowEnabled": false,
+  "directAccessGrantsEnabled": false,
+  "serviceAccountsEnabled": false
+}

@@ -2,7 +2,7 @@
 title: "Keycloak 학습 마무리"
 description: "인증·SSO·API 인가·디렉터리 연결·운영 흐름과 실제 검증 범위를 한눈에 정리"
 aliases: [Keycloak wrapup, SSO 구축 순서, Keycloak 체크리스트, 인증 학습 지도]
-reviewedAt: 2026-09-14
+reviewedAt: 2026-09-15
 deckGroup: reference
 sidebar:
   order: 1270
@@ -34,6 +34,8 @@ group은 Keycloak group/role로 가져온 뒤 별도 protocol mapper를 통해 t
 |---|---|---|
 | macOS/Colima 빈 Compose 시작·보존 재개 | 비브라우저 통과 | P11: kind·kubectl 없이 6 service healthy |
 | macOS 실제 Chrome 대표 로그인 | 통과 | Admin Console·Account Console, 앱 A Code + PKCE |
+| 기존 완성 환경의 guided 공개 설정·검사 | 통과 | app-a/app-b/api/ldap/groups 재적용과 다섯 로그인 검사 |
+| 빈 상태 guided 단계별 시작·재개 | 미실행 | 기존 volume·CA·secret 초기화 승인 필요 |
 | local-user 앱 A→B SSO와 API | HTML form 진단 통과 | credential 1회, API 401/403/200 |
 | Samba LDAPS Federation과 group 권한 | 통과 | alice/bob 로그인, group→role→claim→API |
 | 변경·disable·LDAP 장애 시간축 | 통과 | 새 로그인/refresh/기존 JWT/app session 분리 |
@@ -64,8 +66,9 @@ Authorization Code + PKCE 로그인까지 확인했다. 이 결과를 Ubuntu·Mi
 |---|---|
 | AD·LDAP·IdP·OIDC·SAML·PKCE는 어떻게 다른가 | [인증 생태계의 큰 그림](/keycloak/authentication-landscape/) |
 | Keycloak은 어디에 있고 무엇을 책임하나 | [Keycloak의 역할](/keycloak/keycloak-overview/) |
-| 앱 로그인과 token 검증은 어떻게 이어지나 | [OAuth와 OIDC](/keycloak/oauth-oidc/), [Token 검증](/keycloak/token-validation/) |
+| 앱 로그인과 token 검증은 어떻게 이어지나 | [실습 코드에서 읽을 것](/keycloak/lab-code-guide/), [Client 로그인 실습](/keycloak/client-login-lab/), [SSO·API 실습](/keycloak/sso-api-lab/) |
 | group이 API 권한이 되는 과정은 무엇인가 | [Group과 Role](/keycloak/groups-and-roles/), [Scope와 Mapper](/keycloak/scopes-and-mappers/) |
+| 외부 계정·group을 직접 연결하려면 | [외부 계정 로그인 실습](/keycloak/directory-login-lab/), [외부 Group 권한 실습](/keycloak/directory-permissions-lab/) |
 | 외부 directory 변경은 언제 반영되나 | [디렉터리 변경과 장애](/keycloak/directory-changes/) |
 | 배포·상태·관찰·복구는 어떻게 나뉘나 | [배포 설계](/keycloak/deployment/), [인증 흐름 관찰](/keycloak/observability/), [백업과 업그레이드](/keycloak/backup-and-upgrade/) |
 | 증상에서 어디부터 볼까 | [Keycloak 문제 진단](/keycloak/troubleshooting/) |
@@ -82,4 +85,5 @@ macOS web CA trust 변경을 승인한 뒤 Chrome의 Admin Console과 앱 A 로�
 
 - 신원 원본→Keycloak 모델→token claim→API 검증과 권한 결정을 하나의 추적 가능한 흐름으로 본다.
 - Compose 핵심 흐름과 OTP·Brokering·서비스 계정·DB 복원은 실제 진단으로 검증했다.
-- browser, Ubuntu, 실제 AD/IdP, proxy/Kubernetes와 HA는 미실행 상태와 재개 조건을 명시해 남겼다.
+- 대표 macOS Chrome은 통과했고, Ubuntu·실제 AD/IdP·proxy/Kubernetes·HA와 빈 guided 재현은 미실행
+  상태와 재개 조건을 명시해 남겼다.

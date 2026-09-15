@@ -41,6 +41,19 @@ app.get('/healthz', (_request, response) => {
   response.type('text/plain').send('ok')
 })
 
+app.get('/claims', authenticate, (request, response) => {
+  const claims = request.tokenClaims
+  response.set('cache-control', 'no-store').json({
+    iss: claims.iss,
+    aud: claims.aud,
+    exp: claims.exp,
+    groups: Array.isArray(claims.groups) ? claims.groups : [],
+    realm_access: {
+      roles: Array.isArray(claims.realm_access?.roles) ? claims.realm_access.roles : [],
+    },
+  })
+})
+
 async function authenticate(request, response, next) {
   const authorization = request.get('authorization') ?? ''
   if (!authorization.startsWith('Bearer ')) {

@@ -1,0 +1,78 @@
+---
+title: "두 앱 SSO와 API 권한 실습"
+description: "app-b SSO를 확인하고 audience·realm role을 적용해 API 401·403·200을 구분하는 실습"
+aliases: [Keycloak SSO lab, API role lab, audience mapper 실습]
+reviewedAt: 2026-09-15
+deckGroup: access
+sidebar:
+  order: 1075
+---
+
+import Thesis from '../../../components/docs/Thesis.astro';
+import TermIntro from '../../../components/docs/TermIntro.astro';
+
+<Thesis>SSO는 Keycloak session을 재사용하고, API 허용은 새 access token의 audience와 role을 API가 따로 검증해 결정한다.</Thesis>
+
+app-a가 된 상태에서도 app-b client와 API client·role·audience는 아직 없다. 두 묶음을 따로 적용하면
+“다시 로그인하지 않음”과 “API가 허용함”이 서로 다른 결과임을 확인할 수 있다.
+
+<TermIntro terms={[
+  ['audience', '', '이 access token을 받을 대상으로 발급된 API를 나타내는 aud claim.'],
+  ['realm role', '', 'realm 범위 권한 라벨. 이 실습 API는 realm_access.roles에서 읽는다.'],
+  ['앱 session', '', '각 앱이 access token과 로그인 상태를 보관하는 자체 cookie session. Keycloak SSO session과 별개다.'],
+]}/>
+
+## 앱 B에서 SSO를 확인한다
+
+[`app-b.json`](https://github.com/mechurak/study-starlight/blob/main/labs/keycloak/keycloak/clients/app-b.json)은
+app-a와 별도 secret·callback을 가진다. 적용 시 API container는 시작되지 않는다.
+
+```bash
+./scripts/apply.sh app-b
+./scripts/verify.sh sso
+```
+
+같은 브라우저에서 앱 A에 local-user로 로그인한 뒤 앱 B의 `/login`을 연다. 앱 B도 authorization
+request와 code 교환, 자기 session 생성은 수행하지만 Keycloak은 기존 realm session 때문에 password를
+다시 묻지 않는다. 앱 A/B cookie를 서로 공유한 결과가 아니다.
+
+## API 설정과 결과를 연결한다
+
+다음 공개 원본을 읽는다.
+
+- `clients/lab-api.json`: token을 받기만 하는 bearer-only 대상
+- `roles/realm-roles.json`: `app-user`, `api-admin`
+- `mappings/local-user-roles.json`: local-user에는 app-user만 유지
+- `mappers/api-audience.json`: app A/B access token의 `aud=lab-api`
+
+```bash
+./scripts/apply.sh api
+./scripts/verify.sh api
+```
+
+무토큰 API는 401, local-user의 `/api/user`는 200, `/api/admin`은 403이어야 한다. `/api/claims`에서
+검증된 `iss`, `aud`, `exp`, `realm_access.roles`를 확인한다. 이 JSON은 token 원문이나 Keycloak 전체
+사용자 모델이 아니라 [`api.mjs`](https://github.com/mechurak/study-starlight/blob/main/labs/keycloak/app/api.mjs)가
+검증한 최소 claim이다.
+
+## role을 회수했다 복구한다
+
+1. Admin Console의 **Users → local-user → Role mapping**에서 `app-user`만 회수한다.
+   `default-roles-study`와 다른 role은 건드리지 않는다.
+2. 기존 앱 session의 token은 자동으로 교체된다고 가정하지 않는다. 새 private window에서 `/login`으로
+   authorization code 교환을 다시 거쳐 새 token을 얻는다.
+3. 새 session의 `/api/user`가 403인지 확인한다. 기존 token은 만료 전까지 다른 결과일 수 있다.
+4. 공개 원본으로 대상 role을 복구하고 새 로그인으로 200을 확인한다.
+
+```bash
+./scripts/apply.sh api
+./scripts/verify.sh api
+```
+
+## 요약
+
+- 같은 브라우저의 Keycloak session이 앱 B password 재입력을 없애지만 앱 B session은 별도로 생긴다.
+- API는 서명·issuer·audience·expiration 검증 뒤 role로 403과 200을 가른다.
+- role 변경은 이미 발급된 token을 고쳐 쓰지 않으므로 새 로그인의 결과와 구분한다.
+
+다음은 [외부 디렉터리 계정 로그인 실습](/keycloak/directory-login-lab/)에서 password 원본을 LDAP로 바꾼다.

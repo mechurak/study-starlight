@@ -1,10 +1,10 @@
 # 3. Keycloak 실습 학습 경로와 코드 구조 개편
 
 작성일: 2026-09-15
-상태: 계획
-지금 위치: Compose 전용으로 범위 수정 완료 · 구현 미착수 · 다음 M01
-실행 범위: 조사·계획 문서 작성과 수정만. kind/Kubernetes 실습 자산 삭제는 후속 구현 범위로 확정한다.
-이번에는 실행 코드·컨테이너·설정을 바꾸거나 파일을 삭제하지 않는다.
+상태: 완료
+지금 위치: M01 → M01-C → M02~M13 구현·검증·기록 완료
+실행 범위: M01 → M01-C → M02~M13 전체 구현·검증·기록. 기존 데이터와 비대상 workload를 보존하고
+초기화는 별도 허용 없이 실행하지 않는다. 커밋·푸시·배포는 하지 않는다.
 
 [계획 관리 규칙](README.md)을 따른다. 후속 실행 요청을 받으면 위 실행 범위를 갱신하고 의존 순서로
 진행한다. 이 계획은 서브에이전트나 병렬 에이전트 실행을 요구하지 않는다.
@@ -27,21 +27,21 @@
 
 ## 완료 조건
 
-- [ ] 덱 index와 실습 README에서 학습 시작점·읽을 코드·자동화 역할을 찾을 수 있다.
-- [ ] 기본 개념 실습을 진행하는 데 `P07`, `P08`, `D09` 같은 과거 구현 ID를 알 필요가 없다.
-- [ ] 공개된 Keycloak 설정 파일을 읽고 적용하며, 대응하는 콘솔 항목과 결과를 확인할 수 있다.
-- [ ] 기반 환경 → 앱 A → 앱 B SSO → API → LDAP 로그인 → 그룹/역할/claim을 순서대로 재현한다.
-- [ ] 기반 환경과 앱 B 단계에는 각각 아직 만들지 않은 Client·LDAP·API 등이 몰래 생성되지 않는다.
-- [ ] 적어도 redirect, role, group claim 세 가지를 직접 바꿔 예상 결과와 복구를 확인한다.
-- [ ] 각 실습은 시작 상태·설정 이유·명령/조작·예상 결과·읽을 코드·복구·다음 장을 제공한다.
-- [ ] `app/`에는 앱/API 실행 예제가 있고 seed·검증 코드는 내부 자동화 위치로 분리된다.
-- [ ] 기존 인자 없는 최초 시작은 완성 환경을 만들며, 기존 데이터와 issuer·CA·secret 계약을 유지한다.
-- [ ] 단계별 실행의 재적용·실패 후 재개·보존 중단/재개와 기존 완성 환경 재개를 검증한다.
-- [ ] 학습용 확인 명령은 과거 검증 기록·kind·kubectl 없이 동작하며 설정을 자동 복구하지 않는다.
-- [ ] `labs/keycloak/kind/`, `k8s/`, `kind.yaml`이 없고 모든 유지하는 실행 코드에서 kind/kubectl 호출,
+- [x] 덱 index와 실습 README에서 학습 시작점·읽을 코드·자동화 역할을 찾을 수 있다.
+- [x] 기본 개념 실습을 진행하는 데 `P07`, `P08`, `D09` 같은 과거 구현 ID를 알 필요가 없다.
+- [x] 공개된 Keycloak 설정 파일을 읽고 적용하며, 대응하는 콘솔 항목과 결과를 확인할 수 있다.
+- [x] 기반 환경 → 앱 A → 앱 B SSO → API → LDAP 로그인 → 그룹/역할/claim을 순서대로 재현한다.
+- [x] 기반 환경과 앱 B 단계에는 각각 아직 만들지 않은 Client·LDAP·API 등이 몰래 생성되지 않는다.
+- [x] 적어도 redirect, role, group claim 세 가지를 직접 바꿔 예상 결과와 복구를 확인한다.
+- [x] 각 실습은 시작 상태·설정 이유·명령/조작·예상 결과·읽을 코드·복구·다음 장을 제공한다.
+- [x] `app/`에는 앱/API 실행 예제가 있고 seed·검증 코드는 내부 자동화 위치로 분리된다.
+- [x] 기존 인자 없는 최초 시작은 완성 환경을 만들며, 기존 데이터와 issuer·CA·secret 계약을 유지한다.
+- [x] 단계별 실행의 재적용·실패 후 재개·보존 중단/재개와 기존 완성 환경 재개를 검증한다.
+- [x] 학습용 확인 명령은 과거 검증 기록·kind·kubectl 없이 동작하며 설정을 자동 복구하지 않는다.
+- [x] `labs/keycloak/kind/`, `k8s/`, `kind.yaml`이 없고 모든 유지하는 실행 코드에서 kind/kubectl 호출,
   P04 기록 선행 조건과 전용 보존 검사가 제거돼 있다.
-- [ ] 기존 MFA·Brokering·Service Account·DB 복원 및 전체 재현 경로가 계속 연결돼 있다.
-- [ ] 변경한 실행 경로의 실제 macOS/Colima 결과와 사이트 `pnpm check` 결과를 구분해서 남긴다.
+- [x] 기존 MFA·Brokering·Service Account·DB 복원 및 전체 재현 경로가 계속 연결돼 있다.
+- [x] 변경한 실행 경로의 실제 macOS/Colima 결과와 사이트 `pnpm check` 결과를 구분해서 남긴다.
 
 계획 02의 Ubuntu 검증 보류는 그대로 유지한다. 이 계획의 완료 조건에 Ubuntu 신규 실측을 추가하지
 않는다. 다만 이 계획에서 바꾼 실행 경로의 필수 검증이 미실행이면 그 작업을 완료로 표시하지 않는다.
@@ -717,20 +717,20 @@ index/wrapup/glossary/troubleshooting, MFA/Brokering/Service Account/backup/dire
 |---|---|---|---|---|
 | 계획 작성 | done | `03-keycloak-guided-labs.md`, 목록 README. 같은 레포 유지, 공개 설정/내부 코드 분리, guided+ready와 5개 적용 단계 설계 | 코드·본문·규칙 읽기 완료. 계획 diff와 참조 경로 검증 완료. 컨테이너·사이트 검사는 계획 문서만 변경하므로 미실행 | 후속 구현 요청 시 M01 |
 | Compose 전용 범위 수정 | done | 사용자 요청에 따라 kind/Kubernetes 자산 보존 방침 폐기. M01-C에 8개 파일 삭제·P04 의존성/보존 검사·현재 안내 정리 추가 | 계획만 수정. 실행 자산·환경은 아직 변경하지 않음. 과거 이력은 보존하고 `.state/tools`의 Compose 용도 유지 | 후속 구현 요청 시 M01 → M01-C |
-| M01 | todo | — | — | 호출·이동표 확정 |
-| M01-C | todo | — | — | kind/Kubernetes 자산·의존성 제거 |
-| M02 | todo | — | — | 내부 코드 이동 |
-| M03 | todo | — | — | Client 원본 추출 |
-| M04 | todo | — | — | API 단계 분리 |
-| M05 | todo | — | — | LDAP/group 단계 분리 |
-| M06 | todo | — | — | guided lifecycle |
-| M07 | todo | — | — | 결과 출력·단계 검사 |
-| M08 | todo | — | — | 실제 회귀 검증 |
-| M09 | todo | — | — | 시작·코드 안내 |
-| M10 | todo | — | — | 로그인·SSO/API 본문 |
-| M11 | todo | — | — | LDAP/group 본문 |
-| M12 | todo | — | — | 영구 문서 정리 |
-| M13 | todo | — | — | 완료 판정 |
+| M01 | done | `compose.yaml`, `app/Dockerfile`, `scripts/`, `keycloak/`, `app/seed-*`, 현재 README·본문 호출자, 이 문서 | 추적된 kind/Kubernetes 삭제 대상 8개 확인. 공개 lifecycle 6개는 `scripts/` 유지, prepare/helper·seed·상세 verify는 `internal/`로 이동하고 Compose mount/entrypoint를 함께 바꿔야 함. `app-b`의 API health 의존 확인. 현재 Colima의 `keycloak-lab` 6개 service와 두 named volume은 healthy/존재하며 mode·stage·in-progress marker는 없음: metadata 없는 기존 ready 호환 검증에 사용 가능. `timeline` Supabase workload와 `.state` 비밀값은 조회·변경하지 않음. 과거 상세 검증은 evidence 선행 조건이 있고 새 guided 검사는 별도 구현해야 함 | M01-C |
+| M01-C | done | 추적된 `kind.yaml`, `kind/`, `k8s/` 8개 삭제. reset과 P05~P11의 P04 선행·fingerprint·보존 예외 제거. README/baseline/계획 02에 Compose 전용 현재 계약 반영 | 삭제 파일은 Git에서 복구 가능. 남은 실행 코드의 kind/kubectl 호출과 P04 선행 조건 0건(과거 결과의 `kind_or_kubectl=not_used` 문구만 유지). reset dry-run은 명시한 Compose 디렉터리만 출력하고 무확인 호출 exit 2. `.state` 과거 산출물과 실제 `kind` network는 변경하지 않음 | M02 |
+| M02 | done | helper/prepare/인증서 확장→`internal/runtime`, entrypoint/Admin 적용→`internal/keycloak`, seed→`internal/seed`, 상세 verify→`internal/verify`; 공개 P11 wrapper만 유지. Compose mount·entrypoint와 문서 참조 갱신 | shell/Node syntax, JSON parse, 전체 profile Compose config와 실제 P07/P08·D09/D16/D18/D24 실행 통과. 앱 image에는 실행 app/API/healthcheck만 포함 | M03 |
+| M03 | done | `keycloak/clients/app-a.json`, `app-b.json`, `internal/keycloak/admin.mjs`, `clients.mjs`, `apply.mjs` | 기존 완성 환경에서 app-a/app-b 적용 및 재적용 통과. 정확한 callback·Code·PKCE 유지, groups mapper와 secret/기존 데이터 보존 | M04 |
+| M04 | done | lab-api, realm role, local-user mapping, audience 공개 JSON과 `internal/keycloak/api.mjs`; app-b의 API health 의존 제거 | API 적용과 legacy P07 조합 통과. local-user user 200/admin 403, 무토큰 401. app-a 재적용 2회 뒤 groups 검사 통과 | M05 |
+| M05 | done | samba-ad/ldap-groups/group-roles/groups-claim 공개 JSON과 `ldap.mjs`, `groups.mjs`; P08 진단 후처리 분리 | LDAP user full sync와 group sync를 별도 적용. alice/bob 로그인 및 alice 200/200·bob 200/403, legacy P08 재현 통과 | M06 |
+| M06 | done | `first-start --guided`, `apply.sh`, mode/stage atomic metadata, stage별 status/resume/service, 내부 실제 객체 gate | allowlist·invalid value 비승격 계약 검사, 공개 인자 오류 exit 2, metadata 없는 ready status/apply와 stop/resume 실제 통과. stage 파일과 Client·Role·사용자·LDAP·mapper 실제 상태를 함께 검사하고 기반 성공 뒤에만 `base` 기록. 빈 guided 전이·hidden object·과거 marker-only 재개도 M08에서 실제 통과 | M07 |
+| M07 | done | API `/claims`, 앱 홈 링크, `verify.sh`, `internal/verify/guided.mjs`, 최소 secret별 진단 service | 다섯 검사가 과거 evidence/진단 client 없이 실제 Code+PKCE 흐름으로 통과. redirect·role·groups claim 오류에서 실패하고 설정을 자동 복구하지 않으며 공개 원본 복구 뒤 재통과. claim은 허용 필드만 반환 | M08 |
+| M08 | done | 기존 상태를 xattr·ACL·owner 포함 오프라인 백업한 뒤 빈 guided와 빈 ready/P11을 실제 재현하고 원본 복원 | base→groups exact 객체/부재, app-b·groups stop/resume, 건너뛰기·invalid stage, 실제 unhealthy 비승격→재개, ID/secret 보존 재적용, 다섯 guided 검사 통과. 두 번째 reset의 인자 없는 first-start/P07/P08/P11 및 fresh D09/D16/D18/D24 통과. 원본 state 해시와 두 volume archive 직접 비교 후 metadata 없는 ready/groups·여섯 healthy·groups 검사 복원 통과. Supabase 불변 | M13 |
+| M09 | done | lab README, 루트 README, `lab-setup.mdx`, `lab-code-guide.mdx`, index | guided/기존 resume·학습 순서·공개 설정/앱/내부 자동화 경계와 GitHub source 링크 반영. 실제 빈 상태 문구 대조와 `pnpm check` 통과 | M10 |
+| M10 | done | `client-login-lab.mdx`, `sso-api-lab.mdx`와 관련 개념 링크 | redirect·role 변경의 예상/실패/복구와 새 token 구분 반영. 실제 자동 흐름에서 실패→복구 통과. `pnpm check` 통과 | M11 |
+| M11 | done | `directory-login-lab.mdx`, `directory-permissions-lab.mdx`와 관련 개념 링크 | LDAP login과 group 권한을 분리하고 claim off가 role API를 막지 않는 경계·복구 반영. 실제 claim 실패→복구 및 groups 검사 통과. `pnpm check` 통과 | M12 |
+| M12 | done | README, decisions, verification, baseline, index/wrapup, 선택 실습·backup 실행 참조 | Compose 전용/guided 영구 계약과 과거 이력 구분. MFA/Brokering/Service Account/DB 복원 이동 경로를 fresh ready에서 실제 재확인. Ubuntu 보류 유지. `pnpm check` 통과 | M13 |
+| M13 | done | 전체 완료 조건, 실제 runtime, 원본 복원 상태와 변경 diff 대조 | Node·shell·JSON·전체 Compose profile·공개 인자 계약 통과. `pnpm check`: 432 MDX/431 topic, 479 HTML, 37,914 내부 링크. `git diff --check`, 새 파일 whitespace/실행 권한, Compose-only 의존성 검사 통과. 원본 metadata 없는 ready/groups 여섯 service와 Supabase workload healthy | 완료 |
 
 ## 후속 실행 요청 예시
 
@@ -752,4 +752,14 @@ index/wrapup/glossary/troubleshooting, MFA/Brokering/Service Account/backup/dire
 
 ## 완료 기록
 
-미완료. 이번 산출물은 구현 계획이며 실행 코드·사이트 본문·실습 환경은 변경하지 않았다.
+완료. M01 → M01-C → M02~M13을 의존 순서대로 구현·검증했다. 빈 guided에서 base→app-a→app-b→api→
+ldap→groups의 실제 객체 생성과 뒤 단계 부재, 로그인·SSO·인가, 재적용, app-b/groups stop-resume,
+건너뛰기·invalid stage·readiness 실패 후 재개를 확인했다. 두 번째 빈 환경에서는 인자 없는 first-start와
+P07/P08/P11, D09/D16/D18/D24를 재현했다.
+
+검증 전 원래 state와 두 volume을 오프라인 백업했고, 종료 시 state 파일 해시와 volume의 내용·mode·
+owner·mtime·xattr·ACL을 원본 archive와 직접 비교한 뒤 metadata 없는 ready/groups 환경으로 복원했다.
+여섯 service와 Supabase workload는 healthy다. 민감한 임시 백업은 복원 확인 뒤 삭제하고 비밀 없는 guided
+요약과 fresh 회귀 evidence만 `.state/verification/guided/`에 남겼다. 추적된 kind/Kubernetes 자산과 현재
+실행 의존성은 제거했고 과거 비공개 P04 산출물은 변경하지 않았다. 최종 `pnpm check`와 정적·diff 검사는
+모두 통과했다. 커밋·푸시·배포는 수행하지 않았다.

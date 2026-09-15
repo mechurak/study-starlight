@@ -1,0 +1,15 @@
+{
+  "name": "lab-groups",
+  "providerId": "group-ldap-mapper",
+  "providerType": "org.keycloak.storage.ldap.mappers.LDAPStorageMapper",
+  "config": {
+    "groups.dn": ["CN=Users,DC=ad,DC=keycloak,DC=test"], "group.name.ldap.attribute": ["cn"],
+    "group.object.classes": ["group"], "preserve.group.inheritance": ["false"],
+    "ignore.missing.groups": ["false"], "membership.ldap.attribute": ["member"],
+    "membership.attribute.type": ["DN"], "membership.user.ldap.attribute": ["sAMAccountName"],
+    "groups.ldap.filter": ["(|(cn=app-users)(cn=api-admins))"], "mode": ["READ_ONLY"],
+    "user.roles.retrieve.strategy": ["LOAD_GROUPS_BY_MEMBER_ATTRIBUTE"], "memberof.ldap.attribute": ["memberOf"],
+    "decode.group.uuid.attribute": ["true"], "drop.non.existing.groups.during.sync": ["false"],
+    "groups.path": ["/"]
+  }
+}

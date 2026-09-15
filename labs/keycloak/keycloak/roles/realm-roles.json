@@ -1,0 +1,4 @@
+[
+  { "name": "app-user", "description": "Keycloak lab app-user role" },
+  { "name": "api-admin", "description": "Keycloak lab api-admin role" }
+]

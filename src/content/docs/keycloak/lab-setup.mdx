@@ -2,7 +2,7 @@
 title: "Compose 실습 환경 준비"
 description: "Colima 또는 Docker Engine에서 Keycloak·앱·API·Samba 실습을 시작하고 멈추는 방법"
 aliases: [Keycloak lab, Docker Compose 실습, Colima Keycloak]
-reviewedAt: 2026-09-14
+reviewedAt: 2026-09-15
 deckGroup: foundations
 sidebar:
   order: 1010
@@ -86,18 +86,22 @@ docker info --format '{{.OSType}} {{.Architecture}}'
    cd labs/keycloak
    ```
 
-2. 빈 실습 상태에서 CA·secret을 만들고 service와 seed를 readiness 순서로 시작한다.
+2. 빈 실습 상태에서 CA·secret과 기반 세 service만 준비한다. Client·API·Federation은 아직 만들지 않는다.
 
    ```bash
-   ./scripts/first-start.sh
+   ./scripts/first-start.sh --guided
    ```
 
-3. 여섯 service와 핵심 endpoint 상태를 확인한다.
+3. `mode=guided stage=base`, 기반 세 service와 뒤 단계의 `not-started` 표시를 확인한다.
 
    ```bash
    ./scripts/status.sh
    ```
 </Steps>
+
+다음은 [실습 코드에서 읽을 것](/keycloak/lab-code-guide/)과
+[Client를 연결하고 로그인 확인하기](/keycloak/client-login-lab/)로 이어 간다. 기존 완성 환경이 있다면
+초기화하지 않고 `resume.sh` 뒤 `verify.sh`로 결과를 복습한다. Client 부재 같은 중간 상태는 fresh guided에서만 보인다.
 
 비밀번호·private key·token은 Git 제외 `labs/keycloak/.state/`에서 생성된다. 값을 환경 변수나 문서에
 복사하지 않는다. 세부 명령과 예상 출력의 정본은 `labs/keycloak/README.md`, 실제 검증 기록은
@@ -119,8 +123,9 @@ docker info --format '{{.OSType}} {{.Architecture}}'
 ./scripts/reset.sh
 ```
 
-이 명령은 실습의 PostgreSQL·Samba 데이터와 로컬 CA·secret·검증 산출물을 삭제한다. P04의 kind
-파일이나 다른 Docker project를 지우지 않으며, 전역 prune이나 Colima 초기화를 하지 않는다.
+이 명령은 정확히 나열한 Compose의 PostgreSQL·Samba 데이터와 로컬 CA·secret·검증 산출물을 삭제한다.
+삭제된 kind/Kubernetes 실습 자산이나 과거 비공개 P04 산출물을 현재 경로로 다루지 않으며, 다른 Docker
+project·전역 prune·Colima 초기화도 건드리지 않는다.
 
 ## 검증된 범위와 보류
 
@@ -136,5 +141,5 @@ Samba P03과 전체 P11은 미실행이다. 따라서 macOS 결과와 Ubuntu에�
 
 - 본선 환경은 하나의 `keycloak-lab` Compose project이며 kind·kubectl이 필요 없다.
 - host와 container는 같은 issuer를 쓰고, 내부 DB·API·Samba는 host에 publish하지 않는다.
-- 일반 중단은 데이터를 보존하고, 확인이 필요한 reset만 실습 데이터와 `.state`를 지운다.
+- 일반 중단은 현재 stage의 데이터를 보존하고, 확인이 필요한 reset만 나열한 Compose 데이터와 `.state`를 지운다.
 - macOS 비브라우저 재현과 대표 Chrome 로그인을 통과했지만 네이티브 Ubuntu 검증은 보류다.

@@ -86,3 +86,6 @@ Compose 환경 변수와 image에 값을 넣지 않으며 bootstrap 관리자 cr
 - secret을 감출 수 없는 client는 public이며 Code+PKCE를 사용한다.
 - SSO는 같은 Keycloak realm session을 재사용하는 것이지 앱 cookie 공유가 아니다.
 - 성공 판정은 앱 B가 별도 authorization 흐름을 거치되 자격 증명을 다시 요구하지 않는 것이다.
+
+직접 설정하고 redirect 실패까지 관찰하려면 [Client 로그인 실습](/keycloak/client-login-lab/)과
+[두 앱 SSO와 API 권한 실습](/keycloak/sso-api-lab/)으로 이어 간다.

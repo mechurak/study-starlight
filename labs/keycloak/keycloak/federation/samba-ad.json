@@ -1,0 +1,19 @@
+{
+  "name": "samba-ad",
+  "providerId": "ldap",
+  "providerType": "org.keycloak.storage.UserStorageProvider",
+  "config": {
+    "enabled": ["true"], "priority": ["0"], "fullSyncPeriod": ["-1"],
+    "changedSyncPeriod": ["-1"], "cachePolicy": ["DEFAULT"], "batchSizeForSync": ["1000"],
+    "editMode": ["READ_ONLY"], "importEnabled": ["true"], "syncRegistrations": ["false"],
+    "vendor": ["ad"], "usernameLDAPAttribute": ["sAMAccountName"], "rdnLDAPAttribute": ["cn"],
+    "uuidLDAPAttribute": ["objectGUID"], "userObjectClasses": ["person, organizationalPerson, user"],
+    "connectionUrl": ["ldaps://dc1.ad.keycloak.test:636"],
+    "usersDn": ["CN=Users,DC=ad,DC=keycloak,DC=test"], "authType": ["simple"],
+    "startTls": ["false"], "bindDn": ["Administrator@AD.KEYCLOAK.TEST"],
+    "searchScope": ["1"], "validatePasswordPolicy": ["false"], "trustEmail": ["false"],
+    "useTruststoreSpi": ["always"], "connectionPooling": ["true"], "pagination": ["true"],
+    "allowKerberosAuthentication": ["false"], "useKerberosForPasswordAuthentication": ["false"],
+    "debug": ["false"], "connectionTrace": ["false"], "enableLdapPasswordPolicy": ["false"]
+  }
+}

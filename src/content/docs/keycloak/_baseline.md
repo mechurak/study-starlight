@@ -55,13 +55,16 @@ Kubernetes OIDC는 Keycloak 전체에서의 자리와 선택 기준만 설명한
 - 기본 runtime 계약은 4 logical CPU, RAM 8 GiB, 시작 직전 사용 가능 memory 5 GiB 이상, Docker data
   disk 여유 20 GiB 이상이다. service별 `cpus`·`mem_limit`과 실측값은
   `labs/keycloak/decisions.md`·`verification.md`에서 관리한다.
-- 실습 명령과 설정의 원본은 `labs/keycloak/`에 둔다. 본문은 검증된 결과와 필요한 부분만 설명하고,
+- 실습 명령과 설정의 원본은 `labs/keycloak/`에 둔다. 학습자는 `keycloak/`의 공개 JSON과 `app/` 코드를
+  읽고 바꾸며, 환경 준비·Admin REST 적용·검증은 `internal/`로 분리한다. 빈 상태의 `guided`는
+  base→app-a→app-b→api→ldap→groups를 진행하고 기존 인자 없는 시작은 완성 `ready` 환경을 만든다.
+  stop/resume은 기록된 stage까지만 복원하며 설정을 다시 seed하지 않는다. 본문은 검증된 결과와 필요한 부분만 설명하고,
   사이트 검사 통과를 컨테이너 실습 성공으로 취급하지 않는다.
 
-Samba 단독 P03, P04 kind-to-Samba 경로, Compose 기본 실습은 macOS/Colima에서 검증됐다. P11은 실제
-Compose 전체 초기화 뒤 kind·kubectl 없이 로컬 SSO/API, Samba 로그인·그룹 매핑·refresh, 보존
-중단·재개를 빈 상태에서 다시 재현했다. P04 파일과 당시 결과는 Kubernetes 후속 선택 실습용으로
-보존하되 Compose 기본 실습의 선행 조건이나 검증 근거로 사용하지 않는다. macOS에서는 web CA trust 뒤
+Samba 단독 P03과 Compose 기본 실습은 macOS/Colima에서 검증됐다. P11은 실제 Compose 전체 초기화 뒤
+로컬 SSO/API, Samba 로그인·그룹 매핑·refresh, 보존 중단·재개를 빈 상태에서 다시 재현했다. 과거 P04의
+kind-to-Samba 실행 결과는 이력일 뿐이며 해당 추적 자산은 제거됐다. 현재 lab은 Compose 전용이고 P04를
+선행 조건이나 검증 근거로 사용하지 않는다. macOS에서는 web CA trust 뒤
 실제 Chrome의 Admin Console·Account Console과 앱 A Authorization Code + PKCE 로그인도 확인했다.
 네이티브 Ubuntu는 **P03 플랫폼 검증부터 보류**다. macOS 결과를 Ubuntu나 Microsoft AD DS 결과로
 일반화하지 않으며, 각 환경에서 실제로 재현한 범위와 예정된 명령을 구분한다.

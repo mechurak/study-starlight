@@ -96,6 +96,9 @@ Keycloak이 거부했다. password grant로 이 흐름을 대체하지 않았다
 
 ## 요약
 
+Authorization Code + PKCE를 앱 코드와 실제 callback으로 확인하려면
+[Client를 연결하고 로그인 확인하기](/keycloak/client-login-lab/)로 이어 간다.
+
 - OAuth 2.0은 접근 위임, OIDC는 그 위에 사용자 인증을 정의한다.
 - Authorization Code 흐름에서 code는 짧게 브라우저를 지나고, 앱이 PKCE verifier로 token을 교환한다.
 - state·nonce·redirect URI·PKCE는 서로 다른 공격 경계를 막는다.

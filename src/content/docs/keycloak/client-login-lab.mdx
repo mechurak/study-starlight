@@ -1,0 +1,72 @@
+---
+title: "Client를 연결하고 로그인 확인하기"
+description: "app-a 공개 설정을 적용하고 redirect URI 오류와 복구를 통해 Authorization Code 로그인을 확인하는 실습"
+aliases: [app-a client lab, redirect URI 실습, PKCE 로그인 실습]
+reviewedAt: 2026-09-15
+deckGroup: login
+sidebar:
+  order: 1045
+---
+
+import { Steps } from '@astrojs/starlight/components';
+import Thesis from '../../../components/docs/Thesis.astro';
+import TermIntro from '../../../components/docs/TermIntro.astro';
+
+<Thesis>정확한 client와 callback 계약을 먼저 적용하고, redirect 하나를 깨뜨렸다 복구하면 앱 로그인에서 Keycloak과 앱의 책임 경계가 보인다.</Thesis>
+
+guided `base`에는 realm과 local-user만 있고 app-a client나 앱 service는 없다. 공개 JSON을 읽고 적용해야
+앱이 Authorization Code를 받아 자기 session을 만들 수 있다.
+
+<TermIntro terms={[
+  ['redirect URI', '', 'Keycloak이 authorization code를 돌려보내도록 client에 미리 허용한 정확한 callback 주소.'],
+  ['PKCE', 'Proof Key for Code Exchange', '로그인 시작 시 만든 verifier와 challenge를 code 교환에 묶는 보호 장치.'],
+]}/>
+
+## 정상 설정을 적용한다
+
+<Steps>
+1. `./scripts/status.sh`에서 `mode=guided stage=base`와 기반 세 service를 확인한다.
+2. [`app-a.json`](https://github.com/mechurak/study-starlight/blob/main/labs/keycloak/keycloak/clients/app-a.json)을 읽는다. confidential client이고 Standard Flow만 켜며 callback은 `/callback` 하나, PKCE는 `S256`이다.
+3. 설정을 적용하고 실제 로그인 흐름을 검사한다.
+
+   ```bash
+   ./scripts/apply.sh app-a
+   ./scripts/verify.sh app-a
+   ```
+
+4. Admin Console의 **Clients → app-a → Settings**에서 Client authentication, Standard flow,
+   Valid redirect URIs를 공개 JSON과 대조한다. 앱 A에서 local-user로 로그인하고 `/session`이
+   `authenticated: true`와 `username: local-user`를 반환하는지 확인한다.
+</Steps>
+
+검사는 정상 password와 오답을 각각 새 cookie jar로 제출하며 Code, PKCE S256, state, nonce, callback,
+앱 session을 확인한다. client secret은 브라우저에 보내지 않는다.
+
+## redirect를 일부러 깨뜨린다
+
+1. `keycloak/clients/app-a.json`의 `redirectUris`에서 `/callback`을 `/wrong-callback`으로 바꾼다.
+2. `./scripts/apply.sh app-a`를 다시 실행한다. 앱 코드는 여전히 원래 `/callback`을 요청한다.
+3. 새 private window에서 앱 A `/login`을 열고 Keycloak이 등록되지 않은 redirect를 거부하는지 본다.
+   기존 앱·Keycloak session을 결과로 재사용하지 않는다.
+4. JSON을 정확한 `https://app-a.keycloak.test:30081/callback`으로 되돌리고 다시 apply·verify한다.
+
+```bash
+./scripts/apply.sh app-a
+./scripts/verify.sh app-a
+```
+
+wildcard를 넓히거나 HTTPS 검증을 끄는 것은 복구가 아니다. 설정 원본과 앱 callback 계약을 다시 맞춘다.
+
+## 읽을 코드
+
+[`server.mjs`](https://github.com/mechurak/study-starlight/blob/main/labs/keycloak/app/server.mjs)의
+`/login`, `/callback`, `/session`만 이어 읽는다. 첫 route가 transaction을 만들고, callback이 code를
+교환해 access token을 앱 session에 넣으며, session endpoint는 token 원문 없이 로그인 결과만 보여 준다.
+
+## 요약
+
+- client의 flow·PKCE·redirect는 앱이 보내는 authorization request와 정확히 맞아야 한다.
+- app-a를 적용하기 전에는 client와 앱 service가 없고, 적용 성공 뒤에만 stage가 올라간다.
+- redirect 실패는 wildcard나 TLS 우회가 아니라 공개 JSON을 원래 callback으로 복구해 해결한다.
+
+다음은 [두 앱 SSO와 API 권한 실습](/keycloak/sso-api-lab/)에서 별도 client의 SSO와 API 인가를 붙인다.

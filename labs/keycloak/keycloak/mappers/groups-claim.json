@@ -1,0 +1,10 @@
+{
+  "name": "ldap-groups",
+  "protocol": "openid-connect",
+  "protocolMapper": "oidc-group-membership-mapper",
+  "consentRequired": false,
+  "config": {
+    "claim.name": "groups", "full.path": "true", "id.token.claim": "false",
+    "access.token.claim": "true", "userinfo.token.claim": "false", "introspection.token.claim": "true"
+  }
+}

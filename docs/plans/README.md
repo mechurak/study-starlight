@@ -14,7 +14,7 @@
 |---|---|---|
 | 01 | [CKA 실습 덱 개편](01-cka-udemy-rework.md) · [이관 계약](01-cka-udemy-migration.md) | 완료 |
 | 02 | [Keycloak 덱 재구성](02-keycloak-rework.md) | 차단 |
-| 03 | [Keycloak 실습 학습 경로와 코드 구조 개편](03-keycloak-guided-labs.md) | 계획 |
+| 03 | [Keycloak 실습 학습 경로와 코드 구조 개편](03-keycloak-guided-labs.md) | 완료 |
 
 ## 번호와 파일명
 

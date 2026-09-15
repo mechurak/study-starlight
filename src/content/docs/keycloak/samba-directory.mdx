@@ -76,6 +76,9 @@ privileged mode, Docker socket, host network와 host port는 쓰지 않는다. �
 
 ## 요약
 
+이 원본 사용자로 Keycloak 로그인을 재현하려면
+[외부 디렉터리 계정 로그인 실습](/keycloak/directory-login-lab/)으로 이어 간다.
+
 - alice/bob과 두 group의 작은 고정 상태가 후속 mapper·API 검증의 원본이다.
 - directory CA의 LDAPS와 올바른/오답 bind를 모두 확인한다.
 - container 재생성은 volume을 보존하지만 명시적 reset은 새 domain identity를 만든다.

@@ -1,10 +1,26 @@
 # Keycloak 실습 환경 결정
 
-확인일: **2026-09-14**
+확인일: **2026-09-15**
 
 이 문서는 P03 이후 구현이 임의로 바꾸지 않을 실습 환경 계약이다. 원격 배포물 가용성과 실제 실행
 결과를 구분하며, 환경별 실행 결과와 미검증 사항은 `labs/keycloak/verification.md`에 남긴다. P05-C에서
-기본 실습을 Docker Compose로 확정했고, P04 Kubernetes 파일과 결과는 후속 선택 실습의 기록으로 보존한다.
+기본 실습을 Docker Compose로 확정했다. 2026-09-15 guided 개편에서 추적된 P04 Kubernetes 실행 자산은
+제거했으며 과거 결과는 이력으로만 남긴다. 현재 실행·검증·초기화는 P04나 kind/kubectl에 의존하지 않는다.
+
+## 2026-09-15 guided 학습 구조
+
+- `keycloak/`의 Client·Role·Federation·Mapper JSON은 학습자가 읽고 바꾸는 단일 설정 원본이다.
+- `app/`에는 앱과 API 실행 예제만 두고 seed·상세 검증은 `internal/`에 둔다.
+- `guided`는 base→app-a→app-b→api→ldap→groups를 한 단계씩 적용한다. `ready`는 같은 적용 함수를
+  조합해 기존 완성 환경을 유지한다.
+- mode/stage는 `.state/lifecycle/`에 allowlist 값으로 atomic 기록한다. metadata 없는 기존 환경은
+  완성 ready/groups로 읽으며 status는 metadata를 만들지 않는다.
+- stage 승격은 metadata만으로 판정하지 않는다. 실제 Client·Role·사용자·LDAP·mapper를 공개 설정과
+  대조하고, 새 guided 전진에서는 뒤 단계의 lab 소유 객체가 없는지도 확인한 뒤 성공 stage를 기록한다.
+- apply는 선행 단계를 자동 생성하지 않고 자신이 소유한 설정만 재적용한다. verify는 설정을 변경하지
+  않고 매번 새 로그인 cookie jar로 실제 결과를 관찰한다.
+- 현재 lab은 Compose 전용이다. 아래 P04 절과 kind 버전 표는 2026-09-14의 과거 결정·실측 기록이며
+  현재 사용법이나 보존 계약이 아니다.
 
 ## 지원 범위
 

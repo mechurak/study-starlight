@@ -1,0 +1,16 @@
+{
+  "clientId": "app-b",
+  "name": "Keycloak Lab App B",
+  "enabled": true,
+  "protocol": "openid-connect",
+  "clientAuthenticatorType": "client-secret",
+  "publicClient": false,
+  "bearerOnly": false,
+  "standardFlowEnabled": true,
+  "implicitFlowEnabled": false,
+  "directAccessGrantsEnabled": false,
+  "serviceAccountsEnabled": false,
+  "redirectUris": ["https://app-b.keycloak.test:30082/callback"],
+  "webOrigins": ["https://app-b.keycloak.test:30082"],
+  "attributes": { "pkce.code.challenge.method": "S256" }
+}

@@ -1,0 +1,65 @@
+---
+title: "외부 디렉터리 계정으로 로그인하기"
+description: "Samba AD 호환 계정을 LDAPS READ_ONLY Federation으로 연결하고 로그인과 API 권한을 구분하는 실습"
+aliases: [LDAP login lab, User Federation 실습, Samba Keycloak 로그인]
+reviewedAt: 2026-09-15
+deckGroup: directory
+sidebar:
+  order: 1125
+---
+
+import Thesis from '../../../components/docs/Thesis.astro';
+import TermIntro from '../../../components/docs/TermIntro.astro';
+
+<Thesis>LDAP provider만 적용하면 외부 password 로그인은 가능하지만, group을 role·claim으로 연결하지 않았으므로 API 권한은 아직 별도다.</Thesis>
+
+기반 준비는 Samba에 alice, bob과 `app-users`, `api-admins` 원본 그룹을 만든다. `api` 단계까지는
+Keycloak에 LDAP provider가 없으므로 두 외부 사용자는 로그인할 수 없다.
+
+<TermIntro terms={[
+  ['bind DN', '', 'Keycloak이 LDAP에서 사용자와 속성을 조회할 때 사용하는 서비스 계정 식별자.'],
+  ['users DN', '', '사용자 검색을 시작할 LDAP 트리의 기준 DN.'],
+  ['READ_ONLY', '', 'Keycloak이 외부 원본을 읽고 인증하되 원본 사용자 정보를 쓰지 않는 edit mode.'],
+]}/>
+
+## provider 원본을 읽는다
+
+[`samba-ad.json`](https://github.com/mechurak/study-starlight/blob/main/labs/keycloak/keycloak/federation/samba-ad.json)에서
+다음을 찾는다.
+
+| 필드 | 실습에서 뜻하는 것 |
+|---|---|
+| `connectionUrl` | directory CA로 검증하는 `ldaps://dc1.ad.keycloak.test:636` |
+| `usersDn`·`bindDn` | 검색 시작점과 조회용 계정; credential은 JSON 밖에서 주입 |
+| username/RDN/UUID attribute | AD 호환 schema에서 사용자를 식별하는 방법 |
+| `editMode=READ_ONLY` | Keycloak이 Samba 원본을 수정하지 않음 |
+| `importEnabled=true` | 사용자 표현을 Keycloak DB에 만들되 password 원본은 LDAP에 유지 |
+
+web CA가 아니라 directory CA를 Keycloak truststore에 넣는다. StartTLS와 Kerberos는 이 기본 경로에서
+사용하지 않는다.
+
+## user federation까지만 적용한다
+
+```bash
+./scripts/apply.sh ldap
+./scripts/verify.sh ldap
+```
+
+apply는 provider를 만들거나 갱신한 뒤 **full user sync**만 실행한다. Admin Console의
+**User federation → samba-ad**에서 Connection URL, Users DN, Edit mode를 확인하고 Users에서
+alice와 bob의 federation link를 확인한다. 검사는 각 사용자로 앱 A Code+PKCE 로그인을 성공시키고
+오답 password를 거부한다.
+
+이 시점에는 `lab-groups` LDAP mapper, group-role mapping, groups protocol mapper를 만들지 않았다.
+따라서 “로그인 성공”을 `/api/user`나 `/api/admin` 허용과 같은 말로 쓰면 안 된다.
+
+이미 `groups`까지 끝낸 완성 환경에서 복습한다면 외부 로그인은 확인할 수 있지만 “group 설정 부재”는
+관찰할 수 없다. 그 차이를 보기 위해 기존 데이터를 지우지 말고 공개 설정과 현재 콘솔 값을 대조한다.
+
+## 요약
+
+- Samba의 사용자·password·group이 원본이고 Keycloak은 READ_ONLY provider로 접근한다.
+- ldap 단계는 provider와 user full sync까지만 담당한다.
+- alice/bob 로그인 성공은 LDAP 인증 결과이며 아직 group 기반 API 권한 결과가 아니다.
+
+다음은 [외부 Group 권한 실습](/keycloak/directory-permissions-lab/)에서 group·role·claim·API를 연결한다.

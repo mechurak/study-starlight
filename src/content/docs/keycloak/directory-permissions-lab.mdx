@@ -1,0 +1,72 @@
+---
+title: "외부 Group을 Token과 API 권한으로 연결하기"
+description: "LDAP group mapper부터 role·groups claim·API 결과까지 연결하고 claim 출력을 직접 바꾸는 실습"
+aliases: [LDAP group lab, groups claim 실습, directory API permissions]
+reviewedAt: 2026-09-15
+deckGroup: directory
+sidebar:
+  order: 1135
+---
+
+import Thesis from '../../../components/docs/Thesis.astro';
+import TermIntro from '../../../components/docs/TermIntro.astro';
+
+<Thesis>외부 group은 LDAP mapper로 Keycloak 모델에 들어오고, role mapping과 protocol mapper를 각각 거쳐 token과 API에서 서로 다른 방식으로 쓰인다.</Thesis>
+
+로그인이 된 사용자에게 앱 권한을 주려면 원본 membership부터 API 정책까지 끊기지 않아야 한다.
+groups claim 자체와 API가 사용하는 realm role도 같은 값이 아니다.
+
+<TermIntro terms={[
+  ['group-role mapping', '', 'Keycloak group 구성원에게 realm role을 상속시키는 권한 정책.'],
+  ['Group Membership mapper', '', 'Keycloak group path를 OIDC token의 groups claim으로 출력하는 protocol mapper.'],
+  ['새 token', '', '설정 변경 뒤 새 authorization code 교환으로 발급받은 결과. 기존 앱 session의 token과 구분한다.'],
+]}/>
+
+## 네 경계의 원본을 연결한다
+
+| 경계 | 공개 설정 | 확인할 결과 |
+|---|---|---|
+| LDAP → Keycloak group | `federation/ldap-groups.json` | `/app-users`, `/api-admins`와 membership |
+| group → realm role | `mappings/group-roles.json` | app-user, api-admin 상속 |
+| Keycloak group → token | `mappers/groups-claim.json` | access token의 full-path `groups` |
+| role → API | `app/api.mjs` | `/user`, `/admin`의 403/200 |
+
+```bash
+./scripts/apply.sh groups
+./scripts/verify.sh groups
+```
+
+적용은 LDAP group mapper 생성 → `fedToKeycloak` group sync → user cache clear → group-role 부여 →
+앱 A/B groups mapper 순서다. Admin Console에서 alice는 두 group, bob은 `/app-users` 하나인지 확인한다.
+새 로그인 뒤 `/api/claims`와 API 결과는 다음과 같아야 한다.
+
+| 사용자 | groups | realm role | `/user` | `/admin` |
+|---|---|---|---:|---:|
+| alice | `/app-users`, `/api-admins` | app-user, api-admin | 200 | 200 |
+| bob | `/app-users` | app-user | 200 | 403 |
+
+## groups claim만 껐다 복구한다
+
+1. Admin Console의 **Clients → app-a → Client scopes → app-a-dedicated → Mappers → ldap-groups**에서
+   access token 포함을 끈다. app-b mapper는 바꾸지 않는다.
+2. 새 private window에서 alice로 app A 로그인을 다시 해 새 token을 받는다.
+3. `/api/claims`에서 `groups`가 비었는지 확인한다. API는 `realm_access.roles`로 인가하므로 role이
+   남아 있다면 `/api/user`와 `/api/admin`은 계속 200이다. groups가 없다는 이유만으로 403을 기대하지 않는다.
+4. 공개 원본을 재적용하고 새 로그인에서 groups와 API 결과를 다시 확인한다.
+
+```bash
+./scripts/apply.sh groups
+./scripts/verify.sh groups
+```
+
+Samba 원본 membership 변경, disable, LDAP 장애의 시간축은
+[디렉터리 변경과 장애](/keycloak/directory-changes/)에서 심화로 확인한다. 이 기본 실습에서는 원본을
+깨뜨리지 않는다.
+
+## 요약
+
+- LDAP mapper, group-role mapping, groups protocol mapper, API 정책은 네 개의 별도 경계다.
+- alice와 bob의 서로 다른 membership이 claim과 200/403 차이로 이어진다.
+- groups claim을 끄더라도 API가 role로 인가한다면 role이 유지되는 동안 허용 결과는 그대로다.
+
+다음은 [디렉터리 변경과 장애](/keycloak/directory-changes/)에서 원본 변경과 session/token 시간축을 관찰한다.

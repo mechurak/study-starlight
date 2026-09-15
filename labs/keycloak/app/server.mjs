@@ -79,7 +79,7 @@ app.get('/', (request, response) => {
   <body>
     <h1>${appName}</h1>
     <p>${user ? `Signed in as ${user.username}` : 'Signed out'}</p>
-    ${user ? '' : '<a href="/login">Sign in with Keycloak</a>'}
+    ${user ? '<ul><li><a href="/api/claims">Validated token claims</a></li><li><a href="/api/user">User API</a></li><li><a href="/api/admin">Admin API</a></li></ul>' : '<a href="/login">Sign in with Keycloak</a>'}
   </body>
 </html>`)
 })

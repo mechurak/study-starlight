@@ -2,7 +2,8 @@
 set -eu
 
 script_directory=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
-. "$script_directory/lifecycle-common.sh"
+lab_directory=$(CDPATH= cd -- "$script_directory/.." && pwd)
+. "$lab_directory/internal/runtime/lifecycle-common.sh"
 
 confirmation_phrase=DELETE-keycloak-lab-compose-state
 
@@ -30,10 +31,9 @@ state_reset_roots() {
     "$state_directory/web-ca" \
     "$state_directory/secrets" \
     "$state_directory/lifecycle"
-  if [ -d "$state_directory/verification" ]; then
-    find "$state_directory/verification" -mindepth 1 -maxdepth 1 \
-      ! -name p04 -print | sort
-  fi
+  for reset_name in p03 p05 p06 p07 p08 p09 p10 p11 d09 d16 d18 d24 guided; do
+    printf '%s\n' "$state_directory/verification/$reset_name"
+  done
 }
 
 printf 'Compose project: %s\n' "$project_name"
@@ -63,18 +63,7 @@ state_reset_roots | while IFS= read -r reset_root; do
     printf '  %s (absent)\n' "$reset_root"
   fi
 done
-printf 'preserved from the P04 optional kind exercise:\n'
-for preserved_path in \
-  "$state_directory/coredns" \
-  "$state_directory/kubeconfig" \
-  "$state_directory/tools" \
-  "$state_directory/verification/p04" \
-  "$lab_directory/kind.yaml" \
-  "$lab_directory/kind" \
-  "$lab_directory/k8s"
-do
-  printf '  %s\n' "$preserved_path"
-done
+printf 'Only the listed Compose-owned state is in reset scope; unrelated and historical private state is untouched.\n'
 
 if [ "$mode" = dry-run ]; then
   printf 'dry-run only; no resources or files were deleted\n'

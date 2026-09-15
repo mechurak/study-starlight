@@ -22,6 +22,7 @@ src/content/docs/
 src/components/               # layout / docs / demos 역할별 컴포넌트
 src/styles/custom.css         # 폰트·본문 폭·검색 UI 전역 커스텀
 docs/                         # 작성·검증·배포·Starlight 운영 문서
+labs/                         # 본문과 함께 관리하는 실행 실습 — Keycloak은 Compose guided lab
 AGENTS.md                     # 에이전트 작업 진입점 — 공유 정본
 CLAUDE.md                     # @AGENTS.md 한 줄 어댑터 (Claude Code용)
 ```
@@ -94,3 +95,4 @@ pnpm preview
 | [docs/starlight-changes.md](docs/starlight-changes.md) | 기본 Starlight에서 바꾼 것 전체 목록 — 업그레이드 전에 볼 것 |
 | [docs/deploy.md](docs/deploy.md) | Cloudflare Pages 연동, `PNPM_VERSION`, 도메인 변경 |
 | `src/content/docs/<덱>/_baseline.md` | 덱별 기준 버전·서술 규칙·범위 경계 — 모든 덱에 있고, 그 덱을 고치기 전에 반드시 먼저 읽는다 |
+| [labs/keycloak/README.md](labs/keycloak/README.md) | Keycloak Compose guided 실습의 시작·적용·검증·재개 정본 |

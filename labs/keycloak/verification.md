@@ -1,9 +1,44 @@
 # Keycloak 실습 검증 기록
 
-확인일: **2026-09-14**
+최신 확인일: **2026-09-15**
 
 실제 실행한 환경과 아직 실행하지 않은 환경을 분리한다. 비밀번호·개인키와 긴 원본 로그는 기록하지
 않으며, 로컬 상세 산출물은 Git에서 제외한 `labs/keycloak/.state/verification/`에 둔다.
+
+## 2026-09-15 guided 개편 검증
+
+현재 macOS/Colima의 metadata 없는 기존 완성 환경을 보존한 채 새 공개 설정을 모두 재적용했다.
+Keycloak 26.7.3, Docker client 29.6.1/server 29.5.2, Compose 5.5.1에서 여섯 상시 service는 최종 healthy였다.
+
+| 검사 | 상태 | 실제 결과 |
+|---|---|---|
+| 공개 JSON app-a/app-b/api/ldap/groups 재적용 | 통과 | 중복 없이 적용, 뒤 단계 설정·기존 secret 보존, user full sync와 group sync 분리 |
+| `verify.sh app-a` | 통과 | Code+PKCE S256, local-user callback/session, 오답 거부 |
+| `verify.sh sso` | 통과 | 앱 A credential 1회 뒤 앱 B 별도 session, 두 번째 credential 제출 없음 |
+| `verify.sh api` | 통과 | 무토큰 401, local-user user 200/admin 403, 검증된 최소 claims |
+| `verify.sh ldap` | 통과 | alice/bob 앱 Code+PKCE 로그인, 각각 오답 거부 |
+| `verify.sh groups` | 통과 | alice user/admin 200/200, bob 200/403, full-path groups claim |
+| metadata 없는 기존 환경 status/apply | 통과 | 파일을 만들지 않고 `mode=ready stage=groups`, 재적용 뒤에도 동일 |
+| 실제 단계 객체 gate | 통과 | 완성 환경에서 base→groups 선행 객체와 groups 전체 객체 확인, `base --exact`는 뒤 단계 객체를 찾아 예상대로 실패 |
+| shell·Node·JSON·전체 Compose profile 정적 검사 | 통과 | 이동한 host source와 entrypoint 포함 |
+| 빈 상태 `first-start --guided`와 단계별 stop/resume | 통과 | 원본을 오프라인 백업한 뒤 base→groups 실제 전진, app-b의 5개·groups의 6개 service stop/resume와 identity 보존 확인 |
+| redirect·role·claim의 실제 오류→복구 | 통과 | 각각 verify 실패 확인 뒤 공개 JSON 복구·재적용·새 로그인 정상 확인 |
+| readiness 실패→재개 | 통과 | app-b Client 적용 뒤 의도한 unhealthy에서 stage가 app-a에 머물고, health 복구 후 같은 apply 재실행으로 app-b 완료 |
+| 인자 없는 최초 시작/P11 | 통과 | 두 번째 빈 reset에서 동일 단계 조합으로 ready/groups 생성, P07·P08·P11과 stop/resume·비대상 Docker 자원 불변 확인 |
+| MFA·Brokering·Service Account·DB 격리 복원 | 통과 | fresh ready에서 이동된 D09/D16/D18/D24 경로 모두 재실행 성공 |
+| 기존 실습 상태 복원 | 통과 | state 해시와 volume 내용·mode·owner·mtime·xattr·ACL 대조 뒤 metadata 없는 ready/groups 및 실제 groups 검사 통과 |
+
+빈 상태 검증은 사용자 승인 아래 원본 state와 두 volume을 먼저 일관된 tar로 백업하고 수행했다. guided
+base에서는 세 service만 healthy였고 app-a/app-b/lab-api, lab role, LDAP provider가 없었다. app-b에서도
+API와 LDAP가 없었고, api/ldap에서도 각각 뒤 단계 객체가 없음을 Admin REST 단계 검사로 확인했다. 단계
+건너뛰기와 allowlist 밖 stage는 변경 전에 실패했다. app-a/api/groups 재적용 전후 서버 ID와 secret도
+유지됐다. fresh ready에서 선별한 P11·선택 실습 텍스트 evidence와 guided 요약은
+`.state/verification/guided/`에 보존했으며,
+원래 volume과 CA·secret·검증 기록을 복원한 뒤 archive 직접 비교와 실제 로그인을 모두 통과시켰다.
+사이트 검사 결과를 이 실제 환경 결과의 대체 근거로 사용하지 않았다.
+
+아래 P03~P24 기록은 당시 실행 이력이다. P04의 추적된 kind/Kubernetes 자산은 2026-09-15 제거됐고
+현재 Compose 실행·검증의 선행 조건이나 선택 경로가 아니다. 비공개 과거 산출물은 변경하지 않았다.
 
 ## P03 Samba AD DC
 

@@ -87,3 +87,6 @@ P08은 각 단계의 Admin API 상태, 실제 RS256 token의 `iss`·`aud`·`exp`
 - group의 role mapping은 조직 membership을 앱이 이해할 권한 라벨로 바꾼다.
 - audience도 권한 claim과 별도로 API가 자기 token인지 확인하게 해야 한다.
 - Admin 모델, 실제 token, 최종 API 403/200까지 이어서 검증한다.
+
+groups claim을 직접 끄고 role 인가와의 차이를 확인하려면
+[외부 Group을 Token과 API 권한으로 연결하기](/keycloak/directory-permissions-lab/)로 이어 간다.

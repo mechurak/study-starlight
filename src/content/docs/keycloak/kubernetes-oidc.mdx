@@ -2,7 +2,7 @@
 title: "Kubernetes OIDC 인증"
 description: "kubectl이 Keycloak에서 받은 신원을 API server 인증과 RBAC 권한으로 연결하는 기준"
 aliases: [kubectl OIDC, Kubernetes JWT authenticator, AuthenticationConfiguration, OIDC exec plugin]
-reviewedAt: 2026-09-14
+reviewedAt: 2026-09-15
 deckGroup: integrations
 sidebar:
   order: 1190
@@ -83,8 +83,9 @@ OIDC와 독립적으로 보관한다. 사용 주체, 보관 위치, 만료·회�
 ## 이 덱의 실행 범위
 
 이 페이지는 현재 Kubernetes 인증 설정을 읽고 설계하기 위한 참조다. 기본 Compose 실습은 kind·kubectl을
-요구하지 않으며 이번 작업에서 cluster, credential plugin, AuthenticationConfiguration 또는 RBAC 객체를
-새로 만들거나 실행하지 않았다. P04의 과거 kind 연결 기록도 이 OIDC 흐름의 성공 증거가 아니다.
+요구하지 않으며 lab의 추적된 kind/Kubernetes 실행 자산도 제거됐다. 이 장에서는 cluster, credential
+plugin, AuthenticationConfiguration 또는 RBAC 객체를 만들거나 실행하지 않는다. P04의 과거 kind 연결
+기록도 이 OIDC 흐름의 성공 증거가 아니다.
 
 ## 요약
 

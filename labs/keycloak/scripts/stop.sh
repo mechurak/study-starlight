@@ -2,7 +2,8 @@
 set -eu
 
 script_directory=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
-. "$script_directory/lifecycle-common.sh"
+lab_directory=$(CDPATH= cd -- "$script_directory/.." && pwd)
+. "$lab_directory/internal/runtime/lifecycle-common.sh"
 
 if [ "$#" -ne 0 ]; then
   echo "usage: $0" >&2

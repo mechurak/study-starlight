@@ -84,6 +84,9 @@ account와 공유하면 감사와 최소 권한 경계가 무너진다.
 
 ## 요약
 
+realm과 local-user가 있는 기반 상태에서 첫 client를 직접 붙이려면
+[Client를 연결하고 로그인 확인하기](/keycloak/client-login-lab/)로 이어 간다.
+
 - `master`는 서버 관리용이고, 앱·사용자·정책은 별도 업무 realm에 둔다.
 - 사용자 레코드, enabled 상태, credential, required action은 로그인 성공의 서로 다른 조건이다.
 - 계정 비활성화는 새 인증을 막지만 이미 발급된 JWT를 자동으로 즉시 지우지는 않는다.

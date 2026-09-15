@@ -1,183 +1,141 @@
-# Keycloak Compose lab
+# Keycloak guided lab
 
-Keycloak·PostgreSQL·앱 A/B·API와 Samba AD DC를 `keycloak-lab` Docker Compose project 하나에서
-실행하는 실습 진입점이다. 기본 경로에는 kind와 kubectl을 사용하지 않는다. Samba는 **Microsoft AD
-DS가 아니라 AD 호환 디렉터리 실습 대역**이며, 이 결과를 Windows domain 검증으로 일반화하지 않는다.
+Keycloak·PostgreSQL·앱 A/B·API·Samba AD 호환 디렉터리를 Compose project 하나에서 실행한다.
+학습자는 `keycloak/`의 공개 설정과 `app/`의 실행 코드를 읽고 바꾼다. 인증서·secret 준비,
+Admin REST 인증, 서버 ID 조회, 멱등 적용, 자동 로그인 검사는 `internal/`이 대신한다.
 
-macOS/Colima는 P03~P11 비브라우저 경로와 실제 Chrome의 P05·P06 대표 경로까지 검증했다. Ubuntu
-24.04 + rootful Docker Engine의 P03·P11 플랫폼 검증은 보류 상태다. 이 항목은 Compose lifecycle
-사용을 막지 않지만 Ubuntu에서 통과한 것으로 간주하지 않는다.
+## 시작 경로를 고른다
 
-## 명령 요약
-
-모든 명령은 이 디렉터리에서 실행한다.
+처음부터 객체가 생기는 순서를 관찰하려면 **빈 실습 상태에서만** guided 시작을 사용한다.
 
 ```bash
 cd labs/keycloak
-
-./scripts/first-start.sh       # 최초 시작 또는 marker가 남은 최초 시작 재개
-./scripts/status.sh            # 여섯 상시 service의 readiness 확인
-./scripts/stop.sh              # container/network만 내리고 데이터 보존
-./scripts/resume.sh            # 기존 volume과 .state로 전체 재개
-./scripts/service.sh start api # service 하나와 Compose 의존성 기동
-./scripts/service.sh status api
-./scripts/reset.sh --dry-run   # 초기화 대상 출력만
-./scripts/verify-p11.sh --confirm DELETE-keycloak-lab-compose-state
-```
-
-스크립트는 `compose.yaml`의 고정 project name과 파일을 명시하여 `keycloak-lab`만 다룬다. 다른
-container·network·volume의 ownership이 이름과 충돌하거나 project에 알 수 없는 일회성 container가
-남아 있으면 자동으로 지우지 않고 중단한다.
-
-## 선행조건
-
-- macOS는 Colima 0.10.3의 `colima` Docker context, Ubuntu는 rootful Docker Engine을 사용한다.
-- Docker Compose 5.5.1이 필요하다. macOS에 plugin이 없으면 `samba/compose.sh`가 고정 checksum의
-  바이너리를 `.state/tools/`에 내려받는다. 최초 image pull/build와 패키지 설치에는 인터넷이 필요하다.
-- Docker runtime은 4 logical CPU, RAM 8 GiB 이상이어야 한다. 시작 직전 `MemAvailable` 5 GiB와 Docker
-  data filesystem 여유 20 GiB도 필요하다. lifecycle 시작 명령이 이 조건을 확인한다.
-- `172.30.0.0/24`가 다른 route/network와 겹치지 않고, host loopback의 `30080`~`30082`를 다른
-  container가 사용하지 않아야 한다.
-- browser를 사용할 때만 `/etc/hosts`에서 아래 세 이름을 loopback으로 해석해야 한다. 기존의 충돌하는
-  항목은 덮어쓰지 않는다. 현재 보류 중인 browser 검증을 수행하려면 별도로 web CA를 신뢰해야 하며,
-  인증서 경고를 무시해서는 안 된다.
-
-  ```text
-  127.0.0.1 keycloak.keycloak.test app-a.keycloak.test app-b.keycloak.test
-  ```
-
-고정 버전·주소·CA·secret·자원 근거는 [decisions.md](decisions.md), 실제 환경별 결과와 보류 항목은
-[verification.md](verification.md)가 정본이다.
-
-## 최초 시작
-
-`first-start.sh`는 두 named volume과 `keycloak-lab` network가 모두 없는 최초 실행에서 시작한다. 기존
-데이터가 있으면 초기화나 덮어쓰기를 시도하지 않고 `resume.sh`를 안내한다. 예외는 이 명령 자체가 남긴
-in-progress marker가 있는 중단된 최초 시작뿐이다.
-
-```bash
-./scripts/first-start.sh
-```
-
-이 명령은 서로 분리된 directory/web CA와 file-backed secret을 `.state/`에 준비하고, Samba·PostgreSQL·
-Keycloak을 health condition까지 기다린다. 이어서 앱 A client, 앱 B/API 역할·audience, Samba LDAP
-Federation과 group mapper를 멱등 seed한 뒤 앱 A/B·API를 기동한다. 고정 sleep으로 readiness를
-추측하지 않고 Compose `--wait`와 각 service healthcheck를 사용한다.
-
-최초 시작이 중간에 실패했다면 volume이나 `.state`를 임의로 지우지 않는다. 스크립트가 남긴
-`.state/lifecycle/first-start-in-progress` marker가 있는 동안에는 같은 `first-start.sh`를 다시 실행해
-멱등 seed를 이어 갈 수 있다. 실패 로그와 `./scripts/status.sh` 결과를 먼저 확인하고, 빈 상태 재구성이
-정말 필요할 때만 아래의 명시적 전체 초기화 절차를 사용한다.
-
-## 상태와 readiness
-
-```bash
+./scripts/first-start.sh --guided
 ./scripts/status.sh
-./scripts/status.sh keycloak
 ```
 
-전체 상태 확인은 `samba`, `postgres`, `keycloak`, `api`, `app-a`, `app-b`가 모두
-`running/healthy`일 때만 성공한다. 서비스별 확인도 container 존재만 보지 않고 해당 healthcheck를
-판정한다. 시작과 재개 명령은 Compose `up --detach --wait`가 같은 readiness 조건을 만족할 때 반환한다.
+이미 이 lab을 실행한 적이 있고 두 named volume을 보존했다면 초기화하지 말고 재개한다.
+예전 환경처럼 mode/stage 파일이 없어도 완성된 `ready/groups` 환경으로 인식한다.
 
-## 데이터 보존 중단과 재개
+```bash
+./scripts/resume.sh
+./scripts/status.sh
+```
+
+인자 없는 `./scripts/first-start.sh`는 새 빈 상태에서 아래 단계를 모두 적용해 기존과 같은 완성 환경을
+만드는 호환 경로다. 기존 자원이 있으면 자동 초기화하지 않고 `resume.sh`를 안내한다.
+
+## guided 학습 순서
+
+각 단계에서 먼저 공개 JSON을 읽고 `apply`한 뒤 `verify`한다. `apply`는 앞 단계를 몰래 적용하지 않고,
+`verify`는 설정을 복구하거나 client·role·mapper를 만들지 않는다. 로그인 검사는 새 session/event를 만든다.
+
+```bash
+./scripts/apply.sh app-a
+./scripts/verify.sh app-a
+
+./scripts/apply.sh app-b
+./scripts/verify.sh sso
+
+./scripts/apply.sh api
+./scripts/verify.sh api
+
+./scripts/apply.sh ldap
+./scripts/verify.sh ldap
+
+./scripts/apply.sh groups
+./scripts/verify.sh groups
+```
+
+| 완료 단계 | 새로 배우는 설정 | 정상 상시 service |
+|---|---|---|
+| `base` | `study` realm, local-user, Samba alice/bob·원본 그룹 | samba, postgres, keycloak |
+| `app-a` | app-a client와 정확한 callback | 위 + app-a |
+| `app-b` | 별도 app-b client, 같은 realm SSO | 위 + app-b |
+| `api` | bearer client, realm role, local-user role, audience | 여섯 service |
+| `ldap` | LDAPS READ_ONLY provider와 user full sync | 여섯 service |
+| `groups` | LDAP group mapper, group-role, groups claim | 여섯 service |
+
+순서를 건너뛰면 exit 1, 잘못된 인자나 인자 누락은 exit 2다. 적용 중 readiness가 실패하면 stage는
+승격되지 않으며 같은 명령으로 재개한다. 이미 지난 단계를 재적용해도 뒤 단계 mapper와 다른 role을
+지우지 않고 완료 stage를 낮추지 않는다. 내부 단계 검사는 stage 파일만 믿지 않고 실제 Client·Role·
+사용자·LDAP provider·mapper가 공개 설정과 맞는지 적용 전후에 읽는다. 새 guided 단계가 전진할 때는
+아직 배우지 않은 lab 소유 객체가 없는지도 확인한 뒤에만 stage를 기록한다.
+
+## 무엇을 읽고 무엇을 건너뛰나
+
+| 위치 | 이해할 것 | 처음에는 건너뛰어도 되는 것 |
+|---|---|---|
+| `keycloak/clients/` | confidential client, Code, PKCE, callback | secret 주입과 서버 생성 ID |
+| `keycloak/roles/`, `mappings/`, `mappers/` | role 부여와 token 출력의 차이 | Admin REST의 검색·중복 방지 |
+| `keycloak/federation/` | LDAPS provider와 group mapper의 별도 책임 | bind credential 주입과 sync endpoint 호출 |
+| `app/server.mjs` | `/login`→`/callback`→앱 session→API 전달 | 테스트용 HTML form 추적 |
+| `app/api.mjs` | JWT 서명·issuer·audience 검증과 role 인가 | CA·secret 파일 생성 |
+| `compose.yaml` | service/network/volume/secret 경계 | 과거 상세 검증 profile |
+| `internal/` | 자동화의 역할과 공개 진입점 | 구현 세부 전체 |
+
+`mappings/*.json`은 이 lab의 이름 기반 적용 입력이며 Keycloak native import 형식이 아니다. 다른 JSON도
+ClientRepresentation, ComponentRepresentation, ProtocolMapperModel 등 어느 Admin API 대상인지 해당
+학습 페이지에서 확인한다. 공개 설정과 같은 값을 internal 코드에 복사해 두지 않는다.
+
+## 브라우저와 secret
+
+`/etc/hosts`에 다음 세 이름을 `127.0.0.1`로 연결한다.
+
+```text
+127.0.0.1 keycloak.keycloak.test app-a.keycloak.test app-b.keycloak.test
+```
+
+- Admin Console: `https://keycloak.keycloak.test:30080/admin/` (`lab-admin`)
+- 앱 A: `https://app-a.keycloak.test:30081/`
+- 앱 B: `https://app-b.keycloak.test:30082/`
+- 사용자: `local-user`, Samba의 `alice`, `bob`
+
+비밀번호는 `.state/secrets/keycloak-bootstrap-admin-password`, `keycloak-local-user-password`,
+`samba-alice-password`, `samba-bob-password`에 있다. 예를 들어 값은 로컬 터미널에서
+`cat .state/secrets/keycloak-local-user-password`로만 확인하고 문서·로그에 붙여 넣지 않는다.
+브라우저 HTTPS는 `.state/web-ca/ca.crt`, Keycloak→Samba LDAPS는 `.state/directory-ca/ca.crt`를 신뢰한다.
+두 CA는 서로 대신할 수 없다.
+
+## 중단, 재개, 개별 상태
 
 ```bash
 ./scripts/stop.sh
 ./scripts/resume.sh
-```
-
-`stop.sh`는 ownership을 확인한 정확한 `keycloak-lab` project에 `compose down`을 `--volumes` 없이
-실행한다. 여섯 container와 project network는 사라지지만 다음 상태는 남는다.
-
-- Samba domain DB·SYSVOL: `keycloak-lab-samba-data`
-- Keycloak의 PostgreSQL 상태: `keycloak-lab-postgres-data`
-- 두 CA, leaf key/certificate, secret, 검증 기록: `.state/`
-
-`resume.sh`는 두 volume과 필요한 `.state` 파일이 존재하는지 확인하고 같은 여섯 service를 다시 만든 뒤
-health readiness를 기다린다. 앱 A/B의 memory session은 container와 함께 사라지므로 사용자는 다시
-로그인해야 하지만 Samba SID·계정/그룹과 Keycloak realm·Federation 설정은 보존된다.
-
-## 서비스별 기동
-
-기존 전체 상태에서 service 하나와 Compose가 선언한 의존성만 기동할 수 있다.
-
-```bash
-./scripts/service.sh start samba
-./scripts/service.sh start keycloak  # postgres도 필요하면 함께 기동
-./scripts/service.sh start app-a     # keycloak 의존성 포함
+./scripts/status.sh
 ./scripts/service.sh status app-a
 ```
 
-허용 이름은 `samba`, `postgres`, `keycloak`, `api`, `app-a`, `app-b`뿐이다. seed·diagnostic service는
-일회성 검증 경로이며 lifecycle의 상시 service 목록에 포함하지 않는다. 전체를 원래 상태로 올릴 때는
-서비스별 명령을 반복하지 말고 `resume.sh`를 사용한다.
+`stop`은 project container/network만 내리고 volume·CA·secret·mode/stage를 남긴다. `resume`은 기록된
+단계에 필요한 service만 복원하며 seed를 재적용하지 않는다. 단계보다 앞선 service를 수동 시작하면
+필요한 apply 단계를 안내하고 실패한다.
 
-## 명시적 전체 초기화
+## 선택 실습과 유지보수
 
-전체 초기화는 복구 명령이 아니다. Samba domain, Keycloak DB, 로컬 CA/private key, password와
-P03·P05 이후 Compose 검증 기록을 영구 삭제하고 다음 시작에서 새 identity를 만든다. 먼저 dry-run으로
-현재의 정확한 대상을 확인한다.
+MFA, OIDC Brokering, Service Account, DB 격리 복원은 기본 guided 순서 뒤의 선택 실습이다. 구현과
+상세 진단은 각각 `internal/seed/seed-d09.mjs`, `seed-d16.mjs`, `seed-d18.mjs`와
+`internal/verify/verify-d09.sh`, `verify-d16.sh`, `verify-d18.sh`, `verify-d24.sh`에 있다.
+과거 P05~P11 상세 순차 검증도 `internal/verify/`에 있으며 과거 evidence를 요구하므로 현재 상태
+확인에는 사용하지 않는다. 현재 확인은 `scripts/verify.sh`가 정본이다.
+
+완전 초기화는 일상적인 시작 명령이 아니다. 먼저 삭제 대상을 읽고, 별도 승인 뒤에만 확인 문자열을 쓴다.
 
 ```bash
 ./scripts/reset.sh --dry-run
-```
-
-출력에는 `keycloak-lab` label을 가진 정확한 container, `keycloak-lab` network,
-`keycloak-lab-samba-data`, `keycloak-lab-postgres-data`, 그리고 삭제할 `.state` 파일이 모두 나온다.
-P04 선택 실습의 `kind.yaml`, `kind/`, `k8s/`, `.state/coredns`, `.state/kubeconfig`, `.state/tools`,
-`.state/verification/p04`는 이 Compose 초기화에서 보존된다. 명시적 opt-in이 없으면 스크립트는 대상을
-출력한 뒤 실패하며 아무것도 삭제하지 않는다.
-
-대상과 위험을 검토하고 정말 새 Compose identity가 필요할 때만 아래의 정확한 확인 문자열을 입력한다.
-
-```bash
 ./scripts/reset.sh --confirm DELETE-keycloak-lab-compose-state
 ```
 
-일반 중단에는 이 명령을 사용하지 않는다. lifecycle에는 `compose down --volumes`, `docker system prune`,
-전역 container/network/volume 삭제, Colima reset/delete, kind 조작이 없다.
+대상은 `keycloak-lab` project의 container/network, 두 named volume, 생성한 CA·secret·lifecycle과
+Compose 검증 디렉터리 `p03`, `p05`~`p11`, `d09`, `d16`, `d18`, `d24`, `guided`뿐이다. 다른 Docker
+workload, `.state/tools`, 과거 비공개 P04 산출물은 읽거나 삭제하지 않는다. 전역 prune, Colima reset,
+kind/kubectl 조작은 없다.
 
-## 범위별 검증
+파괴적 전체 재현은 `./scripts/verify-p11.sh --confirm DELETE-keycloak-lab-compose-state`로 호환된다.
+실행 전 반드시 reset 범위와 다른 workload 보존 조건을 다시 확인한다.
 
-현재 정상 상태를 좁게 확인하려면 이미 구현된 진단을 사용한다.
+## 더 읽기
 
-```bash
-./samba/compose.sh --profile p08 run --rm --no-deps p08-diagnostic
-P09_ACTION=inspect ./samba/compose.sh --profile p09 run --rm --no-deps \
-  --env P09_ACTION=inspect p09-admin
-./scripts/verify-d09.sh       # 복제 browser flow의 OTP 등록·성공·실패·복구
-./scripts/verify-d16.sh       # 두 번째 test realm의 OIDC brokering·최초 계정 연결
-./scripts/verify-d18.sh       # service account client credentials·최소 API 권한
-./scripts/verify-d24.sh       # PostgreSQL custom dump·격리 복원·핵심 realm/client 확인
-```
-
-`verify-d09.sh`는 전용 client와 사용자에만 복제 flow를 적용한다. realm 기본 browser flow나 앱 A/B의
-binding을 바꾸지 않으며, OTP secret·code·password·cookie를 출력하지 않는다.
-`verify-d16.sh`도 `d16-upstream` test realm과 `upstream-oidc` provider, 전용 client/user만 만들며
-외부 SaaS 계정이나 실제 회사 IdP를 요구하지 않는다.
-`verify-d18.sh`는 전용 confidential client와 service account에 `app-user`만 부여하고, secret 오답과
-JWT 검증, API 401/200/403을 확인한다. 사용자 password·browser session·refresh token은 사용하지 않는다.
-`verify-d24.sh`는 live DB에서 custom-format dump를 읽고 네트워크 없는 임시 PostgreSQL volume에
-복원한다. source/restore 수와 핵심 realm/client를 확인한 뒤 임시 container·volume만 제거하며 live DB나
-상시 service를 교체하지 않는다.
-
-P10의 보존 중단·재개와 reset dry-run/guard 검증은 다음 명령이다. 실제 volume 또는 `.state` 초기화는
-실행하지 않는다.
-
-```bash
-./scripts/verify-p10.sh
-```
-
-P11의 빈 상태 전체 재현은 실제 Compose volume과 P03·P05 이후 로컬 검증 기록을 삭제한다. 위의 reset
-dry-run으로 대상을 먼저 확인하고, P04 자산과 다른 workload의 전후 상태를 함께 비교할 때만 다음 명령을
-사용한다. 이 명령도 reset과 같은 고정 확인 문자열 없이는 exit 2로 거부된다.
-
-```bash
-./scripts/verify-p11.sh --confirm DELETE-keycloak-lab-compose-state
-```
-
-P11은 빈 상태 최초 시작, 로컬 사용자 앱 A→앱 B SSO와 API, Samba alice/bob 로그인과 group→role→claim,
-refresh, 보존 중단·재개 뒤 같은 결과를 비브라우저 경로로 확인한다. 최초 image pull/build와 패키지 준비는
-인터넷이 필요할 수 있지만, 이후 진단은 로컬 image에 `--pull never`를 적용한다. 별도로 완료한 macOS
-Chrome 검증과 보류 중인 네이티브 Ubuntu 검증은 이 명령의 성공으로 대체되지 않는다.
+- 사이트: [Compose 실습 환경](../../src/content/docs/keycloak/lab-setup.mdx),
+  [실습 코드에서 읽을 것](../../src/content/docs/keycloak/lab-code-guide.mdx)
+- 결정: [decisions.md](decisions.md)
+- 실제 검증 결과와 미실행 범위: [verification.md](verification.md)
