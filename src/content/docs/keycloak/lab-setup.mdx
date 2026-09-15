@@ -41,7 +41,8 @@ AD DS가 아니라 AD 호환 디렉터리 대역이다.
 ## 이 장에서 답할 질문
 
 - 어느 runtime과 자원이 필요한가?
-- 최초 시작·보존 중단·재개·초기화는 어떻게 다른가?
+- 시작한 환경을 브라우저에서 어떻게 확인하는가?
+- 보존 중단·재개와 처음부터 다시 시작하기는 어떻게 다른가?
 - 어떤 결과가 실제로 검증됐고 무엇이 아직 보류인가?
 
 ## 준비 조건
@@ -122,7 +123,82 @@ export CORP_CA_FILE=/path/to/corporate-proxy-ca.crt
 복사하지 않는다. 세부 명령과 예상 출력의 정본은 `labs/keycloak/README.md`, 실제 검증 기록은
 `labs/keycloak/verification.md`다.
 
-## 중단·재개·초기화
+## 브라우저로 확인하기
+
+`status.sh`는 container가 healthy인지만 보고, `verify.sh <단계>`는 지나온 단계의 실제 로그인을 자동으로
+수행한다. 같은 결과를 화면에서 직접 보려면 host에서 한 번만 다음을 준비한다.
+
+<Steps>
+1. `/etc/hosts`에 세 이름을 loopback으로 연결한다.
+
+   ```text
+   127.0.0.1 keycloak.keycloak.test app-a.keycloak.test app-b.keycloak.test
+   ```
+
+2. 브라우저가 회사 프록시나 PAC를 쓰면 `*.keycloak.test`를 프록시 예외에 넣는다. 예외가 없으면 요청이
+   회사 프록시로 나가 loopback의 실습 환경에 닿지 못한다. Ubuntu GNOME은 설정 → 네트워크 → 프록시의
+   Ignored Hosts에 추가한다.
+
+3. 선택 사항으로 `labs/keycloak/.state/web-ca/ca.crt`를 브라우저에 등록하고 브라우저를 다시 시작한다.
+   등록하지 않아도 host별로 한 번씩 인증서 경고를 넘기면 모든 실습이 동작한다. 경고 없이 보고 싶을 때만
+   아래 운영체제 탭을 따른다.
+</Steps>
+
+<Tabs syncKey="operating-system">
+<TabItem label="macOS">
+
+login keychain에 SSL trust root로 등록한다. 실행하면 암호 확인 창이 뜬다.
+
+```bash
+security add-trusted-cert -r trustRoot -p ssl \
+  -k ~/Library/Keychains/login.keychain-db .state/web-ca/ca.crt
+```
+
+</TabItem>
+<TabItem label="Ubuntu">
+
+Chrome·Chromium은 OS 인증서 저장소가 아니라 사용자별 NSS(Network Security Services) DB를 본다.
+Firefox는 설정의 인증서 관리자에서 같은 파일을 가져온다.
+
+```bash
+sudo apt-get install --yes libnss3-tools
+certutil -d sql:$HOME/.pki/nssdb -A -t 'C,,' -n keycloak-lab-web-ca -i .state/web-ca/ca.crt
+```
+
+</TabItem>
+</Tabs>
+
+| 화면 | 주소 | 계정 | 열리는 단계 |
+|---|---|---|---|
+| Admin Console | `https://keycloak.keycloak.test:30080/admin/` | `lab-admin` | `base`부터 |
+| Account Console | `https://keycloak.keycloak.test:30080/realms/study/account/` | `local-user`, `ldap`부터 `alice`·`bob` | `base`부터 |
+| 앱 A | `https://app-a.keycloak.test:30081/` | 위 사용자 | `app-a`부터 |
+| 앱 B | `https://app-b.keycloak.test:30082/` | 위 사용자 | `app-b`부터 |
+
+비밀번호는 `first-start.sh`가 만든 `labs/keycloak/.state/secrets/`의 파일에 있으며 로컬 터미널에서만
+확인한다. Admin Console의 `lab-admin`은 `keycloak-bootstrap-admin-password`, `local-user`는
+`keycloak-local-user-password`, `alice`·`bob`은 `samba-alice-password`·`samba-bob-password`다.
+
+```bash
+cat labs/keycloak/.state/secrets/keycloak-bootstrap-admin-password
+```
+
+Admin Console은
+왼쪽 위 realm 선택을 `study`로 바꿔서 본다. `base` 직후에는 Users에 `local-user`만 있고 Client가 없다.
+단계를 마칠 때마다 Client·Role·User federation·Mapper가 어디에 새로 보이는지는
+`labs/keycloak/README.md`의 브라우저 절 표에 정리돼 있다.
+
+### Samba 디렉터리는 명령으로 본다
+
+Samba AD DC에는 웹 콘솔이 없고, 이 실습은 Samba port를 host에 publish하지 않는다. 원본 계정과 그룹은
+container 안에서 조회하고, Keycloak이 가져온 결과는 `ldap`·`groups` 단계 뒤 Admin Console에서 본다.
+
+```bash
+docker exec keycloak-lab-samba samba-tool user list
+docker exec keycloak-lab-samba samba-tool group listmembers app-users
+```
+
+## 보존 중단과 재개
 
 ```bash
 ./scripts/stop.sh
@@ -132,15 +208,50 @@ export CORP_CA_FILE=/path/to/corporate-proxy-ca.crt
 `stop.sh`는 정확한 Compose project의 container와 network만 내리고 두 named volume과 `.state`를
 남긴다. `resume.sh` 뒤에는 realm·사용자·디렉터리 SID가 그대로여야 한다.
 
-전체 초기화는 별도 명령이며 삭제 대상을 먼저 보여 주고 고정 확인 문자열을 요구한다.
+## 처음부터 다시 시작하기
 
-```bash
-./scripts/reset.sh
-```
+빈 상태에서 다시 재현하려면 `reset.sh`로 Compose 데이터와 `.state`를 함께 지운다. 이 명령은 삭제 대상을
+먼저 보여 주고 고정 확인 문자열을 요구한다.
 
-이 명령은 정확히 나열한 Compose의 PostgreSQL·Samba 데이터와 로컬 CA·secret·검증 산출물을 삭제한다.
-삭제된 kind/Kubernetes 실습 자산이나 과거 비공개 P04 산출물을 현재 경로로 다루지 않으며, 다른 Docker
-project·전역 prune·Colima 초기화도 건드리지 않는다.
+:::caution[함정]
+`.state` 폴더만 지우면 container·network·두 named volume이 남는다. `first-start.sh`는 기존 자원을 이유로
+중단하고, 새로 만든 비밀번호도 volume 안의 PostgreSQL·Samba 비밀번호와 맞지 않는다.
+:::
+
+<Steps>
+1. 삭제 대상을 본다. 이 명령은 아무것도 지우지 않는다.
+
+   ```bash
+   ./scripts/reset.sh --dry-run
+   ```
+
+2. 목록을 확인했으면 초기화한다.
+
+   ```bash
+   ./scripts/reset.sh --confirm DELETE-keycloak-lab-compose-state
+   ```
+
+3. 다시 시작한다. reset이 proxy CA 복사본도 지우므로 프록시 환경에서는 `CORP_CA_FILE`을 다시 지정한다.
+
+   ```bash
+   export CORP_CA_FILE=/path/to/corporate-proxy-ca.crt   # 프록시 환경에서만
+   ./scripts/first-start.sh --guided
+   ./scripts/status.sh
+   ```
+
+4. web CA를 브라우저에 등록했었다면 옛 `keycloak-lab-web-ca`를 지운 뒤
+   [브라우저로 확인하기](#브라우저로-확인하기)의 3번으로 새 파일을 다시 등록한다. 등록하지 않았다면 건너뛴다.
+
+   ```bash
+   # macOS
+   security delete-certificate -c keycloak-lab-web-ca ~/Library/Keychains/login.keychain-db
+   # Ubuntu Chrome/Chromium
+   certutil -d sql:$HOME/.pki/nssdb -D -n keycloak-lab-web-ca
+   ```
+</Steps>
+
+reset은 정확히 나열한 Compose의 PostgreSQL·Samba 데이터와 로컬 CA·secret·검증 산출물만 삭제한다. 다른
+Docker project·전역 prune·Colima 초기화는 건드리지 않으며, image와 build cache도 남긴다.
 
 ## 검증된 범위와 보류
 
@@ -150,11 +261,13 @@ web CA를 명시해 검증했다.
 
 후속 검증에서는 현재 web CA를 macOS login keychain의 신뢰 root로 승인하고 실제 Chrome에서 Admin
 Console·Account Console과 앱 A Authorization Code + PKCE 로그인까지 확인했다. 네이티브 Ubuntu의
-Samba P03과 전체 P11은 미실행이다. 따라서 macOS 결과와 Ubuntu에서 성공했다는 기록을 구분한다.
+Samba P03과 전체 P11, Ubuntu 브라우저의 NSS DB 등록은 미실행이다. Ubuntu에서는 회사 프록시 예외 추가
+뒤 Admin Console 접속까지 확인했다. macOS 결과와 Ubuntu에서 성공했다는 기록을 구분한다.
 
 ## 요약
 
 - 본선 환경은 하나의 `keycloak-lab` Compose project이며 kind·kubectl이 필요 없다.
 - host와 container는 같은 issuer를 쓰고, 내부 DB·API·Samba는 host에 publish하지 않는다.
-- 일반 중단은 현재 stage의 데이터를 보존하고, 확인이 필요한 reset만 나열한 Compose 데이터와 `.state`를 지운다.
+- 브라우저 확인에는 hosts 항목과 프록시 예외가 필요하고, web CA 등록은 선택이다. Samba는 웹 콘솔 없이 `samba-tool`로 본다.
+- 일반 중단은 현재 stage의 데이터를 보존한다. 처음부터 다시 시작할 때는 `.state`만 지우지 말고 `reset.sh`를 쓴다.
 - macOS 비브라우저 재현과 대표 Chrome 로그인을 통과했지만 네이티브 Ubuntu 검증은 보류다.
