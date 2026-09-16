@@ -20,6 +20,9 @@ Keycloak의 User Federation 설정에는 URL만 있는 것이 아니다. 사용�
   terms={[
     ['LDAP', 'Lightweight Directory Access Protocol', '트리 형태의 디렉터리에서 entry를 조회·변경하고 자격 증명을 bind로 검증하는 프로토콜.'],
     ['DN', 'Distinguished Name', '디렉터리 entry의 전체 경로. 예: CN=alice,CN=Users,DC=ad,DC=keycloak,DC=test.'],
+    ['CN', 'Common Name', 'entry 하나의 이름 구성요소. CN=alice는 사용자 하나, CN=Users는 기본 사용자 컨테이너를 가리킨다.'],
+    ['OU', 'Organizational Unit', '부서처럼 entry를 묶는 트리 안의 조직 단위 컨테이너. 사용자 검색의 시작점과 깊이를 정할 때 기준이 된다.'],
+    ['DC', 'Domain Component', '도메인 이름을 점 단위로 나눈 구성요소. DC=ad,DC=keycloak,DC=test는 도메인 ad.keycloak.test를 뜻한다.'],
     ['bind DN', '', 'Keycloak이 사용자 검색과 속성 조회에 사용하는 디렉터리 계정 식별자. 최종 사용자 password bind와 구분한다.'],
     ['LDAPS', '', 'TLS 연결 위에서 LDAP를 사용하는 방식. 서버 이름과 인증서 체인 검증을 우회하지 않는다.'],
   ]}
@@ -45,6 +48,15 @@ Keycloak의 User Federation 설정에는 URL만 있는 것이 아니다. 사용�
 ## 트리의 시작점과 깊이를 정한다
 
 DN은 `CN=Users` 같은 relative name과 `DC=ad,DC=keycloak,DC=test` 도메인 경로를 합친 전체 위치다.
+CN·OU·DC 같은 구성요소를 오른쪽으로 갈수록 상위가 되도록 이어 붙이므로, DN 하나만 봐도 그 entry가
+트리 어디에 있는지 알 수 있다.
+
+:::caution[함정]
+약어 DC는 문맥에 따라 뜻이 다르다. DN 안의 `DC=`는 Domain Component(도메인 이름 조각)이고,
+`dc1.ad.keycloak.test`나 [Samba AD DC](/keycloak-lab/samba-directory/)의 DC는
+Domain Controller(디렉터리·인증을 제공하는 서버)다.
+:::
+
 Keycloak의 Users DN은 사용자 검색의 base가 된다. one-level 검색은 바로 아래만, subtree 검색은 하위
 조직까지 찾는다. OU를 여러 단계로 운영한다면 실제 배치와 검색 범위를 함께 설계한다.
 
