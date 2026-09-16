@@ -59,7 +59,7 @@ export default {
 			"tone": "ok",
 			"desc": "Samba seed · LDAPS Federation · LDAP group mapper · role·groups claim · API 정책",
 			"note": "외부 group은 어느 두 단계를 거쳐 API 권한이 되나",
-			"items": [["Samba 테스트 디렉터리", "/keycloak-lab/samba-directory/"], ["외부 계정 로그인 실습", "/keycloak-lab/directory-login-lab/"], ["외부 Group 권한 실습", "/keycloak-lab/directory-permissions-lab/"]]
+			"items": [["Samba 테스트 디렉터리", "/keycloak-lab/samba-directory/"], ["외부 계정 로그인 실습", "/keycloak-lab/directory-login-lab/"], ["외부 Group 권한 실습", "/keycloak-lab/directory-permissions-lab/"], ["적용된 상태 조회", "/keycloak-lab/state-inspection/"]]
 		}
 	]
 };

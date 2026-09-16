@@ -1,0 +1,171 @@
+---
+title: "적용된 상태를 조회하기"
+description: "Admin REST로 LDAP provider·사용자 원본·group role·brokering 연결의 현재 적용 상태를 읽고 콘솔 화면과 대응시키는 점검 절차"
+aliases: [Admin REST 조회, 현재 설정 확인, federation link 확인, kcadm]
+reviewedAt: 2026-09-16
+deckGroup: directory
+sidebar:
+  order: 1080
+---
+
+import Thesis from '../../../components/docs/Thesis.astro';
+
+<Thesis>적용 스크립트가 쓰는 Admin REST를 그대로 읽으면, 지금 환경에 무엇이 적용됐는지를 원본 → federation → mapper → brokering 순서로 확인할 수 있다.</Thesis>
+
+실습을 며칠 뒤에 다시 열면 "지금 어디까지 적용돼 있지?"부터 확인하게 된다. `./scripts/status.sh`는
+컨테이너 health와 stage 이름까지만 답하고, 설정의 **내용**은 보여 주지 않는다. 이 페이지는
+[적용 자동화](/keycloak-lab/lab-code-guide/)(`internal/keycloak/admin.mjs`)가 쓰는 것과 같은
+Admin REST API를 호출해 적용된 상태를 직접 읽는다. 점검 순서는
+[keycloak 덱](/keycloak/)의 진단 축과 같다 — 원본, federation, mapper, 그리고 brokering.
+
+## 관리자 토큰을 받는다
+
+`labs/keycloak`에서 실행한다. `lab-admin`의 비밀번호는 Git 제외 `.state`에 있고, HTTPS 검증에는
+web CA를 쓴다.
+
+```bash
+TOKEN=$(curl -s --cacert .state/web-ca/ca.crt \
+  -d grant_type=password -d client_id=admin-cli \
+  -d username=lab-admin \
+  -d "password=$(cat .state/secrets/keycloak-bootstrap-admin-password)" \
+  https://keycloak.keycloak.test:30080/realms/master/protocol/openid-connect/token \
+  | jq -r .access_token)
+```
+
+이후 조회는 모두 `https://keycloak.keycloak.test:30080/admin/realms/study` 아래 경로에
+`Authorization: Bearer $TOKEN` 헤더를 붙인 GET이다. Keycloak 배포판의 `kcadm.sh`도 같은 API의
+공식 CLI지만, 이 실습의 Keycloak 컨테이너 truststore에는 directory CA만 있어 web CA 신뢰를
+따로 구성해야 하므로 여기서는 curl을 쓴다.
+
+## LDAP provider — 무엇이 적용돼 있나
+
+```bash
+curl -s --cacert .state/web-ca/ca.crt -H "Authorization: Bearer $TOKEN" \
+  "https://keycloak.keycloak.test:30080/admin/realms/study/components?type=org.keycloak.storage.UserStorageProvider" | jq
+```
+
+`ldap` 단계가 적용된 환경에서는 `samba-ad` provider 하나가 나온다.
+
+```json
+{
+  "name": "samba-ad",
+  "providerId": "ldap",
+  "config": {
+    "connectionUrl": ["ldaps://dc1.ad.keycloak.test:636"],
+    "usersDn": ["CN=Users,DC=ad,DC=keycloak,DC=test"],
+    "bindDn": ["Administrator@AD.KEYCLOAK.TEST"],
+    "editMode": ["READ_ONLY"],
+    "importEnabled": ["true"]
+  }
+}
+```
+
+공개 원본
+[`federation/samba-ad.json`](https://github.com/mechurak/study-starlight/blob/main/labs/keycloak/keycloak/federation/samba-ad.json)과
+대조한다. 먼저 볼 필드는 `editMode`(원본을 쓰지 않는지)와 `bindDn`이다. `bindCredential` 같은
+secret은 마스킹되어 돌아온다. 빈 배열 `[]`이면 아직 `ldap` 단계 전이다.
+
+## 사용자 — 몇 명이고 어디서 왔나
+
+```bash
+curl -s --cacert .state/web-ca/ca.crt -H "Authorization: Bearer $TOKEN" \
+  "https://keycloak.keycloak.test:30080/admin/realms/study/users?briefRepresentation=true" \
+  | jq '.[] | {username, federationLink}'
+```
+
+`users/count`가 주는 총 인원보다 `federationLink`가 더 많은 것을 말해 준다. `ready` 환경의 결과:
+
+```text
+administrator, alice, bob, guest, krbtgt   federationLink = samba-ad provider id
+d09-mfa-user, d16-upstream-user, local-user  federationLink = null
+```
+
+- `federationLink`가 있는 사용자는 LDAP full sync로 들어온 디렉터리 계정이다. **`krbtgt`·`guest`·
+  `administrator`까지 들어온 것**에 주목한다 — Samba의 내장 계정인데 `usersDn`이 `CN=Users` 전체라
+  같이 sync됐다. 실무에서 [검색 시작 OU를 좁혀 신청하는 이유](/keycloak/ad-and-ldap/)가 이 목록에
+  그대로 보인다.
+- `null`인 사용자는 Keycloak 로컬 사용자다. 그중 `d16-upstream-user`는
+  [Identity Brokering 보조 실습](/keycloak/identity-brokering/)이 만든 계정인데, 외부 연결이
+  `federationLink`가 아니라 별도의 federated identity link(`/users/{id}/federated-identity`)에
+  있다. **저장소 연결(federation)과 인증 위임(brokering)은 사용자 레코드에서도 서로 다른 자리에
+  기록된다.**
+
+## group과 role — 권한 사슬이 이어져 있나
+
+```bash
+curl -s --cacert .state/web-ca/ca.crt -H "Authorization: Bearer $TOKEN" \
+  "https://keycloak.keycloak.test:30080/admin/realms/study/groups" | jq '.[] | {name, path}'
+```
+
+`groups` 단계까지 적용됐다면 LDAP group mapper가 가져온 `api-admins`·`app-users`가 나온다.
+각 group의 id로 role mapping과 구성원을 이어서 조회하면 권한 사슬을 확인할 수 있다.
+
+```bash
+# <group-id>는 위 조회의 id 값
+.../groups/<group-id>/role-mappings/realm   # api-admins → api-admin, app-users → app-user
+.../groups/<group-id>/members               # api-admins: alice · app-users: alice, bob
+```
+
+realm role 목록(`/roles`)에는 실습이 만든 `api-admin`·`app-user` 외에 Keycloak 내장
+`default-roles-study`·`offline_access`·`uma_authorization`도 나온다 — 내장 role은 걸러서 본다.
+role이 token claim으로 실리는 마지막 단계는 client의 protocol mapper 영역이며
+[외부 Group 권한 실습](/keycloak-lab/directory-permissions-lab/)에서 다뤘다.
+
+## brokering — 외부 IdP 연결이 있나
+
+```bash
+curl -s --cacert .state/web-ca/ca.crt -H "Authorization: Bearer $TOKEN" \
+  "https://keycloak.keycloak.test:30080/admin/realms/study/identity-provider/instances" | jq
+```
+
+User Federation과 달리 brokering 연결은 `components`가 아니라 `identity-provider/instances`에
+나온다. 보조 실습을 적용한 환경에서는 `d16-upstream` realm을 외부 IdP 대역으로 쓰는
+`upstream-oidc`가 하나 있다.
+
+```json
+{
+  "alias": "upstream-oidc",
+  "providerId": "oidc",
+  "config": {
+    "issuer": ".../realms/d16-upstream",
+    "authorizationUrl": ".../realms/d16-upstream/protocol/openid-connect/auth",
+    "clientId": "study-broker",
+    "clientSecret": "**********",
+    "syncMode": "IMPORT"
+  },
+  "trustEmail": true,
+  "storeToken": false
+}
+```
+
+먼저 볼 필드는 `issuer`·`authorizationUrl`(로그인 때 브라우저가 이동하는 곳 — 회사라면 여기가
+AD FS 주소다), `clientId`(upstream 등록부에서 우리 Keycloak의 이름 — broker에서 Keycloak이
+client가 된다는 [역할 역전](/keycloak/identity-brokering/)이 이 필드다), 그리고
+`trustEmail`·`storeToken` 같은 신뢰 판단이다.
+
+## 같은 것을 Admin Console에서 본다
+
+REST와 콘솔은 같은 Admin API의 두 얼굴이다. realm을 `study`로 바꾼 뒤 다음 화면이 위 조회와
+1:1로 대응한다.
+
+| REST 조회 | Admin Console 위치 |
+|---|---|
+| `components?type=…UserStorageProvider` | User federation → samba-ad (+ Test connection·수동 sync 버튼) |
+| `identity-provider/instances` | Identity providers → upstream-oidc |
+| `groups`, `…/role-mappings/realm`, `…/members` | Groups → 해당 group의 Members·Role mapping 탭 |
+| `roles` | Realm roles |
+| `users`의 `federationLink` | 사용자 상세 Details 탭의 Federation link |
+| `users/{id}/federated-identity` | 사용자 상세의 Identity provider links 탭 |
+
+콘솔은 한 객체를 들여다보고 Test connection처럼 그 자리에서 실험하기에 좋고, REST는 전체를
+덤프해 원본 JSON과 비교·기록하기에 좋다. 단 **콘솔에서 값을 고치면 공개 JSON 원본과 어긋나기
+시작한다.** 이 실습에서 콘솔은 읽기·실험용으로 쓰고, 영구 변경은 공개 JSON을 고쳐
+`./scripts/apply.sh`로 적용한다.
+
+## 요약
+
+- `status.sh`는 컨테이너와 stage까지, 설정 내용은 Admin REST 또는 콘솔로 읽는다.
+- federation 상태는 `components`에, brokering 상태는 `identity-provider/instances`에 있고,
+  사용자 레코드에서도 `federationLink`와 federated identity link로 자리가 다르다.
+- `krbtgt`까지 sync된 사용자 목록은 usersDn 폭이 낳는 결과를 실측으로 보여 준다.
+- 콘솔은 읽기·실험용, 영구 변경은 공개 JSON + `apply.sh`가 이 실습의 규칙이다.
