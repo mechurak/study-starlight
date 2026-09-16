@@ -1,7 +1,7 @@
 ---
 title: "인증 생태계의 큰 그림"
 description: "인증·인가의 필요성과 AD·LDAP·IdP·OIDC·SAML·PKCE를 계층별로 구분하는 큰 그림"
-aliases: [인증 큰 그림, 인증과 인가, authentication, authorization, AD FS, AD DS, 인증 프로토콜, federation, 관리형 IdP, Firebase Auth, Supabase Auth]
+aliases: [인증 큰 그림, 인증과 인가, authentication, authorization, AD FS, AD DS, 인증 프로토콜, federation, 관리형 IdP, Firebase Auth, Supabase Auth, SSO 연동 신청, redirect URI 등록]
 reviewedAt: 2026-09-15
 deckGroup: foundations
 sidebar:
@@ -200,6 +200,61 @@ LDAP·AD의 사용자와 자격 증명을 공통 사용자 모델로 연결하�
 [Identity Brokering 설명](https://www.keycloak.org/docs/26.7.0/server_admin/#integrating-identity-providers)은
 외부 OIDC·SAML IdP가 인증한 결과를 받아 내부 앱으로 중계하는 두 번째 경로를 다룬다. 즉 AD DS와
 AD FS를 같은 제품처럼 부르거나, AD가 있다는 이유만으로 연결 방식을 단정하면 안 된다.
+
+### 회사에 무엇이 있느냐가 기본 선택을 정한다
+
+| 회사 환경 | 기본 선택 | 이유 |
+|---|---|---|
+| AD DS만 있음 | User Federation | 인증 결과를 발급해 줄 외부 IdP가 없다. Keycloak이 LDAPS bind로 직접 검증하는 경로가 사실상 유일하다. |
+| AD FS·사내 SSO가 이미 있음 | Identity Brokering | 비밀번호가 upstream 로그인 화면에만 입력되고 Keycloak을 거치지 않는다. AD 운영팀 입장에서도 제3 시스템에 LDAP bind를 열어 주는 것보다 relying party 등록이 노출이 작다. |
+
+기본 선택일 뿐 절대 규칙은 아니다. AD FS가 있어도 [LDAP mapper](/keycloak/ldap-federation/)로
+디렉터리의 그룹·속성을 직접 가져와야 한다면 User Federation을 고를 수 있다 — 단 AD 운영팀이
+bind 계정을 허용해야 가능한 선택이다. 반대로 brokering에서는 저장소를 조회할 수 없으므로 그룹
+정보를 upstream IdP가 token claim으로 실어 줘야 하며, 그 구성도 upstream 운영팀과의 합의
+대상이다.
+
+### 조직 경계를 넘는 연결은 등록 신청으로 시작한다
+
+위의 어느 경로든 다른 팀이 운영하는 시스템과 연결하려면, 그쪽 등록부에 우리 쪽을 올려 달라는
+신청이 먼저다. 무엇을 신청하는지가 자기 위치에 따라 다르다.
+
+- **앱 팀 → IdP 운영팀**: 앱을 client로 등록한다. 앱을 식별할 서비스 URL과, 로그인 결과를
+  돌려받을 콜백 endpoint(OIDC redirect URI, SAML ACS URL)를 낸다. IdP는 등록된 콜백 주소로만
+  결과를 보내므로 개발·운영 등 환경마다 별도 client로 신청한다.
+- **IdP 운영팀 → AD 운영팀**: 경로에 따라 갈린다. User Federation이면 읽기 전용 bind 계정과
+  검색 시작 OU, LDAPS 방화벽·CA 체인을 신청하고, Brokering이면 AD FS에 Keycloak을
+  relying party로 등록해 달라고 신청한다 — 이때 콜백 endpoint는 앱 주소가 아니라 Keycloak의
+  broker 콜백이다.
+
+```d2 layout=elk pad=40 title="앱 팀은 IdP에 client 등록을, IdP 운영팀은 AD 쪽에 연결 등록을 신청하는 조직 경계"
+direction: down
+
+classes: {
+  key: { style: { fill: "#dbeafe"; stroke: "#2563eb"; font-color: "#1e3a8a" } }
+  ok: { style: { fill: "#dcfce7"; stroke: "#16a34a"; font-color: "#14532d" } }
+  mute: { style: { fill: "#f1f5f9"; stroke: "#94a3b8"; font-color: "#334155" } }
+}
+
+appzone: "앱 팀 영역" {
+  apps: "앱 A · 앱 B" { class: ok }
+}
+idpzone: "IdP 운영팀 영역" {
+  kc: "Keycloak" { class: key }
+}
+adzone: "AD 운영팀 영역" {
+  ds: "AD DS\n디렉터리" { class: mute }
+  fs: "AD FS\n외부 IdP" { class: key }
+}
+
+appzone.apps -> idpzone.kc: "client 등록 신청\n서비스 URL · redirect URI"
+idpzone.kc -> adzone.ds: "User Federation 신청\nbind 계정 · OU · LDAPS CA"
+idpzone.kc -> adzone.fs: "Brokering 등록 신청\nbroker 콜백 URL"
+```
+
+AD 쪽 두 엣지는 대안 관계다 — 위 표의 두 경로 중 회사 환경에 맞는 하나를 고른다. 어느 쪽이든
+AD 비밀번호를 다루는 곳은 신청으로 정한 경계 안쪽(디렉터리 bind 또는 AD FS 로그인 화면)에
+머물고, 경계 밖의 앱에는 검증 가능한 token만 넘어온다.
 
 ## 다음 장에서 자세히 본다
 
