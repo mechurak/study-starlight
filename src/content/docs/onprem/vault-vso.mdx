@@ -1,0 +1,272 @@
+---
+title: "Vault와 VSO의 동작 원리"
+description: "값이 Git이 아니라 금고에 사는 경로 — Vault의 개봉·시크릿 엔진·정책, VSO가 ServiceAccount 신원으로 값을 받아 Secret으로 동기화하는 내부"
+deckGroup: gitops
+sidebar:
+  order: 116
+aliases: [Vault, VSO, Vault Secrets Operator, 외부 금고]
+---
+
+import { LinkCard, Steps } from '@astrojs/starlight/components';
+import Thesis from '../../../components/docs/Thesis.astro';
+import TermIntro from '../../../components/docs/TermIntro.astro';
+
+<Thesis>Vault + VSO 경로에서 값은 Git에도 클러스터에도 살지 않고 **금고에만** 산다 — Git에는 참조만 두고, VSO가 **쿠버네티스가 보증하는 신원**으로 금고에서 값을 받아 `Secret`으로 동기화한다. 신뢰의 근거가 [Sealed Secrets](/onprem/sealed-secrets/)의 암호화 수학에서 **인증과 정책**으로 바뀌는 것이 이 경로의 본질이다</Thesis>
+
+<TermIntro
+  terms={[
+    ['Vault', '', 'HashiCorp의 비밀 금고 서버. 값을 암호화해 저장하고, **모든 접근이 인증 → 정책 → 감사 로그** 한 문을 지나게 한다.'],
+    ['봉인 · 개봉', 'Seal · Unseal', 'Vault는 재시작하면 **잠긴(sealed) 상태**로 떠서 아무 요청도 못 받는다. 데이터 암호화 키를 보호하는 장치라, 개봉 수단을 대야만 서비스가 시작된다.'],
+    ['시크릿 엔진', 'Secret Engine', '비밀의 종류별 백엔드. 키-값 저장(KV), DB 자격증명 발급(database), 인증서 발급(PKI)이 각각 다른 엔진이다.'],
+    ['동적 시크릿', 'Dynamic Secret', '미리 저장해 둔 값이 아니라 **요청 때마다 새로 발급되고 수명이 있는** 자격증명. DB 계정을 그때그때 만들어 주는 식이다.'],
+    ['lease', '리스', '동적 시크릿의 수명 계약. 만료 전에 갱신하거나 새로 발급받아야 하고, 만료되면 Vault가 원천에서 그 자격증명을 회수한다.'],
+    ['정책', 'Policy', 'Vault의 경로 기반 접근 규칙. "이 신원은 `kv/data/loki/*`를 읽을 수 있다"처럼 **누가 어느 경로를** 읽고 쓰는지를 정한다.'],
+    ['VSO', 'Vault Secrets Operator', 'HashiCorp가 만든 클러스터 안 오퍼레이터. Git에 올라간 **참조 CR**을 보고 Vault에서 값을 읽어 평범한 `Secret`으로 만들어 동기화한다.'],
+    ['TokenReview', '', '쿠버네티스 API에 "이 ServiceAccount 토큰이 진짜냐"를 물어보는 검증 API. Vault가 클러스터 신원을 믿는 뿌리다.'],
+  ]}
+/>
+
+[시크릿 장](/onprem/10-secrets/)의 세 방식 표에서 "ESO + 외부 금고" 행이 이 경로다.
+ESO가 금고 종류를 가리지 않는 범용 오퍼레이터라면, VSO는 HashiCorp가 만든 **Vault 전용**
+오퍼레이터라는 차이일 뿐 구조는 같다 — 이 페이지는 Vault를 골랐을 때를 기준으로,
+금고 쪽(Vault)과 클러스터 쪽(VSO)이 각각 무엇을 하는지를 본다.
+
+## 큰 그림 — Git에는 값이 아예 없다
+
+[Sealed Secrets](/onprem/sealed-secrets/)는 값을 암호문으로 바꿔 Git에 뒀다.
+이 경로는 한 발 더 간다 — **Git에는 값이 어떤 형태로도 올라가지 않는다.**
+올라가는 건 "Vault의 이 경로에 있는 값을 이 `Secret`으로 만들어 달라"는 **참조 CR**뿐이고,
+참조는 평문이어도 비밀이 아니다.
+
+```d2 layout=elk pad=40 title="Git에는 값 없는 참조 CR만 올라가고, Argo CD가 적용한 참조를 VSO가 보고 Vault에 인증해 값을 읽어 런타임 Secret으로 동기화하는 흐름"
+direction: down
+
+classes: {
+  key: { style: { fill: "#dbeafe"; stroke: "#2563eb"; font-color: "#1e3a8a" } }
+  bad: { style: { fill: "#fee2e2"; stroke: "#dc2626"; font-color: "#7f1d1d" } }
+  mute: { style: { fill: "#f1f5f9"; stroke: "#94a3b8"; font-color: "#334155" } }
+}
+
+git: "Git — 참조 CR만\n(값이 없다)" { class: mute }
+
+cluster: 클러스터 안 {
+  argo: Argo CD { class: mute }
+  vso: VSO { class: key }
+  vault: "Vault — 값이 사는 곳\n(인증 · 정책 · 감사)" { class: bad }
+  sec: 런타임 Secret { class: mute }
+}
+
+git -> cluster.argo: 동기화
+cluster.argo -> cluster.vso: VaultStaticSecret 적용
+cluster.vso -> cluster.vault: 인증하고 값을 읽는다
+cluster.vso -> cluster.sec: Secret 생성 · 동기화
+```
+
+Sealed Secrets와 나란히 놓으면 바뀌는 것이 선명하다.
+
+| | Sealed Secrets | Vault + VSO |
+|---|---|---|
+| Git에 올라가는 것 | 암호문 | **참조만** — 값은 어떤 형태로도 없다 |
+| 값이 사는 곳 | Git(잠긴 채) + 런타임 Secret | **Vault** + 런타임 Secret |
+| 신뢰의 근거 | 암호화 수학 — 개인키를 가진 컨트롤러만 푼다 | **신원** — 인증된 대상에게 정책이 허락한 경로만 |
+| 값 변경 | 재봉인해서 커밋 | **금고에서 바꾸면 자동 전파** — 커밋이 필요 없다 |
+| 누가 언제 읽었나 | 알 수 없다 | **감사 로그에 남는다** |
+| 추가로 운영할 것 | 컨트롤러 하나 | **Vault 서버 자체** — HA · 개봉 · 백업 |
+
+## Vault 쪽 — 금고는 무엇으로 이루어지나
+
+VSO를 보기 전에 금고 자체를 잡아야 한다. Vault는 크게 네 조각이다.
+
+### 개봉 — 재시작하면 잠긴 채로 뜬다
+
+Vault는 저장하는 모든 데이터를 자체 키로 암호화하고, 그 키를 보호하는 **root key를
+메모리에만** 둔다. 그래서 프로세스가 재시작하면 root key가 사라진 **잠긴 상태**로 뜨고,
+개봉 수단을 대야만 요청을 받기 시작한다. 기본 방식은 root key를 여러 조각으로 나눠
+(예: 5조각 중 3조각이 모여야 복원) 운영자들이 나눠 갖는 **Shamir 분할**이다.
+
+:::caution[온프렘의 개봉 문제]
+클라우드에서는 KMS(Key Management Service)에 개봉을 맡기는 **auto-unseal**이 정석이라
+재시작이 무인으로 끝난다. 온프렘에는 그 KMS가 없다 — 선택지는 **재시작 때마다 사람이
+조각을 대는 것**, 별도 Vault·HSM(Hardware Security Module)에 개봉을 맡기는 것 정도다.
+"새벽에 노드가 재부팅되면 Vault가 잠긴 채로 멈춰 있고, 그동안 VSO 동기화도 멈춘다"는
+시나리오를 설계 단계에서 받아들일지부터 정해야 한다.
+:::
+
+### 저장 — 상태가 어느 바닥에 떨어지나
+
+Vault의 상태는 이 덱의 두 바닥(오브젝트 스토리지 · Postgres)이 아니라 **자체 통합
+스토리지(Raft)** 에 떨어진다 — Vault 파드 여럿이 각자 블록 볼륨([2장](/onprem/02-foundation/)의
+스토리지 계층)에 복제본을 들고 합의하는 구조라, 별도 DB 없이 HA가 된다. 디스크 위 데이터는
+암호화돼 있으므로 볼륨을 통째로 읽혀도 값은 새지 않는다. 백업은 **Raft 스냅샷**을 떠서
+클러스터 밖(예: [MinIO](/onprem/06-minio/) 버킷)에 두는 것이고, 이 스냅샷 + 개봉 수단이
+[복구](#급소의-이동--부트스트랩과-복구)의 전부다.
+
+### 시크릿 엔진 — 저장만 하는 금고가 아니다
+
+| 엔진 | 하는 일 | Sealed Secrets 대비 |
+|---|---|---|
+| **KV** | 버전이 남는 키-값 저장. 잘못 덮어써도 이전 버전으로 돌아간다 | 같은 자리 — 정적 값 보관 |
+| **database** | DB 계정을 **요청 때마다 발급**하고 lease 만료 시 회수 | **대응물이 없다** — 발급 자체가 회전이다 |
+| **PKI** | 단기 인증서를 그 자리에서 발급 | cert-manager와 겹치는 자리 — [4장](/onprem/04-tls-dns/) 경로가 이미 있으면 굳이 옮기지 않는다 |
+
+정적 값만 쓸 거라면 Vault의 이점은 절반이다 — **동적 시크릿과 감사가 필요해질 때**
+이 경로의 운영 비용이 정당화된다는 게 [시크릿 장](/onprem/10-secrets/)의 "회전이 업무가
+되면"의 실체다.
+
+### 정책과 감사 — 모든 접근이 한 문을 지난다
+
+Vault의 모든 요청은 **인증(누구냐) → 정책(그 경로를 읽어도 되냐) → 감사 로그(기록)** 를
+지난다. 정책은 경로 기반이라 "Loki의 신원은 `kv/data/loki/*`만 읽는다"처럼 좁게 자를 수
+있고, 사람의 로그인은 OIDC로 [Keycloak](/onprem/05-identity/)에 붙일 수 있다 — 플랫폼의
+다른 도구들과 같은 SSO 문으로 들어오게 된다.
+
+:::tip[라이선스 한 줄]
+Vault는 오픈소스 라이선스가 아니라 **BUSL(Business Source License)** 로 배포된다.
+사내에서 직접 운영해 쓰는 것은 일반적으로 허용 범위지만, 이 변경 때문에 Linux Foundation
+산하의 오픈소스 포크 **OpenBao**가 갈라져 나왔다. 조직의 라이선스 정책에 따라 선택지가
+달라질 수 있는 지점이다.
+:::
+
+## VSO 쪽 — 참조를 보고 값을 나른다
+
+VSO는 [Sealed Secrets 컨트롤러](/onprem/sealed-secrets/)와 같은 오퍼레이터 패턴이다.
+다른 점은 **감시하는 CR에 값이 없다**는 것 — CR은 "어디의 무엇을 어느 `Secret`으로"라는
+배선 정보만 담고, 값은 매번 Vault에서 읽어 온다. CR은 역할별로 세 축이다.
+
+| CR | 답하는 질문 | Git에 두나 |
+|---|---|---|
+| `VaultConnection` | **어느 Vault에** 접속하나 (주소 · CA) | 둔다 |
+| `VaultAuth` | **누구로서** 인증하나 (인증 방식 · 사용할 ServiceAccount · Vault role) | 둔다 |
+| `VaultStaticSecret` 등 | **어디의 값을 어느 Secret으로** 만드나 (경로 · 대상 이름 · 갱신 주기) | 둔다 — 전부 값이 없는 평문이다 |
+
+```yaml
+# Git에 올라가는 참조의 예 — 비밀이 하나도 없다
+apiVersion: secrets.hashicorp.com/v1beta1
+kind: VaultStaticSecret
+metadata:
+  name: loki-s3
+  namespace: observability
+spec:
+  vaultAuthRef: platform-auth
+  mount: kv
+  path: loki/s3
+  refreshAfter: 60s
+  destination:
+    name: loki-s3        # 이 이름의 Secret이 만들어진다
+    create: true
+  rolloutRestartTargets:
+    - kind: Deployment
+      name: loki
+```
+
+### 인증 — 시드 시크릿 없이 신원으로 들어간다
+
+여기가 이 경로의 가장 좋은 성질이다. "VSO가 Vault에 로그인할 비밀번호는 또 어디에
+두나?"라는 되풀이 문제가 **생기지 않는다** — VSO는 저장된 자격증명이 아니라
+**쿠버네티스가 그 자리에서 발급·보증하는 ServiceAccount 토큰**으로 인증하기 때문이다.
+
+```d2 pad=40 title="VSO가 쿠버네티스 API에서 단기 ServiceAccount 토큰을 발급받아 Vault에 제출하면, Vault가 TokenReview로 진위를 되물어 확인한 뒤 정책이 묶인 자기 토큰을 내주는 인증 순서"
+shape: sequence_diagram
+
+vso: VSO
+kapi: 쿠버네티스 API
+vault: Vault
+
+vso -> kapi: ① 지정된 SA의 단기 토큰 발급 요청
+kapi -> vso: ② 단기 SA 토큰 { style.stroke-dash: 3 }
+vso -> vault: ③ kubernetes auth 로그인 — SA 토큰 제출
+vault -> kapi: ④ TokenReview — 이 토큰 진짜인가
+kapi -> vault: ⑤ 유효 + 신원(SA 이름 · 네임스페이스) { style.stroke-dash: 3 }
+vault -> vso: ⑥ 정책이 묶인 Vault 토큰 { style.stroke-dash: 3 }
+```
+
+Vault 쪽에는 미리 **role**을 만들어 둔다 — "observability 네임스페이스의 `loki` SA가
+오면 `kv/data/loki/*` 읽기 정책을 준다"는 식으로, **쿠버네티스 신원과 Vault 정책을
+묶는 자리**다. 그래서 참조 CR을 훔쳐 다른 네임스페이스에 붙여 넣어도 소용없다 —
+그 네임스페이스의 SA는 role에 묶여 있지 않아 인증 단계에서 끊긴다.
+[Sealed Secrets가 OAEP label 수학으로](/onprem/sealed-secrets/) 막던 것을 여기서는
+신원 검증이 막는 것이다.
+
+이 위임의 뿌리는 클라우드의 IAM 역할 연결(IRSA)과 같은 아이디어다 —
+[시크릿 장](/onprem/10-secrets/)에서 "온프렘에는 신원 기반 접근이 없다"고 했는데,
+**Vault + kubernetes auth가 바로 그 빈칸을 채우는 온프렘 구현**이다.
+
+### 동기화 — 회전이 커밋 없이 끝난다
+
+<Steps>
+
+1. VSO가 `VaultStaticSecret`을 보고 Vault에서 값을 읽어 **대상 `Secret`을 만든다.**
+   이후 `refreshAfter` 주기로 다시 읽는다.
+
+2. **금고에서 값이 바뀌면** 다음 주기에 VSO가 차이를 감지하고 `Secret`을 갱신한다.
+   재봉인도, 커밋도 없다 — Git의 참조는 그대로이기 때문이다.
+
+3. `rolloutRestartTargets`에 적어 둔 워크로드를 **자동으로 롤링 재시작**한다.
+   [시크릿 장](/onprem/10-secrets/)에서 Reloader가 맡던 "파드가 새 값을 읽게 하기"가
+   오퍼레이터에 내장돼 있는 셈이다.
+
+4. 누가 `Secret`을 손으로 고쳐도 다음 동기화 때 **금고 기준으로 덮어써진다.**
+   소스는 Git이 아니라 Vault다.
+
+</Steps>
+
+동적 시크릿은 여기서 한 단계 더 간다 — `VaultDynamicSecret`은 database 엔진에서
+**수명 있는 계정을 발급받아** `Secret`으로 두고, lease 만료 전에 새 계정을 받아
+갈아끼우는 것까지 오퍼레이터가 돈다. "90일마다 DB 비밀번호 교체"라는 업무 자체가
+사라지는 지점이다. CR 종류와 필드의 정본은
+[Vault Secrets Operator 공식 문서](https://developer.hashicorp.com/vault/docs/deploy/kubernetes/vso)다.
+
+:::caution[GitOps 관점에서 하나 잃는 것]
+Sealed Secrets에서는 값의 변경도 커밋 이력에 남았다(암호문이 바뀐 커밋으로).
+이 경로에서 Git은 배선만 알고 **값의 변경 이력은 Vault 쪽**(KV 버전 · 감사 로그)에
+남는다. "언제 무엇이 바뀌었나"를 물을 곳이 한 군데에서 두 군데가 되는 것이다 —
+감사 로그를 켜 두지 않으면 이 트레이드에서 얻는 것 없이 잃기만 한다.
+:::
+
+## 급소의 이동 — 부트스트랩과 복구
+
+[Sealed Secrets](/onprem/sealed-secrets/)의 급소가 sealing key 세트였다면, 이 경로의
+급소는 **Raft 스냅샷 + 개봉 수단**이다. 그리고 Vault가 클러스터 **안**에 있다면
+[백업 장](/onprem/11-backup/)의 복구 순서에 순환이 하나 생긴다 — 앱 시크릿은 Vault에서
+오는데, 그 Vault부터 되살려야 하는 것이다.
+
+<Steps>
+
+1. **개봉 수단(Shamir 조각 등)을 클러스터 밖에서 꺼낸다.** sealing key 백업이 차지하던
+   "잃으면 끝"의 자리를 이것이 물려받는다
+
+2. **Vault를 설치하고 Raft 스냅샷을 복원**한 뒤 개봉한다
+
+3. **VSO와 참조 CR을 Argo CD로 동기화**한다 → VSO가 인증하고 값을 읽어 `Secret`들이
+   되살아난다
+
+4. Vault로 아직 못 옮겼거나 **Vault 이전에 필요한 값**(예: Vault 스냅샷이 든 버킷의
+   접근 키)은 이 경로로 못 되살린다 — 그 몇 개가 Sealed Secrets나 암호화 백업으로
+   남겨 둘 몫이다
+
+</Steps>
+
+그래서 실제 그림은 "VSO가 Sealed Secrets를 밀어낸다"보다 **역할 분담**에 가깝다 —
+앱 시크릿은 금고 경로로 옮기고, Sealed Secrets는 **금고를 되살리는 데 필요한
+최소한**으로 줄어든다.
+
+## 요약
+
+- 이 경로의 본질은 신뢰 근거의 교체다 — Sealed Secrets의 **암호화 수학** 대신
+  **신원 · 정책 · 감사**. Git에는 값이 어떤 형태로도 올라가지 않는다
+- Vault는 저장만 하는 금고가 아니다 — **재시작하면 잠기는 개봉 모델**, 자체 Raft 저장,
+  KV·database·PKI 엔진, 경로 기반 정책과 감사 로그가 한 몸이다
+- 온프렘의 첫 관문은 **개봉**이다 — KMS가 없으니 재시작마다 사람이 낄지, 별도 장치를
+  둘지를 설계 단계에서 정한다
+- VSO의 인증에는 시드 시크릿이 없다 — **쿠버네티스가 보증하는 SA 토큰**을 Vault가
+  TokenReview로 되물어 확인하고, role이 그 신원에 정책을 묶는다
+- 회전이 **커밋 없이** 끝난다 — 금고에서 바꾸면 VSO가 `Secret`을 갱신하고 지정한
+  워크로드를 재시작한다. 동적 시크릿은 발급 자체가 회전이다
+- 급소는 sealing key에서 **Raft 스냅샷 + 개봉 수단**으로 옮겨 간다. Vault 이전에 필요한
+  값 몇 개는 여전히 Sealed Secrets 몫이다 — 대체가 아니라 역할 분담이다
+
+<LinkCard
+  title="11. 백업과 복구"
+  description="무엇을 잃을 수 있고 무엇부터 되살리나 — etcd, Velero, CNPG PITR, 그리고 복구 리허설."
+  href="/onprem/11-backup/"
+/>
