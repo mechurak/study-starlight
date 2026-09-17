@@ -1,0 +1,151 @@
+---
+title: "PV 회수 정책과 재사용"
+description: "PVC를 삭제한 뒤 PV와 데이터가 어떻게 남는지는 회수 정책과 저장소 구현에 달려 있다."
+deckGroup: storage
+sidebar:
+  order: 143
+---
+
+import Thesis from '../../../components/docs/Thesis.astro';
+import { Steps, LinkCard } from '@astrojs/starlight/components';
+
+<Thesis>PVC를 삭제한 뒤 PV와 데이터가 어떻게 남는지는 회수 정책과 저장소 구현에 달려 있다.</Thesis>
+
+[PV/PVC 바인딩](/cka/persistent-volumes/)은 연결의 시작이다. 이 장은 연결을 해제한 뒤
+**PV 상태와 실제 데이터에 무슨 일이 생기는지**, 다시 쓰려면 무엇을 확인해야 하는지 다룬다.
+
+## PV의 생애 — 상태가 어떻게 움직이는가
+
+```d2 layout=elk pad=40 title="PersistentVolume의 Available·Bound·Released·Failed 상태 전이"
+direction: down
+
+classes: {
+  mute: { style: { fill: "#f1f5f9"; stroke: "#94a3b8"; font-color: "#334155" } }
+}
+
+start: "" { shape: circle; style: { fill: "#334155"; stroke: "#334155" }; width: 24; height: 24 }
+available: Available
+bound: Bound
+released: Released
+failed: Failed
+done: "" { shape: circle; style: { fill: "#334155"; stroke: "#334155" }; width: 24; height: 24 }
+
+note: 자동으로 재사용되지 않는다.\n옛 PVC 정보가 spec.claimRef 에 남아 있기 때문. { class: mute }
+
+start -> available: PV 생성 또는 동적 프로비저닝
+available -> bound: 조건에 맞는 PVC 등장
+bound -> released: PVC 삭제 · reclaimPolicy Retain
+bound -> done: PVC 삭제 · reclaimPolicy Delete
+released -> available: claimRef 를 지운다 · 수동
+released -> failed: 자동 회수 실패
+failed -> done: 관리자가 정리
+released -- note: { style.stroke-dash: 3 }
+```
+
+| 상태 | 의미 |
+|---|---|
+| `Available` | 비어 있고 바인딩 가능 |
+| `Bound` | PVC에 묶여 있다 |
+| `Released` | PVC가 삭제됐지만 아직 회수되지 않았다 |
+| `Failed` | 자동 회수에 실패했다 |
+
+## reclaimPolicy — PVC를 지우면 데이터는?
+
+| 정책 | PVC 삭제 시 |
+|---|---|
+| **`Retain`** | PV는 남고 상태가 **`Released`** 가 된다. **데이터 보존**. 재사용하려면 수동 조치 |
+| **`Delete`** | 지원하는 프로비저너·플러그인이 PV와 **실제 스토리지까지 삭제**한다. 동적 프로비저닝의 기본값 |
+| `Recycle` | **deprecated** — 쓰지 말 것. 대신 동적 프로비저닝을 쓴다 |
+
+```bash
+kubectl patch pv pv-data -p '{"spec":{"persistentVolumeReclaimPolicy":"Retain"}}'
+```
+
+`Delete`는 **원하는 회수 동작**이지 삭제 성공의 증거가 아니다. 직접 만든 NFS·local PV처럼
+수명 주기를 대신 관리할 외부 프로비저너가 없거나 플러그인이 삭제를 지원하지 않으면 실제 백엔드는
+남거나 PV가 `Failed`가 될 수 있다. PVC를 지운 뒤 `kubectl get pv`와 백엔드를 함께 확인한다.
+
+:::caution[함정]
+`Released` 상태의 PV는 **자동으로 재사용되지 않는다.**
+옛 PVC 정보(`spec.claimRef`)가 남아 있기 때문이다. **이전 사용자의 데이터를 확인·정리한 뒤**
+다음처럼 연결 정보를 해제한다. 데이터 정리 없이 다른 PVC에 넘기면 이전 데이터가 노출될 수 있다.
+
+```bash
+kubectl patch pv pv-data -p '{"spec":{"claimRef":null}}'
+# → 상태가 Available로 돌아간다
+```
+:::
+
+```bash
+kubectl get pv
+kubectl get pvc
+kubectl describe pvc data          # ★ Events에 왜 Pending인지 나온다
+```
+
+:::tip[시험]
+PVC가 `Pending`이면 `describe pvc`를 먼저 본다.\
+`no persistent volumes available for this claim` → 조건에 맞는 PV가 없다\
+`waiting for first consumer` → **정상이다.** Pod이 만들어지길 기다리는 중
+:::
+
+## 정적 프로비저닝 실습 흐름
+
+PV·PVC·Pod 세 YAML을 손으로 처음부터 치는 건 낭비다 — 시험 중에는 공식
+[Configure a Pod to Use a PersistentVolume for Storage](https://kubernetes.io/docs/tutorials/configuration/configure-persistent-volume-storage/)
+페이지를 열어 뼈대를 복사해 오고, 이름·용량·경로만 문제에 맞게 고치는 게 정석이다.
+
+아래 흐름은 **단일 노드 실습 환경**을 전제로 한다. 공식 예제에서 `pvc.yaml`과 `pod.yaml`을
+준비하고, PVC 이름은 `data`, 요청은 `1Gi`, 클래스는 `manual`, Pod 이름은 `web`,
+`claimName`은 `data`, 마운트 경로는 `/data`로 맞춘다. 모든 명령은 같은 네임스페이스에서 실행한다.
+
+<Steps>
+
+1. **PV 생성** — 관리자의 몫
+
+   ```bash
+   cat <<'EOF' | kubectl apply -f -
+   apiVersion: v1
+   kind: PersistentVolume
+   metadata:
+     name: pv-manual
+   spec:
+     capacity: { storage: 1Gi }
+     accessModes: ["ReadWriteOnce"]
+     persistentVolumeReclaimPolicy: Retain
+     storageClassName: manual
+     hostPath: { path: /mnt/data }
+   EOF
+   ```
+
+2. **PVC 생성** — 개발자의 몫. `Bound`가 되는지 확인한다
+
+   ```bash
+   kubectl create -f pvc.yaml
+   kubectl get pvc                # Bound 확인
+   ```
+
+3. **Pod에서 사용**
+
+   ```bash
+   kubectl apply -f pod.yaml
+   kubectl wait --for=condition=Ready pod/web --timeout=60s
+   kubectl exec web -- sh -c 'echo storage-ok > /data/probe && cat /data/probe'
+   ```
+
+4. **정리 후 확인** — `Retain`이면 PV가 `Released`로 남는다
+
+   ```bash
+   kubectl delete pod web         # 사용 중인 Pod부터 제거
+   kubectl delete pvc data
+   kubectl get pv                 # Retain이면 Released 로 남는다
+   ```
+
+</Steps>
+
+## 요약
+
+- `Retain`이면 PVC 삭제 뒤 PV가 `Released`로 남고 데이터는 보존된다.
+- 재사용 전 데이터를 확인·정리하고, 이전 연결 정보인 `claimRef`를 해제한다.
+- `Delete`는 지원하는 저장소 구현이 PV와 백엔드를 지우는 정책이다. 실제 삭제 결과도 확인한다.
+
+<LinkCard title="다음: StorageClass — 자동 생성과 확장" href="/cka/storage-class/" />

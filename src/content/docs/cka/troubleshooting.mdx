@@ -246,7 +246,7 @@ e -> r7: Events 자체가\n없다
 | `had untolerated taint` | taint | toleration 추가 또는 taint 제거 |
 | `didn't match node affinity/selector` | 라벨 불일치 | 노드에 라벨 추가 또는 셀렉터 수정 |
 | `node(s) were unschedulable` | cordon | `kubectl uncordon` |
-| `unbound immediate PersistentVolumeClaims` | PVC 미바인딩 | [스토리지](/cka/storage/) |
+| `unbound immediate PersistentVolumeClaims` | PVC 미바인딩 | [스토리지 진단](/cka/storage-troubleshooting/) |
 | `didn't match pod anti-affinity rules` | antiAffinity | [스케줄링](/cka/scheduling/) |
 | **Events 자체가 없다** | **스케줄러가 죽었다** 또는 `schedulerName` 오타 | 컨트롤 플레인 확인 |
 
@@ -411,14 +411,14 @@ kubectl describe pod web | grep -A20 Events
 | 메시지 | 원인 |
 |---|---|
 | `MountVolume.SetUp failed ... not found` | **ConfigMap/Secret이 없다** |
-| `Unable to attach or mount volumes` | PV/CSI 문제 ([스토리지](/cka/storage/)) |
+| `Unable to attach or mount volumes` | PV/CSI 문제 ([스토리지 진단](/cka/storage-troubleshooting/)) |
 | `Multi-Attach error` | **RWO 볼륨을 두 노드에서** |
 | `failed to create pod sandbox ... cni` | **CNI 문제** |
 | `network plugin is not ready` | CNI Pod이 안 떴다 |
 
 `Multi-Attach error`는 **RWO**(ReadWriteOnce — 한 번에 한 노드에서만 마운트할 수 있는
 접근 모드) 볼륨을 쓰는 Pod이 다른 노드로 옮겨 갈 때 잘 나온다. 옛 Pod이 완전히 사라져
-볼륨이 detach될 때까지 새 Pod은 계속 `ContainerCreating`에 머문다 ([스토리지](/cka/storage/)).
+볼륨이 detach될 때까지 새 Pod은 계속 `ContainerCreating`에 머문다 ([스토리지 진단](/cka/storage-troubleshooting/)).
 
 ```bash
 # 볼륨 관련

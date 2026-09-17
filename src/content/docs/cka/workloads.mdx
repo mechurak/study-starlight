@@ -94,7 +94,7 @@ q4 -> dep: 아니오
 :::caution[함정]
 "DB니까 StatefulSet"이 항상 맞지는 않다.
 기준은 "**각 인스턴스가 고유한 신원과 저장소를 가져야 하는가**"다.
-단일 인스턴스 DB라면 Deployment + PVC(PersistentVolumeClaim — 저장소 요청, [스토리지](/cka/storage/))로도 충분하다.
+단일 인스턴스 DB라면 Deployment + PVC(PersistentVolumeClaim — 저장소 요청, [Pod별 저장소와 업데이트](/cka/statefulset-storage/))로도 충분하다.
 :::
 
 ## ReplicaSet — 개수를 맞추는 루프
@@ -278,7 +278,7 @@ r2 -> a: { style.stroke-dash: 3 }
 
 전부 죽이고 전부 새로 만든다. 다운타임이 있지만
 **RWO(ReadWriteOnce — 한 번에 한 노드만 붙는) 볼륨을 공유하거나
-버전 공존이 불가능할 때** 필요하다 ([스토리지](/cka/storage/)).
+버전 공존이 불가능할 때** 필요하다 ([Pod별 저장소와 업데이트](/cka/statefulset-storage/)).
 
 </TabItem>
 </Tabs>

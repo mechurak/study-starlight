@@ -149,21 +149,37 @@ helm upgrade --help
 
 ### Vim으로 YAML을 고치는 짧은 연습
 
-초기 설정과 키 설명은 [CKA CKA 시험 해부](/cka/exam/#vim-최소-세트)가 정본이다.
-연습 전에 Vim에서 `:setlocal expandtab tabstop=2 softtabstop=2 shiftwidth=2 autoindent number`를
-실행한다. 아래 파일은 편집 연습용이며, 클러스터에 리소스를 만들지 않는다.
+설정의 의미와 풀 이름·약어 대응은 [CKA 시험 해부의 Vim 초기 설정](/cka/exam/#vim-초기-설정--공백-2칸을-기준으로-편집한다)이 정본이다.
+실습 중에는 **짧은 이름으로 현재 값을 확인하고 필요한 경우만 맞춘다.**
+KodeKloud의 `sw=2`·`et`·`ts=2`·`ai`는 같은 옵션의 약어이므로 기존 설정을 지울 필요가 없다.
+아래 파일은 편집 연습용이며, 클러스터에 리소스를 만들지 않는다.
 
 ```bash
 kubectl run vim-practice --image=nginx --dry-run=client -o yaml > vim-practice.yaml
 vim vim-practice.yaml
 ```
 
+파일을 연 다음 Vim에서 실행한다. 첫 줄은 조회, 둘째 줄은 이 덱의 편집 기준 적용이다.
+이미 값이 맞으면 둘째 줄은 생략한다.
+
+```vim
+:setlocal et? ts? sts? sw? ai? nu?
+:setlocal et ts=2 sts=2 sw=2 ai nu
+```
+
+설정 파일에서 보이는 테마·플러그인 줄의 뜻은
+[KodeKloud의 vimrc](/cka/exam/#kodekloud의-vimrc--기존-설정을-읽고-필요한-값만-보완한다)를 참고한다.
+
 1. `Esc` → `/image:` → `Enter`로 이미지 필드를 찾는다. `n`은 다음 검색 결과다.
 2. `0`·`^`·`$`를 각각 눌러 줄 시작, 첫 글자, 마지막 문자의 차이를 확인한다.
 3. `A`로 줄 끝에서 입력을 시작해 `:alpine`을 붙이고 `Esc`로 나온다. 값은 `nginx:alpine`이 된다.
-4. 현재 줄에서 `>>`로 2칸 오른쪽 이동 후 `<<`로 원래 깊이로 돌아온다.
+4. 현재 줄에서 `>`를 두 번 연속 눌러(`>>`) 2칸 오른쪽 이동 후, `<`를 두 번 눌러(`<<`) 원래 깊이로 돌아온다.
 5. `V` → `j`로 두 줄을 선택하고 `>`로 이동한다. `gv` → `<`로 같은 두 줄을 원래 위치로 되돌린다.
-6. `:wq`로 저장하고 다음 명령으로 YAML과 리소스 구조를 확인한다.
+6. `gv` → `3>`로 같은 두 줄을 한 번에 6칸 옮긴다. `gv` → `3<`로 원래 위치로 되돌린다.
+7. `:wq`로 저장하고 다음 명령으로 YAML과 리소스 구조를 확인한다.
+
+일반 모드의 `3>>`는 **3줄을 각각 2칸**, 선택 후 `3>`는 **선택한 줄들을 각각 6칸** 옮긴다.
+모드별 숫자의 의미는 [Vim YAML 들여쓰기](/cka/exam/#vim-yaml-들여쓰기--선택한-블록을-함께-옮긴다)에서 비교한다.
 
 ```bash
 kubectl create --dry-run=client -f vim-practice.yaml -o yaml

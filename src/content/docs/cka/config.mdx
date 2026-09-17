@@ -624,7 +624,7 @@ spec:
 - **admission 단계에서 동작**한다 — Pod 생성 시 값을 채우거나 거부한다
 - 이미 떠 있는 Pod에는 **소급 적용되지 않는다**
 - `type`은 무엇을 한 단위로 볼지다 — `Container`는 컨테이너 하나씩,
-  `Pod`은 Pod 안 컨테이너들의 **합**, `PersistentVolumeClaim`은 요청 용량([스토리지](/cka/storage/)).
+  `Pod`은 Pod 안 컨테이너들의 **합**, `PersistentVolumeClaim`은 요청 용량([PV와 PVC](/cka/persistent-volumes/)).
   기본값(`default` / `defaultRequest`)을 채워주는 것은 `Container`뿐이다
 
 ### ResourceQuota — 네임스페이스 총량 제한

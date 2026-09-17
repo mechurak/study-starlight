@@ -87,7 +87,16 @@ export default {
 			"title": "Storage",
 			"badge": "10%",
 			"tone": "mute",
-			"desc": "PV · PVC · StorageClass · 볼륨"
+			"desc": "볼륨 기초 · PV/PVC · 회수 정책 · 자동 생성 · Pod별 저장소 · CSI · 진단",
+			"items": [
+				["Pod 볼륨 — 파일 연결과 수명", "/cka/pod-volumes/"],
+				["PV와 PVC — 저장 공간 요청과 연결", "/cka/persistent-volumes/"],
+				["PV 회수 정책과 재사용", "/cka/volume-lifecycle/"],
+				["StorageClass — 자동 생성과 확장", "/cka/storage-class/"],
+				["StatefulSet과 Pod별 저장소", "/cka/statefulset-storage/"],
+				["CSI — 볼륨 생성과 마운트의 구현", "/cka/csi/"],
+				["스토리지 진단 — Pending과 마운트 실패", "/cka/storage-troubleshooting/"]
+			]
 		},
 		{
 			"label": "클러스터 관리",

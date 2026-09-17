@@ -25,21 +25,15 @@ import Thesis from '../../../components/docs/Thesis.astro';
    complete -F __start_kubectl k
    ```
 
-2. **vim 설정** — 탭 문자로 YAML을 깨뜨리지 않기 위해
+2. **Vim 설정 확인** — YAML 파일을 연 뒤, 필요할 때만 공백 2칸 기준 적용
 
-   ```bash
-   # 기존 설정이 있으면 vim ~/.vimrc로 필요한 항목만 수정
-   cat <<'EOF' >> ~/.vimrc
-   set expandtab
-   set tabstop=2
-   set softtabstop=2
-   set shiftwidth=2
-   set autoindent
-   set number
-   set incsearch
-   set hlsearch
-   EOF
+   ```vim
+   :setlocal et? ts? sts? sw? ai? nu?
+   :setlocal et ts=2 sts=2 sw=2 ai nu
    ```
+
+   첫 줄은 조회, 둘째 줄은 설정이다. 이미 값이 맞으면 둘째 줄은 생략한다.
+   `.vimrc`에 저장할 풀 이름 설정은 [Vim 초기 설정](/cka/exam/#vim-초기-설정--공백-2칸을-기준으로-편집한다)을 따른다.
 
 </Steps>
 
@@ -49,7 +43,7 @@ import Thesis from '../../../components/docs/Thesis.astro';
 :::caution[함정]
 `~/.vimrc` 변경은 이미 열려 있는 Vim에 자동 반영되지 않는다. `:source ~/.vimrc`로 다시 읽는다.
 SSH 대상 노드나 `sudo -i` 이후 root는 다른 설정 파일을 쓴다. 현재 Vim에서만 빠르게 맞추려면
-`:setlocal expandtab tabstop=2 softtabstop=2 shiftwidth=2 autoindent number`를 실행한다.
+`:setlocal et ts=2 sts=2 sw=2 ai nu`를 실행한다.
 :::
 
 ### Vim 직전 확인용 치트시트
@@ -61,8 +55,9 @@ SSH 대상 노드나 `sudo -i` 이후 root는 다른 설정 파일을 쓴다. �
 | 줄 맨 앞 / 첫 글자 / 맨 뒤 | `0` / `^` / `$` |
 | 첫 글자 앞 / 줄 끝에서 입력 | `I` / `A` |
 | 검색 / 다음 / 반대 방향 | `/문자열` / `n` / `N` |
-| 줄 들여쓰기 / 내어쓰기 | `>>` / `<<` |
+| 현재 줄 들여쓰기 / 내어쓰기 | `>>` / `<<` — 같은 키를 두 번 연속 |
 | 블록 이동 | `V` → `j`·`k`로 선택 → `>`·`<`, 다시 선택은 `gv` |
+| 숫자로 범위·횟수 지정 (`sw=2`) | 일반 모드 `3>>`: 3줄을 2칸씩 / 선택 후 `3>`: 선택한 줄을 6칸씩 |
 | 취소 / 다시 실행 | `u` / `Ctrl+r` |
 | 저장 종료 / 변경 버리고 종료 | `:wq` / `:q!` |
 
@@ -566,7 +561,7 @@ killer.sh는 **실제 시험보다 어렵다.** 거기서 60%를 받아도 실�
 
 ## 요약
 
-- 시작 30초에 **alias · `$do` · `~/.vimrc`(expandtab)** 를 만든다
+- 시작할 때 **alias · `$do` · Vim의 공백 설정(`et`)** 을 확인하고 필요한 값만 맞춘다
 - 문제마다 **① 컨텍스트 ② 네임스페이스 ③ 검산** 3단계를 반복한다
 - **빈 파일에 YAML을 치지 말 것** — 생성기 / 문서 / 기존 리소스 복사
 - **빨리 풀리는 것부터.** 5분 룰로 넘기고 2차 순회에서 돌아온다

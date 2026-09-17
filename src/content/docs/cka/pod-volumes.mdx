@@ -1,0 +1,160 @@
+---
+title: "Pod 볼륨 — 파일 연결과 수명"
+description: "볼륨은 컨테이너에 파일을 연결하며, 데이터가 언제 사라지는지는 볼륨 종류에 따라 달라진다."
+deckGroup: storage
+sidebar:
+  order: 141
+---
+
+import Thesis from '../../../components/docs/Thesis.astro';
+import { LinkCard } from '@astrojs/starlight/components';
+
+<Thesis>볼륨은 컨테이너에 파일을 연결하며, 데이터가 언제 사라지는지는 볼륨 종류에 따라 달라진다.</Thesis>
+
+먼저 Pod 안에서 파일이 어디에 연결되는지 본다. 이 장은 임시 작업 공간, 노드 파일, 설정 파일을
+각각 어떻게 마운트하고 언제까지 유지하는지 설명한다.
+
+`spec.volumes`는 **파일의 출처**, 컨테이너의 `volumeMounts`는 **파일이 보일 경로**다.
+둘의 `name`이 같아야 연결된다. Pod 교체 뒤에도 보존할 앱 데이터는 다음 장의 PV/PVC로 다룬다.
+
+## emptyDir — Pod과 함께 사는 임시 공간
+
+```yaml
+spec:
+  containers:
+    - name: writer
+      image: busybox:1.36
+      volumeMounts:
+        - name: shared
+          mountPath: /data
+    - name: reader
+      image: busybox:1.36
+      volumeMounts:
+        - name: shared
+          mountPath: /input
+  volumes:
+    - name: shared
+      emptyDir: {}
+    - name: cache
+      emptyDir:
+        medium: Memory        # tmpfs — 메모리에 만든다
+        sizeLimit: 128Mi
+```
+
+- **Pod이 노드에 배정될 때 생기고, Pod이 사라지면 함께 사라진다**
+- **컨테이너 재시작으로는 안 없어진다** — 사이드카 패턴의 기반
+- `medium: Memory`는 빠르지만 **Pod의 메모리 limit에 포함**된다
+
+수명의 경계가 어디인지가 전부다. 기준은 **프로세스나 노드가 아니라 같은 UID의 Pod가
+계속 존재하는가**다.
+
+```d2 layout=elk pad=40 title="emptyDir 데이터가 컨테이너 재시작·kubelet 재시작·Pod 교체에서 각각 어떻게 되는지"
+direction: right
+
+classes: {
+  ok: { style: { fill: "#dcfce7"; stroke: "#16a34a"; font-color: "#14532d" } }
+  bad: { style: { fill: "#fee2e2"; stroke: "#dc2626"; font-color: "#7f1d1d" } }
+  warn: { style: { fill: "#fef3c7"; stroke: "#d97706"; font-color: "#78350f" } }
+  mute: { style: { fill: "#f1f5f9"; stroke: "#94a3b8"; font-color: "#334155" } }
+}
+
+c1: 컨테이너 재시작 { class: mute }
+k1: 같은 Pod · 유지 ✅ { class: ok }
+c2: kubelet 재시작 { class: mute }
+k2: 같은 Pod라면 디스크 데이터 유지 가능 { class: warn }
+c3: Pod 삭제 · 축출 · 교체 { class: mute }
+k3: 새 UID · 소멸 ❌ { class: bad }
+
+c1 -> k1
+c2 -> k2
+c3 -> k3
+```
+
+`medium: Memory`는 RAM이 바닥이라 노드 재부팅 때 사라진다. 기본 디스크 기반 `emptyDir`도
+영속 저장소는 아니다 — 노드 장애로 Pod가 교체되거나 drain으로 축출되면 새 Pod에는 빈
+디렉터리가 생긴다. 중요한 데이터에는 PV/PVC를 쓴다. 공식 문서도 수명의 기준을
+[Pod이 노드에서 제거되는 시점](https://kubernetes.io/docs/concepts/storage/volumes/#emptydir)으로 설명한다.
+
+## hostPath — 노드의 디렉터리
+
+`emptyDir`는 Pod이 사라지면 같이 사라지고, 무엇보다 **노드에 이미 있는 파일**을 볼 수 없다.
+노드의 로그 디렉터리나 컨테이너 런타임 소켓처럼 "Pod 밖에 이미 존재하는 것"을 읽어야 할 때
+쓰는 것이 `hostPath`다.
+
+```yaml
+volumes:
+  - name: docker-sock
+    hostPath:
+      path: /var/run/containerd/containerd.sock
+      type: Socket            # DirectoryOrCreate | Directory | FileOrCreate | File | Socket
+```
+
+- **노드의 파일시스템을 그대로** 마운트한다
+- Pod이 다른 노드로 가면 **거기엔 그 파일이 없다**
+- 보안상 위험하다 — 노드 전체를 노출할 수 있다
+- `type`은 **마운트 전에 그 경로가 무엇인지 검사하는 조건**이다. `Directory`/`File`/`Socket`은
+  "이미 그것이어야 한다"는 뜻이고, `DirectoryOrCreate`/`FileOrCreate`는 없으면 만든다.
+  비워 두면 검사를 하지 않아, 경로 오타가 조용히 빈 디렉터리로 만들어지는 사고가 난다
+
+**정당한 쓰임**
+
+- 로그 수집 DaemonSet이 `/var/log`를 읽을 때
+- 모니터링 에이전트가 노드 메트릭을 읽을 때
+- **단일 노드 실습 클러스터**에서 PV를 만들 때
+
+:::caution[함정]
+일반 워크로드에 `hostPath`를 쓰면
+**노드에 고정된 Pod**이 된다. 재스케줄되면 데이터를 잃는다. PV/PVC를 쓸 것.
+:::
+
+## 설정을 담는 볼륨들
+
+앞에서 본 볼륨은 "**데이터를 어디에 둘 것인가**"였다. 그런데 볼륨 메커니즘은 설정을 넣는 데도 쓰인다 —
+설정 파일이나 인증서를 이미지에 구워 넣으면 값이 바뀔 때마다 이미지를 다시 만들어야 하고,
+환경 변수로 넣으면 파일을 기대하는 프로그램에는 쓸 수 없다.
+아래 볼륨 타입들은 **API 오브젝트의 내용을 컨테이너 안의 파일로** 보여 준다 ([설정과 리소스](/cka/config/)의 ConfigMap·Secret이 재료다).
+
+```yaml
+volumes:
+  - name: config
+    configMap: { name: app-config }
+
+  - name: creds
+    secret:
+      secretName: db-secret
+      defaultMode: 0400
+
+  - name: info
+    downwardAPI:                    # Pod 자신의 정보를 파일로
+      items:
+        - { path: labels, fieldRef: { fieldPath: metadata.labels } }
+
+  - name: all-in-one
+    projected:                      # 여러 소스를 한 디렉터리에 합친다
+      sources:
+        - configMap: { name: app-config }
+        - secret: { name: db-secret }
+        - serviceAccountToken:
+            path: token
+            expirationSeconds: 3600
+            audience: vault
+```
+
+`downwardAPI`는 **Pod이 자기 자신에 대한 정보**(이름·네임스페이스·라벨·노드 이름, 리소스 요청량)를
+파일로 받는 통로다. 앱이 API 서버에 물어보지 않고도 "나는 어느 네임스페이스의 누구인가"를 알 수 있다 —
+로그에 Pod 이름을 찍는 용도가 대표적이다. 같은 값을 환경 변수로 받는 `fieldRef` 방식이 더 흔하고,
+**시험에서 파일 형태의 downwardAPI를 쓸 일은 드물다** — 이런 것이 있다는 정도로 충분하다.
+
+`projected`는 **여러 소스를 한 디렉터리로 합치는** 볼륨이다. ConfigMap·Secret·downwardAPI를
+따로 마운트하면 마운트 지점이 여러 개가 되는데, 이걸 하나로 모아 준다.
+`serviceAccountToken` 소스는 여기에만 있고, **현재 SA(ServiceAccount) 토큰의 표준 주입 방식**이다 ([ServiceAccount](/cka/service-account/)).
+`expirationSeconds`로 수명이 붙고 kubelet이 만료 전에 갈아 끼우며, `audience`는
+"이 토큰은 이 대상에게만 유효하다"는 표시라 토큰이 새어도 다른 곳에 못 쓰인다.
+
+## 요약
+
+- `emptyDir`은 컨테이너 재시작에는 남고, Pod이 제거되면 사라진다.
+- `hostPath`는 노드의 경로를 연결하므로 다른 노드에서 같은 데이터를 보장하지 않는다.
+- ConfigMap·Secret은 설정 파일을, `projected`는 여러 소스를 한 디렉터리로 제공한다.
+
+<LinkCard title="다음: PV와 PVC — 저장 공간 요청과 연결" href="/cka/persistent-volumes/" />

@@ -1,0 +1,158 @@
+---
+title: "StorageClass — 자동 생성과 확장"
+description: "StorageClass는 PVC 요청을 어떤 방식으로 처리할지 정하고, 프로비저너가 실제 볼륨을 만든다."
+deckGroup: storage
+sidebar:
+  order: 144
+---
+
+import Thesis from '../../../components/docs/Thesis.astro';
+import { Tabs, TabItem, LinkCard } from '@astrojs/starlight/components';
+
+<Thesis>StorageClass는 PVC 요청을 어떤 방식으로 처리할지 정하고, 프로비저너가 실제 볼륨을 만든다.</Thesis>
+
+[정적 PV/PVC](/cka/persistent-volumes/)에서는 관리자가 저장 공간을 먼저 준비했다.
+이 장은 **PVC 요청 → 프로비저너의 볼륨 생성 → PV 바인딩**을 자동화하는 방법과
+Pod의 배치 위치·용량 확장을 함께 다룬다.
+
+## StorageClass — 동적 프로비저닝
+
+정적 프로비저닝은 PVC가 올 때마다 관리자가 PV를 손으로 만들어야 한다 — 팀이 커지면 확장이 안 된다.
+StorageClass는 그 생성을 **프로비저너에게 맡겨 자동화**한다.
+
+```yaml
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: fast
+  annotations:
+    storageclass.kubernetes.io/is-default-class: "true"
+provisioner: ebs.csi.aws.com                # EBS CSI 드라이버가 설치된 환경의 예
+parameters:
+  type: gp3
+  fsType: ext4
+reclaimPolicy: Delete
+allowVolumeExpansion: true
+volumeBindingMode: WaitForFirstConsumer
+```
+
+- PVC가 이 클래스를 요청하면 **프로비저너가 PV를 자동으로 만든다**
+- 관리자가 PV를 미리 만들어둘 필요가 없다
+- `provisioner: kubernetes.io/no-provisioner` 는 **동적 생성을 하지 않는다** (로컬 볼륨용)
+- `parameters`의 내용은 **프로비저너마다 완전히 다르다.** 위의 `type: gp3`는 AWS EBS 드라이버가
+  아는 값이고, 다른 드라이버에는 없는 키다 — 외울 것이 아니라 드라이버 문서를 보는 자리다
+- `is-default-class` 애너테이션이 붙은 클래스가 **`storageClassName`을 생략한 PVC의 기본값**이 된다.
+  기본 클래스는 하나로 유지하는 편이 명확하다. 여럿이면
+  [가장 최근에 생성된 기본 클래스](https://kubernetes.io/docs/concepts/storage/storage-classes/#default-storageclass)가 적용된다
+
+```bash
+kubectl get sc
+# NAME              PROVISIONER            RECLAIMPOLICY  VOLUMEBINDINGMODE
+# standard (default) rancher.io/local-path Delete         WaitForFirstConsumer
+```
+
+### volumeBindingMode — 언제 묶을 것인가
+
+볼륨은 대체로 **어디에 있는지가 정해진 물건**이다 — 클라우드 디스크는 특정 AZ(Availability Zone·가용 영역)에,
+로컬 디스크는 특정 노드에 붙어 있다. 그런데 볼륨을 먼저 만들어 버리면 스케줄러는 나중에 움직이므로,
+Pod이 그 볼륨에 닿을 수 없는 곳에 배정될 수 있다. `volumeBindingMode`는 **바인딩과 스케줄링 중 무엇을 먼저 할지**를 정한다.
+
+<Tabs>
+<TabItem label="Immediate">
+
+PVC가 생기는 **즉시** PV를 만들고 묶는다. 스케줄러는 그다음에 움직인다.
+
+```d2 layout=elk pad=40 title="Immediate 바인딩에서 볼륨과 Pod이 다른 zone에 놓여 마운트가 실패하는 흐름"
+direction: down
+
+classes: {
+  bad: { style: { fill: "#fee2e2"; stroke: "#dc2626"; font-color: "#7f1d1d" } }
+  mute: { style: { fill: "#f1f5f9"; stroke: "#94a3b8"; font-color: "#334155" } }
+}
+
+pvc: PVC 생성 { class: mute }
+bind: 즉시 바인딩\nzone A 에 볼륨 생성 { class: mute }
+sch: 나중에 Pod 스케줄 { class: mute }
+z: zone B 노드에 배정 { class: mute }
+f: 마운트 실패 ❌\n볼륨이 다른 zone 에 있다 { class: bad }
+
+pvc -> bind
+bind -> sch
+sch -> z
+z -> f
+```
+
+**문제** — 볼륨이 zone A에 생겼는데 Pod은 zone B에 스케줄될 수 있다. 그러면 마운트가 실패한다.
+
+</TabItem>
+<TabItem label="WaitForFirstConsumer">
+
+**Pod이 스케줄될 때까지 기다렸다가** 그 노드에 맞는 볼륨을 만든다.
+
+```d2 layout=elk pad=40 title="WaitForFirstConsumer가 Pod 스케줄 뒤에 볼륨을 만들어 마운트에 성공하는 흐름"
+direction: down
+
+classes: {
+  ok: { style: { fill: "#dcfce7"; stroke: "#16a34a"; font-color: "#14532d" } }
+  warn: { style: { fill: "#fef3c7"; stroke: "#d97706"; font-color: "#78350f" } }
+  mute: { style: { fill: "#f1f5f9"; stroke: "#94a3b8"; font-color: "#334155" } }
+}
+
+pvc: PVC 생성 { class: mute }
+w: Pending\nwaiting for first consumer { class: warn }
+pod: Pod 생성 { class: mute }
+sch: 스케줄러가 노드 결정\nzone B { class: mute }
+bind: 그 zone 에 볼륨을 만들고 바인딩 { class: mute }
+fine: 마운트 성공 ✅ { class: ok }
+
+pvc -> w
+w -> pod
+pod -> sch
+sch -> bind
+bind -> fine
+```
+
+토폴로지 제약이 있는 환경(멀티 AZ, 로컬 디스크)에서 **사실상 필수**다.
+
+</TabItem>
+</Tabs>
+
+:::tip[시험]
+PVC가 `Pending`이고 메시지가
+**`waiting for first consumer to be created before binding`** 이면
+**고장이 아니다.** Pod을 만들면 바인딩된다. 이걸 문제로 착각하지 말 것.
+:::
+
+### 볼륨 확장
+
+디스크가 꽉 찼다고 볼륨을 지우고 다시 만들면 데이터가 사라진다.
+그래서 **PVC의 요청 용량을 늘리면 실제 볼륨과 파일시스템까지 따라 커지는** 경로가 따로 있다.
+여기서도 축은 같다 — spec(요청 용량)을 고치면 컨트롤러가 status를 거기에 맞춰 간다.
+
+```bash
+# StorageClass에 allowVolumeExpansion: true 가 있어야 한다
+kubectl patch pvc data -p '{"spec":{"resources":{"requests":{"storage":"20Gi"}}}}'
+kubectl get pvc data -w
+```
+
+- **늘리는 것만 가능하다.** 줄일 수 없다
+- 대부분의 CSI 드라이버는 **온라인 확장**을 지원한다 (Pod 재시작 불필요)
+- 파일시스템 확장이 필요하면 PVC 상태에 `FileSystemResizePending` 이 뜬다
+
+`FileSystemResizePending`은 **블록 장치는 이미 커졌지만 그 위의 파일시스템은 아직**이라는 뜻이다.
+확장이 두 단계(장치 확장 → 파일시스템 확장)로 나뉘어 있고, 뒤 단계는 노드의 kubelet이 한다.
+온라인 확장을 지원하지 않는 드라이버라면 Pod을 한 번 재시작해야 이 상태가 풀린다.
+
+:::caution[함정]
+`allowVolumeExpansion`이 `false`(기본)면
+확장 요청이 **거부**된다. PVC가 참조하는 StorageClass의 설정과
+[드라이버의 확장 지원](https://kubernetes.io/docs/concepts/storage/storage-classes/#volume-expansion)을 함께 확인한다.
+:::
+
+## 요약
+
+- 동적 프로비저닝에는 StorageClass와 그에 맞는 프로비저너가 필요하다.
+- `WaitForFirstConsumer`는 Pod의 배치 조건을 고려하기 위해 바인딩을 늦춘다.
+- 확장은 `allowVolumeExpansion: true`와 드라이버 지원이 필요하며, 용량은 늘리기만 가능하다.
+
+<LinkCard title="다음: StatefulSet과 Pod별 저장소" href="/cka/statefulset-storage/" />

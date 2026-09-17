@@ -701,7 +701,7 @@ e -> r6: 메시지가 없다
 | `node(s) had untolerated taint {...}` | toleration 없음 |
 | `node(s) didn't match Pod's node affinity/selector` | 라벨 불일치 |
 | `node(s) were unschedulable` | cordon 되어 있다 |
-| `pod has unbound immediate PersistentVolumeClaims` | PVC가 Bound 안 됨 ([스토리지](/cka/storage/)) |
+| `pod has unbound immediate PersistentVolumeClaims` | PVC가 Bound 안 됨 ([PV/PVC 바인딩](/cka/persistent-volumes/#바인딩-규칙)) |
 | **(메시지 없음)** | 스케줄러가 죽었거나 `schedulerName` 오타 |
 
 ## 요약

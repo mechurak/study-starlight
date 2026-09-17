@@ -1,0 +1,223 @@
+---
+title: "PV와 PVC — 저장 공간 요청과 연결"
+description: "PVC는 필요한 저장 공간을 요청하고, 컨트롤러는 그 조건을 만족하는 PV 하나에 연결한다."
+deckGroup: storage
+sidebar:
+  order: 142
+---
+
+import Thesis from '../../../components/docs/Thesis.astro';
+import { LinkCard } from '@astrojs/starlight/components';
+
+<Thesis>PVC는 필요한 저장 공간을 요청하고, 컨트롤러는 그 조건을 만족하는 PV 하나에 연결한다.</Thesis>
+
+[Pod 볼륨](/cka/pod-volumes/)을 알았다면 이제 Pod 밖에 남을 데이터를 연결할 차례다.
+이 장은 **Pod → PVC → PV**에서 각 리소스가 맡는 역할과, PVC가 `Bound`가 되는 조건을 설명한다.
+
+## PV와 PVC — 왜 나눴나
+
+```d2 layout=elk pad=40 title="관리자가 만드는 StorageClass·PV와 개발자가 만드는 PVC·Pod의 역할 분리"
+direction: down
+
+classes: {
+  admin: { style: { fill: "#fef3c7"; stroke: "#d97706"; font-color: "#78350f" } }
+  dev: { style: { fill: "#dbeafe"; stroke: "#2563eb"; font-color: "#1e3a8a" } }
+}
+
+a: 클러스터 관리자 — 무엇이 있는가 {
+  sc: StorageClass\n프로비저너 · 파라미터 { class: admin }
+  pv: PersistentVolume\ncapacity · accessModes\nreclaimPolicy { class: admin }
+}
+
+b: 앱 개발자 — 무엇이 필요한가 {
+  pvc: PersistentVolumeClaim\n10Gi · RWO { class: dev }
+  pod: "Pod\nclaimName: data" { class: dev }
+}
+
+b.pod -> b.pvc
+b.pvc -> a.pv: 바인딩
+b.pvc -> a.sc: 클래스 요청 { style.stroke-dash: 3 }
+a.sc -> a.pv: 동적 생성 { style.stroke-dash: 3 }
+```
+
+- **앱 개발자는 저장소가 NFS인지 EBS인지 몰라도 된다.** "10Gi, RWO(ReadWriteOnce — 한 노드에서 읽기·쓰기)"만 요청한다
+- **관리자는 실제 저장소를 준비한다.** 또는 StorageClass로 자동 생성되게 한다
+- 이 분리 덕분에 **같은 매니페스트가 온프렘과 클라우드에서 모두 동작**한다
+
+### PersistentVolume
+
+```yaml
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: pv-data
+spec:
+  capacity:
+    storage: 10Gi
+  accessModes:
+    - ReadWriteOnce
+  persistentVolumeReclaimPolicy: Retain      # Retain | Delete
+  storageClassName: manual
+  volumeMode: Filesystem                     # Filesystem(기본) | Block
+  hostPath:                                  # 실습용. 실제로는 nfs, csi 등
+    path: /mnt/data
+```
+
+- **클러스터 스코프**다 — 네임스페이스에 속하지 않는다
+- `storageClassName`이 PVC와 **일치해야** 바인딩된다
+- `volumeMode: Block`은 파일시스템 없이 **raw 블록 디바이스를 그대로** 넘기는 모드다 —
+  자체 포맷을 쓰는 DB 등 특수 용도라, 기본값이 `Filesystem`이라는 것과 이런 모드가 있다는 것만 알면 된다
+
+```bash
+kubectl get pv
+# NAME      CAPACITY  ACCESS MODES  RECLAIM POLICY  STATUS     CLAIM          STORAGECLASS
+# pv-data   10Gi      RWO           Retain          Bound      default/data   manual
+```
+
+### PersistentVolumeClaim
+
+```yaml
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: data
+  namespace: default
+spec:
+  accessModes: ["ReadWriteOnce"]
+  storageClassName: manual
+  resources:
+    requests:
+      storage: 5Gi
+  # selector:            # 특정 PV를 라벨로 고를 수도 있다
+  #   matchLabels: { tier: fast }
+```
+
+`selector`는 조건이 같은 PV가 여럿일 때 **라벨로 후보를 좁히는** 장치다.
+정적 PV를 등급별로 나눠 둔 환경에서 쓴다. **비어 있지 않은 `selector`를 지정하면
+동적 프로비저닝을 사용할 수 없다**
+([공식 문서](https://kubernetes.io/docs/concepts/storage/persistent-volumes/#class-1)).
+
+```yaml
+# Pod에서 쓰기
+spec:
+  containers:
+    - name: app
+      volumeMounts:
+        - name: data
+          mountPath: /var/lib/data
+  volumes:
+    - name: data
+      persistentVolumeClaim:
+        claimName: data
+```
+
+### 바인딩 규칙
+
+이 바인딩도 [시작하기 전에](/cka/intro/)의 축 — **선언된 상태(spec)와 실제 상태(status)의 차이를 줄이는 루프** — 위에 있다.
+PVC의 spec이 "이런 저장소가 필요하다"는 선언이고, 컨트롤러는 그 선언을 만족하는 PV가
+나타날 때까지 계속 재시도한다. 그래서 지금 조건에 맞는 PV가 없어 `Pending`이어도,
+나중에 PV가 생기면 **알아서 묶인다**.
+
+PVC가 만들어지면 컨트롤러가 조건에 맞는 PV를 찾는다. 아래 그림은 PV와 PVC가 모두 기본 `volumeMode: Filesystem`인 경우다.
+**네 조건을 모두 확인하고, PV가 다른 PVC에 이미 바인딩되어 있지 않아야** 묶인다.
+`Block`을 쓸 때는 [volumeMode도 맞아야 한다](https://kubernetes.io/docs/concepts/storage/persistent-volumes/#binding-block-volumes).
+
+```d2 layout=elk pad=40 title="PVC가 PV에 바인딩되기까지 거치는 네 가지 조건 검사"
+direction: down
+
+classes: {
+  ok: { style: { fill: "#dcfce7"; stroke: "#16a34a"; font-color: "#14532d" } }
+  bad: { style: { fill: "#fee2e2"; stroke: "#dc2626"; font-color: "#7f1d1d" } }
+  key: { style: { fill: "#dbeafe"; stroke: "#2563eb"; font-color: "#1e3a8a" } }
+}
+
+pvc: 새 PVC { class: key }
+q1: storageClassName\n일치? { shape: diamond }
+q2: accessModes\n만족? { shape: diamond }
+q3: 용량이\n요청 이상? { shape: diamond }
+q4: 셀렉터가 있으면\n라벨 일치? { shape: diamond }
+x: Pending\n바인딩 안 됨 { class: bad }
+b: Bound ✅ { class: ok }
+
+pvc -> q1
+q1 -> x: 아니오
+q1 -> q2: 예
+q2 -> x: 아니오
+q2 -> q3: 예
+q3 -> x: 아니오
+q3 -> q4: 예
+q4 -> x: 아니오
+q4 -> b: 예
+```
+
+**1:1 관계다.** 바인딩된 PV는 다른 PVC가 쓸 수 없다.
+그리고 **5Gi를 요청했는데 10Gi PV에 묶이면 10Gi 전부를 쓴다** — 남는 5Gi는 낭비된다.
+
+:::caution[함정]
+**PVC에 `storageClassName`을 아예 안 쓰면**
+기본 StorageClass가 적용될 수 있다. 위 정적 PV와 맞추려면 PVC에도
+`storageClassName: manual`을 쓴다. **클래스가 없는 PV**에 연결할 때는
+`storageClassName: ""`로 기본 클래스 적용을 막는다
+([공식 문서](https://kubernetes.io/docs/concepts/storage/persistent-volumes/#class-1)).
+"PV는 Available인데 PVC가 Pending"의 단골 원인이다.
+:::
+
+### accessModes
+
+| 모드 | 약칭 | 의미 |
+|---|---|---|
+| `ReadWriteOnce` | **RWO** | **한 노드**에서 읽기·쓰기 |
+| `ReadOnlyMany` | ROX | 여러 노드에서 읽기만 |
+| `ReadWriteMany` | **RWX** | **여러 노드**에서 읽기·쓰기 |
+| `ReadWriteOncePod` | RWOP | **Pod 하나**만 읽기·쓰기 |
+
+**RWO의 경계는 노드다.** 그림으로 보면 헷갈릴 일이 없다.
+
+```d2 layout=elk pad=40 title="RWO PV를 같은 노드의 두 Pod은 함께 마운트하지만 다른 노드 Pod은 Multi-Attach error가 나는 관계"
+direction: down
+
+classes: {
+  ok: { style: { fill: "#dcfce7"; stroke: "#16a34a"; font-color: "#14532d" } }
+  bad: { style: { fill: "#fee2e2"; stroke: "#dc2626"; font-color: "#7f1d1d" } }
+  mute: { style: { fill: "#f1f5f9"; stroke: "#94a3b8"; font-color: "#334155" } }
+}
+
+na: 노드 A {
+  p1: Pod 1 { class: ok }
+  p2: Pod 2 { class: ok }
+}
+
+nb: 노드 B {
+  p3: Pod 3 { class: bad }
+}
+
+vol: RWO PV 하나 { shape: cylinder; class: mute }
+
+na.p1 -> vol: 마운트 ✅
+na.p2 -> vol: 같은 노드라 가능 ✅
+nb.p3 -> vol: Multi-Attach error ❌ { style.stroke-dash: 3 }
+```
+
+:::caution[함정]
+**RWO는 "Pod 하나"가 아니라 "노드 하나"다.**
+같은 노드에 있는 여러 Pod은 동시에 마운트할 수 있다.
+정말 하나만 허용하려면 `ReadWriteOncePod`를 쓴다.
+:::
+
+**RWX는 아무 스토리지나 되는 게 아니다.**
+블록 스토리지(EBS, GCE PD)는 RWO만 가능하다. RWX는 **NFS·CephFS·EFS 같은 파일 스토리지**가 필요하다.
+
+accessMode는 **스토리지의 실제 능력을 강제하지 않는다.** 바인딩 조건으로만 쓰인다.
+
+실제로 시험과 실무에서 마주치는 것은 **RWO와 RWX 둘**이다.
+`ReadOnlyMany`(ROX)는 여러 노드가 같은 데이터를 읽기만 하는 배포용 이미지·정적 자산에나 쓰이고,
+`ReadWriteOncePod`(RWOP)는 "동시 쓰기가 데이터를 깨뜨리는" 단일 인스턴스 DB를 위해 나중에 추가된 모드다.
+둘 다 이름과 뜻만 알아두면 된다.
+
+## 요약
+
+- PV는 클러스터의 저장 공간이고, PVC는 네임스페이스 안의 요청이다.
+- 클래스·접근 모드·용량·선택한 라벨·volumeMode가 맞는 사용 가능한 PV에 1:1로 바인딩한다.
+- RWO의 경계는 노드 하나다. Pod 하나로 제한하려면 RWOP를 쓴다.
+
+<LinkCard title="다음: PV 회수 정책과 재사용" href="/cka/volume-lifecycle/" />

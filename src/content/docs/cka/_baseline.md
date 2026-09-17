@@ -46,5 +46,6 @@
 - CKA 덱은 제목·파일명·URL에 페이지 번호를 붙이지 않는다. 순서는 `sidebar.order`만 관리한다.
 - 본문에서 다른 페이지를 가리킬 때는 개념 이름과 링크를 쓴다. 요약 절 제목은 `요약`이다.
 - Cluster Architecture는 개념별 페이지로 나누되 같은 사이드바 그룹에 둔다.
+- Storage는 `storage`를 전체 흐름 안내로 두고, 볼륨·PV/PVC·회수 정책·StorageClass·Pod별 저장소·CSI·진단을 같은 사이드바 그룹에서 순서대로 읽는다.
 - 기존 번호 주소의 이동 정보는 `src/data/cka-legacy-routes.json`에 있으며,
   `src/pages/cka/[legacy].astro`가 페이지와 절 북마크를 새 주소로 연결한다.

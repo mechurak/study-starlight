@@ -135,7 +135,26 @@
   "13-storage": {
     "target": "/cka/storage/",
     "anchors": {
-      "13장-요약": "/cka/storage/#요약"
+      "13장-요약": "/cka/storage/#요약",
+      "emptydir--pod과-함께-사는-임시-공간": "/cka/pod-volumes/#emptydir--pod과-함께-사는-임시-공간",
+      "hostpath--노드의-디렉터리": "/cka/pod-volumes/#hostpath--노드의-디렉터리",
+      "설정을-담는-볼륨들": "/cka/pod-volumes/#설정을-담는-볼륨들",
+      "pv와-pvc--왜-나눴나": "/cka/persistent-volumes/#pv와-pvc--왜-나눴나",
+      "persistentvolume": "/cka/persistent-volumes/#persistentvolume",
+      "persistentvolumeclaim": "/cka/persistent-volumes/#persistentvolumeclaim",
+      "바인딩-규칙": "/cka/persistent-volumes/#바인딩-규칙",
+      "accessmodes": "/cka/persistent-volumes/#accessmodes",
+      "pv의-생애--상태가-어떻게-움직이는가": "/cka/volume-lifecycle/#pv의-생애--상태가-어떻게-움직이는가",
+      "reclaimpolicy--pvc를-지우면-데이터는": "/cka/volume-lifecycle/#reclaimpolicy--pvc를-지우면-데이터는",
+      "정적-프로비저닝-실습-흐름": "/cka/volume-lifecycle/#정적-프로비저닝-실습-흐름",
+      "storageclass--동적-프로비저닝": "/cka/storage-class/#storageclass--동적-프로비저닝",
+      "volumebindingmode--언제-묶을-것인가": "/cka/storage-class/#volumebindingmode--언제-묶을-것인가",
+      "볼륨-확장": "/cka/storage-class/#볼륨-확장",
+      "statefulset과-volumeclaimtemplates": "/cka/statefulset-storage/#statefulset과-volumeclaimtemplates",
+      "rwo-볼륨--deployment의-함정": "/cka/statefulset-storage/#rwo-볼륨--deployment의-함정",
+      "csi--스토리지-확장-인터페이스": "/cka/csi/#csi--스토리지-확장-인터페이스",
+      "진단-절차": "/cka/storage-troubleshooting/#진단-절차",
+      "진단과-실습": "/cka/storage-troubleshooting/"
     }
   },
   "11-ingress-gateway": {
