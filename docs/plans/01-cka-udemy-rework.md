@@ -14,7 +14,7 @@
 여러 주제 때문에 이해와 재탐색이 어렵다. 원하는 결과는 **필요한 개념을 이해하고, 어떤 명령으로
 풀며, 막히면 어떤 공식 문서를 찾아야 하는지 바로 연결되는 실습 노트**다.
 
-이 문서는 [coding-agents의 작업 계획 가이드](../../src/content/docs/coding-agents/01-development-process.mdx)를
+이 문서는 [coding-agents의 작업 계획 가이드](../../src/content/docs/coding-agents/work-plans.mdx)를
 따른다. M0·M1을 수행하는 Astra 세션과 M2~M8을 수행할 Sol Medium 세션이 같은 파일로 인계한다.
 페이지 내용의 영구 규칙은 개편 과정에서 `cka-udemy/_baseline.md`에 반영한다.
 

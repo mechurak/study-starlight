@@ -1,0 +1,97 @@
+---
+title: "Monorepo의 지침 경계"
+description: "앱·package마다 명령과 규칙이 달라질 때 공유 정본과 어댑터를 배치하는 선택 심화"
+reviewedAt: 2026-09-18
+status: stable
+deckGroup: advanced
+sidebar:
+  order: 50
+---
+
+import { LinkCard } from '@astrojs/starlight/components';
+import Thesis from '../../../components/docs/Thesis.astro';
+import TermIntro from '../../../components/docs/TermIntro.astro';
+
+<Thesis>하위 지침은 규칙이 달라지는 경계에만 두고, 상위 내용을 복사하는 대신 그 범위의 차이를 적는다</Thesis>
+
+이 페이지는 여러 앱의 검사 명령이나 의존성 규칙이 달라졌을 때 읽는 심화다.
+단일 사이트는 [루트의 최소 구성](/coding-agents/project-instructions/)으로 시작하면 된다.
+질문은 **폴더가 많을 때 어느 경계에 지침을 추가해야 하는가**다.
+
+<TermIntro terms={[["Monorepo", "", "여러 앱이나 package를 하나의 저장소에서 관리하는 구성. 지침도 실제 작업 경계에 맞춰 나눌 필요가 있다."]]} />
+
+## 목표 monorepo 구조
+
+다음은 가상 저장소의 배치 예시다. 이 사이트에 `apps/web`이 있다는 뜻은 아니다.
+
+```text
+my-workspace/
+  AGENTS.md                 # 공통 계약·하위 지침 확인
+  CLAUDE.md                 # @AGENTS.md
+  docs/verification.md      # 공통 검증 설명
+  apps/web/
+    AGENTS.md               # web 명령·제약
+    CLAUDE.md               # @AGENTS.md
+  apps/api/
+    AGENTS.md               # api 명령·제약
+    CLAUDE.md               # @AGENTS.md
+```
+
+폴더가 생길 때마다 파일 쌍을 만들지 않는다. `apps/web/src/components`가 web 전체와 같은 규칙을
+쓴다면 중첩 지침은 필요 없다. 명령·의존 방향·검증 방식이 달라지는 곳이 경계다.
+
+## 하위 파일은 상위 규칙의 복사본이 아니다
+
+루트에 “모든 package는 Jest”, web에 “Vitest”라고 쓰면 충돌한다. 루트에는 package별 명령을
+가까운 지침에서 확인하라고 쓰고 하위에 정확한 명령을 둔다.
+
+```md title="apps/web/AGENTS.md — 가상 package 예시"
+# Web 범위
+
+- 이 지침은 apps/web/에 적용한다.
+- 공유 UI는 packages/ui의 기존 컴포넌트를 먼저 확인한다.
+- src/server 모듈을 브라우저 코드에서 import하지 않는다.
+- 동작 변경은 pnpm --filter web test로 검증한다.
+- 레이아웃 변경은 바꾼 화면의 필요한 뷰포트만 확인한다.
+```
+
+이 명령은 `web`이라는 package와 `test` script가 있을 때만 실행 가능하다.
+실제 `package.json`의 이름·명령으로 바꾸고, 이 사이트의 `pnpm check`와 혼동하지 않는다.
+같은 폴더의 CLAUDE는 다시 `@AGENTS.md` 한 줄이다.
+
+상충 지침을 피하는 이유는 [도구별 결합 방식](/coding-agents/instruction-discovery/)이 다르기 때문이다.
+우선순위에 기대 상위 규칙을 계속 부정하기보다 공통 규칙과 지역 차이가 함께 성립하게 쓴다.
+
+## 실행 위치를 작업 범위에 맞춘다
+
+한 package 작업이라면 그 폴더에서 시작하면 적용 범위를 확인하기 쉽다.
+여러 package를 함께 바꾸면 루트에서 시작하고 대상 경로와 각 지침을 요청에 명시한다.
+다음은 가상 경로가 실제로 있는 환경에서 사용할 실행 위치 예시다.
+
+```bash
+cd apps/web
+codex
+# 또는 같은 위치에서 claude
+```
+
+실행 전 해당 CLI가 설치돼 있어야 하며 이 사이트를 빌드하는 데는 어느 CLI도 필요 없다.
+위치만 맞췄다고 적용을 확신하지 말고 [실제 세션 확인](/coding-agents/instruction-discovery/#실제-세션에서-확인한다)을 한다.
+
+## 구조가 자란 뒤의 점검
+
+- 공유 규칙이 같은 범위 AGENTS 한 곳에 있는가?
+- CLAUDE import가 같은 폴더 정본을 가리키는가?
+- 상위와 하위 규칙이 충돌하지 않고 검사 명령이 실제 package와 맞는가?
+- 개인 설정이나 도구 전용 기억에만 공유 결정이 남지 않았는가?
+
+반복해서 어댑터가 빠진다면 추적된 AGENTS와 CLAUDE 쌍을 검사하는 작은 스크립트를 고려한다.
+처음부터 별도 지침 관리 프레임워크를 만들 필요는 없다. 의미상 중복은 단순 문자열 검사만으로
+판정하기 어려우므로 리뷰를 함께 한다.
+
+## 이해 확인
+
+web과 api의 규칙이 같은데 폴더가 둘이다. 하위 AGENTS가 둘 다 필요할까?
+폴더 수가 아니라 규칙의 차이가 기준이므로 필요하지 않을 수 있다. 공통 계약으로 충분한 동안은
+루트만 유지하고, 실제 차이가 생긴 경계에 추가한다.
+
+<LinkCard title="덱 개요로 돌아가기" description="기본 작업 경로와 선택 심화를 다시 고른다." href="/coding-agents/" />

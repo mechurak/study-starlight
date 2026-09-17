@@ -1,0 +1,39 @@
+{
+  "00-project-instructions": {
+    "target": "/coding-agents/project-instructions/",
+    "anchors": {
+      "먼저-바로잡을-네-가지": "/coding-agents/instruction-discovery/#두-도구는-어디까지-자동으로-읽는가",
+      "두-도구는-어디까지-자동으로-읽는가": "/coding-agents/instruction-discovery/#두-도구는-어디까지-자동으로-읽는가",
+      "목표-monorepo-구조": "/coding-agents/monorepo-instructions/#목표-monorepo-구조",
+      "루트-파일은-지도와-공통-계약이다": "/coding-agents/project-instructions/#루트-파일은-지도와-공통-계약이다",
+      "하위-파일은-상위-규칙의-복사본이-아니다": "/coding-agents/monorepo-instructions/#하위-파일은-상위-규칙의-복사본이-아니다",
+      "실행-위치를-작업-범위에-맞춘다": "/coding-agents/monorepo-instructions/#실행-위치를-작업-범위에-맞춘다",
+      "지침에는-행동만-설명은-연결만-둔다": "/coding-agents/project-instructions/#지침에는-행동만-설명은-연결만-둔다",
+      "astra-출시-뒤-지침을-다시-고르는-기준": "/coding-agents/project-instructions/#작은-작업으로-지침-변경을-비교한다",
+      "작은-작업으로-지침-변경을-비교한다": "/coding-agents/project-instructions/#작은-작업으로-지침-변경을-비교한다",
+      "운영-체크리스트": "/coding-agents/monorepo-instructions/#구조가-자란-뒤의-점검",
+      "이-장의-결론": "/coding-agents/project-instructions/#이해-확인"
+    }
+  },
+  "01-development-process": {
+    "target": "/coding-agents/work-plans/",
+    "anchors": {
+      "대화가-아니라-저장소가-기억한다": "/coding-agents/execution-and-resume/#새-세션은-현재-파일에서-재개한다",
+      "언제-계획-문서를-만드는가": "/coding-agents/work-plans/#언제-계획-문서를-만드는가",
+      "계획의-크기와-실행-권한을-따로-정한다": "/coding-agents/work-plans/#계획의-크기와-실행-권한을-따로-정한다",
+      "github-이슈-대신-로컬에-둘-때": "/coding-agents/work-plans/#저장소-문서는-서로-다른-시간을-기억한다",
+      "저장소-문서는-서로-다른-시간을-기억한다": "/coding-agents/work-plans/#저장소-문서는-서로-다른-시간을-기억한다",
+      "timeline에서-배운-기록의-서열": "/coding-agents/work-plans/#저장소-문서는-서로-다른-시간을-기억한다",
+      "prd는-현재-제품의-정본이다": "/coding-agents/work-plans/#저장소-문서는-서로-다른-시간을-기억한다",
+      "계획-문서는-실행-가능한-계약이다": "/coding-agents/work-plans/#계획-문서는-실행-가능한-계약이다",
+      "execplan과-계획-문서": "/coding-agents/work-plans/#execplan과-계획-문서",
+      "한-작업-계획을-여섯-단계로-운영한다": "/coding-agents/execution-and-resume/#자료-조사와-작성의-연결을-확인한다",
+      "검증은-완료-조건에-맞춰-끝낸다": "/coding-agents/execution-and-resume/#실패하면-원인을-좁히고-해당-결과를-다시-확인한다",
+      "병렬-작업에는-독립적인-질문을-맡긴다": "/coding-agents/execution-and-resume/#권한과-병렬-작업의-경계",
+      "프롬프트는-설명서가-아니라-파일을-가리킨다": "/coding-agents/execution-and-resume/#요청은-결과와-경계를-드러낸다",
+      "사람은-의도와-위험-에이전트는-실행과-증거를-맡는다": "/coding-agents/execution-and-resume/#권한과-병렬-작업의-경계",
+      "완료하면-작업-지식을-영구-지식으로-승격한다": "/coding-agents/work-plans/#완료하면-필요한-지식을-제자리로-옮긴다",
+      "운영-체크리스트와-더-읽을-자료": "/coding-agents/execution-and-resume/#결과는-세-종류의-증거로-읽는다"
+    }
+  }
+}

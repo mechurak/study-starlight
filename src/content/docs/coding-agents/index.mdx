@@ -1,54 +1,35 @@
 ---
 title: 개요
-description: Claude Code와 Codex를 같은 저장소에서 운영하는 지침·PRD·로컬 작업 문서·컨텍스트·검증 패턴
-reviewedAt: 2026-09-12
-status: review
+description: 단일 저장소에서 Claude Code와 Codex의 지침을 공유하고 작업 요청·검증·재개를 연결하는 학습 경로
+reviewedAt: 2026-09-18
+status: stable
 ---
 
-import { LinkCard, LinkButton } from '@astrojs/starlight/components';
+import { LinkButton } from '@astrojs/starlight/components';
 import DeckMap from '../../../components/docs/DeckMap.astro';
 import Thesis from '../../../components/docs/Thesis.astro';
 
-<Thesis>도구를 잘 쓰는 비결을 거대한 prompt 하나로 만들지 않는다 — 현재 제품 정본, 반복 규칙, 작업별 로컬 문서, 자동 검사를 나눈다</Thesis>
+<Thesis>반복 규칙은 공유하고, 이번 작업의 목표와 증거는 파일에 남겨 두 도구와 다음 세션이 이어받게 한다</Thesis>
 
-Claude Code와 Codex는 같은 코드를 고치지만, 저장소 지침을 찾는 방식은 같지 않다. 이 차이를 모르고
-`AGENTS.md`와 `CLAUDE.md`에 같은 규칙을 복사하면 둘은 곧 어긋난다. 반대로 한 파일만 두면 어느 한쪽이
-하위 package 규칙을 놓칠 수 있다.
+에이전트에게 같은 규칙을 매번 설명하거나, 다음 세션에서 이미 한 작업을 반복하는 문제에서 출발한다.
+Git·Markdown·기본 명령 실행을 아는 독자가 **단일 저장소의 지침을 구성하고, 작은 덱을 맡기고,
+결과를 리뷰한 뒤 재개할 수 있는 것**이 목표다. 특정 모델의 성능 비교나 API 개발은 다루지 않는다.
 
-이 덱은 그런 경계에서 출발한다. 첫 장에서는 monorepo까지 견디는 지침 계층을 만들고, 둘째 장에서는
-GitHub 이슈 대신 `docs/plans/`에 목표·계획·상태·검증을 남기며 AI에게 맡길 실행 범위를 정하는
-프로세스를 세운다. 이때 PRD는 현재 제품 요구, 작업 계획은 변경 과정과 증거로 분리한다. 이후 실제로
-반복해서 쓸 만한 컨텍스트·검증 패턴을 한 장씩 보탠다.
+기본 경로는 공유 지침 → 제품별 탐색 → 작업 계획 → 실행과 재개다. 여러 앱을 관리할 때만
+monorepo 심화를 읽는다. 파일 이름과 문서 체계는 이 덱의 운영안이며 제품의 의무 규격이 아니다.
+두 CLI는 학습 사이트 빌드의 필수 의존성이 아니고, 사용할 때만 각 제품의 설치·계정 준비가 필요하다.
 
-2026-09-12에는 [Astra 출시 뒤 지침 정리 가이드](https://developers.openai.com/blog/rethinking-skills-and-prompts-for-gpt-6-astra)를
-반영했다. 0장은 조건부 문서 읽기와 skill 선택 범위, 1장은 완료 조건과 실제로 필요한 승인 지점을
-다룬다. 모델 교체가 저장소의 권한 경계나 두 도구의 파일 탐색 방식을 바꾸는 것은 아니다.
-
-<LinkButton href="/coding-agents/00-project-instructions/" icon="right-arrow">첫 장부터 읽기</LinkButton>
+<LinkButton href="/coding-agents/project-instructions/" icon="right-arrow">공유 지침부터 시작하기</LinkButton>
 
 ## 구성
 
 <DeckMap deck="coding-agents" />
 
-## 이 덱의 기본 관점
+## 읽은 뒤 확인할 것
 
-지침 파일은 설명서가 아니라 **작업 입구의 표지판**이다. 항상 알아야 할 행동 규칙과 정확한 명령만
-짧게 두고, 아키텍처와 긴 절차는 별도 문서로 연결한다. 반드시 지켜야 하는 포맷·검사·금지는 프롬프트에만
-기대지 않고 CI나 hook으로 옮긴다.
+공유 규칙의 편집 지점, 현재 작업의 실행 범위, 완료를 뒷받침하는 증거를 각각 가리킬 수 있어야 한다.
+예를 들어 “검사가 통과했다”와 “독자가 예제를 실행해 원리를 확인할 수 있다”는 다른 조건이다.
+기술 검사와 의미 리뷰를 모두 수행하고 실제 확인한 범위만 보고한다.
 
-이 원칙은 OpenAI가 실제 Codex 운영에서 `AGENTS.md`를 거대한 백과사전 대신 짧은 지도처럼 쓴다는
-[harness engineering 사례](https://openai.com/index/harness-engineering/)와, Claude Code가 `CLAUDE.md`를
-200줄 아래로 유지하고 세부 절차는 path-scoped rule이나 skill로 옮기라고 하는
-[Anthropic 공식 가이드](https://code.claude.com/docs/en/memory#write-effective-instructions)에 공통으로 나타난다.
-
-<LinkCard
-  title="0. AGENTS.md와 CLAUDE.md 함께 설계하기"
-  description="탐색 방식 비교, 권장 monorepo 구조, 루트·package 템플릿과 검증 체크리스트."
-  href="/coding-agents/00-project-instructions/"
-/>
-
-<LinkCard
-  title="1. AI와 함께 개발하는 작업 프로세스"
-  description="PRD와 작업 계획의 경계, 로컬 문서의 수명주기, 실행 범위·완료 조건·사람 확인 지점."
-  href="/coding-agents/01-development-process/"
-/>
+2026-09-18에 본문의 공식 근거와 이 저장소의 파일을 대조했다. 도구별 별도 세션의 자동 로딩을
+실측한 결과는 아니며, 실제 로드 확인 방법은 지침 탐색 페이지에 있다.

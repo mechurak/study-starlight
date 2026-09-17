@@ -1,48 +1,70 @@
-// 덱 단위 metadata와 구조. 페이지 소속·순서는 각 MDX frontmatter에 있다.
 export default {
-	"navOrder": 2100,
-	"catalogOrder": 2100,
-	"label": "Claude Code · Codex",
-	"title": "Claude Code · Codex 실전",
-	"icon": "pencil",
-	"aliases": [
-		"코딩 에이전트",
-		"Coding Agents",
-		"AGENTS.md",
-		"CLAUDE.md"
-	],
-	"description": "두 코딩 에이전트를 같은 저장소에서 쓰는 법 — 지침 계층, 컨텍스트, 작업 요청과 검증 패턴.",
-	"category": "tools",
-	"tags": [
-		"agent"
-	],
-	"termIntro": "required",
-	"groups": [
-		{
-			"id": "project-instructions",
-			"label": "프로젝트 지침"
-		},
-		{
-			"id": "development-process",
-			"label": "작업 프로세스"
-		}
-	],
-	"map": [
-		{
-			"label": "0장",
-			"href": "/coding-agents/00-project-instructions/",
-			"title": "프로젝트 지침",
-			"tone": "key",
-			"desc": "`AGENTS.md`를 공유 정본으로 두고 `CLAUDE.md`를 얇은 어댑터로 만드는 monorepo 구조",
-			"note": "두 도구가 같은 규칙을 읽되, 서로 다른 하위 폴더 탐색 방식도 놓치지 않게 하려면"
-		},
-		{
-			"label": "1장",
-			"href": "/coding-agents/01-development-process/",
-			"title": "AI 개발 프로세스",
-			"tone": "ok",
-			"desc": "PRD·`AGENTS.md`·`docs/plans/`의 역할을 나누고 마일스톤마다 구현·검증·기록을 닫는 흐름",
-			"note": "현재 제품 정본을 흐리지 않고 긴 작업을 새 세션에서도 이어 가려면"
-		}
-	]
+  "navOrder": 2100,
+  "catalogOrder": 2100,
+  "label": "Claude Code · Codex",
+  "title": "Claude Code · Codex 실전",
+  "icon": "pencil",
+  "aliases": [
+    "코딩 에이전트",
+    "Coding Agents",
+    "AGENTS.md",
+    "CLAUDE.md"
+  ],
+  "description": "두 코딩 에이전트를 같은 저장소에서 쓰는 법 — 지침 계층, 컨텍스트, 작업 요청과 검증 패턴.",
+  "category": "tools",
+  "tags": [
+    "agent"
+  ],
+  "termIntro": "required",
+  "groups": [
+    {
+      "id": "project-instructions",
+      "label": "프로젝트 지침"
+    },
+    {
+      "id": "development-process",
+      "label": "작업 프로세스"
+    },
+    {
+      "id": "advanced",
+      "label": "선택 심화"
+    }
+  ],
+  "map": [
+    {
+      "label": "공유",
+      "href": "/coding-agents/project-instructions/",
+      "title": "공유 지침",
+      "tone": "key",
+      "desc": "단일 저장소의 AGENTS 정본과 CLAUDE 어댑터"
+    },
+    {
+      "label": "탐색",
+      "href": "/coding-agents/instruction-discovery/",
+      "title": "지침 탐색",
+      "tone": "mute",
+      "desc": "실행 위치와 제품별 자동 로딩 경계"
+    },
+    {
+      "label": "계획",
+      "href": "/coding-agents/work-plans/",
+      "title": "목표와 증거",
+      "tone": "ok",
+      "desc": "실행 범위·현재 위치·검증 기록"
+    },
+    {
+      "label": "실행",
+      "href": "/coding-agents/execution-and-resume/",
+      "title": "요청과 재개",
+      "tone": "warn",
+      "desc": "작은 덱 요청부터 리뷰·실패 수정·재개까지"
+    },
+    {
+      "label": "심화",
+      "href": "/coding-agents/monorepo-instructions/",
+      "title": "Monorepo 경계",
+      "tone": "zone",
+      "desc": "규칙이 달라지는 package에만 추가 지침"
+    }
+  ]
 };

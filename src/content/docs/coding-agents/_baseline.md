@@ -1,73 +1,37 @@
 # Claude Code · Codex 실전 덱의 기준
 
-`coding-agents` 덱을 고치기 전에 읽는다.
+이 덱을 수정하기 전에 읽는다.
 
-이 덱은 Claude Code와 Codex를 실제 저장소에서 함께 쓰며 반복해서 확인할 **운영 패턴**을 모은다.
-제품 기능을 나열하는 설명서가 아니라, 어떤 구성을 택할지와 어디서 실패하는지를 중심으로 쓴다.
+## 독자·학습 결과·범위
+
+독자는 Git·Markdown·기본 명령 실행을 알지만 이 사이트와 공유 지침 설계는 처음인 동료다.
+단일 저장소에서 공유 규칙을 만들고, 작은 학습 덱을 요청·리뷰·검증·재개할 수 있게 한다.
+기본 경로는 공유 지침 → 지침 탐색 → 작업 계획 → 실행과 재개이며 monorepo는 선택 심화다.
+API 개발, 모델 성능 비교, 제품별 전체 설정·권한 레퍼런스는 범위 밖이다.
 
 ## 현재성 기준
 
-**2026년 9월 12일**에는 Astra에 맞춘 지침·작업 프로세스를 아래 OpenAI 원문으로 재검토했다.
-공유 정본·어댑터 구조는 유지하고, 조건부 읽기·skill 선택 범위·실행 권한·검증 종료 기준을 갱신했다.
-Anthropic 세부 기능과 `timeline` 사례의 확인 시점은 아래 9월 4일 기록을 유지한다. MDX의 `status: review`도
-유지하며, 날짜 갱신을 두 제품의 모든 기능을 새로 실측했다는 뜻으로 해석하지 않는다.
+2026-09-18에 다음 공식 근거와 저장소 파일을 대조했다. 별도 Codex·Claude Code 세션을
+실행해 자동 로딩·권한·컨텍스트 복원을 실측한 것은 아니다. 본문은 문서가 보장하는 핵심 경계와
+직접 확인하는 방법을 설명한다. 모델별 성향·요금제별 기본 권한처럼 이 학습 경로에 불필요하고
+변하기 쉬운 세부 단정은 두지 않는다.
 
-- Astra 지침 정리: <https://developers.openai.com/blog/rethinking-skills-and-prompts-for-gpt-6-astra> (9월 11일 게시)
-- Astra 모델별 보정: <https://developers.openai.com/api/docs/guides/latest-model?model=gpt-6-astra>
-- 재확인: OpenAI AGENTS.md·best practices·ExecPlan·Subagents 문서
-  (<https://learn.chatgpt.com/docs/agent-configuration/subagents>)
-
-**2026년 9월 4일**에 다음 공식 문서와 사례를 확인했다.
-
-- OpenAI 지침 파일: <https://learn.chatgpt.com/docs/agent-configuration/agents-md>
-  (구 주소 `developers.openai.com/codex/guides/agents-md`는 이곳으로 영구 리다이렉트된다)
-- OpenAI 작업 방식: <https://learn.chatgpt.com/guides/best-practices>,
-  <https://learn.chatgpt.com/docs/long-running-work> (ChatGPT·Codex 공용 goals 문서 — 인용할 때 주어를 Codex로 좁히지 않는다)
-- OpenAI 실행 계획: <https://developers.openai.com/cookbook/articles/codex_exec_plans>
-  (`PLANS.md`·ExecPlan. best-practices가 직접 링크하는, `docs/plans/`의 가장 가까운 공식 대응물)
-- Anthropic 지침 파일: <https://code.claude.com/docs/en/memory>
-- Anthropic 작업 방식: <https://code.claude.com/docs/en/best-practices>
-- Anthropic 기능 선택: <https://code.claude.com/docs/en/features-overview>
-- Anthropic monorepo 설정: <https://code.claude.com/docs/en/large-codebases>
-- Anthropic compaction 뒤 남는 것: <https://code.claude.com/docs/en/context-window#what-survives-compaction>
-- Anthropic 완료 조건 loop: <https://code.claude.com/docs/en/goal>
-- OpenAI 장시간 작업 사례: <https://developers.openai.com/blog/run-long-horizon-tasks-with-codex>,
-  <https://developers.openai.com/blog/automating-repetitive-work-at-openai-with-codex>
-- Anthropic 내부 활용 사례: <https://claude.com/blog/how-anthropic-teams-use-claude-code>
-- AGENTS.md 스펙 사이트: <https://agents.md/> — "가장 가까운 파일을 자동으로 읽는다"는 문구는 스펙의
-  일반론이고, Codex가 실제로 어디까지 읽는지는 OpenAI 공식 문서를 따른다
-- OpenAI harness engineering: <https://openai.com/index/harness-engineering/> — 2026-09-04 재확인 때
-  봇 차단(403)으로 원문을 다시 읽지 못했다. 2차 자료와 일치하는 요지("짧은 지도 + 구조화된 `docs/`")만
-  인용하고 세부 구조를 새로 단정하지 않는다
-
-제품의 탐색·로딩 동작은 바뀔 수 있다. 사실을 적을 때는 본문 주장 가까이에 공식 링크를 두고,
-이 덱의 권장 설계와 제품이 보장하는 동작을 구분한다. 공식 문서가 보장하지 않는 경계 사례는
-"보장하지 않는다" 또는 "의존하지 않는다"로 표현하고 단정하지 않는다.
+- OpenAI AGENTS: <https://learn.chatgpt.com/docs/agent-configuration/agents-md>
+- Anthropic memory: <https://code.claude.com/docs/en/memory>
+- Anthropic best practices: <https://code.claude.com/docs/en/best-practices>
+- OpenAI ExecPlan: <https://developers.openai.com/cookbook/articles/codex_exec_plans>
+  (원문 archived 표시. 자기완결 계획의 과거 공식 사례로 인용한다.)
 
 ## 서술 규칙
 
-- 각 장 첫머리에 `<TermIntro>`를 둔다.
-- 큰 그림은 **공유 규칙 / 도구별 어댑터 / 강제 장치**의 세 층으로 설명한다.
-- 예시는 루트와 여러 package가 있는 monorepo를 기본으로 한다. 단일 package 저장소는 그 축약형이다.
-- 명령과 파일 예시는 복사해서 시작할 수 있을 정도로 구체적으로 쓰되, 특정 언어·프레임워크에 종속된 값은
-  `<repo-command>` 같은 추상 표기보다 `pnpm test`처럼 알아보기 쉬운 예시를 쓰고 교체 지점을 설명한다.
-- 공유 행동 규칙의 정본은 `AGENTS.md`라는 이 덱의 권장안을 유지한다. 제품 공식 표준이라는 뜻으로 쓰지 않는다.
-- PRD는 현재 제품 요구, 작업 계획(`docs/plans/`)은 작업 과정과 증거, architecture·spec은 영구 기술 경계라는 역할 구분을
-  유지한다. 이 구분은 공식 파일명 표준이 아니라 공식 사례를 저장소에 적용한 이 덱의 권장안이다.
-- `docs/plans/`를 설명할 때는 OpenAI ExecPlan(`PLANS.md`)이 가장 가까운 공식 대응물임을 밝히고,
-  **자기완결 vs 링크**, **연속 실행 vs milestone gate** 두 축의 차이를 이 덱의 선택으로 서술한다.
-  1장에서 한 번 설명하고 다른 장에서 반복하지 않는다.
-- milestone은 구현·검증·기록의 단위다. 자동 승인 gate로 취급하지 않는다. 조사·계획만, 특정 milestone까지,
-  전체 완료 중 사용자가 맡긴 실행 범위를 따르고, 추가 결정·권한이 필요한 곳만 확인 지점으로 둔다.
-- Astra의 성향은 모델별 관찰로 표시한다. 공유 지침의 단순화와 제품의 파일 탐색·도구 권한을 혼동하지 않는다.
-- 작업 단위는 "작업 계획(plan)", 파일은 "계획 문서"라고 부른다. 도구의 plan mode가 만드는 임시 plan과
-  구분해서 쓴다. "배치"는 `timeline`의 옛 이름이라 사례 설명에서만 쓴다.
-- `timeline` 저장소를 사례로 들 때는 그 저장소의 현재 구조와 맞춘다. 덱에서 권장하는 구조가 사례와
-  달라지면 어느 쪽이 먼저 바뀌었는지 밝힌다.
+공유 지침·도구별 어댑터·검사 장치를 구분한다. AGENTS를 공유 정본으로 두는 것은 이 덱의 운영안이다.
+제품 탐색·import 동작과 이 저장소의 선택을 혼동하지 않는다. 실제 세션 로드를 확인하지 않았다면
+문서 확인이라고 쓴다. 개인 기억·대화의 요약이 저장소 정본을 대체한다고 설명하지 않는다.
 
-## 범위
+예시는 단일 사이트가 기본이다. 가상 package와 명령은 가상임과 교체할 값을 명시한다.
+작은 작업에 PRD·changelog·decision 문서를 일괄 생성하지 않는다. 계획은 docs/plans/README.md를 따른다.
+ExecPlan 비교는 work-plans에서 한 번만 설명한다. 마일스톤은 작업·검증·기록의 단위이며
+실행 범위는 사용자 요청으로 정한다. 전체 완료이면 허용된 다음 작업을 이어 간다.
 
-다룬다: 프로젝트 지침, PRD와 로컬 작업 문서의 수명주기, 프롬프트와 컨텍스트 관리, 계획·구현·검증 요청,
-병렬 작업, 실패 복구, 도구별 기능을 함께 쓸 때의 이식 가능한 패턴.
-
-다루지 않는다: 모델 API 개발, 범용 prompt engineering 이론, IDE 자체 사용법 전체, 각 제품의 전체 설정 레퍼런스.
+각 학습 본문은 Thesis·TermIntro와 하나의 중심 질문을 가지며 번호 없는 파일명·제목·URL을 쓴다.
+옛 두 페이지의 URL·절 북마크 호환은 src/data/coding-agents-legacy-routes.json이 소유한다.

@@ -1,6 +1,6 @@
 # 작업 계획 관리
 
-[coding-agents의 작업 계획 가이드](../../src/content/docs/coding-agents/01-development-process.mdx)를
+[coding-agents의 작업 계획 가이드](../../src/content/docs/coding-agents/work-plans.mdx)를
 이 저장소에 적용한 공통 규칙이다. 여러 단계·세션에 걸친 작업과 사용자가 요청한 계획에 적용한다.
 바로 편집·검증으로 끝나는 작은 수정에는 별도 계획을 만들 필요가 없다.
 개별 계획은 이 문서를 링크하고 공통 수명주기를 복사하지 않는다.
