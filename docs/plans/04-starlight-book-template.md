@@ -1,7 +1,7 @@
 # 4. 학습 콘텐츠 품질 정비와 Starlight 템플릿 분리
 
 상태: 진행 중
-지금 위치: M01~M05 완료 · 원본 품질 조건 충족 · 다음 M06 이관표 확정 후 M07 독립 저장소 생성
+지금 위치: M01~M05 완료 · 원본 품질 조건 충족 · M06 이관표 확정 · 다음 M07 독립 저장소 생성
 실행 범위: 전체 완료. M01~M10을 의존 순서대로 수행하고 주요 마일스톤에서 로컬 커밋한다.
 푸시·원격 저장소 생성·배포는 하지 않는다. 템플릿 생성은 M05 충족 뒤에만 진행한다.
 
@@ -292,7 +292,8 @@ AI 사용이나 특정 계정은 사이트 빌드의 필수 조건이 아니다.
 | M03 | done | Coding Agents index+5본문, baseline·metadata, 옛 URL 호환과 들어오는 파일 링크 | 아래 페이지별 리뷰·check·27개 앵커·브라우저 2건 확인 | M04 |
 | M04 | done | Starlight 12페이지·baseline·metadata·옛 URL/절 대응·배포 문서의 파일 참조 | 페이지별 리뷰와 예제 실행 결과 아래 기록 | M05 |
 | M05 | done | 두 덱 총 18페이지, 지침 일치·예제·호환·최종 검사 대조 | 508 HTML·39,587 링크 check 통과, 124개 옛 절 목적지·대표 브라우저 이동 통과. 템플릿 부재 확인 | M06 |
-| M06~M10 | todo | 이관표·독립 저장소·사용 경로·새 환경 시나리오·마감 | 템플릿 폴더 미생성 | M06 |
+| M06 | done | 아래 포함·제외·치환 파일과 로컬 기본값 확정 | 공용 import·스크립트·현재 두 덱 참조 추적, M05 완료 커밋 8899e3b | M07 |
+| M07~M10 | todo | 독립 저장소·사용 경로·새 환경 시나리오·마감 | 템플릿 폴더 미생성 | M07 |
 
 계획 문서 검증: `git diff --check` 통과. 신규 계획을 포함한 두 문서의 공백과 로컬 참조 29개를
 확인했다. 변경 파일은 이 계획과 목록뿐이며 대상 템플릿 폴더는 아직 없다.
@@ -472,6 +473,40 @@ sidebar-topics 0.8.0·image-zoom 0.15.0이다. 버전 업그레이드는 하지 
 없음을 다시 확인했다. 이후 M06 이관표를 확정한 뒤에만 폴더를 생성한다.
 이 원본 검증이 새 환경·템플릿 검증을 대신하지는 않으며 M07~M09는 아직 미실행이다.
 
+## M06 확정 이관표
+
+원본 품질 완료 커밋은 `8899e3b`다. 아래 경로만 명시적으로 복사하고 디렉터리 전체 export는 하지 않는다.
+이관 뒤 실제 파일 차이는 M07·M08 기록에 남긴다. `src/components/docs`·layout과 scripts의
+import/read 경로를 조사했으며 원본의 labs·demos·다른 덱 자산을 요구하는 실행 의존성은 없다.
+
+| 처리 | 정확한 포함 경로 | 템플릿 차이 |
+|---|---|---|
+| 포함 | `package.json`, `pnpm-lock.yaml`, `pnpm-workspace.yaml`, `.nvmrc`, `tsconfig.json`, `astro.config.mjs`, `src/content.config.ts` | package 이름을 starlight-book-template, site를 로컬 주소로, 제목을 학습 노트로 변경. 의존성 버전 유지 |
+| 포함 | `.github/workflows/check.yml`, `.gitignore`, `public/favicon.svg` | ignore의 원본 labs/local-references 전용 설명 제거, `.env*`·개인 도구 설정·산출물 제외. CI는 파일 제공만 하고 원격 성공을 주장하지 않음 |
+| 포함 | `scripts/check-content.mjs`, `check-links.mjs`, `report-content-health.mjs`, `prepare-d2.mjs`, `d2-measure.mjs`, `prepare-git-history.mjs` | 검사 강도 유지. 마지막 스크립트는 CF_PAGES=1일 때만 이력 확인/필요 시 origin fetch하므로 로컬에 remote 불필요. M07에서 확인 |
+| 포함 | `src/data/catalog.mjs`, `deck-schema.mjs`, `decks.mjs`, `frontmatter.mjs`, `load-decks.mjs` | category 어휘 유지, tags는 실제 쓰는 agent·frontend만 남김. 원본 legacy JSON 전부 제외 |
+| 포함 | `src/components/docs/DeckCatalog.astro`, `DeckMap.astro`, `ExternalLink.astro`, `SourceFigure.astro`, `TermIntro.astro`, `Thesis.astro` | 공용 작성 도구를 포함. DeckCatalog의 원본 덱 수·태그 예시 주석을 일반 예시로. 커밋 없는 날짜 표시 실제 확인 |
+| 포함 | `src/components/layout/MarkdownContent.astro`, `Sidebar.astro`, `SidebarToggle.astro`, `SiteTitle.astro`, `src/styles/custom.css` | 공용 UI를 유지하고 원본 브랜드 주석만 치환 |
+| 포함 | `src/content/docs/index.mdx`, `coding-agents/`의 6 MDX+baseline+metadata, `starlight/`의 12 MDX+baseline+metadata | 랜딩 제목·소개 치환. 본문 원본 GitHub 소스 링크는 로컬 파일 경로 안내로 바꿔 가짜 원격 주소를 넣지 않음. 호환 파일 설명·전용 demo 경로를 템플릿 실물과 대조 |
+| 포함·정비 | `AGENTS.md`, `CLAUDE.md`, `README.md`, `docs/content-authoring.md`, `d2-authoring.md`, `verification.md`, `starlight-changes.md`, `deploy.md` | README는 시작·개인화·수동/AI 작성 경로로, deploy는 선택 배포 안내로. 원본 실습 링크·태그 예시·개인 운영 이력 제거 |
+| 새로 정리 | `docs/plans/README.md` | 공통 계획 관리 규칙과 빈 목록. 원본 완료/진행 계획 01~04는 이관하지 않음 |
+| 제외 | 그 밖의 학습 덱, `src/pages/` 전부, 모든 `*-legacy-routes.json`, `src/components/demos/`, `labs/`, `public/images/` | 템플릿에 과거 주소가 없으므로 호환 페이지 불필요. 공용 SourceFigure는 남기되 미사용 원본 이미지 미포함 |
+| 제외 | 원본 `.git`, `.env*`, 로컬 설정·참고 자료, `node_modules`, `dist`, `.astro`, `public/d2`, `.d2-measure`, `.playwright-cli` | 독립 Git init, 자체 설치와 D2 최초 다운로드로 검증 |
+
+### 시작 환경과 개인화 결정
+
+- Node 24 이상·pnpm 11.20.0, D2 지원은 macOS/Linux arm64/x64. 실제 검증한 OS·버전은 M09에 기록한다.
+  Windows 지원 확대는 하지 않는다. 패키지와 native D2 최초 다운로드에 네트워크가 필요하다.
+- 초기 `site`는 `http://localhost:4321`로 명시하고 로컬 기본값임을 README에 쓴다. 배포 전 실제
+  대표 주소로 반드시 바꾼다. 원본 도메인을 새 사이트의 canonical로 남기지 않는다.
+- 개인화 편집 지점은 package 이름, config의 title·locales·site, 랜딩의 title·description·hero다.
+  값의 소유 파일을 명시하고 별도 설정 프레임워크는 만들지 않는다.
+- 저장소 remote·소스 링크 주소는 미설정이다. 본문은 실제 로컬 경로를 안내한다.
+  원격 소유자·공개 범위·라이선스는 공개 준비 때 결정할 사항이며 이번 로컬 작업을 막지 않는다.
+  원본에 LICENSE가 없으므로 임의 오픈소스 라이선스를 만들지 않고 README에 후속 결정으로 남긴다.
+- 독립 복사본으로 운영하며 자동 동기화를 구현하지 않는다. 원본 출처·재사용 자산 출처는 유지하되
+  원본의 배포 설정·개인 이력을 템플릿의 현재 사실로 설명하지 않는다.
+
 ## 후속 실행 요청 예시
 
 원본 품질 정비부터 맡길 때:
@@ -487,4 +522,4 @@ sidebar-topics 0.8.0·image-zoom 0.15.0이다. 버전 업그레이드는 하지 
 
 ## 완료 기록
 
-미완료. M01~M05 완료, M06~M10 대기. 원본 품질 조건을 충족했으며 템플릿은 아직 생성하지 않았다.
+미완료. M01~M06 완료, M07~M10 대기. 원본 품질 조건을 충족했으며 템플릿은 아직 생성하지 않았다.
