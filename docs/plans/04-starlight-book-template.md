@@ -1,7 +1,7 @@
 # 4. 학습 콘텐츠 품질 정비와 Starlight 템플릿 분리
 
-상태: 진행 중
-지금 위치: M01~M05 완료 · 원본 품질 조건 충족 · M06 이관표 확정 · 다음 M07 독립 저장소 생성
+상태: 완료
+지금 위치: M01~M10 완료 · 원본 품질 정비·독립 템플릿·시작/개인화/작성 검증 완료
 실행 범위: 전체 완료. M01~M10을 의존 순서대로 수행하고 주요 마일스톤에서 로컬 커밋한다.
 푸시·원격 저장소 생성·배포는 하지 않는다. 템플릿 생성은 M05 충족 뒤에만 진행한다.
 
@@ -16,11 +16,11 @@
 - [x] `AGENTS.md`는 작업 진입점과 핵심 행동 규칙을 안내하고, 상세 학습 품질 기준은 작성 지침에 있다.
 - [x] 두 덱의 모든 페이지를 정확성·설명·예제·구조·이식성 관점에서 검토하고 수정 근거를 기록했다.
 - [x] 두 덱의 제목·파일명·URL·구성도는 번호 없는 개념·작업 이름을 사용하고, 원본의 옛 URL·주요 절 링크를 보존한다.
-- [ ] 원본에서 M05의 품질 완료 조건을 충족한 뒤에만 템플릿 폴더를 만든다.
-- [ ] 새 저장소는 기본 학습 덱 두 개와 공용 기반만 포함하며, 원본 폴더·Git 이력·개인 설정 없이 동작한다.
-- [ ] 동료가 README만으로 환경 준비 → 실행 → 개인화 → 첫 덱 작성 → 검증을 진행할 수 있다.
-- [ ] 새 환경에서 설치·검사가 통과하고, AI로 작은 덱을 만드는 대표 작업에서 품질 기준을 적용한 결과가 있다.
-- [ ] 두 저장소의 결과·검증·제한·영구 문서 위치가 기록되어 있다. 원격 공개는 별도 범위다.
+- [x] 원본에서 M05의 품질 완료 조건을 충족한 뒤에만 템플릿 폴더를 만든다.
+- [x] 새 저장소는 기본 학습 덱 두 개와 공용 기반만 포함하며, 원본 폴더·Git 이력·개인 설정 없이 동작한다.
+- [x] 동료가 README만으로 환경 준비 → 실행 → 개인화 → 첫 덱 작성 → 검증을 진행할 수 있다.
+- [x] 새 환경에서 설치·검사가 통과하고, AI로 작은 덱을 만드는 대표 작업에서 품질 기준을 적용한 결과가 있다.
+- [x] 두 저장소의 결과·검증·제한·영구 문서 위치가 기록되어 있다. 원격 공개는 별도 범위다.
 
 ## 범위와 입력
 
@@ -293,7 +293,10 @@ AI 사용이나 특정 계정은 사이트 빌드의 필수 조건이 아니다.
 | M04 | done | Starlight 12페이지·baseline·metadata·옛 URL/절 대응·배포 문서의 파일 참조 | 페이지별 리뷰와 예제 실행 결과 아래 기록 | M05 |
 | M05 | done | 두 덱 총 18페이지, 지침 일치·예제·호환·최종 검사 대조 | 508 HTML·39,587 링크 check 통과, 124개 옛 절 목적지·대표 브라우저 이동 통과. 템플릿 부재 확인 | M06 |
 | M06 | done | 아래 포함·제외·치환 파일과 로컬 기본값 확정 | 공용 import·스크립트·현재 두 덱 참조 추적, M05 완료 커밋 8899e3b | M07 |
-| M07~M10 | todo | 독립 저장소·사용 경로·새 환경 시나리오·마감 | 템플릿 폴더 미생성 | M07 |
+| M07 | done | 64파일 독립 추출·git init·브랜드/태그 정리 | 새 설치·D2 다운로드·이력 없는 check 성공, 독립 첫 커밋 | M08 |
+| M08 | done | README 시작/개인화/작성, 운영 지침·본문 이식 차이 | 두 덱 18페이지를 템플릿 실물과 재대조, 아래 기록 | M09 |
+| M09 | done | dev·개인화·수동/AI 임시 덱·복구·최종 검사 | 25 HTML 시나리오와 최종 20 HTML·777 링크 check 통과 | M10 |
+| M10 | done | 이관표·완료 조건·영구 문서·작업 트리 감사 | 원본과 템플릿 로컬 커밋, 외부 쓰기 없음 | 로컬 작업 완료 |
 
 계획 문서 검증: `git diff --check` 통과. 신규 계획을 포함한 두 문서의 공백과 로컬 참조 29개를
 확인했다. 변경 파일은 이 계획과 목록뿐이며 대상 템플릿 폴더는 아직 없다.
@@ -471,7 +474,7 @@ sidebar-topics 0.8.0·image-zoom 0.15.0이다. 버전 업그레이드는 하지 
 
 **M05 판정: 충족.** 모든 원본 조건을 확인한 이 시점에 `../starlight-book-template` 경로가
 없음을 다시 확인했다. 이후 M06 이관표를 확정한 뒤에만 폴더를 생성한다.
-이 원본 검증이 새 환경·템플릿 검증을 대신하지는 않으며 M07~M09는 아직 미실행이다.
+이 시점에는 M07~M09가 미실행이었다. 이후 별도로 수행한 새 환경·템플릿 검증은 아래 기록한다.
 
 ## M06 확정 이관표
 
@@ -507,6 +510,117 @@ import/read 경로를 조사했으며 원본의 labs·demos·다른 덱 자산�
 - 독립 복사본으로 운영하며 자동 동기화를 구현하지 않는다. 원본 출처·재사용 자산 출처는 유지하되
   원본의 배포 설정·개인 이력을 템플릿의 현재 사실로 설명하지 않는다.
 
+## M07·M08 독립 저장소와 사용 경로
+
+M05 완료와 M06 이관표 확정 뒤 대상 경로 부재를 다시 확인하고
+`../starlight-book-template`을 만들었다. 64개 파일을 명시적으로 복사하고 `git init -b main`으로
+독립 이력을 시작했다. 원본 `.git`·node_modules·D2 캐시·개인 설정은 가져오지 않았다.
+템플릿 최초 커밋은 `6920faa`, 개인화 설치 안내 보완은 `a9cfc8f`, 최종 로컬 참조 문장 정리는 `ddcb7ac`다.
+
+이관표와의 실제 차이는 다음과 같다. 검사 6개 스크립트·lockfile·workspace·CI 파일은 원본과
+바이트 단위로 같다. 공용 UI의 변경은 원본 덱 수·브랜드·태그 예시 주석뿐이며 동작을 바꾸지 않았다.
+
+- config의 site는 `http://localhost:4321`, 사이트·랜딩 제목은 `학습 노트`, package는
+  `starlight-book-template`이다. tags는 agent·frontend만 남겼다.
+- README는 준비→실행→개인화→수동 작성→AI 작성→운영 순서로 새로 썼다. 각 설정의 소유 파일,
+  공식 설치 안내, dev 종료, 검증, 독립 업데이트, 공개 전 결정 항목을 포함한다.
+- AGENTS·작성·D2·검증 문서에서 원본의 전용 실습·demo·개인 이력·태그 예시를 정리했다.
+  plans/README는 공통 규칙과 빈 목록만 포함한다. 원본 계획 01~04는 템플릿에 없다.
+- deploy는 미설정 상태에서 출발하는 선택 안내, starlight-changes는 현재 구현의 소유 위치로 정리했다.
+  본문의 원본 GitHub 소스 링크는 실제 로컬 파일 경로로 바꿨다. README의 원본 링크만 출처로 유지했다.
+- legacy routes/data·src/pages·다른 덱·labs·전용 demos·public/images는 포함하지 않았다.
+  원본 옛 URL 호환은 원본에만 남는다. LICENSE는 임의 생성하지 않았다.
+
+### 템플릿의 전체 페이지 이식 재검토
+
+아래는 M03·M04의 의미 리뷰에 더해 이식 뒤 본문과 템플릿 실물을 다시 대조한 근거다.
+새 제품 기능을 추가한 검토가 아니며, 제품별 실행 제한은 앞선 baseline 기록과 같다.
+
+| 페이지 | 이식 뒤 유지·수정 이유와 근거 |
+|---|---|
+| coding-agents/index | 공유 규칙→탐색→계획→실행의 기본 경로 유지. 모든 내부 목적지가 이식됨 |
+| coding-agents/project-instructions | 단일 루트 AGENTS·CLAUDE 어댑터 예제가 실제 두 파일과 일치해 유지 |
+| coding-agents/instruction-discovery | 제품 문서와 로컬 규칙을 구분한 설명 유지. 원본 전용 경로 없음 |
+| coding-agents/work-plans | 공통 계획 수명주기 유지. 템플릿 plans/README는 같은 규칙과 빈 목록임을 대조 |
+| coding-agents/execution-and-resume | JSON 요청·리뷰·재개 예제 유지. M09에서 README의 같은 목표로 실제 표본 작성 |
+| coding-agents/monorepo-instructions | 가상 심화 예제임이 명시돼 있어 유지. 기본 사이트 시작의 의존성이 아님 |
+| starlight/index | 실행→첫 덱→작성 경로와 map 유지. 템플릿에도 모든 대상이 존재 |
+| starlight/intro | 원본 소유자·Cloudflare 배포 단정과 원본 소스 링크 정리. 설치·dev를 M09 실측 |
+| starlight/first-deck | 네 파일 예제를 그대로 적용해 등록·검사·정렬값 변경·제거 확인 |
+| starlight/landscape | 조건별 도구 선택 설명 유지. 원본 전용 덱·계정 의존 없음 |
+| starlight/astro | 정적 출력·script·타입 검사 경계 유지. 동일 버전·동일 공용 기반이며 원본에서 예제 실행 |
+| starlight/structure | 존재하지 않는 demos 경로 제거, 로컬 변경 문서 안내. loader가 두 덱만 발견함을 확인 |
+| starlight/mdx | 없는 demos import 안내 제거, 작성 지침을 로컬 경로로 연결. 링크 치환 뒤 조사도 교정 |
+| starlight/components | 실제 FileTree에 맞춰 demos 제거. 원본 Mermaid 전환 이력을 현재 D2 선택 이유로 변경 |
+| starlight/custom | 공용 docs import와 실제 컴포넌트 목록 유지, 전용 demo 경로 제거. 공용 구현은 그대로 |
+| starlight/writing | 의미 리뷰·이름·검증 기준을 유지. 템플릿 작성 지침과 일치하며 M09 표본에 적용 |
+| starlight/pipeline | 원본 운영 환경 대신 미설정 선택 배포 안내. check와 prebuild를 실제 실행해 구분 확인 |
+| starlight/wrapup | 없는 demos·main 푸시 자동 배포·원본 GitHub 카드 제거. 실제 로컬 규칙 안내는 카드 밖 문단으로 정리 |
+
+두 baseline의 원본 호환 경로 설명도 제거하고, Starlight baseline은 로컬 기본 site·선택 배포 안내로
+맞췄다. 유지된 D2 네 블록의 배치는 바뀌지 않았다. 새 UI 동작은 없어 템플릿 브라우저 전수 검사는 하지 않았다.
+
+## M09 실제 시작·개인화·작성 결과
+
+검증 환경은 **Darwin arm64, Node v24.14.0, pnpm 11.20.0**이다. 새 OS/VM 실험이 아니라
+동일 호스트의 독립 디렉터리·독립 설치 실험이며, 다른 OS·원격 CI·호스팅 성공으로 확대하지 않는다.
+원본 node_modules·D2 캐시는 복사하지 않았다. 빈 npm 사용자 설정을 지정하고 새 store
+`/tmp/starlight-book-template-store`로 `pnpm install --frozen-lockfile`을 실행했다(18.1초, exit 0).
+첫 check 로그에서 D2 v0.8.2 macos-arm64의 실제 다운로드·자체 node_modules 내 설치를 확인했다.
+
+| 시나리오 | 실제 실행·관찰 | 판정 |
+|---|---|---|
+| 이력·origin 없는 시작 | 첫 커밋 전 check: 2덱·19 MDX·18 topic, Pagefind 성공, 20 HTML·777 내부 링크 | 통과. 카드 수정일 없음, 테이블 두 행은 수정일 없음 `—`; HTML assertion으로 확인 |
+| README 실행 | `pnpm astro dev --background`, status, `/starlight/first-deck/` HTTP 성공, stop | 통과. dev PID 종료 확인. UI 변경이 없어 브라우저 추가 검사 없음 |
+| 개인화 | README의 package/config/랜딩 필드만 임시 변경. 제목·소개·description 및 예약 예시 주소 `https://notes.example.org`의 canonical·sitemap 확인 | 통과. 외부 발행 없이 로컬 산출물만 확인. 원래 세 파일을 정확히 복구 |
+| 수동 작성 | first-deck의 코드 펜스 네 파일을 그대로 추출·적용. 두 sample slug, catalog 1장, basics 그룹 자동 등록 | 통과. order 10→20도 loader 값만 변하고 `sample-notes/page-order` slug 유지 |
+| AI 작성 표본 | 아래 JSON 5파일 작성, 문서 속 명령을 추출해 실행, 의미 리뷰, check | 통과. JSON 3 slug, catalog 2장, 그룹·map 자동 등록 |
+| 시나리오 합본 검사 | 임시 2덱+기본 2덱 및 개인화 상태의 check | 25 HTML·918 내부 링크·Pagefind 통과 |
+| 선택 build 진입점 | 같은 상태에서 `pnpm build` 실행. 로그에 prepare-git-history 이후 Astro build 확인 | exit 0. origin·CF_PAGES 없이 성공; 원격 fetch 없음 |
+| 복구 후 최종 검사 | 생성한 9파일만 제거, 개인화 복구, 최종 이식 문장 교정 후 check | 2덱·19 MDX·18 topic, 20 HTML·777 내부 링크·Pagefind 통과 |
+
+개인화 중 package 이름 변경으로 pnpm이 설치 상태를 다시 확인하면서 실험용 store와 기본 store가
+달라 비대화식 재설치가 중단됐다. 동일한 빈 사용자 설정·store 경로로 frozen install을 명시해 해결했다.
+의존성·검사 강도는 바꾸지 않았다. README에 package 이름 변경 뒤 frozen install을 안내했고,
+기본값 복구 뒤에도 설치 상태를 맞춘 다음 검사했다. 최초 실패를 콘텐츠 검사 실패로 보고하지 않는다.
+
+### JSON 표본 의미 리뷰와 실행 근거
+
+README의 요청과 템플릿 AGENTS·작성 지침·first-deck 예제로 구조·명령을 찾았다. 별도 생성기나
+원본 전용 지시 없이 `_baseline.md`, `_deck.mjs`, `index.mdx`, `text-and-values.mdx`,
+`parse-errors.mdx`를 만들었다. 이 에이전트의 표본 수행이며 독립 학습자 실험이나 두 제품 비교가 아니다.
+
+근거는 [RFC 8259 값·객체·배열 문법](https://www.rfc-editor.org/rfc/rfc8259)과
+[ECMAScript JSON.parse·stringify](https://tc39.es/ecma262/multipage/structured-data.html#sec-json.parse)를
+열어 확인했다. 공식 주장을 본문 가까이에 링크하고 실제 실행일을 baseline·reviewedAt에 기록했다.
+
+| 파일 | 중심 질문·리뷰 근거 | 실제 결과·한계 |
+|---|---|---|
+| baseline·metadata | JS 객체·Node 실행을 아는 독자, JSON/JS 구별·쉼표 복구가 목표. API·스키마는 제외. basics 그룹·order 10/20·기존 frontend tag 사용 | 규칙·catalog 변경 없이 loader·check 통과 |
+| index | 왜 객체처럼 보이는 입력이 실패하는가? 기본 문법→오류 복구 두 단계로 안내 | 목적·범위·CTA·map이 두 본문과 일치. 세 slug 모두 생성 |
+| text-and-values | JSON 텍스트와 실행 중인 값은 어떻게 다른가? 기본 값·객체·배열 표와 parse/stringify 예제로 연결 | 문서 명령 실행 결과 `string object 2`, 다음 줄 `{"name":"노트","count":2}`. JSON 최상위는 객체만이라는 오해 방지, 모든 JS 값이 손실 없이 왕복한다는 단정 제외 |
+| parse-errors | 마지막 쉼표가 왜 실패하고 무엇을 고치는가? 구분자 원리→catch로 오류 종류 관찰→쉼표 제거 | 실제 출력 `SyntaxError`, 다음 줄 `2`. catch 자체가 입력을 고치는 것은 아님을 설명. 오류 메시지 전문은 버전별 고정하지 않음 |
+
+이해 확인도 실행했다: `JSON.parse('true') === true`, `JSON.parse('[1,2]').length === 2`,
+`JSON.parse('[1,2,]')`는 SyntaxError. 예제는 파일·서버를 만들지 않아 복구할 런타임 상태가 없다.
+본문은 준비 조건·명령·예상 출력·답의 원리를 제공하며, 형식 컴포넌트 개수만으로 의미 리뷰를 대신하지 않았다.
+임시 덱은 최종 템플릿에 없고 표본 사본은 세션 임시 경로에만 보존했다.
+
+### 최종 감사
+
+- 추적 파일 64개, 기본 덱 디렉터리는 coding-agents·starlight 두 개, 문서 수는 각각 index 포함 6·12개다.
+  `report:content`는 18개 검토됨·미검토/기간 초과/Thesis 이관 0개다. 이 수치는 학습 효과 증명이 아니다.
+- 지침·README의 실제 로컬 Markdown 참조 33개 존재 확인. 가상 코드 펜스 안 경로는 실제 링크로 오판하지 않았다.
+  파일 diff·공백 검사 통과. 개인 도메인·계정·상위 원본 의존 잔류를 조사했고 README의 출처 링크만 의도해 유지했다.
+- scripts 6개와 lockfile·workspace·CI가 원본과 동일하다. source→template 차이는 위 이관·개인화 범위에 한정된다.
+  `.git`은 독립이고 template remote는 비어 있다. 원본의 기존 remote 설정은 변경하지 않았다.
+- 원본은 M05의 마지막 check(508 HTML·39,587 링크) 이후 사이트 변경이 없으므로 검사를 반복하지 않았다.
+  이후 원본 변경은 이관표·실행·완료 기록뿐이다. 템플릿 최종 검사 로그는
+  `/tmp/starlight-book-template-final-check.log`, 원본 로그는 `/tmp/starlight-book-m05-final.log`다.
+  임시 로그가 사라져도 이 기록의 실행·관찰 수치로 결과를 확인할 수 있다.
+- 최종 이식 문장 검토에서 카드 그룹 안의 로컬 안내 문단을 밖으로 옮기고 치환 후 조사를 교정했다.
+  결과를 바꾸는 마지막 MDX 변경이므로 그 뒤 최종 check를 실행했다. 통과 뒤 추가 사이트 변경은 없다.
+
 ## 후속 실행 요청 예시
 
 원본 품질 정비부터 맡길 때:
@@ -522,4 +636,13 @@ import/read 경로를 조사했으며 원본의 labs·demos·다른 덱 자산�
 
 ## 완료 기록
 
-미완료. M01~M06 완료, M07~M10 대기. 원본 품질 조건을 충족했으며 템플릿은 아직 생성하지 않았다.
+M01~M10 완료. 원본의 작성 지침과 두 덱 전체를 정비·검토·검증하고 M05 통과 뒤에만
+`../starlight-book-template`을 독립 생성했다. 원본의 옛 URL·앵커는 유지하고 템플릿은 두 기본 덱과
+공용 기반만 포함한다. 양쪽의 마지막 관련 변경 뒤 check가 통과했고 임시 작성물·개인화 값은 복구했다.
+
+영구 사용법은 템플릿 README·docs·각 baseline, 원본의 공통 지침·각 baseline에 반영했다.
+이 계획과 계획 목록은 완료 상태로 보존한다. 마감 문서의 diff·공백과 실제 로컬 참조 28개를 확인했다.
+주요 마일스톤은 로컬 커밋했고 푸시·원격 생성·배포는 없다.
+
+남은 제한은 다른 OS·원격 CI·실제 배포 미실측, 독립 학습자 평가 미실시다. 원격 소유자·주소·공개 범위와
+라이선스는 외부 공유를 요청할 때 사용자가 정할 후속 사항이며, 이번 로컬 완료 범위에 미해결 작업은 없다.
