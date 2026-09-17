@@ -1,7 +1,7 @@
 # 4. 학습 콘텐츠 품질 정비와 Starlight 템플릿 분리
 
 상태: 진행 중
-지금 위치: M01 전체 원문 리뷰·구조안, M02 작성 계약 정비 완료 · 다음 M03 공식 근거 확인과 Coding Agents 개편
+지금 위치: M01 전체 원문 리뷰·구조안, M02 작성 계약 정비 완료 · M03 공식 근거 1차 대조 진행 중 · 다음 Coding Agents 본문 분할·교정
 실행 범위: 전체 완료. M01~M10을 의존 순서대로 수행하고 주요 마일스톤에서 로컬 커밋한다.
 푸시·원격 저장소 생성·배포는 하지 않는다. 템플릿 생성은 M05 충족 뒤에만 진행한다.
 
@@ -289,7 +289,7 @@ AI 사용이나 특정 계정은 사이트 빌드의 필수 조건이 아니다.
 | 계획 작성 | done | 이 문서와 계획 목록. 원본 품질 정비 후 템플릿 추출, 두 덱만 기본 포함 | 구조·지침·baseline·목록·대표 본문·공용 코드 사전 조사. 전체 페이지 리뷰·외부 사실 확인·구현은 미실행. 계획 diff·참조 검사 결과는 아래 기록 | 후속 실행 요청 시 M01 |
 | M01 | done | 두 덱 14개 MDX 전체와 baseline·metadata를 읽고 아래 질문·문제·slug 대응 확정 | 소스 리뷰이며 외부 사실 확인·실행 검증은 아직 아님. 대상 템플릿 경로 부재 확인 | M02 |
 | M02 | done | AGENTS에 의미 리뷰 진입 규칙, 작성 지침에 작성 순서·유형별 예·판정 기준·baseline 계약 | 지침 간 의미 대조, diff·참조 검사. 상세 결과는 아래 | M03 |
-| M03 | todo | Coding Agents 개편 | 공식 근거·새 페이지 리뷰·검증 미실행 | 공식 근거 확인 |
+| M03 | doing | Coding Agents 공식 근거 1차 대조 | 아래 근거 기록. 본문 개편·새 페이지 리뷰·실행 검증은 미실행 | 본문 분할·교정 |
 | M04~M10 | todo | 원본 품질 확인 뒤 템플릿 이관·시나리오 검증 | 템플릿 폴더 미생성 | 의존 순서대로 진행 |
 
 계획 문서 검증: `git diff --check` 통과. 신규 계획을 포함한 두 문서의 공백과 로컬 참조 29개를
@@ -345,6 +345,29 @@ AGENTS에는 매번 수행할 행동과 정본 링크만 추가하고 세부 표
 CLAUDE는 기존 `@AGENTS.md` 한 줄을 유지한다. 재승인·외부 심사·분량 할당은 추가하지 않았다.
 `git diff --check` 통과, 변경한 네 문서의 로컬 참조 45개 존재 확인 통과.
 빌드에 포함되지 않는 지침·계획만 바뀌어 `pnpm check`는 실행하지 않았다.
+
+## M03 근거 확인 중간 기록 (2026-09-18)
+
+OpenAI Docs 스킬로 공식 문서를 검색하고 원문을 열었다. 현재 근거는 문서 확인이며
+Codex·Claude Code 별도 세션을 실행한 실측이 아니다.
+
+- [OpenAI AGENTS](https://learn.chatgpt.com/docs/agent-configuration/agents-md): 시작 시 루트→cwd,
+  폴더별 override/AGENTS/fallback 하나, 가까운 지침 우선, 기본 32 KiB를 확인했다.
+- [Anthropic memory](https://code.claude.com/docs/en/memory): cwd와 상위 지침을 시작 시 결합하고
+  하위 지침은 파일을 읽을 때 로드한다. import는 참조 파일 기준 상대 경로이며 내용을 컨텍스트에
+  펼친다. `/context`로 목록 확인을 안내한다. 기존의 “Claude는 AGENTS를 읽지 않는다”는 문장은
+  **자동 탐색 대상이 아니다**로 좁혀 직접 읽기·import와 구분할 것.
+- [ExecPlan](https://developers.openai.com/cookbook/articles/codex_exec_plans): 현재 페이지에
+  **archived** 표시가 있다. 현행 공식 필수 표준으로 소개하지 않고 자기완결 계획의 과거 공식 사례로
+  명시할 것. 자기완결·진행 중 갱신·다음 milestone 지속은 원문에서 확인했다.
+- [Claude best practices](https://code.claude.com/docs/en/best-practices)와
+  [OpenAI best practices](https://learn.chatgpt.com/guides/best-practices)를 열었다.
+  전자의 실행 가능한 검증 신호를 확인했다. 후자는 필요한 본문을 추가 확인할 것.
+
+다음 실행: 기존 `dist/coding-agents/*/index.html`과 원본 heading을 대조해 옛 anchor를 보존하고,
+M01의 5개 본문으로 개편한다. 호환 구현 참고는 `src/pages/keycloak/[legacy].astro`와
+`src/data/keycloak-legacy-routes.json`이다. hash는 브라우저에서 대응하므로 대표 이동 확인이 필요하다.
+관련 레거시 코드를 읽었으나 새 호환 파일은 아직 만들지 않았다.
 
 ## 후속 실행 요청 예시
 
