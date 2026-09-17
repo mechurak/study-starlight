@@ -1,9 +1,11 @@
 ---
-title: "0. 시작하기 전에"
+title: "시작하기 전에"
 description: "이 덱의 대상과 범위, 왜 노션이 아니라 문서 사이트인가, 그리고 콘텐츠·구조·표현의 3층 멘탈 모델"
 deckGroup: intro
 sidebar:
   order: 10
+reviewedAt: 2026-09-18
+status: stable
 ---
 
 import { Card, CardGrid, LinkCard } from '@astrojs/starlight/components';
@@ -14,9 +16,9 @@ import Thesis from '../../../components/docs/Thesis.astro';
 
 <TermIntro
   terms={[
-    ['SSG', 'Static Site Generator', '정적 사이트 생성기. 빌드 시점에 모든 페이지를 HTML 파일로 미리 만들어 둔다. 요청마다 서버가 페이지를 조립하지 않으므로 **서버가 필요 없고, 싸고, 빠르다.** Starlight가 이 부류다.'],
+    ['SSG', 'Static Site Generator', '정적 사이트 생성기. 빌드 시점에 모든 페이지를 HTML 파일로 미리 만들어 둔다. 요청마다 서버가 페이지를 조립하지 않으므로 **요청마다 HTML을 조립하는 애플리케이션 서버가 필요 없다. 정적 파일을 제공할 호스팅은 필요하다.** Starlight가 이 부류다.'],
     ['docs-as-code', '', '문서를 코드처럼 다루는 방식 — 마크다운 파일을 git으로 버전 관리하고, diff로 리뷰하고, 빌드해서 배포한다. 이 레포의 운영 방식 그 자체다.'],
-    ['마크다운', 'Markdown', '평문에 가까운 경량 마크업. `#` 제목, `**굵게**` 같은 기호로 서식을 준다. 이 사이트의 모든 본문이 이것이다 — 정확히는 컴포넌트를 얹은 MDX(4장).'],
+    ['마크다운', 'Markdown', '평문에 가까운 경량 마크업. `#` 제목, `**굵게**` 같은 기호로 서식을 준다. 이 사이트의 모든 본문이 이것이다 — 정확히는 컴포넌트를 얹은 MDX(MDX).'],
     ['프론트매터', 'Frontmatter', '마크다운 파일 맨 위 `---` 사이의 메타데이터 블록. 본문이 아니라 **페이지의 속성**(제목·설명·소속·순서)이다. 이 값이 사이드바와 검색 결과에 쓰인다.'],
     ['Starlight', '', 'Astro 위에 만들어진 문서 사이트 프레임워크. 헤더·사이드바·검색·다크모드 같은 뼈대를 전부 주고, 우리는 마크다운 폴더만 채운다.'],
   ]}
@@ -52,9 +54,9 @@ Starlight의 구조 — 라우팅 · 사이드바 · topics.
 <Card title="다루지 않는다" icon="close">
 Astro로 하는 일반 웹앱 개발 (SSR · API 라우트 · DB).
 
-React · Vue 등 UI 프레임워크 자체 (→ [프론트엔드 덱](/frontend/)).
+React · Vue 등 UI 프레임워크 자체.
 
-CSS 일반론과 디자인 시스템 (→ [shadcn 덱](/shadcn/)).
+CSS 일반론과 디자인 시스템.
 
 Starlight 전체 API 레퍼런스 — 공식 문서로 링크만 한다.
 
@@ -68,18 +70,17 @@ Starlight 전체 API 레퍼런스 — 공식 문서로 링크만 한다.
 "쓰기 편한가"가 아니라 "쌓이고, 검색되고, 참조되는가"로 바뀐다.
 이 관점에서 도구를 보면 갈림길이 분명해진다.
 
-| 요구 | 노션 · 위키 | docs-as-code (이 레포) |
+| 판단할 것 | 서비스형 위키 | 이 사이트의 docs-as-code |
 |---|---|---|
-| 본문의 소유 | 그 서비스 안의 데이터 | **내 레포의 마크다운 파일** |
-| 버전 관리 | 페이지 히스토리 (제한적) | git — diff · 되돌리기 · 브랜치 |
-| 코드 블록 · 다이어그램 | 되지만 이식 불가 | 하이라이트 · D2 같은 텍스트 다이어그램이 표준 문법 |
-| 대량 리팩터링 | 페이지 단위 수작업 | `grep` · 일괄 치환 · 빌드가 검증 |
-| AI 에이전트와 협업 | API 통해 간접 | **파일이라서 직접 읽고 쓴다** |
-| 진입 장벽 | 없음 — 누구나 바로 | 마크다운 · git을 알아야 한다 |
+| 편집 경로 | 화면 편집과 협업 기능 중심 | MDX 파일과 Git diff 중심 |
+| 이식·복구 | 내보내기 형식·이력 정책 확인 | 파일과 Git 이력을 직접 보관 |
+| 검증 | 서비스가 제공하는 기능과 API 확인 | 자체 검사·빌드·링크 검사 조합 |
+| 운영 부담 | 계정·서비스 정책에 의존 | 의존성·빌드·호스팅을 직접 관리 |
 
-마지막 줄이 유일한 대가다. 편집자가 개발자(또는 개발 도구를 쓰는 사람) 하나뿐인
-이 레포에서는 대가가 사실상 없고, 나머지 줄을 전부 가져간다.
-편집자가 비개발자 여럿이라면 결론이 달라진다 — 그 갈림길은 [1장](/starlight/01-landscape/)에서 다룬다.
+이 사이트는 파일 소유와 Git 기반 변경 검토를 우선해 문서 사이트를 택했다.
+비개발자 여러 명의 동시 편집이 중요하면 다른 선택이 나을 수 있다.
+서비스 전체를 이식 불가능하거나 AI로 다룰 수 없다고 일반화하지 않는다.
+
 
 :::tip[핵심]
 이 선택의 본질은 Starlight냐 다른 SSG냐가 아니라 **"본문을 파일로 소유하는가"** 다.
@@ -129,32 +130,51 @@ presentation -> check
 check -> dist
 ```
 
-- **콘텐츠** — 글을 쓰고 고치는 일의 거의 전부. 마크다운만 만지면 되고, 이 덱의 4~7장이 여기다
-- **구조** — 덱을 추가하거나 장 순서를 바꿀 때만 연다. 3장이 여기다
-- **표현** — 새 시각 패턴이 필요할 때만. 6장이 여기다
+- **콘텐츠** — 글을 쓰고 고치는 일의 거의 전부. 마크다운만 만지면 되고, [MDX](/starlight/mdx/)·[문서 작성](/starlight/writing/)에서 다룬다
+- **구조** — 덱을 추가하거나 장 순서를 바꿀 때만 연다. [Starlight 구조](/starlight/structure/)에서 다룬다
+- **표현** — 새 시각 패턴이 필요할 때만. [커스텀 컴포넌트](/starlight/custom/)에서 다룬다
 
-층이 분리되어 있어서 **글을 고치다 실수해도 사이트 구조가 깨지지 않고**, 그 역도 성립한다.
-노션 같은 WYSIWYG 도구는 세 층이 한 화면에 뭉쳐 있다 — 편하지만, 층별로 검증하거나
-버전 관리할 수 없는 이유이기도 하다.
+층을 나누면 고칠 위치를 좁히기 쉽다. 다만 MDX import나 frontmatter 오류는 전체 빌드를
+깨뜨릴 수 있으므로 분리가 검증을 대신하지는 않는다.
+
+## 실행하고 첫 페이지를 만든다
+
+저장소 루트에서 Node 24 이상과 `package.json`의 pnpm 11.20.0을 준비한다.
+설치 방법은 [Node 공식 다운로드](https://nodejs.org/en/download)와
+[pnpm 설치 안내](https://pnpm.io/installation)를 따른다.
+D2 준비 스크립트는 macOS arm64/x64, Linux arm64/x64를 지원하며 첫 설정 로드에는
+고정 바이너리를 내려받을 네트워크가 필요하다.
+
+```bash
+node --version
+pnpm --version
+pnpm install --frozen-lockfile
+pnpm astro dev --background
+pnpm astro dev status
+```
+
+출력된 로컬 주소에서 사이트를 연다. 종료는 `pnpm astro dev stop`, 로그는
+`pnpm astro dev logs`다. 실행만 해 보는 데 원격 저장소·배포·AI 계정은 필요 없다.
+준비됐다면 [첫 덱 작성](/starlight/first-deck/)의 최소 파일을 만들고 자동 등록을 확인한다.
 
 ## 이 덱의 기준
 
-**Starlight 0.41 · Astro 7, 2026년 8월** 기준이다. Starlight는 아직 1.0 전이라
+**Starlight 0.41.6 · Astro 7.1.6, 2026-09-18 확인** 기준이다. Starlight는 아직 1.0 전이라
 마이너 버전에서도 동작이 바뀔 수 있다 — 업그레이드 전에
 [docs/starlight-changes.md](https://github.com/mechurak/study-starlight/blob/main/docs/starlight-changes.md)를 본다.
 
 그리고 다시 한번 — **예제는 전부 이 레포다.** 장마다 "이 레포에서는"이 나오는 이유이고,
 이 덱이 공식 문서를 베낀 요약이 아니라 **선택과 운영의 기록**인 이유다.
 
-## 0장 요약
+## 요약
 
 - 대상은 **이 사이트를 고치거나 비슷한 것을 만들려는 사람**, 예제는 이 레포 자체
 - 노션 대신 문서 사이트인 이유는 **본문을 파일로 소유**하기 위해서다 — git · 검색 · 에이전트 협업이 따라온다
 - 멘탈 모델은 3층 분리: **콘텐츠**(`src/content/docs/`) / **구조**(덱별 `_deck.mjs` · `src/data/` · `astro.config.mjs`) / **표현**(`src/components/`)
-- 기준은 Starlight 0.41 · Astro 7 (2026-08) — 예제가 레포와 다르면 레포가 맞다
+- 기준은 Starlight 0.41.6 · Astro 7.1.6 — 예제가 레포와 다르면 레포가 맞다
 
 <LinkCard
-  title="1. 문서 도구의 지형"
+  title="문서 도구의 지형"
   description="노션부터 Docusaurus까지 — 문서를 두는 곳 세 부류, 후보 비교, 그리고 왜 Starlight였나."
-  href="/starlight/01-landscape/"
+  href="/starlight/landscape/"
 />

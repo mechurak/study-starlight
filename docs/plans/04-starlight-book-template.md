@@ -1,7 +1,7 @@
 # 4. 학습 콘텐츠 품질 정비와 Starlight 템플릿 분리
 
 상태: 진행 중
-지금 위치: M01~M03 완료 · Coding Agents 6페이지·옛 절 27개 검증 완료 · 다음 M04 Starlight 개편
+지금 위치: M01~M05 완료 · 원본 품질 조건 충족 · 다음 M06 이관표 확정 후 M07 독립 저장소 생성
 실행 범위: 전체 완료. M01~M10을 의존 순서대로 수행하고 주요 마일스톤에서 로컬 커밋한다.
 푸시·원격 저장소 생성·배포는 하지 않는다. 템플릿 생성은 M05 충족 뒤에만 진행한다.
 
@@ -13,9 +13,9 @@
 개념을 이해하고 적용하는 데 도움이 되는 덱을 얻도록 한다. 원본의 작성 지침과 `coding-agents`·
 `starlight` 덱을 먼저 정비하고, 그 결과가 검증된 다음 독립된 로컬 템플릿 저장소를 만든다.
 
-- [ ] `AGENTS.md`는 작업 진입점과 핵심 행동 규칙을 안내하고, 상세 학습 품질 기준은 작성 지침에 있다.
-- [ ] 두 덱의 모든 페이지를 정확성·설명·예제·구조·이식성 관점에서 검토하고 수정 근거를 기록했다.
-- [ ] 두 덱의 제목·파일명·URL·구성도는 번호 없는 개념·작업 이름을 사용하고, 원본의 옛 URL·주요 절 링크를 보존한다.
+- [x] `AGENTS.md`는 작업 진입점과 핵심 행동 규칙을 안내하고, 상세 학습 품질 기준은 작성 지침에 있다.
+- [x] 두 덱의 모든 페이지를 정확성·설명·예제·구조·이식성 관점에서 검토하고 수정 근거를 기록했다.
+- [x] 두 덱의 제목·파일명·URL·구성도는 번호 없는 개념·작업 이름을 사용하고, 원본의 옛 URL·주요 절 링크를 보존한다.
 - [ ] 원본에서 M05의 품질 완료 조건을 충족한 뒤에만 템플릿 폴더를 만든다.
 - [ ] 새 저장소는 기본 학습 덱 두 개와 공용 기반만 포함하며, 원본 폴더·Git 이력·개인 설정 없이 동작한다.
 - [ ] 동료가 README만으로 환경 준비 → 실행 → 개인화 → 첫 덱 작성 → 검증을 진행할 수 있다.
@@ -173,11 +173,11 @@ Astro·Starlight·관련 플러그인의 공식 자료, lockfile의 실제 버�
 
 다음을 모두 확인하기 전에는 새 템플릿 폴더를 만들지 않는다.
 
-- [ ] index와 분할된 페이지까지 두 덱 전체에 리뷰 기록이 있고, 핵심 학습을 방해하는 미해결 항목이 없다.
-- [ ] 두 덱·`AGENTS.md`·작성·검증·계획 지침의 규칙과 예제가 서로 모순되지 않는다.
-- [ ] 첫 덱을 만드는 대표 예제를 실제로 적용해 본 결과와, Coding Agents의 요청·검토 예제에 대한 평가가 있다.
-- [ ] 번호 없는 이름·sidebar 순서·DeckMap이 일치하고, 원본의 옛 URL·앵커 이동을 검증했다.
-- [ ] 마지막 관련 변경 뒤 원본의 `pnpm check`가 통과했다. 페이지별 자동 통과를 내용 리뷰로 대신하지 않았다.
+- [x] index와 분할된 페이지까지 두 덱 전체에 리뷰 기록이 있고, 핵심 학습을 방해하는 미해결 항목이 없다.
+- [x] 두 덱·`AGENTS.md`·작성·검증·계획 지침의 규칙과 예제가 서로 모순되지 않는다.
+- [x] 첫 덱을 만드는 대표 예제를 실제로 적용해 본 결과와, Coding Agents의 요청·검토 예제에 대한 평가가 있다.
+- [x] 번호 없는 이름·sidebar 순서·DeckMap이 일치하고, 원본의 옛 URL·앵커 이동을 검증했다.
+- [x] 마지막 관련 변경 뒤 원본의 `pnpm check`가 통과했다. 페이지별 자동 통과를 내용 리뷰로 대신하지 않았다.
 
 M03~M04에서 함께 보정한 지침을 M02의 정본에 반영한다. 사용자나 동료의 실제 독해 피드백이 있으면
 활용하되, 아직 받지 않은 피드백을 완료 근거로 쓰거나 새로운 의무 승인 단계로 만들지 않는다.
@@ -290,7 +290,9 @@ AI 사용이나 특정 계정은 사이트 빌드의 필수 조건이 아니다.
 | M01 | done | 두 덱 14개 MDX 전체와 baseline·metadata를 읽고 아래 질문·문제·slug 대응 확정 | 소스 리뷰이며 외부 사실 확인·실행 검증은 아직 아님. 대상 템플릿 경로 부재 확인 | M02 |
 | M02 | done | AGENTS에 의미 리뷰 진입 규칙, 작성 지침에 작성 순서·유형별 예·판정 기준·baseline 계약 | 지침 간 의미 대조, diff·참조 검사. 상세 결과는 아래 | M03 |
 | M03 | done | Coding Agents index+5본문, baseline·metadata, 옛 URL 호환과 들어오는 파일 링크 | 아래 페이지별 리뷰·check·27개 앵커·브라우저 2건 확인 | M04 |
-| M04~M10 | todo | 원본 품질 확인 뒤 템플릿 이관·시나리오 검증 | 템플릿 폴더 미생성 | 의존 순서대로 진행 |
+| M04 | done | Starlight 12페이지·baseline·metadata·옛 URL/절 대응·배포 문서의 파일 참조 | 페이지별 리뷰와 예제 실행 결과 아래 기록 | M05 |
+| M05 | done | 두 덱 총 18페이지, 지침 일치·예제·호환·최종 검사 대조 | 508 HTML·39,587 링크 check 통과, 124개 옛 절 목적지·대표 브라우저 이동 통과. 템플릿 부재 확인 | M06 |
+| M06~M10 | todo | 이관표·독립 저장소·사용 경로·새 환경 시나리오·마감 | 템플릿 폴더 미생성 | M06 |
 
 계획 문서 검증: `git diff --check` 통과. 신규 계획을 포함한 두 문서의 공백과 로컬 참조 29개를
 확인했다. 변경 파일은 이 계획과 목록뿐이며 대상 템플릿 폴더는 아직 없다.
@@ -409,6 +411,67 @@ M04 다음 행동: Starlight baseline·현재 설치 버전/코드와 본문을 
 기존 `dist/starlight/`의 절 id를 먼저 보존하고 이름 변경·호환 경로를 처리한다.
 최소 first-deck 예제를 실제 적용·제거한 뒤 원본 check 결과와 함께 M05를 판정한다.
 
+## M04 페이지별 최종 리뷰 (2026-09-18)
+
+전체 Starlight 원문을 M01에서 읽고 이번에는 실제 설치·코드와 대조해 수정했다.
+설치 package와 lockfile 기준은 Astro 7.1.6·Starlight 0.41.6·astro-d2 0.13.1·
+sidebar-topics 0.8.0·image-zoom 0.15.0이다. 버전 업그레이드는 하지 않았다.
+
+| 최종 페이지 | 중심 질문 / 발견한 문제 | 수정·유지 이유 | 근거·실행 결과 | 남은 제한 |
+|---|---|---|---|---|
+| `index` | 작업을 어디서 시작하는가 / 이론 순서만 제공 | 실행→first-deck→writing→pipeline 경로와 독자·범위 명시, 포괄 브라우저 검사 제거 | DeckMap·그룹·11본문 order 대조, 최종 check 통과 | 독립 학습자 독해 실험 아님 |
+| `intro` | 처음 실행할 때 무엇이 필요한가 / 시작 명령 부재·비교 과장 | 환경·설치·dev 관리·다음 실습 추가. 다른 덱 선행 링크 제거, 파일 분리가 오류를 막는다는 단정 교정 | manifest·prepare-d2·README 대조. 후속 새 환경 실행은 M09 | 다른 OS 실측은 하지 않음 |
+| `first-deck` | 최소 파일에서 무엇이 자동 등록되는가 / 완성 예제 부재 | baseline·metadata·index·본문 네 파일, 예상 결과·오류표·복구를 새로 제공 | 네 코드 블록 그대로 생성, check·두 slug 자동 발견·order 20/URL 유지 확인, 제거 후 최종 check | 페이지 하나만으로 시각적 앞뒤 변화는 없다는 제한을 본문에 명시 |
+| `landscape` | 무엇을 기준으로 도구를 고르는가 / SaaS·모델 정확도·속도 단정 | 선택 기준·운영 부담·전환 비용 유지, 근거 없는 순위·측정 제거 | Starlight와 Docusaurus 공식 검색 문서, loader와 plugin 구분 대조 | 동등 조건 성능 비교 실험 아님 |
+| `astro` | 코드가 어디서 실행되는가 / 탭=아일랜드·타입 검사 단정 | script·프레임워크 island·정적 컴포넌트를 나누고 스키마/프로젝트 검사의 경계 설명 | Astro 공식 components/scripts/typescript, 설치 Tabs script·docsSchema 대조. BuildNote 예제 렌더 출력 일치 | 일반 웹앱·SSR 전체 설명은 범위 밖 |
+| `structure` | 파일이 URL·사이드바가 되는 과정 / 번호 유지 권장 | 번호 없는 이름, loader·plugin·공식 UI 구분, 접근성 작성자 책임·SidebarToggle 보강 | load-decks·deck-schema·config·SiteTitle import, 최소 덱 적용·최종 check | FileTree의 sample 폴더는 설명용임을 명시 |
+| `mdx` | 문법 오류를 어디서 고치는가 / 발췌를 완성 예제로 오해 | 발췌 표시·최소 예제 링크·표현식 파싱/스키마 경계 교정, CommonMark 사례 유지 | 실제 MDX 빌드, 산출물에서 코드 외 별표 흔적 확인. 의도한 제목의 **만 남음 | 일반 MDX 전체 레퍼런스 아님 |
+| `components` | 정보 모양에 어떤 표현을 쓰는가 / 자체 원칙과 반대인 탭·전수 검사 | 필수 설명을 탭 밖 문단으로, 정적 D2 확인과 동작 검사 분리, Mermaid 통합 이력의 범위 한정 | 설치 컴포넌트·config·D2/검증 지침 대조. 기존 D2 소스 동일·최종 check | 이미지 확대 구현은 이번에 변경하지 않음 |
+| `custom` | 언제 컴포넌트와 override를 만드는가 / 실제 TermIntro·타입 검사 불일치 | details·open을 실제 파일에 맞춰 발췌, script·타입·HTML escape 범위 명시, 데모 의존 제거 | TermIntro·SiteTitle·SidebarToggle·config 및 공식 TS 문서 대조. BuildNote 실제 실행 | 생략한 TermIntro 발췌를 완성 파일로 주장하지 않음 |
+| `writing` | 독자가 이해·적용하도록 어떻게 쓰는가 / h2 수량·검색 발췌 혼동 | 문제→원리→적용 예제, 이해 확인과 의미 리뷰·근거·검토 날짜를 M02와 연결 | 작성 지침과 대응, MarkdownContent aliases·공식 Pagefind 검색 대조 | 학습 효과 실험 아님 |
+| `pipeline` | 어느 검사로 어디까지 확인하는가 / 전수 스윕·hidden 강제 해제·exclude 혼동 | 변경별 최소 검사, topic/pagefind 차이, check/build/typecheck 구분, 배포는 선택 운영으로 | package scripts·loader·MarkdownContent·검증 지침·Starlight 검색 원문 대조. 실제 check 성공 | 원격 배포·CI 실측 안 함, 하위 경로 배포는 기본 지원으로 주장하지 않음 |
+| `wrapup` | 다음 작업에서 어디를 보는가 / 번호 파일 권장·브라우저 포괄 판정 | 정본 분리·치트시트 유지, 이름·검증 규칙 교정, first-deck로 완성 예제 연결 | 문서 역할·명령·실제 파일과 대조, 링크 check 통과 | 원본 배포·GitHub 소스 안내는 M08에서 템플릿 값으로 바꿀 대상 |
+
+공식 확인 근거:
+
+- [Astro components](https://docs.astro.build/en/basics/astro-components/),
+  [scripts](https://docs.astro.build/en/guides/client-side-scripts/),
+  [TypeScript](https://docs.astro.build/en/guides/typescript/): 정적 템플릿·일반 script·별도 타입 검사의 경계.
+- [Starlight 검색](https://starlight.astro.build/guides/site-search/): 기본 Pagefind·pagefind:false·부분 제외.
+- [Docusaurus 검색](https://docusaurus.io/docs/search),
+  [sidebar-topics 시작](https://starlight-sidebar-topics.netlify.app/docs/getting-started/): 제품 기능과 선택 플러그인 구분.
+
+### M04·M05 실제 검증과 품질 판정
+
+1. first-deck의 네 코드 블록을 경로대로 `sample-notes/`에 생성했다.
+   `pnpm check` 종료 0: **510 HTML·40,120 링크**. 문서의 slug 조회 명령이
+   `sample-notes`, `sample-notes/page-order`를 출력했다. loader의 group·map·본문 order 10도 확인했다.
+2. 본문 실습대로 order를 20으로 변경하고, Astro 페이지의 BuildNote 소스를 실제 컴포넌트로 만들어
+   임시 본문에 import했다. `pnpm check` 종료 0. loader에서 order=20·동일 slug를 assertion으로 확인,
+   렌더 HTML에 `<p>빌드 때 만든 문장</p>` 일치 확인. 로그는
+   `/tmp/starlight-book-m04-example.log`, `/tmp/starlight-book-m04-order.log`에 남겼다.
+3. 생성한 네 파일과 BuildNote만 제거했다. 최종 `pnpm check` 종료 0:
+   **508 HTML·39,587 페이지/앵커 링크**, Pagefind 성공. 최종 로그
+   `/tmp/starlight-book-m05-final.log`. 이 후 콘텐츠·코드 변경 없이 기록만 갱신했다.
+4. Starlight의 옛 10 URL·97개 본문 heading을 새 페이지의 해당 설명으로 대응했다.
+   번호 요약은 요약/이해 확인, 통합 절은 실제 설명을 이어받는 절로 연결했다.
+   최종 산출물에서 Coding Agents까지 **12 URL·124개 절 목적지** 존재와 noindex를 확인했다.
+5. playwright-cli로 대표 2페이지에서 실제 이동 확인:
+   `07-writing/#문제--해법-순서로-쓴다` → `writing/#문제--원리--적용으로-연결한다`,
+   `02-astro/#콘텐츠-컬렉션--프론트매터에-타입이-붙는다` → `astro/#콘텐츠-컬렉션은-무엇을-검증하는가`.
+   실제 location과 대상 id 존재가 모두 일치했다. 정의하지 않은 hash가 보존되는 것도 관찰했다.
+   검증용 브라우저·preview 종료.
+6. 유지한 D2 네 블록은 기존 Git 파일과 문자열 비교해 모두 동일했다. 새 D2·이미지·배치 변경이
+   없어 정적 렌더를 반복하지 않았다. 코드·script 밖 `**` 검사에서는 MDX 문법을 설명하는 의도한
+   제목만 발견됐다. 페이지 번호 참조는 개념 이름으로 정리하고 절차의 단계 번호는 유지했다.
+7. M03의 요청·리뷰 예제 평가는 위 독자·예상 결과·원리·복구를 가진 실습과 연결된다.
+   두 덱 18페이지와 AGENTS·작성·검증·계획 지침 사이의 번호·의미 리뷰·검사 종료 규칙을 대조했다.
+   핵심 학습을 막는 미해결 항목은 없으며 제품별 CLI 실측·독립 학습자 평가는 한계로 명시했다.
+
+**M05 판정: 충족.** 모든 원본 조건을 확인한 이 시점에 `../starlight-book-template` 경로가
+없음을 다시 확인했다. 이후 M06 이관표를 확정한 뒤에만 폴더를 생성한다.
+이 원본 검증이 새 환경·템플릿 검증을 대신하지는 않으며 M07~M09는 아직 미실행이다.
+
 ## 후속 실행 요청 예시
 
 원본 품질 정비부터 맡길 때:
@@ -424,4 +487,4 @@ M04 다음 행동: Starlight baseline·현재 설치 버전/코드와 본문을 
 
 ## 완료 기록
 
-미완료. M01~M03 완료, M04~M10 대기. M05를 충족하기 전 템플릿을 생성하지 않는다.
+미완료. M01~M05 완료, M06~M10 대기. 원본 품질 조건을 충족했으며 템플릿은 아직 생성하지 않았다.

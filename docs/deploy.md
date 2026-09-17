@@ -13,7 +13,7 @@
 
 이 문서는 이 레포의 실제 배포(Cloudflare Pages) 기록이다. 다른 정적 호스팅으로 옮길 때의
 일반 원칙(base path · CI 빌드 환경 · `site` 값 · preview 유무)은
-[starlight 덱 8장](../src/content/docs/starlight/08-pipeline.mdx)의
+[Starlight의 빌드와 검증](../src/content/docs/starlight/pipeline.mdx)의
 "Cloudflare Pages가 아니라면" 절에 있다.
 
 ## 최초 연결 (대시보드에서 한 번만)

@@ -1,0 +1,98 @@
+---
+title: "Astro의 정적 출력과 브라우저 JS"
+description: "컴포넌트·일반 스크립트·아일랜드의 실행 위치와 콘텐츠 검사·타입 검사의 경계를 구분한다"
+deckGroup: astro
+sidebar:
+  order: 30
+reviewedAt: 2026-09-18
+status: stable
+---
+
+import { LinkCard } from '@astrojs/starlight/components';
+import Thesis from '../../../components/docs/Thesis.astro';
+import TermIntro from '../../../components/docs/TermIntro.astro';
+
+<Thesis>Astro는 컴포넌트를 HTML로 만들고, 상호작용은 일반 스크립트나 프레임워크 아일랜드로 별도 추가한다</Thesis>
+
+이 사이트는 Astro가 페이지를 만들고 Starlight가 문서 UI를 제공하며 프로젝트 코드가 덱을 묶는다.
+이 페이지의 질문은 **어떤 코드가 빌드 때 실행되고 어떤 코드가 브라우저로 가는가**다.
+
+<TermIntro terms={[["아일랜드", "Islands Architecture", "정적 페이지에서 상호작용이 필요한 UI 부분만 브라우저에서 활성화하는 구조."], ["콘텐츠 컬렉션", "Content Collections", "문서 파일을 읽고 스키마로 데이터를 검증하는 Astro 기능."]]} />
+
+## 왜 Astro부터 아는가
+
+MDX import 오류, `.astro` 컴포넌트, `astro.config.mjs`는 Starlight 아래의 Astro 층과 연결된다.
+일반 웹앱 개발 전체를 배울 필요는 없지만 이 경계를 알면 문제를 찾을 파일이 좁혀진다.
+
+| 층 | 이 사이트에서 맡는 일 |
+|---|---|
+| Astro | 콘텐츠 로드·변환·페이지 생성 |
+| Starlight | 문서 레이아웃·탐색·검색 통합 |
+| 프로젝트 | 덱 loader·공용 본문 컴포넌트·검사 |
+
+## 정적 컴포넌트와 브라우저 코드를 구분한다
+
+[Astro 컴포넌트](https://docs.astro.build/en/basics/astro-components/)의 앞 코드 영역은
+서버 쪽에서 실행된다. 이 사이트처럼 정적으로 빌드하면 HTML 생성 시 실행되고 브라우저에는 결과가 간다.
+다음은 `src/components/docs/BuildNote.astro`로 만들 수 있는 작은 독립 예제다.
+
+```astro
+---
+interface Props { title: string; }
+const { title } = Astro.props;
+---
+<p>{title}</p>
+```
+
+본문 MDX에서 상대 경로로 import해 `<BuildNote title="빌드 때 만든 문장" />`를 쓰면 그 문장이
+HTML에 남는다. `Props` 타입이 있다고 일반 빌드가 타입까지 검사하는 것은 아니다.
+[Astro 타입 검사](https://docs.astro.build/en/guides/typescript/#type-checking)는 별도 절차다.
+
+## 아일랜드가 없어도 스크립트는 실행된다
+
+React·Vue 같은 UI 컴포넌트에 `client:load`·`client:visible` 등을 붙이면 해당 컴포넌트의
+브라우저 활성화 시점을 정할 수 있다. 이 문법은 프레임워크 통합과 해당 컴포넌트가 있을 때 쓰며,
+이 사이트에 존재하지 않는 SearchBox를 그대로 복사하면 실행되지 않는다.
+
+한편 `.astro`의 일반 `script`와 커스텀 엘리먼트로도 상호작용을 만들 수 있다.
+[Astro 스크립트 안내](https://docs.astro.build/en/guides/client-side-scripts/)가 이 경로를 설명한다.
+설치된 Starlight의 `user-components/Tabs.astro`도 일반 script를 사용한다.
+따라서 “탭이 움직인다 → client:* 아일랜드다” 또는 “client:*가 없다 → JS가 없다”는 추론은 틀린다.
+
+이 저장소의 TermIntro는 HTML `details`로 접고 펼치고, DeckMap은 링크를 렌더한다.
+두 컴포넌트 자체에는 브라우저 script가 없지만 페이지에는 검색·테마·확대용 JS가 추가될 수 있다.
+D2 그림은 빌드 때 SVG로 만들며 확대 동작은 별도 브라우저 기능이다.
+
+## 콘텐츠 컬렉션은 무엇을 검증하는가
+
+`src/content.config.ts`는 Starlight의 docsLoader·docsSchema에 프로젝트 필드를 더한다.
+`title` 같은 필수 필드와 선언한 타입을 확인하지만 모든 알 수 없는 키를 오타로 거절하는 것은 아니다.
+특히 Starlight의 `description`은 선택 필드인 반면 이 프로젝트의 `check:content`는 필수로 검사한다.
+
+| 상황 | 이 저장소의 확인 지점 |
+|---|---|
+| `title` 누락 | 콘텐츠 검사·스키마 |
+| `description` 대신 `descripton`만 작성 | 콘텐츠 검사에서 description 누락 |
+| 올바른 description과 불필요한 키가 함께 존재 | 모든 미지 키를 잡는다고 보장하지 않음 |
+| 잘못된 deckGroup·중복 order | 프로젝트 loader·콘텐츠 검사 |
+
+`_baseline.md`와 `_deck.mjs`는 본문 페이지로 생성되지 않는다. 전자는 작성 기준이고 후자는
+프로젝트 loader가 읽는 설정이다. 파일마다 누가 읽는지 구분하는 것이 중요한 이유다.
+
+## 이 레포에서 Astro가 하는 일
+
+`astro.config.mjs`는 D2 바이너리를 준비하고 `astroD2()`를 `starlight()`보다 먼저 등록한다.
+D2 펜스를 처리할 순서를 바꾸지 않는다. 사이트 주소는 `site`, Starlight 제목·플러그인은
+`starlight({...})` 안에서 설정한다. 전체 설정을 추측해서 복사하기보다 실제 파일을 읽는다.
+
+`prepare-d2.mjs`는 고정 버전 v0.8.2·체크섬으로 native CLI를 준비한다.
+MDX → 다이어그램 등 변환 → 컴포넌트 렌더 → HTML → Pagefind 색인이 빌드의 큰 흐름이다.
+오류가 나면 콘텐츠 검사, import·문법, SVG 생성, 렌더된 링크 중 어느 단계인지 로그로 구분한다.
+
+## 이해 확인
+
+`client:*`가 없는 `.astro` 파일에 script를 넣었다. 브라우저 JS가 생길까? 생길 수 있다.
+컴포넌트 앞 코드 영역과 script 태그가 서로 다른 실행 위치라는 것이 판단 근거다.
+타입 오류까지 일반 빌드가 잡는다는 가정도 하지 않는다.
+
+<LinkCard title="Starlight의 구조" description="MDX와 덱 설정이 URL·사이드바로 연결되는 과정을 본다." href="/starlight/structure/" />

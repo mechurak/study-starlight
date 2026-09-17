@@ -1,12 +1,12 @@
 ---
-title: "9. 마무리 — 지식베이스 설계와 치트시트"
+title: "마무리 — 지식베이스 설계와 치트시트"
 description: "Starlight로 학습 지식베이스를 설계할 때의 판단, 새 덱 추가 절차, 명령 치트시트, 빌드가 못 잡는 함정 목록"
 aliases: [개인 지식베이스, 학습 노트 구조, PKM]
-reviewedAt: 2026-08-25
-status: stable
 deckGroup: wrapup
 sidebar:
   order: 100
+reviewedAt: 2026-09-18
+status: stable
 ---
 
 import { Steps, CardGrid, LinkCard } from '@astrojs/starlight/components';
@@ -18,9 +18,9 @@ import Thesis from '../../../components/docs/Thesis.astro';
 
 **콘텐츠 · 구조 · 표현은 다른 층이고, 층마다 판정자가 다르다.**
 
-- 콘텐츠(`src/content/docs/`)는 마크다운/MDX — 문법은 빌드가, 렌더는 브라우저가 판정한다
+- 콘텐츠(`src/content/docs/`)는 마크다운/MDX — 문법은 빌드가, 정확성과 적용 가능성은 의미 리뷰·예제 실행이 확인한다
 - 구조(덱별 `_deck.mjs` · MDX frontmatter · `src/data/` · `astro.config.mjs`)는 가까운 원본과 파생 설정 — 어긋남은 `check:content`가 잡는다
-- 표현(`src/components/` · `custom.css`)은 컴포넌트와 스타일 — 라이트/다크 두 모드가 판정한다
+- 표현(`src/components/` · `custom.css`)은 컴포넌트와 스타일 — 바뀐 배치·동작에 필요한 정적 렌더·대표 화면 확인으로 판정한다
 
 무언가 이상할 때 "어느 층의 문제인가"부터 물으면, 뒤질 파일과 문서가 바로 좁혀진다.
 
@@ -68,21 +68,21 @@ import Thesis from '../../../components/docs/Thesis.astro';
 :::tip[도입 기준]
 좋은 구조는 파일이 많은 구조가 아니라 **같은 실수를 두 번 하지 않게 만든 구조**다.
 기본 Starlight로 해결되는 동안은 기본값을 쓰고, 실제로 반복된 통증에만 새 계층을 둔다.
-특히 override는 업그레이드 때 다시 확인할 부채이므로 마지막 수단이다(6장).
+특히 override는 업그레이드 때 다시 확인할 부채이므로 마지막 수단이다(커스텀 컴포넌트).
 :::
 
 ## 장별 한 줄 지도
 
 | 장 | 남길 한 줄 |
 |---|---|
-| [1. 지형](/starlight/01-landscape/) | 선택의 축은 "본문이 어디에 사는가" — Starlight는 **파일 소유 + 내장 기본값**의 답 |
-| [2. Astro](/starlight/02-astro/) | 기본값이 zero-JS — 컴포넌트는 빌드 시점 템플릿, JS는 섬만 |
-| [3. 구조](/starlight/03-starlight/) | 파일 경로 = slug = URL, 덱과 페이지가 자기 정보를 소유하고 loader가 탐색 구조를 파생 |
-| [4. MDX](/starlight/04-mdx/) | 문서인 척하는 소스 코드 — 중괄호 · 들여쓰기 · 닫는 `**`가 지뢰 |
-| [5. 내장 컴포넌트](/starlight/05-components/) | 절차는 Steps, 갈래는 Tabs, 분류는 Card — 다이어그램 기본값은 D2, 색 여섯 개의 약속 |
-| [6. 커스텀](/starlight/06-custom/) | 사다리 아래 칸부터 — 만들면 머리 주석에 "왜"를 남긴다 |
-| [7. 글쓰기](/starlight/07-writing/) | 독자는 검색으로 착지한다 — 제목이 목차, 문제가 먼저 |
-| [8. 파이프라인](/starlight/08-pipeline/) | 빌드가 못 잡는 것들은 브라우저와 grep이 판정한다 |
+| [지형](/starlight/landscape/) | 선택의 축은 "본문이 어디에 사는가" — Starlight는 **파일 소유 + 내장 기본값**의 답 |
+| [Astro](/starlight/astro/) | 기본값이 zero-JS — 컴포넌트는 빌드 시점 템플릿, JS는 일반 스크립트나 프레임워크 섬으로 추가 |
+| [구조](/starlight/structure/) | 파일 경로 = slug = URL, 덱과 페이지가 자기 정보를 소유하고 loader가 탐색 구조를 파생 |
+| [MDX](/starlight/mdx/) | 문서인 척하는 소스 코드 — 중괄호 · 들여쓰기 · 닫는 `**`가 지뢰 |
+| [내장 컴포넌트](/starlight/components/) | 절차는 Steps, 갈래는 Tabs, 분류는 Card — 다이어그램 기본값은 D2, 색 여섯 개의 약속 |
+| [커스텀](/starlight/custom/) | 사다리 아래 칸부터 — 만들면 머리 주석에 "왜"를 남긴다 |
+| [글쓰기](/starlight/writing/) | 독자는 검색으로 착지한다 — 제목이 목차, 문제가 먼저 |
+| [파이프라인](/starlight/pipeline/) | 의미 리뷰와 변경별 최소 검증을 구분한다 |
 
 ## 새 덱을 추가하는 절차
 
@@ -102,11 +102,11 @@ import Thesis from '../../../components/docs/Thesis.astro';
 
 3. 본문 페이지를 넣는다
 
-   장 파일명은 `00-intro.mdx`부터 번호로 두고 처음부터 `.mdx`로 만든다. 각 페이지에
+   파일명은 `intro.mdx`처럼 번호 없는 개념·작업 이름으로 짓고 `.mdx`로 만든다. 각 페이지에
    `deckGroup`과 겹치지 않는 `sidebar.order`를 적으면 사이드바와 장 수에 자동 반영된다.
    새 장은 `<Thesis>`를 두고, 개념 학습 덱이면 규칙에 맞춰 `<TermIntro>`도 둔다.
 
-4. `pnpm check`로 설정·본문·빌드·내부 링크를 판정하고, 실제 사이드바와 DeckMap을 확인한다
+4. `pnpm check`로 설정·본문·빌드·내부 링크를 판정하고, 소스의 그룹·순서·DeckMap 목적지를 대조한다. 완성 예제는 [첫 덱 작성](/starlight/first-deck/)에 있다
 
 </Steps>
 
@@ -130,15 +130,15 @@ import Thesis from '../../../components/docs/Thesis.astro';
 
 | 증상 | 원인 | 장 |
 |---|---|---|
-| D2가 코드 블록이거나 빌드 실패 | `astroD2()`가 `starlight()` 뒤, 또는 D2 문법 오류 | 2·5 |
-| 다이어그램이 다크 모드에서 안 읽힘 | 팔레트의 `font-color` 누락 | 5 |
-| D2를 눌러도 확대되지 않음 | `inline: true`로 SVG를 HTML에 직접 넣음 | 5 |
-| 화면에 `**` 가 그대로 보임 | 닫는 `**` 앞 문장부호 + 뒤 조사 | 4 |
-| 컴포넌트 안 내용이 코드 블록으로 | JSX 자식 마크다운 들여쓰기 | 4 |
-| 외부 참고 링크가 조용히 죽음 | 상대 사이트의 이전·삭제 — 기본 내부 링크 검사 범위 밖 | 7 |
-| 제목 옆 Badge 후 링크 변경 | `<Badge>` 앞에 공백 — slug 끝에 `-` | 5 |
-| 검색에 새 글이 안 나옴 (배포) | 인덱스는 빌드 산출물 — 배포가 안 된 것 | 8 |
-| 하위 경로 배포에서 본문 링크만 깨짐 | 본문 절대 경로 링크에 base 미적용 | 8 |
+| D2가 코드 블록이거나 빌드 실패 | `astroD2()`가 `starlight()` 뒤, 또는 D2 문법 오류 | Astro·내장 컴포넌트 |
+| 다이어그램이 다크 모드에서 안 읽힘 | 팔레트의 `font-color` 누락 | 내장 컴포넌트 |
+| D2를 눌러도 확대되지 않음 | `inline: true`로 SVG를 HTML에 직접 넣음 | 내장 컴포넌트 |
+| 화면에 `**` 가 그대로 보임 | 닫는 `**` 앞 문장부호 + 뒤 조사 | MDX |
+| 컴포넌트 안 내용이 코드 블록으로 | JSX 자식 마크다운 들여쓰기 | MDX |
+| 외부 참고 링크가 조용히 죽음 | 상대 사이트의 이전·삭제 — 기본 내부 링크 검사 범위 밖 | 글쓰기 |
+| 제목 옆 Badge 후 링크 변경 | `<Badge>` 앞에 공백 — slug 끝에 `-` | 내장 컴포넌트 |
+| 검색에 새 글이 안 나옴 (배포) | 인덱스는 빌드 산출물 — 배포가 안 된 것 | 빌드와 검증 |
+| 하위 경로 배포에서 본문 링크만 깨짐 | 본문 절대 경로 링크에 base 미적용 | 빌드와 검증 |
 
 ## 더 읽을 것
 
@@ -167,6 +167,6 @@ import Thesis from '../../../components/docs/Thesis.astro';
 
 ## 이 덱이 스스로에게 거는 검증
 
-이 덱의 예제는 전부 이 레포다(0장). 그래서 레포가 바뀌면 이 덱도 낡는다 —
-컴포넌트 목록(6장), 배포 설정(8장), 덱 추가 절차(이 장)를 고쳤다면
+이 덱의 예제는 전부 이 레포다(시작하기). 그래서 레포가 바뀌면 이 덱도 낡는다 —
+컴포넌트 목록(커스텀 컴포넌트), 배포 설정(빌드와 검증), 덱 추가 절차(이 장)를 고쳤다면
 `starlight` 덱의 해당 대목도 같이 고친다. 기준은 덱 폴더의 `_baseline.md`에 있다.

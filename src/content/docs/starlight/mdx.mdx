@@ -1,9 +1,11 @@
 ---
-title: "4. MDX — 마크다운에 컴포넌트를"
+title: "MDX — 마크다운에 컴포넌트를"
 description: "MDX의 해부와 remark·rehype 변환 파이프라인, 마크다운과 다른 문법 함정 네 가지, 그리고 한글 문서에서 굵게가 깨지는 CommonMark 규칙"
 deckGroup: mdx
 sidebar:
   order: 50
+reviewedAt: 2026-09-18
+status: stable
 ---
 
 import { LinkCard } from '@astrojs/starlight/components';
@@ -11,6 +13,9 @@ import TermIntro from '../../../components/docs/TermIntro.astro';
 import Thesis from '../../../components/docs/Thesis.astro';
 
 <Thesis>MDX 파일은 문서인 척하는 프로그램 소스다 — 그래서 빌드가 문법을 잡아 주고, 그래서 문법에 함정이 있다</Thesis>
+
+이 페이지는 **본문 문법이 깨졌을 때 어떤 단계와 표기를 확인해야 하는가**를 다룬다.
+MDX 구조와 오류 표를 실제 파일 수정에 연결한다.
 
 <TermIntro
   terms={[
@@ -39,11 +44,12 @@ MDX의 답은 컴포넌트다 — 패턴을 컴포넌트로 한 번 정의하고
 
 ## MDX 문서의 해부
 
-이 덱의 아무 장이나 열면 구조가 똑같다 —
+다음은 구조를 설명하는 발췌다. `...`는 생략 표시이므로 그대로 실행할 수 없다.
+완성된 최소 파일은 [첫 덱 작성](/starlight/first-deck/)에서 복사한다.
 
 ```mdx
 ---
-title: "4. MDX — 마크다운에 컴포넌트를"    # ① 프론트매터 — 페이지 속성
+title: "MDX — 마크다운에 컴포넌트를"    # ① 프론트매터 — 페이지 속성
 description: "..."
 ---
 
@@ -109,9 +115,9 @@ jsx -> out
 
 | 에러의 낌새 | 층 | 흔한 원인 |
 |---|---|---|
-| `Could not parse expression` · acorn 언급 | JSX 평가 | 본문의 중괄호 `{`, 안 닫힌 태그 |
+| `Could not parse expression` · acorn 언급 | MDX 표현식 파싱 | 본문의 중괄호 `{`, 안 닫힌 태그 |
 | `Cannot find module` | import | 컴포넌트 상대 경로 오타 |
-| 프론트매터 필드 에러 | 콘텐츠 컬렉션 (2장) | `title` 누락, 필드명 오타 |
+| 프론트매터 필드 에러 | 콘텐츠 컬렉션 (Astro) | 필수 필드 누락·잘못된 타입. 모든 미지 필드명을 잡는 것은 아님 |
 | 에러 없이 **모양만 이상** | 렌더 결과 | 강조 깨짐 · 들여쓰기 코드 블록 — 아래 두 절 |
 
 가장 위험한 것은 마지막 줄이다 — 빌드가 통과하는 문제는 아래에서 따로 다룬다.
@@ -161,7 +167,7 @@ CommonMark의 강조 규칙에서 닫는 `**`는 **"단어의 끝" 위치여야*
 | `` **`get all`**이다 `` | `` `get all`이다 `` | 코드 서식이 이미 강조다 — `**`를 뺀다 |
 
 :::caution[함정]
-이 문제는 눈으로 훑어서 못 잡는다 — **산출물로 판정한다.** `pnpm check` 후:
+강조 표시가 의심되는 변경에서는 **산출물을 확인한다.** `pnpm check` 후 필요한 경우:
 
 ```bash
 grep -rho '\*\*[^<*]\{0,45\}' dist --include=index.html | sort -u
@@ -173,12 +179,12 @@ grep -rho '\*\*[^<*]\{0,45\}' dist --include=index.html | sort -u
 ## 이 레포의 MDX 운용
 
 - **전 페이지가 처음부터 `.mdx`다.** `.md`로 시작했다가 컴포넌트가 필요해지면 확장자를
-  바꾸고 링크를 걱정하는 일을 없앴다 — slug는 확장자와 무관하므로(3장) 비용도 없다
+  바꾸고 링크를 걱정하는 일을 없앴다 — slug는 확장자와 무관하므로(Starlight 구조) 비용도 없다
 - `@astrojs/mdx`는 Starlight의 전이 의존성이라 **별도 설치가 없다** — package.json에 안 보여도 정상
 - 컴포넌트 import는 두 종류뿐이다 — 내장은 `@astrojs/starlight/components`에서,
   커스텀은 역할에 따라 `../../../components/docs/` 또는 `../../../components/demos/` 상대 경로로
 
-## 4장 요약
+## 요약
 
 - MDX = 마크다운 + import + 컴포넌트. **컴파일되는 소스**라서 빌드가 문법을 보증한다
 - 파이프라인은 remark → rehype → JSX 평가 — **에러 메시지가 어느 층 것인지**부터 읽는다
@@ -187,7 +193,7 @@ grep -rho '\*\*[^<*]\{0,45\}' dist --include=index.html | sort -u
 - 이 레포는 전 페이지 `.mdx` — 확장자 고민을 없앤 선택
 
 <LinkCard
-  title="5. 내장 컴포넌트"
+  title="내장 컴포넌트"
   description="Steps · Tabs · Card · aside · D2 — 무엇을 어디에 쓰고 어디에 쓰지 않는지, 역할 분담의 규칙."
-  href="/starlight/05-components/"
+  href="/starlight/components/"
 />

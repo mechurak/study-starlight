@@ -1,9 +1,11 @@
 ---
-title: "6. 커스텀 컴포넌트"
+title: "커스텀 컴포넌트"
 description: ".astro 컴포넌트 만들기 — Props와 템플릿, 스타일 캡슐화와 다크 모드, set:html의 안전 규칙, 그리고 Starlight UI를 교체하는 override"
 deckGroup: mdx
 sidebar:
   order: 70
+reviewedAt: 2026-09-18
+status: stable
 ---
 
 import { LinkCard } from '@astrojs/starlight/components';
@@ -12,9 +14,12 @@ import Thesis from '../../../components/docs/Thesis.astro';
 
 <Thesis>컴포넌트를 만들 실력보다 중요한 것은 만들지 않을 판단이다 — 사다리를 아래 칸부터 밟는다</Thesis>
 
+이 페이지는 **기존 표현으로 부족할 때 어디까지 직접 만들어야 하는가**를 다룬다.
+본문 컴포넌트와 사이트 UI override를 다른 유지보수 경계로 구분한다.
+
 <TermIntro
   terms={[
-    ['Props', 'Properties', '컴포넌트가 밖에서 받는 값. 태그의 속성으로 넘기고, 컴포넌트 안에서 `Astro.props`로 받는다. TypeScript `interface Props`를 쓰면 잘못된 사용을 빌드가 잡는다.'],
+    ['Props', 'Properties', '컴포넌트가 밖에서 받는 값. 태그의 속성으로 넘기고, 컴포넌트 안에서 `Astro.props`로 받는다. TypeScript `interface Props`는 편집기와 별도 타입 검사를 돕는다. 일반 빌드는 타입 검사를 하지 않는다.'],
     ['스코프 스타일', 'Scoped Style', '컴포넌트 `<style>`이 **그 컴포넌트의 HTML에만** 적용되는 것. Astro의 기본 동작 — 클래스 이름 충돌을 걱정하지 않아도 되는 이유.'],
     ['override', 'Component Override', 'Starlight가 자기 UI 부품(사이드바·헤더 등)을 내 컴포넌트로 **교체할 수 있게 열어 둔 공식 구멍.** config의 `components` 항목으로 선언한다.'],
     ['slot', '', '컴포넌트 태그 사이에 쓴 자식 콘텐츠가 들어가는 자리. `<slot />`을 템플릿에 두면 그 위치에 자식이 렌더된다 — 이 레포 컴포넌트는 대부분 slot 대신 props를 쓴다.'],
@@ -69,49 +74,47 @@ step4 -> step5
 이 레포의 `TermIntro`(용어 상자) · `Thesis`(이 장 첫머리의 "결론부터" 카드) ·
 `DeckMap`(덱 구성 지도)이 그렇게 태어났다. 한 번 쓸 강조를 위해 컴포넌트를 만들지 않는다.
 
-3번 칸을 건너뛰지 않는 것도 규칙이다 — `src/components/demos/`에는 이미 데모·시각화
-컴포넌트가 여럿 있다(`UiSurface` · `ThemeCompare` · `ColorScale` 등, 주로 shadcn 덱용).
-비슷한 것이 있으면 만들지 말고 넓힌다.
+3번 칸을 건너뛰지 않는다. `src/components/docs/`의 Thesis·TermIntro·DeckMap처럼
+기존 공용 컴포넌트의 목적과 props를 먼저 읽고 필요한 표현을 지원하는지 확인한다.
 
 ## .astro 컴포넌트의 해부 — TermIntro를 예제로
 
 이 페이지 첫머리의 용어 상자가 `src/components/docs/TermIntro.astro`다. 뼈대만 추리면 —
 
+아래는 실제 파일의 역할을 설명하는 발췌다. 행 렌더와 CSS를 생략했으므로 완성 컴포넌트는 아니다.
+
 ```astro
 ---
-/*
-  장 첫머리의 "처음 나오는 말" 상자.        ← ① 머리 주석: 왜 있는지 + 사용법
-  terms: [용어, 풀 이름(없으면 ''), 한 줄 설명][]
-*/
-interface Props {                            // ② 받는 값의 타입 — 오용을 빌드가 잡는다
+// TermIntro: 처음 나오는 용어를 기본으로 접힌 상자에 둔다.
+interface Props {
   title?: string;
   terms: [string, string, string][];
+  open?: boolean;
 }
-const { title = '이 장에서 처음 나오는 말', terms } = Astro.props;
+const { title = '이 장에서 처음 나오는 말', terms, open = false } = Astro.props;
 ---
-                                             {/* ③ 템플릿 — 빌드 때 HTML로 굳는다 */}
-<div class="terms">
-  <div class="terms__title">{title}</div>
-  <dl>
-    {terms.map(([word, full, desc]) => (
-      <div class="terms__row"> … </div>
-    ))}
-  </dl>
-</div>
-
-<style>                                      /* ④ 스코프 스타일 — 이 컴포넌트에만 */
-  .terms { … }
+<details class="terms" open={open}>
+  <summary>{title}</summary>
+  <dl>{/* 실제 파일에서는 terms를 순회해 dt/dd를 렌더한다. */}</dl>
+</details>
+<style>
+  /* 실제 파일의 .terms 스타일을 적용한다. */
 </style>
 ```
+
 
 네 부분의 역할 분담이 이 레포 컴포넌트의 표준형이다 —
 
 - **① 머리 주석** — "왜 이 컴포넌트가 존재하고 props를 어떻게 주는지"를 파일 맨 위에.
   AGENTS.md가 컴포넌트 문서를 따로 두지 않고 **머리 주석을 가리키는** 이유다.
   고치기 전에 읽는 것도, 여기에 적는 것도 규칙이다
-- **② Props interface** — 필수/선택과 타입을 선언. 본문에서 잘못 쓰면 빌드 에러
-- **③ 템플릿** — 2장에서 본 대로 클라이언트 상태 없음, 빌드 때 한 번 렌더
+- **② Props interface** — 필수/선택과 타입을 선언. 편집기·별도 타입 검사에서 진단
+- **③ 템플릿** — Astro 페이지에서 본 대로 클라이언트 상태 없음, 빌드 때 한 번 렌더
 - **④ 스코프 스타일** — 다음 절
+
+`astro build`는 TypeScript를 변환하지만 타입 검사는 하지 않는다.
+[Astro 타입 검사 안내](https://docs.astro.build/en/guides/typescript/#type-checking)를 구분해서 읽는다.
+이 저장소의 `pnpm check`는 콘텐츠 검사·빌드·링크 검사이며 `astro check`를 실행하는 명령이 아니다.
 
 ## 스타일 캡슐화와 다크 모드
 
@@ -133,9 +136,8 @@ const { title = '이 장에서 처음 나오는 말', terms } = Astro.props;
 - **사이트 전역 조정은 컴포넌트가 아니라 `src/styles/custom.css`.** 컴포넌트 스타일은
   자기 안에서 끝나야 한다 — 전역을 건드리는 컴포넌트는 디버깅 불가능한 결합을 만든다
 
-예외는 컴포넌트가 직접 렌더하지 않은 DOM을 꾸미는 경우다. `UiSurface`는 슬롯으로 들어오는
-데모 마크업(`.ui-*`)을 대상으로 하므로 `<style is:global>`이 필요하지만,
-선택자를 `.ui` 아래로 제한해 영향 범위는 컴포넌트 안에 가둔다.
+슬롯의 자식처럼 컴포넌트가 직접 렌더하지 않은 DOM에는 스코프가 기대대로 적용되는지 확인한다.
+전역 선택자가 필요하면 컴포넌트의 루트 클래스 아래로 범위를 제한한다.
 
 ## 문자열을 HTML로 넣을 때 — set:html의 안전 규칙
 
@@ -153,9 +155,10 @@ const format = (s: string) =>
     .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
 ```
 
-순서가 안전의 전부다 — **escape가 먼저**라서 props에 태그가 들어와도 문자 그대로
+이 예시의 안전 경계는 HTML 텍스트 위치에만 쓰고 escape를 먼저 하는 것이다 — **escape가 먼저**라서 props에 태그가 들어와도 문자 그대로
 보일 뿐 실행되지 않고, 그 위에 code와 strong 두 개만 살린다.
-`set:html`을 쓰는 자리에는 반드시 이런 관문을 둔다.
+이 코드는 일반 HTML sanitizer나 URL·속성 값용 인코더가 아니다. 허용 문법을 넓히면
+새 입력 경계에 맞게 다시 검토한다.
 
 ## 본문에서 쓰기
 
@@ -172,7 +175,7 @@ import TermIntro from '../../../components/docs/TermIntro.astro';
 - import 경로는 상대 경로다 — 공용 문서 컴포넌트는 `../../../components/docs/`, 데모는 `../../../components/demos/`
 - **본문에는 태그 하나만 남긴다.** 데이터는 props로, 모양은 컴포넌트 안에 —
   본문 파일에서 시각 조정을 하고 싶어지면 컴포넌트를 고칠 때다
-- `client:*` 지시자는 붙이지 않는다 — 이 레포 본문 컴포넌트는 전부 정적이다(2장)
+- `client:*` 지시자는 붙이지 않는다 — 이 레포 본문 컴포넌트는 전부 정적이다(Astro)
 
 ## override — 사이트 UI를 교체하는 마지막 칸
 
@@ -192,7 +195,8 @@ starlight({
 })
 ```
 
-이 레포의 사이드바 드롭다운·접기 토글·헤더 덱 표시가 전부 이 세트다.
+이 config는 발췌다. `SiteTitle`이 `SidebarToggle.astro`를 직접 import하므로 실제 사이드바
+동작은 `Sidebar`·`SiteTitle`·`SidebarToggle`과 `custom.css`의 전역 접힘 규칙을 함께 봐야 한다.
 각 파일의 머리 주석에 "왜 이 구조인가"가 있고, **고치기 전에 그걸 먼저 읽는 것**이 규칙이다.
 
 `MarkdownContent.astro`는 검색 meta만 심는 데서 끝나지 않는다. 이미지 확대 플러그인이 기존
@@ -205,7 +209,7 @@ override한 컴포넌트는 Starlight 내부 구조에 기대는 만큼, **Starl
 override로 하지 않고, 하게 되면 머리 주석에 이유와 기대는 지점을 남긴다.
 :::
 
-## 6장 요약
+## 요약
 
 - 사다리 순서 — 마크다운 → 내장 → **기존 컴포넌트 훑기** → 새로 만들기 → override.
   만드는 신호는 "같은 패턴 세 번째 복붙"
@@ -215,7 +219,7 @@ override로 하지 않고, 하게 되면 머리 주석에 이유와 기대는 �
 - override는 사이트 UI 수술이자 **업그레이드 부채** — 마지막 수단, 이유는 머리 주석에
 
 <LinkCard
-  title="7. 문서답게 쓰기"
+  title="문서답게 쓰기"
   description="슬라이드가 아니라 문서 — 제목이 목차가 되는 설계, 문제→해법 서술, 표와 그림의 분업, 검색을 위한 글쓰기."
-  href="/starlight/07-writing/"
+  href="/starlight/writing/"
 />

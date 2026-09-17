@@ -1,0 +1,149 @@
+{
+  "00-intro": {
+    "target": "/starlight/intro/",
+    "anchors": {
+      "이-덱은-누구를-위한-것인가": "/starlight/intro/#이-덱은-누구를-위한-것인가",
+      "다루는-것과-다루지-않는-것": "/starlight/intro/#다루는-것과-다루지-않는-것",
+      "왜-노션이-아니라-문서-사이트인가": "/starlight/intro/#왜-노션이-아니라-문서-사이트인가",
+      "미리-잡아두는-멘탈-모델--3층-분리": "/starlight/intro/#미리-잡아두는-멘탈-모델--3층-분리",
+      "이-덱의-기준": "/starlight/intro/#이-덱의-기준",
+      "0장-요약": "/starlight/intro/#요약"
+    }
+  },
+  "03-starlight": {
+    "target": "/starlight/structure/",
+    "anchors": {
+      "starlight가-주는-것": "/starlight/structure/#starlight가-주는-것",
+      "파일이-곧-페이지다": "/starlight/structure/#파일이-곧-페이지다",
+      "프론트매터--내용-두-필드-구조-두-필드": "/starlight/structure/#프론트매터--내용-두-필드-구조-두-필드",
+      "사이드바--이-레포는-topics로-쪼갠다": "/starlight/structure/#사이드바--이-레포는-topics로-쪼갠다",
+      "이-레포가-기본값에서-바꾼-것들": "/starlight/structure/#이-레포가-기본값에서-바꾼-것들",
+      "3장-요약": "/starlight/structure/#요약"
+    }
+  },
+  "06-custom": {
+    "target": "/starlight/custom/",
+    "anchors": {
+      "언제-만드는가--개입의-사다리": "/starlight/custom/#언제-만드는가--개입의-사다리",
+      "astro-컴포넌트의-해부--termintro를-예제로": "/starlight/custom/#astro-컴포넌트의-해부--termintro를-예제로",
+      "스타일-캡슐화와-다크-모드": "/starlight/custom/#스타일-캡슐화와-다크-모드",
+      "문자열을-html로-넣을-때--sethtml의-안전-규칙": "/starlight/custom/#문자열을-html로-넣을-때--sethtml의-안전-규칙",
+      "본문에서-쓰기": "/starlight/custom/#본문에서-쓰기",
+      "override--사이트-ui를-교체하는-마지막-칸": "/starlight/custom/#override--사이트-ui를-교체하는-마지막-칸",
+      "6장-요약": "/starlight/custom/#요약"
+    }
+  },
+  "07-writing": {
+    "target": "/starlight/writing/",
+    "anchors": {
+      "슬라이드가-아니라-문서다": "/starlight/writing/#슬라이드가-아니라-문서다",
+      "제목이-목차다": "/starlight/writing/#제목이-목차다",
+      "문제--해법-순서로-쓴다": "/starlight/writing/#문제--원리--적용으로-연결한다",
+      "표와-그림의-분업": "/starlight/writing/#표와-그림의-분업",
+      "검색을-위해-쓴다": "/starlight/writing/#검색을-위해-쓴다",
+      "반복-구조가-재독을-만든다": "/starlight/writing/#작성-후-의미를-리뷰한다",
+      "7장-요약": "/starlight/writing/#이해-확인"
+    }
+  },
+  "09-wrapup": {
+    "target": "/starlight/wrapup/",
+    "anchors": {
+      "덱을-관통한-한-문장": "/starlight/wrapup/#덱을-관통한-한-문장",
+      "비슷한-학습-지식베이스를-만든다면": "/starlight/wrapup/#비슷한-학습-지식베이스를-만든다면",
+      "페이지는-검색-결과-한-건의-크기로": "/starlight/wrapup/#페이지는-검색-결과-한-건의-크기로",
+      "처음부터-전부-만들지-않는다": "/starlight/wrapup/#처음부터-전부-만들지-않는다",
+      "장별-한-줄-지도": "/starlight/wrapup/#장별-한-줄-지도",
+      "새-덱을-추가하는-절차": "/starlight/wrapup/#새-덱을-추가하는-절차",
+      "치트시트": "/starlight/wrapup/#치트시트",
+      "명령": "/starlight/wrapup/#명령",
+      "빌드가-통과해도-깨져-있는-것들": "/starlight/wrapup/#빌드가-통과해도-깨져-있는-것들",
+      "더-읽을-것": "/starlight/wrapup/#더-읽을-것",
+      "이-덱이-스스로에게-거는-검증": "/starlight/wrapup/#이-덱이-스스로에게-거는-검증"
+    }
+  },
+  "01-landscape": {
+    "target": "/starlight/landscape/",
+    "anchors": {
+      "문서를-두는-곳은-세-부류다": "/starlight/landscape/#문서를-두는-곳은-세-부류다",
+      "docs-as-code-진영의-후보들": "/starlight/landscape/#선택이-달라지는-경우",
+      "갈림길이-되는-질문들": "/starlight/landscape/#갈림길이-되는-질문들",
+      "왜-starlight였나": "/starlight/landscape/#왜-starlight였나",
+      "처음부터-있던-요구--덱-여러-개를-한-사이트에": "/starlight/landscape/#왜-starlight였나",
+      "검색이-내장이다--docusaurus와-실제로-갈리는-지점": "/starlight/landscape/#왜-starlight였나",
+      "기본값이-문서에-맞다": "/starlight/landscape/#왜-starlight였나",
+      "조립할-게-없다": "/starlight/landscape/#왜-starlight였나",
+      "컴포넌트가-프레임워크에-묶이지-않는다": "/starlight/landscape/#왜-starlight였나",
+      "필요한-만큼만-손댈-수-있다": "/starlight/landscape/#선택이-달라지는-경우",
+      "갈림길이-아니었던-것들": "/starlight/landscape/#선택이-달라지는-경우",
+      "ai가-작성자일-때": "/starlight/landscape/#ai가-작성자일-때",
+      "부류-선택은-더-굳어진다": "/starlight/landscape/#ai가-작성자일-때",
+      "검증-루프--starlight가-유리해지는-축": "/starlight/landscape/#ai가-작성자일-때",
+      "모델-지식--docusaurus가-유리해지는-축": "/starlight/landscape/#ai가-작성자일-때",
+      "선택이-달라지는-경우": "/starlight/landscape/#선택이-달라지는-경우",
+      "이미-고른-뒤에-오는-추천--갈아타기는-다른-문제다": "/starlight/landscape/#선택이-달라지는-경우",
+      "1장-요약": "/starlight/landscape/#이해-확인"
+    }
+  },
+  "05-components": {
+    "target": "/starlight/components/",
+    "anchors": {
+      "원칙--컴포넌트는-정보-구조다": "/starlight/components/#원칙--컴포넌트는-정보-구조다",
+      "본문에-넣는-것은-세-종류다": "/starlight/components/#본문에-넣는-것은-세-종류다",
+      "역할-표--무엇을-어디에": "/starlight/components/#역할-표--무엇을-어디에",
+      "절차--갈래--분류--큰-셋": "/starlight/components/#절차--갈래--분류--큰-셋",
+      "절차는-steps": "/starlight/components/#절차는-steps",
+      "갈래는-tabs": "/starlight/components/#갈래는-tabs",
+      "분류는-cardgrid": "/starlight/components/#분류는-cardgrid",
+      "소소하지만-규칙이-있는-것들": "/starlight/components/#소소하지만-규칙이-있는-것들",
+      "aside--네-가지-색의-약속": "/starlight/components/#aside--네-가지-색의-약속",
+      "다이어그램--전부-d2다": "/starlight/components/#다이어그램--전부-d2다",
+      "여섯-색-의미-팔레트": "/starlight/components/#여섯-색-의미-팔레트",
+      "mermaid에서-d2로--왜-갈아탔나": "/starlight/components/#mermaid에서-d2로--왜-갈아탔나",
+      "5장-요약": "/starlight/components/#요약"
+    }
+  },
+  "02-astro": {
+    "target": "/starlight/astro/",
+    "anchors": {
+      "왜-astro부터-아는가": "/starlight/astro/#왜-astro부터-아는가",
+      "흔한-혼동--react-같은-ui-라이브러리인가": "/starlight/astro/#왜-astro부터-아는가",
+      "기본값이-반대다--zero-js": "/starlight/astro/#정적-컴포넌트와-브라우저-코드를-구분한다",
+      "아일랜드--필요한-곳만-살아-있다": "/starlight/astro/#아일랜드가-없어도-스크립트는-실행된다",
+      "astro-컴포넌트--빌드-때-실행되는-템플릿": "/starlight/astro/#정적-컴포넌트와-브라우저-코드를-구분한다",
+      "콘텐츠-컬렉션--프론트매터에-타입이-붙는다": "/starlight/astro/#콘텐츠-컬렉션은-무엇을-검증하는가",
+      "이-레포에서-astro가-하는-일": "/starlight/astro/#이-레포에서-astro가-하는-일",
+      "2장-요약": "/starlight/astro/#이해-확인"
+    }
+  },
+  "04-mdx": {
+    "target": "/starlight/mdx/",
+    "anchors": {
+      "마크다운의-한계에서-출발한다": "/starlight/mdx/#마크다운의-한계에서-출발한다",
+      "mdx-문서의-해부": "/starlight/mdx/#mdx-문서의-해부",
+      "변환-파이프라인--에러가-나는-층-읽기": "/starlight/mdx/#변환-파이프라인--에러가-나는-층-읽기",
+      "마크다운과-다른-점--함정-네-개": "/starlight/mdx/#마크다운과-다른-점--함정-네-개",
+      "중괄호는-표현식이다": "/starlight/mdx/#중괄호는-표현식이다",
+      "html-주석이-없다": "/starlight/mdx/#html-주석이-없다",
+      "컴포넌트-태그-안의-마크다운은-들여쓰지-않는다": "/starlight/mdx/#컴포넌트-태그-안의-마크다운은-들여쓰지-않는다",
+      "여는-꺾쇠도-문법이다": "/starlight/mdx/#여는-꺾쇠도-문법이다",
+      "한글-문서의--함정--빌드가-안-잡는-그-문제": "/starlight/mdx/#한글-문서의--함정--빌드가-안-잡는-그-문제",
+      "이-레포의-mdx-운용": "/starlight/mdx/#이-레포의-mdx-운용",
+      "4장-요약": "/starlight/mdx/#요약"
+    }
+  },
+  "08-pipeline": {
+    "target": "/starlight/pipeline/",
+    "anchors": {
+      "pnpm-build가-하는-일": "/starlight/pipeline/#pnpm-build가-하는-일",
+      "dev와-최종-검사는-다른-물건이다": "/starlight/pipeline/#dev와-최종-검사는-다른-물건이다",
+      "빌드가-잡는-것-못-잡는-것": "/starlight/pipeline/#빌드가-잡는-것-못-잡는-것",
+      "검색--pagefind의-동작": "/starlight/pipeline/#검색--pagefind의-동작",
+      "배포--cloudflare-pages": "/starlight/pipeline/#배포-전에-결정할-것",
+      "pnpm_version을-박아야-한다": "/starlight/pipeline/#배포-전에-결정할-것",
+      "site와-canonical": "/starlight/pipeline/#배포-전에-결정할-것",
+      "cloudflare-pages가-아니라면": "/starlight/pipeline/#cloudflare-pages가-아니라면",
+      "콘텐츠-수정의-전체-흐름": "/starlight/pipeline/#변경별-최소-검증",
+      "8장-요약": "/starlight/pipeline/#이해-확인"
+    }
+  }
+}
