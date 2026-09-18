@@ -122,7 +122,7 @@ import Thesis from '../../../components/docs/Thesis.astro';
 | 배포와 같은 산출물 확인 | `pnpm preview` |
 | 깨진 굵게 찾기 | `grep -rho '\*\*[^<*]\{0,45\}' dist --include=index.html \| sort -u` |
 | 제목 고치기 전 앵커 참조 확인 | `grep -rn '#앵커-slug' src/content/docs/` |
-| 배포 | `main` 푸시 (요청받았을 때만) — 브랜치 푸시는 preview |
+| 배포 | `main` 푸시 (요청받았을 때만) — 호스팅별 설정은 배포 그룹의 세 페이지 |
 
 ### 빌드가 통과해도 깨져 있는 것들
 
@@ -168,5 +168,5 @@ import Thesis from '../../../components/docs/Thesis.astro';
 ## 이 덱이 스스로에게 거는 검증
 
 이 덱의 예제는 전부 이 레포다(시작하기). 그래서 레포가 바뀌면 이 덱도 낡는다 —
-컴포넌트 목록(커스텀 컴포넌트), 배포 설정(빌드와 검증), 덱 추가 절차(이 장)를 고쳤다면
+컴포넌트 목록(커스텀 컴포넌트), 배포 스크립트·설정(배포 그룹), 덱 추가 절차(이 장)를 고쳤다면
 `starlight` 덱의 해당 대목도 같이 고친다. 기준은 덱 폴더의 `_baseline.md`에 있다.

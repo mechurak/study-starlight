@@ -1,0 +1,113 @@
+---
+title: "Vercel로 배포하기"
+description: "저장소를 가져오면 Astro를 자동 감지하지만, pnpm 버전과 Git 이력 깊이는 직접 정한다"
+deckGroup: deploy
+sidebar:
+  order: 94
+reviewedAt: 2026-09-18
+status: stable
+---
+
+import { LinkCard, Steps } from '@astrojs/starlight/components';
+import Thesis from '../../../components/docs/Thesis.astro';
+import TermIntro from '../../../components/docs/TermIntro.astro';
+
+<Thesis>Astro 정적 사이트는 설정 없이 올라가지만, 이 저장소의 pnpm 버전 요구와 수정일 표시는 기본값과 어긋난다</Thesis>
+
+브랜치마다 미리보기 주소가 생기는 것을 원하고 GitHub 밖 서비스 계정을 하나 더 만들 수 있다면
+Vercel이 가장 손이 덜 간다. 이 페이지는 **자동 감지에 맡길 것과 직접 정해야 할 것을 어떻게 가르는가**에 답한다.
+[배포 전에 결정할 것](/starlight/pipeline/#배포-전에-결정할-것)의 공통 값은 이미 확인했다고 본다.
+
+<TermIntro terms={[
+  ['Preview Deployment', '', '프로덕션 브랜치가 아닌 브랜치를 푸시할 때마다 생기는 별도 주소의 배포. 합치기 전에 결과를 본다.'],
+  ['Corepack', '', 'Node.js에 딸린 도구로 package.json의 packageManager 값에 적힌 패키지 관리자 버전을 그대로 쓰게 한다.'],
+]} />
+
+## 대시보드에서 저장소를 가져온다
+
+[Astro 공식 Vercel 안내](https://docs.astro.build/en/guides/deploy/vercel/)대로 정적 사이트에는
+어댑터가 필요 없다. 이 저장소에는 `@astrojs/vercel`을 넣지 않는다.
+
+<Steps>
+
+1. [Vercel 대시보드](https://vercel.com/new)에서 **Add New → Project**를 고르고 GitHub 저장소를 선택한다.
+
+2. Framework Preset이 **Astro**로 감지되는지 본다. 빌드 명령과 출력 디렉터리 `dist`는 프리셋이 채운다.
+
+3. **Environment Variables**에 아래 변수 하나를 추가한다. 이유는 다음 절에 있다.
+
+   | 이름 | 값 |
+   |---|---|
+   | `ENABLE_EXPERIMENTAL_COREPACK` | `1` |
+
+4. **Deploy**를 누른다. 끝나면 `<프로젝트>.vercel.app` 주소가 생기고, 이후 `main` 푸시는 프로덕션,
+   다른 브랜치 푸시는 Preview로 배포된다.
+
+</Steps>
+
+## pnpm 버전을 Corepack으로 고정하는 이유
+
+Vercel은 `pnpm-lock.yaml`의 `lockfileVersion`으로 pnpm 버전을 고른다. 이 저장소의 lockfile은
+`9.0`이고, [Vercel 문서](https://vercel.com/docs/package-managers)는 이 값을 pnpm 9 또는 10으로
+해석한다. 그런데 `pnpm-workspace.yaml`의 `allowBuilds`는 pnpm 10.26에서 들어온 문법이다.
+그보다 오래된 pnpm은 이 필드를 무시하고 esbuild·sharp의 빌드 스크립트를 막아 빌드가 깨진다.
+
+`ENABLE_EXPERIMENTAL_COREPACK=1`을 두면 Vercel은 `package.json`의 `packageManager`
+(`pnpm@11.20.0`)를 그대로 쓴다. 대시보드의 Install Command 덮어쓰기는 대안이 아니다.
+`pnpm install`을 직접 적으면 빌드 컨테이너에 있는 **가장 오래된** pnpm을 쓴다고 문서가 밝히고 있다.
+
+Node 버전은 따로 손대지 않는다. `package.json`의 `engines.node`가 `>=24`이고,
+Vercel은 이 범위를 최신 24.x로 해석한다.
+
+## 랜딩의 수정일이 어긋날 수 있다
+
+Vercel 빌드는 저장소를 `--depth=10`으로 얕게 복제한다. 랜딩 카드의 "마지막 수정"은 각 덱 폴더의
+최신 커밋일을 git log에서 읽으므로, 최근 10개 커밋 안에서 안 바뀐 덱은 모두 같은 경계 날짜로 표시된다.
+
+저장소의 `scripts/prepare-git-history.mjs`는 `CF_PAGES=1`일 때만 전체 이력을 받는다.
+Vercel에서도 같은 처리를 하려면 그 스크립트가 `VERCEL=1`도 인식하도록 고쳐야 하고, 이 변경은
+아직 하지 않았다. 수정일 표시가 중요하지 않다면 그대로 둬도 사이트는 정상 동작한다.
+
+## 주소와 site를 맞춘다
+
+프로젝트 **Settings → Domains**에서 커스텀 도메인을 붙일 수 있다. 어느 주소를 대표로 쓰든
+`astro.config.mjs`의 `site`를 그 주소로 바꿔야 canonical과 sitemap이 맞는다.
+
+```js title="astro.config.mjs"
+export default defineConfig({
+  site: 'https://<프로젝트>.vercel.app', // 커스텀 도메인을 붙였다면 그 주소
+});
+```
+
+배포 뒤 확인은 GitHub Pages와 같다.
+
+```bash
+curl -s https://<프로젝트>.vercel.app/starlight/intro/ | grep -o '<link rel="canonical"[^>]*>'
+```
+
+## CLI로 올리고 싶을 때
+
+대시보드 연동 없이도 저장소 루트에서 다음 한 번이면 된다. 설치 방법은
+[Vercel CLI 문서](https://vercel.com/docs/cli)를 따르고 본문에 복사하지 않는다.
+
+```bash
+vercel
+```
+
+프레임워크 설정을 덮어쓸지 물으면 아니오를 고른다. 이 방식은 로컬 파일을 올리므로 Git 이력
+문제는 없지만, 푸시할 때마다 자동 배포되는 것은 아니다.
+
+## 확인할 제한
+
+- Corepack 사용과 pnpm 11 조합은 2026-09-18 공식 문서로 확인했고 실제 Vercel 배포로 실측하지 않았다.
+  첫 빌드 로그에서 `pnpm --version`이 11.20.0으로 찍히는지 본다.
+- 비공개 저장소는 조직 소유일 때 요금제 제한이 있다. 개인 계정의 비공개 저장소는 Hobby로도 된다.
+- Preview 배포는 기본으로 검색엔진 색인에서 제외된다. 프로덕션 주소만 `site`에 넣는다.
+
+## 이해 확인
+
+빌드 로그에 `esbuild` 빌드 스크립트가 차단됐다는 경고가 뜨고 D2 단계에서 멈췄다. 어디를 볼까?
+Corepack 변수가 빠져 옛 pnpm이 `allowBuilds`를 무시한 상황이다. 변수를 넣고 다시 배포한다.
+로컬 `pnpm check`가 통과한다는 사실은 이 문제와 무관하다. 로컬 pnpm은 이미 11이기 때문이다.
+
+<LinkCard title="Cloudflare Pages로 배포하기" description="이 저장소가 실제로 쓰는 경로. 변수 하나만 넣으면 나머지는 스크립트가 처리한다." href="/starlight/cloudflare-pages/" />

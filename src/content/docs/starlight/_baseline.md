@@ -19,6 +19,11 @@ sidebar-topics 0.8.0, image-zoom 0.15.0, native D2 0.8.2.
 프로젝트 동작은 실제 loader·schema·check 스크립트·components·astro.config.mjs를 대조한다.
 일반 Astro build는 타입 검사를 하지 않는다. pnpm check도 astro check와 다른 프로젝트 명령이다.
 
+배포 세 페이지는 2026-09-18에 Astro deploy 가이드(github·vercel·cloudflare), GitHub Pages 문서,
+withastro/action README, Vercel package-managers·configure-a-build·node-js-versions 문서,
+Cloudflare Pages build-image·build-configuration 문서와 저장소의 prepare-*.mjs를 대조했다.
+실제 배포로 실측한 것은 Cloudflare Pages뿐이며 GitHub Pages·Vercel은 문서 확인이다.
+
 ## 서술 규칙
 
 예제는 이 저장소의 실제 구조에 맞춘다. 발췌·가상 경로는 그대로 실행 가능한 완성 파일과 구분한다.
@@ -29,6 +34,7 @@ Starlight 공식 기능, 플러그인 기능, 자체 loader·검사를 구분한
 정적 컴포넌트와 일반 script·프레임워크 아일랜드, description과 검색 발췌를 혼동하지 않는다.
 검증은 docs/verification.md를 따르며 전수 브라우저 검사를 기본으로 권하지 않는다.
 원본의 개인 배포 설정은 docs/deploy.md에 있고 다른 저장소의 기본값으로 복제하지 않는다.
+배포 페이지는 도메인 루트 배포를 전제로 쓰고, 문서로만 확인한 값과 실측한 값을 구분해 적는다.
 
 새 학습 본문에는 Thesis·TermIntro를 둔다. wrapup은 TermIntro 예외다.
 옛 열 페이지의 URL·절 북마크는 src/data/starlight-legacy-routes.json이 소유한다.

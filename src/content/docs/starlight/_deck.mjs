@@ -31,6 +31,10 @@ export default {
       "label": "글쓰기와 운영"
     },
     {
+      "id": "deploy",
+      "label": "배포"
+    },
+    {
       "id": "wrapup",
       "label": "마무리"
     }
@@ -77,6 +81,28 @@ export default {
       "tone": "warn",
       "desc": "독자·예제·의미 리뷰 · 콘텐츠·빌드·링크 검사와 검색",
       "note": "빌드가 못 잡는 것은 무엇으로 판정하나"
+    },
+    {
+      "label": "배포",
+      "href": "/starlight/github-pages/",
+      "title": "배포",
+      "tone": "key",
+      "desc": "GitHub Pages · Vercel · Cloudflare Pages — 호스팅마다 직접 정할 값과 저장소가 대신 처리하는 것",
+      "note": "같은 dist/를 올리는데 왜 호스팅마다 손댈 곳이 다른가",
+      "items": [
+        [
+          "GitHub Pages",
+          "/starlight/github-pages/"
+        ],
+        [
+          "Vercel",
+          "/starlight/vercel/"
+        ],
+        [
+          "Cloudflare Pages",
+          "/starlight/cloudflare-pages/"
+        ]
+      ]
     },
     {
       "label": "참조",
