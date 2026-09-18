@@ -16,6 +16,16 @@
 [Starlight의 빌드와 검증](../src/content/docs/starlight/pipeline.mdx)의
 "Cloudflare Pages가 아니라면" 절에 있다.
 
+## 선택용 GitHub Pages 워크플로
+
+`.github/workflows/deploy.yml`은 `main` push 트리거를 주석으로 준비해 두었다.
+GitHub Pages를 쓸 때 주소·`site`·Pages의 Source를 먼저 맞춘 뒤 `push`·`branches` 두 줄의
+주석을 해제해 커밋·푸시하면 이후 `main`에 푸시할 때마다 배포된다.
+기본 상태에서는 `workflow_dispatch`를 통한 수동 실행만 가능하다. 준비와 실행 절차는
+[GitHub Pages로 배포하기](../src/content/docs/starlight/github-pages.mdx)에 있다.
+GitHub의 `Disable workflow` 상태는 YAML 기본값이 아니라 GitHub에서 따로 관리한다.
+이 파일을 추가한 것만으로 현재 배포 대상이 바뀌지는 않는다.
+
 ## 최초 연결 (대시보드에서 한 번만)
 
 Git 연결은 OAuth 승인이 필요해서 **대시보드에서만** 할 수 있다 (CLI/API 불가).

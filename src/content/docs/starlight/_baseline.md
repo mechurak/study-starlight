@@ -24,6 +24,11 @@ withastro/action README, Vercel package-managers·configure-a-build·node-js-ver
 Cloudflare Pages build-image·build-configuration 문서와 저장소의 prepare-*.mjs를 대조했다.
 2026-09-19 npm 전환에 맞춰 갱신했다. pnpm 기반 Cloudflare Pages 배포는 실측 이력이 있으나
 npm 기반 빌드는 세 호스팅 모두 아직 문서 확인이며, 다음 푸시의 빌드 로그로 확인한다.
+GitHub Pages는 2026-09-19에 템플릿 생성·수동 실행·비활성화 공식 안내를 추가 대조했다.
+`deploy.yml`은 main push 트리거를 주석으로 제공한다. GitHub Pages 사용 시 주석을 해제하며,
+기본 상태는 수동 실행만 가능하다. 실제 Pages 배포는 아직 실행하지 않았다.
+프로젝트 사이트 안내는 Astro site·base 정의와 GHES Pages 주소·action 호환성 문서를 대조했다.
+현재 저장소의 하위 경로 대응은 미구현이며, 문서의 설정 예제와 동작하는 구현을 구분한다.
 
 ## 서술 규칙
 
@@ -35,7 +40,8 @@ Starlight 공식 기능, 플러그인 기능, 자체 loader·검사를 구분한
 정적 컴포넌트와 일반 script·프레임워크 아일랜드, description과 검색 발췌를 혼동하지 않는다.
 검증은 docs/verification.md를 따르며 전수 브라우저 검사를 기본으로 권하지 않는다.
 원본의 개인 배포 설정은 docs/deploy.md에 있고 다른 저장소의 기본값으로 복제하지 않는다.
-배포 페이지는 도메인 루트 배포를 전제로 쓰고, 문서로만 확인한 값과 실측한 값을 구분해 적는다.
+GitHub Pages는 프로젝트 사이트를 기본 예제로 쓰며, 루트 배포용 현재 코드의 추가 수정 범위를 명시한다.
+다른 배포 페이지는 도메인 루트 배포가 기본이다. 문서로 확인한 값과 실측한 값을 구분해 적는다.
 
 새 학습 본문에는 Thesis·TermIntro를 둔다. wrapup은 TermIntro 예외다.
 옛 열 페이지의 URL·절 북마크는 src/data/starlight-legacy-routes.json이 소유한다.
