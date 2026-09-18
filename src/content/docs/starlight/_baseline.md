@@ -13,16 +13,17 @@ Astro·구조·MDX·컴포넌트는 필요한 작업에서 참조한다. 일반 
 
 2026-09-18 설치·lockfile 기준: Astro 7.1.6, Starlight 0.41.6, astro-d2 0.13.1,
 sidebar-topics 0.8.0, image-zoom 0.15.0, native D2 0.8.2.
-버전 범위는 package.json, 재현 설치는 pnpm-lock.yaml을 따른다.
+버전 범위는 package.json, 재현 설치는 package-lock.json을 따른다.
 
 공식 기능은 Astro 컴포넌트·브라우저 script·TypeScript 문서와 Starlight 검색·컴포넌트 문서를,
 프로젝트 동작은 실제 loader·schema·check 스크립트·components·astro.config.mjs를 대조한다.
-일반 Astro build는 타입 검사를 하지 않는다. pnpm check도 astro check와 다른 프로젝트 명령이다.
+일반 Astro build는 타입 검사를 하지 않는다. npm run check도 astro check와 다른 프로젝트 명령이다.
 
 배포 세 페이지는 2026-09-18에 Astro deploy 가이드(github·vercel·cloudflare), GitHub Pages 문서,
 withastro/action README, Vercel package-managers·configure-a-build·node-js-versions 문서,
 Cloudflare Pages build-image·build-configuration 문서와 저장소의 prepare-*.mjs를 대조했다.
-실제 배포로 실측한 것은 Cloudflare Pages뿐이며 GitHub Pages·Vercel은 문서 확인이다.
+2026-09-19 npm 전환에 맞춰 갱신했다. pnpm 기반 Cloudflare Pages 배포는 실측 이력이 있으나
+npm 기반 빌드는 세 호스팅 모두 아직 문서 확인이며, 다음 푸시의 빌드 로그로 확인한다.
 
 ## 서술 규칙
 

@@ -23,7 +23,7 @@ Astro Starlight 기반 개인 스터디 노트 사이트. 슬라이드가 아니
 구현 선택은 진행하고, 사용자 결정이 필요한 범위 변경이나 아직 허용받지 않은 외부 쓰기는 먼저 확인한다.
 지침 때문에 중단한다면 파일 경로와 해당 문장, 현재 요청에 적용되는 이유를 설명한다.
 
-사이트 콘텐츠·코드·설정을 바꾼 작업은 마지막에 `pnpm check`를 한 번 실행한다. 빌드에 포함되지 않는
+사이트 콘텐츠·코드·설정을 바꾼 작업은 마지막에 `npm run check`를 한 번 실행한다. 빌드에 포함되지 않는
 지침·계획 문서만 바꿨다면 diff와 참조 경로만 확인한다. 검증의 목적과 최소 범위는
 [docs/verification.md](docs/verification.md)를 따른다.
 `playwright-cli` 등 브라우저 검증은 자동 검사로 확인할 수 없는 화면 동작·레이아웃에 구체적인
@@ -73,7 +73,7 @@ Astro Starlight 기반 개인 스터디 노트 사이트. 슬라이드가 아니
 
 `_baseline.md`에는 기준 버전, 덱 전용 서술 규칙, 범위 경계를 둔다. `_`로 시작하는 파일은
 콘텐츠 컬렉션에서 제외되어 빌드·검색·사이드바에 나오지 않는다. 모든 덱에 baseline이 있어야 하며
-`pnpm check`가 이를 강제한다.
+`npm run check`가 이를 강제한다.
 
 새 페이지·덱의 필수 필드, category·tag 선택, `<Thesis>`·`<TermIntro>` 규칙은
 [콘텐츠 작성 규칙](docs/content-authoring.md)의 프론트매터·덱 메타데이터 절을 따른다.
@@ -86,6 +86,5 @@ Astro Starlight 기반 개인 스터디 노트 사이트. 슬라이드가 아니
 - 랜딩(`/`)은 어느 topic에도 속하지 않는다. topic 밖 페이지는 plugin `exclude`에 추가한다.
 - 사이드바 UI는 `src/components/layout/`의 `Sidebar`·`SiteTitle`·`SidebarToggle` override 세트다.
   실제 접힘 레이아웃은 `src/styles/custom.css`의 전역 규칙이다.
-- `pnpm-workspace.yaml`은 워크스페이스 목록이 아니라 esbuild·sharp의 빌드 허용 설정이다. 지우지 않는다.
 
 세부 작성 규칙과 MDX 함정은 `docs/content-authoring.md`, D2 전용 규칙은 `docs/d2-authoring.md`에서 관리한다.

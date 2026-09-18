@@ -167,7 +167,7 @@ CommonMark의 강조 규칙에서 닫는 `**`는 **"단어의 끝" 위치여야*
 | `` **`get all`**이다 `` | `` `get all`이다 `` | 코드 서식이 이미 강조다 — `**`를 뺀다 |
 
 :::caution[함정]
-강조 표시가 의심되는 변경에서는 **산출물을 확인한다.** `pnpm check` 후 필요한 경우:
+강조 표시가 의심되는 변경에서는 **산출물을 확인한다.** `npm run check` 후 필요한 경우:
 
 ```bash
 grep -rho '\*\*[^<*]\{0,45\}' dist --include=index.html | sort -u

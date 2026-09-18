@@ -20,7 +20,7 @@ GitHub에 저장소를 올린 사람이 다른 서비스 계정 없이 사이트
 
 <TermIntro terms={[
   ['GitHub Pages', '', 'GitHub이 저장소의 정적 파일을 웹으로 제공하는 기능. 빌드는 하지 않고 올려 준 파일을 그대로 낸다.'],
-  ['GitHub Actions', '', 'GitHub이 저장소 이벤트에 맞춰 실행하는 CI. 여기서는 pnpm build를 실행해 dist/를 만든다.'],
+  ['GitHub Actions', '', 'GitHub이 저장소 이벤트에 맞춰 실행하는 CI. 여기서는 npm run build를 실행해 dist/를 만든다.'],
   ['base', 'base path', '사이트가 도메인 루트가 아니라 /repo/ 같은 하위 경로에 놓일 때 모든 링크 앞에 붙는 경로.'],
 ]} />
 
@@ -81,8 +81,7 @@ jobs:
           fetch-depth: 0
       - uses: withastro/action@v6
         with:
-          package-manager: pnpm@11.20.0
-          build-cmd: pnpm build
+          build-cmd: npm run build
   deploy:
     needs: build
     runs-on: ubuntu-latest
@@ -97,9 +96,8 @@ jobs:
 | 부분 | 왜 필요한가 |
 |---|---|
 | `fetch-depth: 0` | 기본값 1이면 모든 문서가 같은 날짜로 보인다. 저장소의 `prepare-git-history.mjs`는 Cloudflare Pages에서만 동작하므로 여기서는 checkout이 직접 전체 이력을 받아야 한다 |
-| `withastro/action@v6` | lockfile로 패키지 관리자를 감지해 설치·빌드하고 산출물을 Pages 아티팩트로 올린다. Node 기본값은 24다 |
-| `package-manager: pnpm@11.20.0` | `pnpm-workspace.yaml`의 `allowBuilds`는 pnpm 10.26 이상 문법이라 버전을 명시한다. `package.json`의 `packageManager`와 같은 값으로 맞춘다 |
-| `build-cmd: pnpm build` | `package.json`의 build 스크립트를 그대로 쓴다. D2 바이너리는 이 안에서 GitHub release에서 내려받는다 |
+| `withastro/action@v6` | lockfile로 패키지 관리자를 감지해 설치·빌드하고 산출물을 Pages 아티팩트로 올린다. `package-lock.json`이 있으므로 npm을 쓴다. Node 기본값은 24다 |
+| `build-cmd: npm run build` | `package.json`의 build 스크립트를 그대로 쓴다. D2 바이너리는 이 안에서 GitHub release에서 내려받는다 |
 | `deploy-pages@v5` | 빌드 job이 올린 아티팩트를 Pages에 게시한다 |
 
 ## Pages의 게시 원본을 Actions로 바꾼다
@@ -123,8 +121,8 @@ jobs:
 curl -s https://<계정>.github.io/starlight/intro/ | grep -o '<link rel="canonical"[^>]*>'
 ```
 
-첫 실행이 실패하면 로그에서 pnpm 버전과 D2 다운로드 줄부터 본다. 로컬에서 `pnpm check`가
-통과하는데 Actions에서만 실패한다면 대개 이 둘 중 하나다.
+첫 실행이 실패하면 로그에서 `npm ci` 결과와 D2 다운로드 줄부터 본다. 로컬에서 `npm run check`가
+통과하는데 Actions에서만 실패한다면 대개 환경 차이가 이 둘에 있다.
 
 ## 커스텀 도메인을 붙일 때
 
@@ -150,9 +148,9 @@ Settings → Pages의 Custom domain 칸에도 같은 값을 넣어야 HTTPS 인�
 - **비공개 저장소여도 사이트는 공개다.** GitHub 문서가 명시하는 동작이며, 요금제에 따라 비공개
   저장소의 Pages 자체가 막힐 수 있다.
 - 빌드는 GitHub이 제공하는 러너에서 돌며 외부 다운로드가 가능하다. D2 바이너리 다운로드가 여기 의존한다.
-- 브랜치별 미리보기는 없다. 다른 브랜치를 미리 보려면 로컬 `pnpm preview`를 쓴다.
+- 브랜치별 미리보기는 없다. 다른 브랜치를 미리 보려면 로컬 `npm run preview`를 쓴다.
 - 위 워크플로는 2026-09-18 공식 문서와 이 저장소의 스크립트를 대조해 작성했고, 실제 GitHub Pages
-  배포로 실측한 것은 아니다. `package-manager` 입력이 pnpm 11을 받는지는 첫 실행 로그로 확인한다.
+  배포로 실측한 것은 아니다. lockfile 감지로 npm이 선택되는지는 첫 실행 로그로 확인한다.
 
 ## 이해 확인
 
@@ -160,4 +158,4 @@ Settings → Pages의 Custom domain 칸에도 같은 값을 넣어야 HTTPS 인�
 `<계정>.github.io/study-notes/`가 되는데 본문 링크는 `/starlight/…`로 루트를 가리키므로
 사이드바와 본문 링크가 404가 된다. 저장소 이름을 `<계정>.github.io`로 바꾸거나 커스텀 도메인을 붙인다.
 
-<LinkCard title="Vercel로 배포하기" description="가져오기만 하면 되지만 pnpm 버전과 Git 이력 깊이는 직접 정한다." href="/starlight/vercel/" />
+<LinkCard title="Vercel로 배포하기" description="자동 감지로 대부분 끝난다. 남는 것은 Git 이력 깊이다." href="/starlight/vercel/" />

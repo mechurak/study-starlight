@@ -2,7 +2,6 @@
   "name": "study-starlight",
   "type": "module",
   "version": "0.0.1",
-  "packageManager": "pnpm@11.20.0",
   "engines": {
     "node": ">=24"
   },
@@ -12,7 +11,7 @@
     "check:content": "node scripts/check-content.mjs",
     "check:links": "node scripts/check-links.mjs",
     "report:content": "node scripts/report-content-health.mjs",
-    "check": "pnpm run check:content && astro build && pnpm run check:links",
+    "check": "npm run check:content && astro build && npm run check:links",
     "prebuild": "node scripts/prepare-git-history.mjs",
     "build": "astro build",
     "preview": "astro preview",

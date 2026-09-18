@@ -19,27 +19,27 @@ import TermIntro from '../../../components/docs/TermIntro.astro';
 
 <TermIntro terms={[["Pagefind", "", "빌드된 HTML에서 정적 검색 인덱스를 만드는 도구."], ["canonical", "", "페이지의 대표 URL을 검색엔진에 알리는 메타데이터. 주소를 리다이렉트하는 기능은 아니다."]]} />
 
-## pnpm build가 하는 일
+## npm run build가 하는 일
 
 이 사이트는 Astro가 MDX와 컴포넌트를 정적 HTML로 만들고 Starlight가 Pagefind 인덱스를 만든다.
-산출물은 `dist/`다. `pnpm preview`는 이 산출물을 로컬에서 확인하는 명령이며 배포는 아니다.
+산출물은 `dist/`다. `npm run preview`는 이 산출물을 로컬에서 확인하는 명령이며 배포는 아니다.
 
-`pnpm build`에는 `prebuild`가 있어 선택 배포 환경의 얕은 Git 이력을 준비한다.
-`pnpm check`는 콘텐츠 검사 → `astro build` → 렌더된 내부 링크 검사로 실행된다.
+`npm run build`에는 `prebuild`가 있어 선택 배포 환경의 얕은 Git 이력을 준비한다.
+`npm run check`는 콘텐츠 검사 → `astro build` → 렌더된 내부 링크 검사로 실행된다.
 명령 이름은 비슷해도 `package.json`에 정의된 단계가 다르므로 필요한 진입점을 쓴다.
 
 ## dev와 최종 검사는 다른 물건이다
 
 | 확인할 것 | 명령 |
 |---|---|
-| 편집 중 페이지 | `pnpm astro dev --background` |
-| dev 상태·로그·종료 | `pnpm astro dev status` · `logs` · `stop` |
-| 최종 콘텐츠·빌드·내부 링크 | `pnpm check` |
-| 빌드 결과 확인 | `pnpm preview` |
+| 편집 중 페이지 | `npx astro dev --background` |
+| dev 상태·로그·종료 | `npx astro dev status` · `logs` · `stop` |
+| 최종 콘텐츠·빌드·내부 링크 | `npm run check` |
+| 빌드 결과 확인 | `npm run preview` |
 
 dev 서버는 선택 사항이다. 페이지를 추가·이름 변경한 뒤 dev를 계속 쓴다면 서버를 재시작해
-config에서 파생한 사이드바를 다시 읽는다. 일반 `pnpm dev`는 포그라운드 실행이다.
-`astro`는 로컬 의존성이므로 이 저장소에서는 `pnpm`을 거쳐 호출한다.
+config에서 파생한 사이드바를 다시 읽는다. 일반 `npm run dev`는 포그라운드 실행이다.
+`astro`는 로컬 의존성이므로 이 저장소에서는 `npx`나 npm script를 거쳐 호출한다.
 
 ## 빌드가 잡는 것, 못 잡는 것
 
@@ -54,7 +54,7 @@ config에서 파생한 사이드바를 다시 읽는다. 일반 `pnpm dev`는 �
 
 ### 변경별 최소 검증
 
-- 사이트 본문·코드·설정 변경은 작업 묶음의 끝에 `pnpm check`를 실행한다.
+- 사이트 본문·코드·설정 변경은 작업 묶음의 끝에 `npm run check`를 실행한다.
 - 빌드 밖 지침·계획만 바꾸면 diff와 참조 경로를 확인한다.
 - 페이지 추가·분할·순서 변경은 자동 검사와 metadata 대조로 마친다.
 - 새 이미지·D2 배치는 정적 렌더로 확인한다. 일반 표나 기존 컴포넌트 사용만으로 화면 검사를 늘리지 않는다.
@@ -90,8 +90,8 @@ Tabs 안의 동작을 확인하려면 실제 탭을 선택한다. 숨긴 패널�
 | 대표 주소 | `astro.config.mjs`의 site |
 | 사이트 제목·언어 | 같은 파일의 starlight 설정 |
 | 빌드 명령·출력 | package scripts와 호스팅 설정의 dist |
-| Node·pnpm | .nvmrc·package.json의 고정 조건 |
-| 네이티브 도구 | D2 최초 다운로드와 esbuild·sharp 빌드 허용 |
+| Node·npm | `.nvmrc`·package.json `engines`의 고정 조건 |
+| 네이티브 도구 | D2 최초 다운로드 — 외부 네트워크가 필요하다 |
 
 canonical은 검색엔진에 대표 주소를 알리는 신호이며 방문자를 이동시키거나 검색엔진의 선택을
 보장하지 않는다. 다른 사이트로 복사할 때 원본 site 값을 그대로 발행하지 않는다.

@@ -40,7 +40,7 @@ loader는 `_deck.mjs`가 있는 폴더를 덱으로 발견하고 MDX를 순회�
 `src/data/decks.mjs`는 기존 컴포넌트 import를 유지하기 위한 re-export다.
 
 새 파일 추가·이름 변경을 실행 중 dev 서버가 즉시 config 변경으로 인식하지 못할 수 있으므로 이때는
-서버를 재시작한다. 빌드와 `pnpm check`는 매번 전체 source tree를 새로 읽는다.
+서버를 재시작한다. 빌드와 `npm run check`는 매번 전체 source tree를 새로 읽는다.
 
 ## 다이어그램과 이미지 확대
 
@@ -165,7 +165,7 @@ Pagefind JS API(`debouncedSearch` → `result.data()` → meta로 그룹핑)로 
 - dev에서는 파일별 `git log`, build에서는 Starlight가 빌드 시작 시 한 번 수집해 인라인한 Git
   이력을 사용한다
 - Cloudflare Pages의 얇은 checkout은 모든 문서를 HEAD에서 추가된 것처럼 보이게 한다.
-  `pnpm build`의 `prebuild`가 `CF_PAGES=1`이고 저장소가 얇은 경우에만 `git fetch --unshallow`로
+  `npm run build`의 `prebuild`가 `CF_PAGES=1`이고 저장소가 얇은 경우에만 `git fetch --unshallow`로
   전체 이력을 확보한 뒤 Starlight 빌드를 시작한다
 - 아직 커밋되지 않아 이력이 없는 새 문서는 계산에서 제외하고, 덱 전체에 이력이 없으면 날짜를
   표시하지 않는다
@@ -185,7 +185,7 @@ Pagefind JS API(`debouncedSearch` → `result.data()` → meta로 그룹핑)로 
 - 날짜 + `review` 또는 `stale`: `검토 필요` 또는 `오래된 내용`
 
 덱별 기본 검토 주기는 `_deck.mjs`의 `reviewIntervalDays`(생략 시 180일)이며,
-`pnpm report:content`가 미검토·주기 초과 현황을 보여 준다. 주기 초과는 보고서 대상이지 build 실패는
+`npm run report:content`가 미검토·주기 초과 현황을 보여 준다. 주기 초과는 보고서 대상이지 build 실패는
 아니다. 오래된 사실을 발견했을 때 작업을 막기보다 우선순위를 드러내기 위한 선택이다.
 
 ## 로케일
@@ -202,5 +202,5 @@ URL에 언어 프리픽스가 없고, Starlight UI 문구(검색 버튼, 목차 
 - 기본 프론트매터에 덱 파생용 `deckGroup`, 점진적 이관용 `legacyThesis`, 검색·현재성용
   `aliases` · `reviewedAt` · `status`를 확장했다
   (쓰는 방식의 규칙은 [content-authoring.md](content-authoring.md))
-- `pnpm-workspace.yaml`은 Starlight 커스텀이 아니라 pnpm 빌드 스크립트 허용 설정
+- 패키지 관리자는 npm이다. 예전 pnpm 구성(`pnpm-workspace.yaml`의 빌드 스크립트 허용)은 2026-09에 제거했다
   — [deploy.md](deploy.md) 참고

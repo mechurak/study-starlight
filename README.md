@@ -44,12 +44,12 @@ CLAUDE.md                     # @AGENTS.md 한 줄 어댑터 (Claude Code용)
 ## 사용법
 
 ```bash
-pnpm install
-pnpm dev        # http://localhost:4321
-pnpm build      # dist/ 생성 + Pagefind 인덱스
-pnpm check      # 콘텐츠 규칙 + build + 렌더된 내부 링크 검사
-pnpm report:content # 덱별 검토 이력·Thesis 이관 현황
-pnpm preview
+npm install
+npm run dev         # http://localhost:4321
+npm run build       # dist/ 생성 + Pagefind 인덱스
+npm run check       # 콘텐츠 규칙 + build + 렌더된 내부 링크 검사
+npm run report:content # 덱별 검토 이력·Thesis 이관 현황
+npm run preview
 ```
 
 ## 새 페이지 추가
@@ -60,12 +60,12 @@ pnpm preview
    `sidebar.order`를 frontmatter에 적는다. 보통 10 단위를 써서 중간 삽입 여유를 둔다.
 3. 새 본문에는 `<Thesis>`를 두고, `_deck.mjs`의 `termIntro`가 `required`면 glossary·wrapup을
    제외한 학습 본문에 `<TermIntro>`도 둔다.
-4. `pnpm check`를 실행한다. 실행 중인 dev 서버에서 페이지를 새로 만들거나 이름을 바꿨다면
+4. `npm run check`를 실행한다. 실행 중인 dev 서버에서 페이지를 새로 만들거나 이름을 바꿨다면
    파생 사이드바를 다시 읽도록 서버를 재시작한다.
 
 페이지 slug·그룹·순서는 그 페이지가 소유한다. 새 장 하나 때문에 전역 파일을 고칠 필요가 없다.
 기존 번호 페이지를 일괄 변경하는 것은 별도 개편에서 다룬다. 페이지 추가·분할·순서 변경은
-`pnpm check`와 메타데이터 확인으로 마치며, 브라우저는 구체적인 화면 동작·레이아웃 확인이
+`npm run check`와 메타데이터 확인으로 마치며, 브라우저는 구체적인 화면 동작·레이아웃 확인이
 필요할 때만 쓴다. 지침·계획 문서만 바꾼 경우에는 diff와 참조 경로 확인으로 충분하다.
 자세한 범위는 [검증 지침](docs/verification.md)을 따른다.
 
@@ -79,7 +79,7 @@ pnpm preview
    `src/data/catalog.mjs`를 고친다. 한 장에서 스치는 주제는 태그로 붙이지 않는다.
 4. 개념 학습 덱은 `termIntro: 'required'`, 실습·문제풀이 위주 덱은 `not-required`로 정한다.
    `legacy`는 기존 미이관 덱에만 쓴다.
-5. `pnpm check`로 설정·파일·링크가 모두 맞는지 확인한다.
+5. `npm run check`로 설정·파일·링크가 모두 맞는지 확인한다.
 
 `_`로 시작하는 `_deck.mjs`와 `_baseline.md`는 콘텐츠 컬렉션·검색·사이드바에 나오지 않는다.
 

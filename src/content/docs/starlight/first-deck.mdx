@@ -128,7 +128,7 @@ import TermIntro from '../../../components/docs/TermIntro.astro';
 
 ## 적용하고 확인한다
 
-이 파일의 order만 20으로 바꾸고 저장소 루트에서 `pnpm check`를 실행한다.
+이 파일의 order만 20으로 바꾸고 저장소 루트에서 `npm run check`를 실행한다.
 예상 결과는 검사 통과와 같은 페이지 URL이다. 실습 후 order를 10으로 되돌린다.
 다른 페이지와 정렬값이 겹치면 loader가 실패하므로 덱 안에서 유일한 값을 쓴다.
 
@@ -142,7 +142,7 @@ import TermIntro from '../../../components/docs/TermIntro.astro';
 저장소 루트에서 실행한다.
 
 ```bash
-pnpm check
+npm run check
 node --input-type=module -e "import { topicPageSlugs } from './src/data/decks.mjs'; console.log(topicPageSlugs.filter(s => s.startsWith('sample-notes')))"
 ```
 
@@ -166,6 +166,6 @@ node --input-type=module -e "import { topicPageSlugs } from './src/data/decks.mj
 
 계속 쓸 덱이라면 이름·독자·주제·근거를 실제 목적에 맞게 고친다. 연습만 했다면 이번에 만든
 `src/content/docs/sample-notes/` 네 파일과 폴더를 제거한다. 기존 폴더를 수정했다면 전체를 지우지
-말고 이번 변경만 복구한다. 제거도 사이트 결과를 바꾸므로 최종 상태에서 `pnpm check`를 실행한다.
+말고 이번 변경만 복구한다. 제거도 사이트 결과를 바꾸므로 최종 상태에서 `npm run check`를 실행한다.
 
 <LinkCard title="문서답게 쓰기" description="형식이 맞는 덱을 독자가 적용할 수 있는 설명으로 다듬는다." href="/starlight/writing/" />

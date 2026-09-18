@@ -134,7 +134,7 @@
   "08-pipeline": {
     "target": "/starlight/pipeline/",
     "anchors": {
-      "pnpm-build가-하는-일": "/starlight/pipeline/#pnpm-build가-하는-일",
+      "pnpm-build가-하는-일": "/starlight/pipeline/#npm-run-build가-하는-일",
       "dev와-최종-검사는-다른-물건이다": "/starlight/pipeline/#dev와-최종-검사는-다른-물건이다",
       "빌드가-잡는-것-못-잡는-것": "/starlight/pipeline/#빌드가-잡는-것-못-잡는-것",
       "검색--pagefind의-동작": "/starlight/pipeline/#검색--pagefind의-동작",

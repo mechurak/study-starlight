@@ -5,7 +5,7 @@
 //
 // astro-d2가 쓰는 것과 같은 native D2 v0.8.2 CLI를 같은 옵션(elk · pad 40 · theme 0/200)으로
 // 직접 호출하므로 결과 SVG의 width/height가 빌드 산출물과 픽셀 단위로 일치한다.
-// `pnpm check` 전체 빌드 대신 파일 하나만 빠르게 확인할 때 쓴다.
+// `npm run check` 전체 빌드 대신 파일 하나만 빠르게 확인할 때 쓴다.
 // 옵션 기본값을 바꾸면 astro.config.mjs의 astroD2() 설정과 같이 맞춘다.
 //
 // native CLI도 astro.config.mjs와 같은 prepareD2()를 거치므로 시스템 전역 D2에는 의존하지 않는다.

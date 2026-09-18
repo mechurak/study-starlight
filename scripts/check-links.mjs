@@ -3,7 +3,7 @@ import path from 'node:path';
 
 const distRoot = path.resolve('dist');
 if (!fs.existsSync(distRoot)) {
-	console.error('dist/가 없습니다. pnpm build 뒤에 check:links를 실행하세요.');
+	console.error('dist/가 없습니다. npm run build 뒤에 check:links를 실행하세요.');
 	process.exit(1);
 }
 

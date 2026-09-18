@@ -27,25 +27,22 @@ Git 연결은 OAuth 승인이 필요해서 **대시보드에서만** 할 수 있
    | 항목 | 값 |
    |---|---|
    | Framework preset | Astro |
-   | Build command | `pnpm build` |
+   | Build command | `npm run build` |
    | Build output directory | `dist` |
    | Production branch | `main` |
 
-4. **Settings → Environment variables 에 반드시 추가** (아래 참고)
+환경 변수는 필요 없다. (pnpm을 쓰던 2026-09-19 이전에는 `PNPM_VERSION=11.20.0`이 필수였다 —
+npm 전환 시 대시보드에서 Build command를 바꾸고 이 변수를 지웠는지 확인한다.)
 
-   | 변수 | 값 |
-   |---|---|
-   | `PNPM_VERSION` | `11.20.0` |
-
-`pnpm build`의 `prebuild`는 Cloudflare Pages가 넣은 `CF_PAGES=1`을 확인하고,
+`npm run build`의 `prebuild`는 Cloudflare Pages가 넣은 `CF_PAGES=1`을 확인하고,
 얇은 Git checkout이면 `git fetch --unshallow` 후 Astro 빌드를 시작한다.
-대시보드의 Build command는 `pnpm build`로 그대로 둔다. D2 설치용 환경 변수나 별도 명령은 없다.
+대시보드의 Build command는 `npm run build`로 그대로 둔다. D2 설치용 환경 변수나 별도 명령은 없다.
 
 ## D2 native 바이너리는 어떻게 준비하나
 
 D2 다이어그램은 **native D2 `v0.8.2`**로 빌드한다. 시스템 전역 설치나 Cloudflare 대시보드
 설정에 기대지 않고, `astro.config.mjs`가 로드될 때 `scripts/prepare-d2.mjs`를 먼저 호출한다.
-그래서 `pnpm astro dev --background`·`pnpm build`·`pnpm check` 어느 진입점이든 같은 준비
+그래서 `npx astro dev --background`·`npm run build`·`npm run check` 어느 진입점이든 같은 준비
 경로를 거친다.
 
 - 현재 플랫폼에 맞는 공식 standalone archive를 받는다. 지원 조합은 macOS arm64/x64와
@@ -77,16 +74,15 @@ Cloudflare Pages의 얇은 checkout에서는 HEAD가 실질적인 root commit으
 `--unshallow`를 `--shallow-since="1 year ago"` 같은 기간 제한 fetch로 바꾼다. 최근 수정일
 표시에는 최근 이력만 있으면 되고, 그보다 오래 안 고친 덱만 날짜가 경계값으로 뭉개진다.
 
-## 왜 `PNPM_VERSION`을 박아야 하나
+## 버전 고정은 `.nvmrc` 하나다
 
-아래는 **2026-08에 확인한 것**이다 — Cloudflare 빌드 이미지의 기본값은 바뀔 수 있다.
+2026-09-19에 pnpm에서 npm으로 전환했다. 현재 상태는 다음과 같다.
 
-- `pnpm-workspace.yaml`의 **`allowBuilds`는 pnpm 10.26.0에서 들어온 문법**인데
-  (그 전에는 `onlyBuiltDependencies`),
-  Cloudflare v3 빌드 이미지의 기본 pnpm은 **10.11.1** 이다 → 필드를 무시하고
-  **esbuild·sharp의 빌드 스크립트가 막혀 빌드가 깨진다**
-- v3 이미지는 **`pnpm-lock.yaml`에서 pnpm 버전을 자동 감지하지 않는다.** 직접 지정해야 한다
-- Node 버전은 `.nvmrc`(현재 `24`)로 고정된다 — 이건 파일이라 대시보드 설정이 필요 없다
+- Node 버전은 `.nvmrc`(현재 `24`)로 고정된다 — 파일이라 대시보드 설정이 필요 없고,
+  npm은 그 Node에 딸려 온다
+- npm은 의존성 설치 스크립트를 기본으로 실행하므로 esbuild·sharp에 별도 허용 설정이 없다.
+  pnpm 시절의 `pnpm-workspace.yaml`(`allowBuilds`)과 `PNPM_VERSION` 변수는 전환 때 제거했다
+- v3 빌드 이미지는 `package.json`의 `engines`를 읽지 않는다 — Node 고정은 `.nvmrc`가 유일한 지점이다
 
 ## 도메인을 바꿀 때
 
@@ -103,6 +99,6 @@ curl -s https://study.upggu.com/sitemap-0.xml | grep -o '<loc>[^<]*</loc>' | hea
 ## 로컬에서 직접 올리고 싶을 때
 
 ```bash
-pnpm build
-pnpm exec wrangler pages deploy dist --project-name=<프로젝트명>
+npm run build
+npx wrangler pages deploy dist --project-name=<프로젝트명>
 ```
