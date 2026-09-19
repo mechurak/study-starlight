@@ -1,0 +1,135 @@
+---
+title: "Kustomize로 HPA 전환"
+description: "공통 HPA와 prod 전용 maxReplicas patch를 적용하고 폐기한 ConfigMap의 실제 삭제까지 확인한다"
+reviewedAt: 2026-09-19
+---
+
+import { LinkCard } from '@astrojs/starlight/components';
+import Thesis from '../../../components/docs/Thesis.astro';
+
+<Thesis>공통 HPA는 base에, 환경별 차이는 overlay에 두고 렌더 결과와 클러스터의 잔존 리소스를 따로 확인한다.</Thesis>
+
+외부 autoscaler가 읽던 ConfigMap을 없애고 Kubernetes HPA로 전환하는 작업이다.
+HPA(HorizontalPodAutoscaler)는 관측한 부하로 Deployment의 복제본 수를 조정한다.
+Kustomize는 그 설정을 환경별 YAML로 조합할 뿐 실제 부하를 측정하지 않는다.
+개념은 [CKA 오토스케일링](/cka/autoscaling/), 패치 문법은 [Kustomize patch](/cka-udemy/kustomize-patches/)에 있다.
+
+## 기존 디렉터리와 요구값 확인
+
+제공된 `api-gateway/` 아래 `base/`, `staging/`, `prod/`가 있고 두 환경이 이미 배포된 랩을 전제로 한다.
+각 환경의 namespace도 존재한다. 앞 페이지의 공통 예제와 별개의 입력이다.
+작업 디렉터리는 문제에서 준 경로로 바꾸고 변경 전 사본을 만든다.
+
+```bash
+cd /course/5/api-gateway
+cp -a . ../api-gateway.before-hpa
+kubectl kustomize staging > /tmp/api-gateway-staging-before.yaml
+kubectl kustomize prod > /tmp/api-gateway-prod-before.yaml
+grep -R -n 'horizontal-scaling-config\|replicas:' base staging prod
+```
+
+| 환경 | namespace | minReplicas | maxReplicas | CPU 평균 사용률 |
+|---|---|---|---|---|
+| staging | api-gateway-staging | 2 | 4 | requests 대비 50% |
+| prod | api-gateway-prod | 2 | 6 | requests 대비 50% |
+
+현재 Deployment의 모든 대상 컨테이너에 CPU requests가 있고 Metrics API가 응답하는지 확인한다.
+CPU utilization은 limit이나 노드 CPU 대비가 아니다.
+([HPA 계산 방식](https://kubernetes.io/docs/concepts/workloads/autoscaling/horizontal-pod-autoscale/#algorithm-details))
+
+## 공통 HPA와 환경별 patch
+
+아래 전체를 `base/hpa.yaml`로 저장하고 **기존** `base/kustomization.yaml`의 `resources`에
+`- hpa.yaml`을 추가한다. Deployment·ServiceAccount 등 기존 항목은 보존한다.
+공식 [HPA walkthrough](https://kubernetes.io/docs/tasks/run-application/horizontal-pod-autoscale-walkthrough/)에서
+`autoscaling/v2`의 Resource metric 예제를 찾아 대상 이름과 수치를 바꾼다.
+
+```yaml
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: api-gateway
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: api-gateway
+  minReplicas: 2
+  maxReplicas: 4
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 50
+```
+
+prod에만 다음 `prod/hpa-patch.yaml`을 추가한다.
+
+```yaml
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: api-gateway
+spec:
+  maxReplicas: 6
+```
+
+기존 `prod/kustomization.yaml`의 `patches` 배열에 `- path: hpa-patch.yaml`을 추가한다.
+이미 있는 namespace 변환과 다른 patch는 유지한다. 환경별 namespace는 HPA에도 적용되어
+같은 namespace의 Deployment를 가리켜야 한다.
+[Kustomize 문서](https://kubernetes.io/docs/tasks/manage-kubernetes-objects/kustomization/#bases-and-overlays)의
+`Bases and Overlays`와 `patches`가 이 구조의 근거다.
+
+## 이전 ConfigMap의 정의와 참조 제거
+
+`horizontal-scaling-config`를 정의하는 base 문서, 해당 `resources` 항목 또는 generator를 제거한다.
+여러 오브젝트가 들어 있는 YAML이면 ConfigMap 문서만 지운다. staging·prod의 그 ConfigMap 전용
+patch와 patch 등록도 함께 제거해야 `no matches for Id` 같은 오류가 남지 않는다.
+
+Pod의 `envFrom`, `configMapKeyRef`, volume이 이 ConfigMap을 쓰는지도 확인한다.
+참조가 있다면 전환 요구에 맞게 정리한 뒤 적용한다. 외부 autoscaler가 여전히 replicas를 쓰고
+있다면 그것의 중지도 작업 범위에 포함되는지 확인해야 한다.
+
+Deployment의 고정 `spec.replicas`나 Kustomize `replicas` 변환도 HPA와 경쟁할 수 있다.
+계속 적용할 원본에서는 HPA가 값을 관리하도록 정리한다. 기존 apply 소유 필드를 제거하는 첫 적용은
+일시적인 replicas 기본값 복귀를 일으킬 수 있어 [HPA로 replica 관리 이관](https://kubernetes.io/docs/concepts/workloads/autoscaling/horizontal-pod-autoscale/#migrating-deployments-and-statefulsets-to-horizontal-autoscaling)을 따른다.
+
+## 두 환경을 렌더하고 적용
+
+```bash
+kubectl kustomize staging > /tmp/api-gateway-staging-after.yaml
+kubectl kustomize prod > /tmp/api-gateway-prod-after.yaml
+kubectl diff -k staging
+kubectl diff -k prod
+```
+
+두 렌더 결과에서 위 표의 namespace·min·max·CPU 목표, ConfigMap 부재, 기존 workload 보존을
+확인한다. `kubectl diff`의 종료 코드 1은 차이가 있다는 뜻이다. 렌더 성공은 클러스터 적용 성공이 아니다.
+
+```bash
+kubectl apply -k staging
+kubectl apply -k prod
+kubectl -n api-gateway-staging delete configmap horizontal-scaling-config --ignore-not-found
+kubectl -n api-gateway-prod delete configmap horizontal-scaling-config --ignore-not-found
+kubectl -n api-gateway-staging get hpa api-gateway
+kubectl -n api-gateway-prod get hpa api-gateway
+```
+
+일반 `apply`는 입력에서 사라진 오브젝트를 삭제하지 않는다. 그래서 **폐기 대상으로 지정한
+ConfigMap만** 두 namespace에서 명시적으로 지운다. 광범위한 `delete -k`로 Deployment까지
+지우지 않는다. ([선언적 관리의 삭제](https://kubernetes.io/docs/tasks/manage-kubernetes-objects/declarative-config/#how-to-delete-objects))
+
+## 완료 판정과 복구
+
+두 환경의 HPA `spec`이 표와 같고, `kubectl get cm horizontal-scaling-config -n <환경>`은
+`NotFound`여야 한다. `kubectl describe hpa api-gateway -n <환경>`에서 metric과 condition을 확인한다.
+`<unknown>`이면 CPU requests와 `kubectl top pods -n <환경>`부터 확인한다. 낮은 부하에서
+복제본이 늘지 않는 것은 정상이다. 실제 부하에 따른 스케일링 검증은 [HPA 실습](/cka-udemy/autoscaling/)을 따른다.
+
+복구가 필요하면 이번에 추가한 HPA를 두 namespace에서 삭제하고, 보관한 이전 디렉터리의
+staging·prod를 각각 `apply -k`한다. 이전 ConfigMap과 Deployment replicas를 재확인하고
+별도로 중지한 외부 autoscaler가 있다면 원래 운영 방식으로 복구한다.
+
+<LinkCard title="HPA 설정과 검증" href="/cka-udemy/autoscaling/" />

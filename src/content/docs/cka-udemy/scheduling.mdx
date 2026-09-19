@@ -207,6 +207,38 @@ affinity:
 값이 아니라 라벨 존재만 검사할 때는 `operator: Exists`를 쓴다. required와 preferred 모두 이름의
 `IgnoredDuringExecution`대로 배치 뒤 노드 라벨이 바뀌어도 실행 중인 Pod을 자동 퇴거시키지는 않는다.
 
+## 같은 앱을 노드당 하나로 제한
+
+Deployment의 복제본을 서로 다른 노드에만 배치하려면 **필수 Pod anti-affinity**를 쓴다.
+아래는 같은 namespace의 `app=spread-app` Pod끼리 같은 hostname에 놓이지 않게 하는
+`spec.template.spec` 아래의 발췌다. Pod template에 그 라벨이 실제로 있어야 한다.
+
+```yaml
+affinity:
+  podAntiAffinity:
+    requiredDuringSchedulingIgnoredDuringExecution:
+      - labelSelector:
+          matchLabels:
+            app: spread-app
+        topologyKey: kubernetes.io/hostname
+```
+
+[Assigning Pods to Nodes](https://kubernetes.io/docs/concepts/scheduling-eviction/assign-pod-node/#inter-pod-affinity-and-anti-affinity)에서
+`podAntiAffinity` 예제를 찾아 selector와 topologyKey를 옮긴다. 모든 대상 노드에 hostname 라벨이
+있어야 하며, namespace 범위를 생략한 이 규칙은 자신의 namespace에 적용된다.
+
+배치 가능한 worker가 2개이고 replicas가 3이면 **2개 실행·1개 Pending**이 요구에 맞는 결과다.
+`kubectl get pods -n <namespace> -l app=spread-app -o wide`에서 NODE 중복이 없는지,
+Pending Pod의 `describe`에서 anti-affinity나 control-plane taint가 원인인지 확인한다.
+replicas를 충족시키려고 taint를 지우거나 required를 preferred로 바꾸면 제한을 깨뜨린다.
+
+`topologySpreadConstraints.maxSkew: 1`은 노드당 최대 1개를 뜻하지 않는다. 계산 대상 노드가
+2개면 `2개/1개`도 차이 1이므로 허용될 수 있다.
+([topology spread의 skew](https://kubernetes.io/docs/concepts/scheduling-eviction/topology-spread-constraints/))
+`IgnoredDuringExecution`은 기존 Pod을 자동으로 쫓아내는 규칙도 아니다.
+기존 Deployment를 바꿨다면 rollout 후 실제 분포까지 확인한다. 되돌릴 때는 저장한 원본의
+affinity를 복원하고, 복제본 수 변경도 별도로 원래 값으로 돌린다.
+
 ## 공식 문서에서 찾을 것
 
 | 검색어 | 가져올 필드·명령 |

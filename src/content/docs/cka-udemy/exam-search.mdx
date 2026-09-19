@@ -43,6 +43,35 @@ Kubernetes 버전으로 바꾸고, KodeKloud·GitHub 예제와 학습 보충은 
 | 13 · 로컬 Helm chart로 교체 | [새 release 설치 후 이전 release 제거](/cka-udemy/helm-release-replacement/) | `helm list -A` | `helm lint install uninstall` |
 | 14 · 클러스터 Pod CIDR 제출 | [podSubnet 추출](/cka-udemy/network-environment/#kubeadm의-pod-서브넷을-파일로-제출) | `kubectl get cm kubeadm-config -n kube-system -o yaml` | `kubeadm ClusterConfiguration podSubnet` |
 
+## killer.sh 복습 경로
+
+사용자가 제공한 [killer.sh](https://killer.sh) CKA Simulator A Kubernetes 1.35 자료에서
+재사용할 작업을 추렸다. 아래 링크는 문제 순서가 아닌 **작업별 정본**이다. 이미 설명한
+스토리지·kubeconfig는 기존 절에 연결하고, 빠진 절차와 해설의 주의점만 보강했다.
+명령은 지정 랩에서 실행할 예이며 이 업데이트에서 실제 클러스터 실행을 검증한 것은 아니다.
+제품 문서는 학습용으로 구분하고 시험의 버전·허용 자료는 각 문제 지시와 [시험 기준](/cka/exam/)을 따른다.
+
+| 작업 | 복습 위치 | 첫 관찰·검색어 |
+|---|---|---|
+| SSH 인스턴스와 제출 호스트 | [작업 위치 확인](/cka-udemy/basics/#ssh-작업-위치와-제출-위치-확인) | `hostname`, `whoami`, `config current-context` |
+| kubeconfig 이름·인증서 추출 | [지정 파일 읽기](/cka-udemy/jsonpath/#지정-kubeconfig에서-이름과-인증서-꺼내기) | `config get-contexts -o name`, `config view --raw` |
+| Helm·CRD·cert-manager | [설치와 ClusterIssuer](/cka-udemy/cert-manager/) | `helm repo list`, `explain clusterissuer.spec.selfSigned` |
+| StatefulSet 축소 | [owner 확인 후 scale](/cka-udemy/statefulset-scale/) | `ownerReferences`, `Scale a StatefulSet` |
+| 퇴거 가능성이 큰 Pod | [BestEffort 후보와 판정 한계](/cka-udemy/resource-limits/#메모리-압박-때-퇴거-후보-찾기) | `status.qosClass`, `Node-pressure Eviction` |
+| 환경별 HPA 전환 | [Kustomize HPA](/cka-udemy/kustomize-hpa/) | `kubectl kustomize`, `Horizontal Pod Autoscaling` |
+| PV·PVC·workload 연결 | [정적 PV/PVC와 mount 검증](/cka-udemy/storage/) | `describe pvc`, `Persistent Volumes Binding` |
+| 메트릭 조회 스크립트 | [컨테이너별 top](/cka-udemy/troubleshooting/#메트릭-조회-명령을-스크립트로-제출) | `kubectl top pod --help` |
+| worker 버전 변경·조인 | [미조인 여부부터 구분](/cka-udemy/cluster-upgrade/#신규-worker의-패키지-변경과-조인-구분) | `kubelet --version`, `kubeadm join` |
+| Pod에서 API 호출 | [CA·token과 응답 저장](/cka-udemy/pod-api-access/) | `Accessing API from a Pod`, `auth can-i list` |
+| Secret·ConfigMap create 권한 | [허용·거부 검증](/cka-udemy/rbac/#생성-권한만-요구한-경우) | `create role --help`, `RBAC Role examples` |
+| 모든 노드에 DaemonSet | [control-plane toleration](/cka-udemy/daemonset-static-pod/#control-plane에도-실행해야-할-때) | `describe node`, `DaemonSet tolerations` |
+| 앱을 노드당 하나로 배치 | [필수 anti-affinity](/cka-udemy/scheduling/#같은-앱을-노드당-하나로-제한) | `Inter-pod anti-affinity`, `describe pod` |
+| HTTPRoute 헤더 분기 | [match 조건과 우선순위](/cka-udemy/httproute-matching/) | `HTTP routing`, `HTTPRouteRule matches` |
+| 인증서 만료일과 갱신 명령 | [조회와 실행 구분](/cka-udemy/security/#만료일-제출과-갱신-명령-기록) | `openssl x509 -enddate`, `kubeadm certs` |
+| NetworkPolicy 목적지·포트 | [짝별 egress 규칙](/cka-udemy/network-policy/#목적지와-포트를-짝으로-제한) | `get pods -L app`, `NetworkPolicyEgressRule` |
+| CoreDNS 추가 도메인 | [zone 추가와 복구](/cka-udemy/coredns-domain/) | `get cm coredns -o yaml`, `Customizing DNS Service` |
+| Pod의 런타임 정보·로그 | [sandbox와 container 추적](/cka-udemy/troubleshooting/#pod에서-런타임-컨테이너까지-추적) | `get pod -o wide`, `crictl ps --pod` |
+
 ## 기초와 Workloads
 
 | 작업·실습 | 첫 명령 | 공식 문서 검색어 |

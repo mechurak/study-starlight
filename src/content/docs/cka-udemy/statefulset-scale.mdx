@@ -1,0 +1,51 @@
+---
+title: "StatefulSet 복제본 줄이기"
+description: "Pod owner를 확인해 StatefulSet을 scale하고 실제 Pod 수와 PVC 보존 정책을 확인한다"
+reviewedAt: 2026-09-19
+---
+
+import { LinkCard } from '@astrojs/starlight/components';
+import Thesis from '../../../components/docs/Thesis.astro';
+
+<Thesis>Pod의 controller를 확인한 뒤 StatefulSet의 replicas를 줄이고, Pod 종료와 PVC 정책을 함께 확인한다.</Thesis>
+
+Pod 두 개를 하나로 줄이라는 요구는 Pod 삭제 명령으로 끝나지 않는다. controller가 원하는 개수를
+유지하므로 삭제된 Pod을 다시 만들기 때문이다. 개념은 [CKA 워크로드 컨트롤러](/cka/workloads/)에 있다.
+아래는 `project-h800`의 `o3db-0`, `o3db-1`을 하나로 줄이는 제공 사례다.
+
+## 이름은 힌트이고 owner가 근거다
+
+```bash
+kubectl -n project-h800 get pods -o wide
+kubectl -n project-h800 get pod o3db-0 \
+  -o jsonpath='{range .metadata.ownerReferences[?(@.controller==true)]}{.kind}{" "}{.name}{"\n"}{end}'
+kubectl -n project-h800 get statefulset o3db -o yaml
+```
+
+두 번째 명령에서 `StatefulSet o3db`가 나와야 아래 scale의 대상이 맞는다. `-0`, `-1`이라는
+이름만으로 단정하지 않는다. 현재 replicas를 기록하고 `spec.persistentVolumeClaimRetentionPolicy`도
+확인한다. 기본값 `Retain`이면 축소된 Pod의 PVC가 남지만 `whenScaled: Delete`이면 삭제될 수 있다.
+([StatefulSet PVC 보존 정책](https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/#persistentvolumeclaim-retention))
+
+## controller의 목표 개수를 변경
+
+```bash
+kubectl -n project-h800 scale statefulset o3db --replicas=1
+kubectl -n project-h800 get statefulset o3db
+kubectl -n project-h800 get pod o3db-0
+kubectl -n project-h800 wait --for=delete pod/o3db-1 --timeout=120s
+kubectl -n project-h800 get pvc
+```
+
+기본 ordinal 0부터 시작한 이 사례에서는 `o3db-0`이 남고 `o3db-1`이 종료된다.
+StatefulSet의 `spec.replicas=1`, READY `1/1`, 실제 대상 Pod 하나를 모두 확인한다.
+종료가 지연되면 해당 Pod의 상태와 Events를 읽는다. 즉시 강제 삭제로 건너뛰지 않는다.
+공식 문서는 `Scale a StatefulSet`으로 검색해 [scale 명령과 순서 조건](https://kubernetes.io/docs/tasks/run-application/scale-stateful-set/)을 확인한다.
+
+## 되돌리기
+
+이 사례의 원래 개수는 2이므로 `kubectl -n project-h800 scale sts o3db --replicas=2`로
+되돌릴 수 있다. 다시 두 Pod의 Ready와 앱 동작을 확인한다.
+PVC가 삭제되는 정책이었다면 복제본을 늘리는 것만으로 원래 데이터까지 복구되지는 않는다.
+
+<LinkCard title="볼륨과 정적 PV/PVC" href="/cka-udemy/storage/" />

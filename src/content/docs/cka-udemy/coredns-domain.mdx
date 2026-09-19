@@ -1,0 +1,89 @@
+---
+title: "CoreDNS 도메인 추가와 복구"
+description: "Corefile에 추가 zone을 등록하고 기존·새 Service FQDN을 검증한 뒤 백업으로 설정을 복구한다"
+reviewedAt: 2026-09-19
+---
+
+import { LinkCard } from '@astrojs/starlight/components';
+import Thesis from '../../../components/docs/Thesis.astro';
+
+<Thesis>기존 zone을 보존하며 새 DNS zone을 추가하고, 두 이름이 같은 Service IP를 반환하는지 확인한다.</Thesis>
+
+기존 `cluster.local` 이름을 유지하면서 `custom-domain`으로도 같은 Service를 찾게 하는 작업이다.
+Service의 완전한 이름은 `SERVICE.NAMESPACE.svc.DOMAIN`이므로 중간의 `svc`를 빠뜨리지 않는다.
+개념은 [CKA DNS](/cka/dns/), ConfigMap이 CoreDNS에 전달되는 경로는
+[DNS와 CoreDNS](/cka-udemy/dns/)에 있다.
+
+## 변경 전 백업
+
+kubeadm 형태로 `kube-system/coredns` ConfigMap의 `data.Corefile`을 사용하는 환경이다.
+지정 작업 호스트에서 백업 경로를 문제의 값으로 바꾼다. 아래 `./coredns-backup.yaml`은 읽기 쉬운 예시다.
+
+```bash
+kubectl -n kube-system get configmap coredns -o yaml > coredns-backup.yaml
+kubectl -n kube-system get configmap coredns \
+  -o jsonpath='{.data.Corefile}' > Corefile.before
+kubectl -n default get service kubernetes
+```
+
+전체 YAML은 변경 전 증거로, `Corefile.before`는 설정 내용만 되돌릴 때 사용한다.
+백업이 비어 있지 않고 기존 zone이 들어 있는지 확인한 뒤 편집한다.
+
+## kubernetes 플러그인에 zone 추가
+
+`kubectl -n kube-system edit configmap coredns`로 기존 Corefile의 해당 줄만 바꾼다.
+아래는 **Corefile 일부**이며 전체 ConfigMap을 이 블록으로 대체하지 않는다.
+
+```text
+kubernetes cluster.local custom-domain in-addr.arpa ip6.arpa {
+    pods insecure
+    fallthrough in-addr.arpa ip6.arpa
+    ttl 30
+}
+```
+
+[CoreDNS kubernetes 플러그인](https://coredns.io/plugins/kubernetes/)은 여러 zone을 받을 수 있다.
+기존 `cluster.local`·역방향 zone·나머지 플러그인은 유지한다. 이것은 CoreDNS의 응답 zone 추가이며
+kubelet의 `clusterDomain`이나 기존 Pod의 DNS search 목록까지 바꾸는 작업은 아니다.
+
+Corefile에 `reload`가 있으면 마운트된 ConfigMap 반영 후 자동으로 다시 읽는다.
+[Kubernetes DNS 설정 안내](https://kubernetes.io/docs/tasks/administer-cluster/dns-custom-nameservers/)는
+반영에 약 2분을 기다릴 수 있다고 설명한다. 즉시 재시작을 필수 단계로 외우지 않는다.
+필요한 경우 `kubectl -n kube-system rollout restart deployment/coredns` 후
+`rollout status deployment/coredns`로 교체 상태를 확인한다.
+
+## 두 FQDN으로 검증
+
+같은 이름의 Pod이 없는 연습 환경에서 만든다.
+
+```bash
+kubectl -n default run dns-check --image=busybox:1 --restart=Never --command -- sleep 3600
+kubectl -n default wait --for=condition=Ready pod/dns-check --timeout=90s
+kubectl -n default exec dns-check -- nslookup kubernetes.default.svc.cluster.local.
+kubectl -n default exec dns-check -- nslookup kubernetes.default.svc.custom-domain.
+```
+
+끝의 점은 DNS search 접미사를 더하지 않는 절대 이름이다. 두 응답의 **대상 Address**가 앞서
+조회한 `default/kubernetes` Service의 ClusterIP와 같아야 한다. 출력 맨 위 DNS 서버 주소와
+혼동하지 않는다. CoreDNS Pod이 Running인 것만으로 설정 성공을 판정하지 않는다.
+
+실패하면 Corefile 오타와 `kubectl -n kube-system logs deployment/coredns --tail=50`을 확인한다.
+기존 이름도 함께 실패하는지 비교하면 새 zone 문제와 전체 DNS 장애를 나눌 수 있다.
+
+## ConfigMap을 삭제하지 않고 복구
+
+다음은 백업한 Corefile을 JSON merge patch로 되돌리는 명령이다. 현재 작업 호스트에
+`Corefile.before`가 있어야 한다. `--dry-run=client`는 로컬에서 patch 입력만 만든다.
+
+```bash
+kubectl create configmap coredns -n kube-system \
+  --from-file=Corefile=Corefile.before --dry-run=client -o json > coredns-restore.json
+kubectl -n kube-system patch configmap coredns \
+  --type=merge --patch-file=coredns-restore.json
+```
+
+생성한 JSON에는 오래된 `resourceVersion`·UID가 없고 `data.Corefile`에 백업 내용이 들어 있다.
+ConfigMap 삭제·재생성 없이 복구할 수 있다. reload 또는 필요한 재시작 뒤 기존 FQDN을 다시 검사한다.
+검증을 마치면 이번에 만든 `dns-check`만 삭제한다.
+
+<LinkCard title="DNS 장애의 계층별 진단" href="/cka-udemy/network-failure/" />

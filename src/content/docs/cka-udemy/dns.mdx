@@ -17,6 +17,8 @@ import Thesis from '../../../components/docs/Thesis.astro';
 `nslookup` 성공은 이름을 IP로 바꿨다는 뜻일 뿐 애플리케이션 연결 성공은 아니다. kube-dns Service와
 EndpointSlice, 대상 Service의 EndpointSlice, FQDN 조회, 실제 포트 요청을 순서대로 검증한다.
 
+관련 실습: [CoreDNS 도메인 추가와 복구](/cka-udemy/coredns-domain/).
+
 ## CoreDNS — Practice Test: CoreDNS in Kubernetes
 
 원본 풀이: [21-Practice-Test-CoreDNS-in-Kubernetes.md](https://github.com/kodekloudhub/certified-kubernetes-administrator-course/blob/master/docs/09-Networking/21-Practice-Test-CoreDNS-in-Kubernetes.md)
@@ -26,7 +28,7 @@ EndpointSlice, 대상 Service의 EndpointSlice, FQDN 조회, 실제 포트 요�
 | DNS 서버 주소 | `kube-dns` Service의 ClusterIP (보통 `10.96.0.10`) |
 | Corefile 경로 | CoreDNS Deployment의 Args → `/etc/coredns/Corefile` |
 | Corefile은 어떻게 주입되나 | ConfigMap `coredns`로 마운트 |
-| 루트 도메인 | Corefile의 `kubernetes` 뒤 **첫 인자** — `cluster.local` |
+| 기본 Service 도메인 | 기본 Corefile의 `cluster.local` zone과 kubelet의 `clusterDomain` 교차 확인 |
 
 ### Corefile 전달 경로 — 고리 세 개를 잇는다
 
@@ -56,15 +58,17 @@ CoreDNS 이미지에는 셸이 없어 `kubectl exec`로 못 들어간다 — 직
 `kubectl debug -it <pod> --image=busybox --target=coredns`로 ephemeral 컨테이너를 붙인다.
 :::
 
-:::caution[함정 — 루트 도메인은 kubernetes 뒤 첫 인자만이다]
+:::caution[함정 — 정방향 zone과 역방향 zone 구분]
 ```text
 kubernetes cluster.local in-addr.arpa ip6.arpa {
 ```
 
-`kubernetes` 플러그인의 zone 나열에서 루트 도메인은 첫 인자 `cluster.local`이다.
+이 기본 설정에서 Service의 정방향 zone은 `cluster.local`이다.
 뒤의 `in-addr.arpa`·`ip6.arpa`는 역방향 조회(IP → 이름, PTR)용 zone이라 답이 아니다.
 kubelet 쪽 원본과 같은 값인지 교차 확인할 수 있다 —
 `grep clusterDomain /var/lib/kubelet/config.yaml`.
+플러그인에는 여러 정방향 zone을 넣을 수 있어 첫 인자만이 유일한 도메인이라고 일반화하지 않는다.
+추가와 복구는 [CoreDNS 도메인 추가](/cka-udemy/coredns-domain/)에서 연습한다.
 :::
 
 이름 규칙의 공식 근거는

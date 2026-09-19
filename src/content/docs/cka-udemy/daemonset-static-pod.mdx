@@ -40,6 +40,27 @@ kubectl create deployment elasticsearch -n kube-system \
 `status`를 제거한다. `spec.selector.matchLabels`와 `spec.template.metadata.labels`는 같은 값으로
 유지한다. 적용 뒤 `DESIRED`, `CURRENT`, `READY`가 대상 노드 수와 맞는지 확인한다.
 
+### control plane에도 실행해야 할 때
+
+`kubectl describe node <control-plane>`으로 실제 taint를 확인하고, 요구된 경우 다음을
+DaemonSet의 `spec.template.spec`에 추가한다. DaemonSet이 자동으로 모든 taint를 허용하는 것은 아니다.
+
+```yaml
+tolerations:
+  - key: node-role.kubernetes.io/control-plane
+    operator: Exists
+    effect: NoSchedule
+```
+
+[공식 DaemonSet 예제](https://kubernetes.io/docs/concepts/workloads/controllers/daemonset/#writing-a-daemonset-spec)의
+control-plane toleration을 가져오되 실제 노드의 key·effect에 맞춘다.
+DaemonSet 자체의 `metadata.labels`와 Pod의 `spec.template.metadata.labels`는 별개다.
+둘 다 라벨을 요구하면 두 위치를 확인한다.
+
+`DESIRED=READY`여도 control plane이 대상에서 빠졌을 수 있다. `kubectl get nodes`와
+`kubectl get pods -n <namespace> -l <selector> -o wide`를 비교해 요구한 **모든 노드에 하나씩**
+있는지 확인한다. 특정 taint를 허용하려고 key 없는 포괄적 `Exists`를 추가하지 않는다.
+
 ### 업데이트와 롤백은 전략까지 확인한다
 
 ```bash

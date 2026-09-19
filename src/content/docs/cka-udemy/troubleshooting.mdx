@@ -84,6 +84,31 @@ CPU가 `1m`처럼 작은 것은 자연스럽다. probe나 런타임의 백그라
 [CKA 오토스케일링](/cka/autoscaling/)에 있다. 실제 CPU·메모리 목표 설정은
 [HPA 설정과 검증](/cka-udemy/autoscaling/)에서 이어 간다.
 
+## 메트릭 조회 명령을 스크립트로 제출
+
+실행 결과가 아니라 **다시 실행할 명령 파일**을 요구하면 `top` 출력을 저장하지 않는다.
+다음은 노드 전체와 전체 namespace의 컨테이너별 사용량을 보는 두 스크립트다.
+지정 작업 호스트에서 쓰기 가능한 제출 경로로 파일명을 바꾼다.
+
+```bash
+cat > node-metrics.sh <<'EOF'
+#!/bin/sh
+kubectl top nodes
+EOF
+cat > container-metrics.sh <<'EOF'
+#!/bin/sh
+kubectl top pods -A --containers
+EOF
+chmod +x node-metrics.sh container-metrics.sh
+./node-metrics.sh
+./container-metrics.sh
+```
+
+`k` alias는 비대화형 셸에 없을 수 있어 전체 명령을 쓴다. 실행할 셸의 kubeconfig로 요청하므로
+SSH 호스트와 context도 확인한다. 특정 namespace만 요구하면 `-A`를 해당 `-n`으로 바꾼다.
+옵션은 [`kubectl top pod`](https://kubernetes.io/docs/reference/kubectl/generated/kubectl_top/kubectl_top_pod/)의
+`--containers`에서 확인한다. metric 수집 실패를 빈 출력 파일로 숨기지 않는다.
+
 ## 애플리케이션 로그 — Practice Test: Managing Application Logs
 
 원본 풀이: [06-Practice-Test-Managing-Application-Logs.md](https://github.com/kodekloudhub/certified-kubernetes-administrator-course/blob/master/docs/04-Logging-and-Monitoring/06-Practice-Test-Managing-Application-Logs.md)
@@ -150,6 +175,45 @@ API 서버·스케줄러·컨트롤러 매니저는 보통 스태틱 Pod이므�
 [Pod 디버깅](https://v1-35.docs.kubernetes.io/docs/tasks/debug/debug-application/debug-pods/),
 [클러스터 트러블슈팅](https://v1-35.docs.kubernetes.io/docs/tasks/debug/debug-cluster/),
 [`crictl`로 노드 디버깅](https://v1-35.docs.kubernetes.io/docs/tasks/debug/debug-cluster/crictl/).
+
+## Pod에서 런타임 컨테이너까지 추적
+
+실행 노드의 container ID·runtimeType·로그를 요구하면 API의 Pod 이름을 노드의 CRI 객체와 연결한다.
+아래는 `project-tiger/tigers-reunite`가 이미 실행 중인 경우다.
+
+```bash
+# kubeconfig가 있는 작업 호스트
+kubectl -n project-tiger get pod tigers-reunite -o wide
+kubectl -n project-tiger get pod tigers-reunite \
+  -o jsonpath='{range .status.containerStatuses[*]}{.name}{" "}{.containerID}{"\n"}{end}'
+```
+
+확인한 NODE로 SSH한 뒤 노드에서 실행한다. `<sandbox-id>`와 `<container-id>`는 실제 조회값으로 바꾼다.
+
+```bash
+sudo crictl pods --namespace project-tiger --name tigers-reunite
+sudo crictl ps -a --pod <sandbox-id>
+sudo crictl inspect <container-id>
+sudo crictl logs <container-id>
+```
+
+Pod sandbox ID와 앱 container ID는 다르다. 컨테이너가 여러 개면 이름과 실행 상태를 확인하고
+API의 `containerd://` 접두사를 뺀 ID와 대조한다. `inspect`의 `status.id`는 전체 ID이고,
+`info.runtimeType`은 런타임이 제공하는 세부 정보다. containerd 예시의 `io.containerd.runc.v2`를
+모든 런타임의 고정값으로 쓰지 않는다. `crictl`과 `docker`의 옵션·출력도 동일하지 않다.
+([공식 crictl 안내](https://kubernetes.io/docs/tasks/debug/debug-cluster/crictl/))
+
+로그 파일을 worker가 아닌 작업 호스트에 제출하려면 **작업 호스트로 돌아와** 아래처럼 저장한다.
+`worker-node`와 ID를 실제 값으로 바꾸며, 원격 sudo가 비대화형으로 허용되는 환경의 예다.
+
+```bash
+ssh worker-node 'sudo crictl logs <container-id> 2>&1' > /course/17/pod-container.log
+```
+
+`2>&1`은 컨테이너의 stderr 로그도 함께 받기 위한 것이다. 명령이 실패하면 SSH·sudo·crictl
+오류가 섞일 수 있으므로 종료 코드와 파일 내용을 확인한다. 프롬프트·수동 복사 흔적·빈 파일이
+없고 해당 컨테이너의 로그인지 대조한다. 권한상 이 방식이 안 되면 노드의 쓰기 가능한 임시 파일에
+저장한 뒤 `scp`로 지정 호스트에 가져온다. 조회 작업이므로 컨테이너를 재시작할 필요는 없다.
 
 ## 완료 기준
 

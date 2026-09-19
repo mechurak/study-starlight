@@ -17,6 +17,8 @@ add-on CRD이고, 그 리소스를 실제 데이터 플레인으로 바꾸는 �
 먼저 API resource와 GatewayClass를 조회하고, Gateway의 listener가 어떤 namespace와 Route를
 허용하는지 확인한다. HTTPRoute를 붙인 뒤 Accepted·ResolvedRefs 조건과 실제 HTTP 응답까지 본다.
 
+관련 실습: [HTTPRoute 경로와 헤더 분기](/cka-udemy/httproute-matching/).
+
 ## Gateway API — 만들기와 진단
 
 Gateway API는 Ingress보다 오브젝트가 많지만, 층은 더 명확하다. **CRD는 API 서버가 리소스를

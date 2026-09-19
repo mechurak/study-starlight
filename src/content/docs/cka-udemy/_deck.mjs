@@ -9,7 +9,8 @@ export default {
 		"KodeKloud CKA Practice Test",
 		"CKA 연습 문제",
 		"CKA labs",
-		"Kubernetes 관리자 실습"
+		"Kubernetes 관리자 실습",
+		"killer.sh CKA Simulator"
 	],
 	"description": "KodeKloud 랩을 뼈대로 여러 실습의 실패 진단·완료 검증·복구 패턴을 모은 CKA 연습 덱.",
 	"category": "infra",
@@ -30,6 +31,7 @@ export default {
 			"pages": [
 				"pods",
 				"workloads",
+				"statefulset-scale",
 				"jobs",
 				"pod-config",
 				"configmap-secret",
@@ -48,9 +50,11 @@ export default {
 			"pages": [
 				"services-dns",
 				"dns",
+				"coredns-domain",
 				"network-environment",
 				"ingress-netpol",
 				"gateway",
+				"httproute-matching",
 				"network-policy"
 			]
 		},
@@ -67,6 +71,7 @@ export default {
 				"security",
 				"rbac",
 				"service-account",
+				"pod-api-access",
 				"image-pull-secrets",
 				"admission",
 				"custom-resource",
@@ -74,10 +79,12 @@ export default {
 				"cluster-upgrade",
 				"etcd-backup-restore",
 				"helm",
+				"cert-manager",
 				"helm-release-replacement",
 				"kustomize",
 				"kustomize-transformers",
 				"kustomize-patches",
+				"kustomize-hpa",
 				"kustomize-components"
 			]
 		},
@@ -142,6 +149,19 @@ export default {
 			"title": "Deployment rollout과 rollback",
 			"href": "/cka-udemy/workloads/",
 			"desc": "ReplicaSet · Deployment 생성 · rollout · 실패 진단 · rollback",
+			"items": [
+				[
+					"CKA 워크로드 컨트롤러",
+					"/cka/workloads/"
+				]
+			],
+			"tone": "key"
+		},
+		{
+			"label": "Workloads와 스케줄링",
+			"title": "StatefulSet 복제본 줄이기",
+			"href": "/cka-udemy/statefulset-scale/",
+			"desc": "owner 확인 · replicas · Pod 종료 · PVC 보존",
 			"items": [
 				[
 					"CKA 워크로드 컨트롤러",
@@ -329,6 +349,19 @@ export default {
 		},
 		{
 			"label": "네트워킹",
+			"title": "CoreDNS 도메인 추가와 복구",
+			"href": "/cka-udemy/coredns-domain/",
+			"desc": "zone 추가 · 두 FQDN 검증 · Corefile 백업 복구",
+			"items": [
+				[
+					"CKA 클러스터 DNS",
+					"/cka/dns/"
+				]
+			],
+			"tone": "warn"
+		},
+		{
+			"label": "네트워킹",
 			"title": "네트워크 환경과 CNI 확인",
 			"href": "/cka-udemy/network-environment/",
 			"desc": "인터페이스 · 세 IP 대역 · 런타임 socket · CNI 경로 · Calico 설치",
@@ -362,6 +395,19 @@ export default {
 			"title": "Gateway와 HTTPRoute",
 			"href": "/cka-udemy/gateway/",
 			"desc": "CRD와 구현체 · listener · parentRefs · attachment 조건 · 실제 요청",
+			"items": [
+				[
+					"CKA Ingress와 Gateway API",
+					"/cka/ingress-gateway/"
+				]
+			],
+			"tone": "warn"
+		},
+		{
+			"label": "네트워킹",
+			"title": "HTTPRoute 경로와 헤더 분기",
+			"href": "/cka-udemy/httproute-matching/",
+			"desc": "path·header AND · match 우선순위 · 기본 경로",
 			"items": [
 				[
 					"CKA Ingress와 Gateway API",
@@ -443,6 +489,19 @@ export default {
 			"items": [
 				[
 					"CKA API 요청 처리 흐름",
+					"/cka/api-access/"
+				]
+			],
+			"tone": "zone"
+		},
+		{
+			"label": "Cluster Architecture",
+			"title": "Pod에서 Kubernetes API 호출",
+			"href": "/cka-udemy/pod-api-access/",
+			"desc": "CA · Bearer token · list 권한 · 응답 파일",
+			"items": [
+				[
+					"CKA API 접근",
 					"/cka/api-access/"
 				]
 			],
@@ -536,6 +595,19 @@ export default {
 		},
 		{
 			"label": "Cluster Architecture",
+			"title": "Helm으로 cert-manager 설치와 CR 생성",
+			"href": "/cka-udemy/cert-manager/",
+			"desc": "CRD · webhook · selfSigned ClusterIssuer",
+			"items": [
+				[
+					"CKA CRD",
+					"/cka/crd/"
+				]
+			],
+			"tone": "bad"
+		},
+		{
+			"label": "Cluster Architecture",
 			"title": "Helm 새 release로 교체",
 			"href": "/cka-udemy/helm-release-replacement/",
 			"desc": "로컬 chart lint · 새 release 설치 · 이전 release 제거",
@@ -560,6 +632,10 @@ export default {
 				[
 					"특정 대상 수정·삭제",
 					"/cka-udemy/kustomize-patches/"
+				],
+				[
+					"Kustomize로 HPA 전환",
+					"/cka-udemy/kustomize-hpa/"
 				],
 				[
 					"선택 기능 (학습 보충)",

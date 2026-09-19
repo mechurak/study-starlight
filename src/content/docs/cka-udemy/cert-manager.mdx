@@ -1,0 +1,95 @@
+---
+title: "Helm으로 cert-manager 설치와 CR 생성"
+description: "차트의 CRD 설치 옵션을 확인하고 webhook 준비 후 selfSigned ClusterIssuer를 생성한다"
+reviewedAt: 2026-09-19
+---
+
+import { LinkCard } from '@astrojs/starlight/components';
+import Thesis from '../../../components/docs/Thesis.astro';
+
+<Thesis>Helm 설치 뒤 CRD와 webhook의 준비를 확인하고, 설치된 스키마에 맞춰 ClusterIssuer를 만든다.</Thesis>
+
+새 종류의 리소스는 API 정의인 CRD와 그 선언을 처리할 컨트롤러가 필요하다. 이 실습은
+cert-manager를 설치한 뒤 인증서 발급자 설정인 `ClusterIssuer`를 등록하는 흐름이다.
+실제 인증서 발급·갱신까지는 수행하지 않는다.
+
+사용자가 제공한 killer.sh 사례를 바탕으로 한 학습 보충이다. 개념은 [CKA CRD](/cka/crd/),
+명령의 기본 구조는 [Helm](/cka-udemy/helm/)에서 연결한다. cert-manager 제품 문서는
+학습용 근거이며 시험에서 열 수 있는지는 제공 자료 범위를 따른다.
+
+## 저장소와 차트 옵션 확인
+
+지정 인스턴스에서 실행한다. `jetstack` 저장소가 이미 등록된 랩에서는 그 주소를 유지한다.
+이름은 같아도 시뮬레이터 내부 미러일 수 있다. 버전이 지정되었다면 아래 차트 조회와 설치에
+동일한 `--version` 값을 붙인다.
+
+```bash
+helm repo list
+helm search repo jetstack/cert-manager --versions
+helm show values jetstack/cert-manager
+```
+
+[cert-manager Helm 안내](https://cert-manager.io/docs/installation/helm/)의 `crds.enabled`는
+이 차트의 값이다. 모든 operator 차트에 공통인 Helm 옵션으로 외우지 않는다.
+등록되지 않은 일반 연습 환경은 공식 안내의 저장소 등록부터 진행한다.
+
+## 설치하고 API 준비 확인
+
+아래는 namespace와 release가 아직 없는 랩의 명령이다.
+
+```bash
+kubectl create namespace cert-manager
+helm install cert-manager jetstack/cert-manager -n cert-manager \
+  --set crds.enabled=true --wait --timeout=3m
+kubectl wait --for=condition=Established \
+  crd/clusterissuers.cert-manager.io --timeout=60s
+kubectl -n cert-manager get deployments,pods
+kubectl explain clusterissuer.spec.selfSigned --api-version=cert-manager.io/v1
+```
+
+`helm list -n cert-manager`의 `deployed`와 controller·cainjector·webhook의 Ready를 확인한다.
+CRD가 없으면 `no matches for kind`, webhook이 준비되지 않았으면 연결·인증서 오류가 날 수 있다.
+후자는 CRD를 다시 만드는 대신 `kubectl -n cert-manager describe pod`와 webhook 로그로 좁힌다.
+준비 시간이 걸리는 이유는 [webhook 부트스트랩](https://cert-manager.io/docs/concepts/webhook/#webhook-connection-problems-shortly-after-cert-manager-installation)에 있다.
+
+## 스키마를 보고 ClusterIssuer 작성
+
+`explain`에서 `crlDistributionPoints`가 문자열 배열인지 확인한다. CRL은 인증서 폐기 목록이며,
+이 필드는 발급할 인증서에 그 조회 위치를 기록한다. URL을 적는 것만으로 CRL 서버를 만들지는 않는다.
+[SelfSigned 설정](https://cert-manager.io/docs/configuration/selfsigned/#crl-distribution-points)의 해당 필드를 가져온다.
+
+아래는 `cluster-issuer.yaml`의 완성 예다. 주어진 파일이 있다면 이름과 기존 설정을 보존하고
+`spec.selfSigned` 아래의 배열만 추가한다.
+
+```yaml
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: course-issuer
+spec:
+  selfSigned:
+    crlDistributionPoints:
+      - http://example.com/crl
+```
+
+`ClusterIssuer`는 클러스터 범위이므로 `metadata.namespace`가 없다.
+release의 namespace와 발급자 리소스의 범위는 별개다.
+([Issuer와 ClusterIssuer](https://cert-manager.io/docs/concepts/issuer/))
+
+```bash
+kubectl apply -f cluster-issuer.yaml
+kubectl get clusterissuer course-issuer -o yaml
+kubectl describe clusterissuer course-issuer
+```
+
+## 완료와 복구
+
+요구한 이름·selfSigned 배열이 저장되었고 `Ready=True`면 발급자 설정까지 확인한 것이다.
+`Certificate`나 TLS Secret을 추가로 만들 필요는 없다. 실제 인증서 발급 성공과는 구분한다.
+
+필드가 틀렸다면 파일을 고쳐 재적용한다. 연습 종료 시 **이번에 새로 만든** 발급자는
+`kubectl delete clusterissuer course-issuer`로 정리할 수 있다. cert-manager도 이번 실습 전용으로
+설치했고 다른 CR이 사용하지 않는 경우에만 `helm uninstall cert-manager -n cert-manager`를 쓴다.
+차트가 CRD를 보존할 수 있으므로 제거 결과를 확인하되, 남은 CRD를 일괄 삭제하지 않는다.
+
+<LinkCard title="설치된 CRD로 Custom Resource 만들기" href="/cka-udemy/custom-resource/" />

@@ -225,6 +225,65 @@ kubectl run test-conn -n default --image=busybox --restart=Never --rm -i \
 새 ingress 허용은 출발지 egress 제한까지 해제하지 않는다. 잘못 만든 정책만 수정하거나,
 연습 종료 시 이번에 추가한 `ingress-to-nptest`만 삭제한다.
 
+## 목적지와 포트를 짝으로 제한
+
+`project-snake`의 `app=backend` Pod에서 `app=db1`의 TCP 1111과 `app=db2`의 TCP 2222만
+허용하는 사례다. 먼저 `kubectl -n project-snake get pods -o wide -L app`와 기존 정책을 조회한다.
+Pod 이름 접두사가 아니라 실제 `app` 라벨을 사용한다. 다음은 `np-backend.yaml` 전체다.
+
+```yaml
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: np-backend
+  namespace: project-snake
+spec:
+  podSelector:
+    matchLabels:
+      app: backend
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - podSelector:
+            matchLabels:
+              app: db1
+      ports:
+        - protocol: TCP
+          port: 1111
+    - to:
+        - podSelector:
+            matchLabels:
+              app: db2
+      ports:
+        - protocol: TCP
+          port: 2222
+```
+
+한 규칙의 `to`와 `ports`는 AND, 서로 다른 egress 규칙은 OR다.
+위 정책은 `(db1 AND 1111) OR (db2 AND 2222)`다. 하나의 규칙 안에 목적지 두 개와 포트 두 개를
+모두 넣으면 `(db1 OR db2) AND (1111 OR 2222)`가 되어 원치 않는 `db1:2222`도 허용한다.
+`podSelector`만 있는 peer는 정책과 같은 namespace를 선택한다.
+([NetworkPolicy egress 규칙](https://kubernetes.io/docs/reference/kubernetes-api/networking/network-policy-v1/#NetworkPolicyEgressRule))
+
+```bash
+kubectl apply -f np-backend.yaml
+kubectl -n project-snake describe networkpolicy np-backend
+# 실제 조회한 IP로 각각 실행한다
+kubectl -n project-snake exec backend-0 -- curl -sS --max-time 3 http://<db1-ip>:1111
+kubectl -n project-snake exec backend-0 -- curl -sS --max-time 3 http://<db2-ip>:2222
+kubectl -n project-snake exec backend-0 -- curl -sS --max-time 3 http://<vault-ip>:3333
+```
+
+적용 전에는 세 목적지 모두 응답하는 기준선을 확인하고, 적용 후에는 앞의 둘만 성공해야 한다.
+교차 포트도 검사하되 **원래 그 포트에 listener가 없었다면 Connection refused만으로 차단을
+증명할 수 없다.** 포트와 목적지의 짝은 `describe` 결과와 YAML도 함께 대조한다.
+
+기존 egress 정책의 허용은 합쳐지므로 별도 allow-all이 있으면 이 정책만으로 제한되지 않는다.
+목적지 ingress 정책과 CNI 지원도 조건이다. DNS도 허용하지 않은 이 예는 Pod IP로 검증한다.
+이름 기반 연결이 요구될 때만 별도의 DNS 허용을 설계하고, 두 목적지뿐이라는 요구를 임의로 넓히지 않는다.
+복구는 이번에 추가한 `np-backend`만 삭제하거나, 기존 정책을 수정했다면 저장한 원래 규칙으로 되돌린다.
+
 ## 공식 문서에서 찾을 것
 
 | 검색어 | 가져올 필드·판정 |

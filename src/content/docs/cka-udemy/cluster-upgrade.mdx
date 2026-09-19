@@ -17,6 +17,29 @@ import Thesis from '../../../components/docs/Thesis.astro';
 
 > 개념 연결: [CKA 클러스터 업그레이드](/cka/cluster-upgrade/)
 
+## 신규 worker의 패키지 변경과 조인 구분
+
+아직 클러스터에 조인하지 않은 worker를 준비하는 문제는 기존 노드 업그레이드와 다르다.
+관리 호스트에서 `kubectl get nodes -o wide`와 `kubectl version`을 확인하고, worker에서는
+`kubeadm version -o short`, `kubelet --version`, `kubectl version --client`를 따로 확인한다.
+`get nodes`의 VERSION은 kubelet 버전이며 로컬 kubectl 버전으로 대신 판단하지 않는다.
+
+| 현재 상태 | 다음 작업 |
+|---|---|
+| 아직 조인하지 않은 worker | 요구 버전의 패키지 준비 → control plane에서 join 명령 발급 → worker에서 join |
+| 이미 정상 조인한 worker | drain → kubeadm 패키지와 `upgrade node` → kubelet 변경 → 재시작·uncordon |
+
+미조인 worker에서 `kubeadm upgrade node`가 kubelet 설정 파일을 찾지 못했다고 해서
+파일을 임의로 만들지 않는다. 이 명령은 기존 클러스터 구성원을 업그레이드하는 단계다.
+조인은 [kubeadm 설치와 노드 조인](/cka-udemy/cluster-lifecycle/)의 전제와 명령을 따른다.
+
+APT 환경에서는 아래의 [패키지 버전 선택](#버전-업그레이드--practice-test-cluster-upgrade-process)처럼
+목표 마이너 저장소와 `apt-cache madison`의 실제 버전 문자열을 확인한다.
+control plane에서 `sudo kubeadm token create --print-join-command`로 받은 명령을 worker에서
+root 권한으로 실행하고, 마지막에 Node Ready·kubelet 버전·CNI 상태를 확인한다.
+([kubeadm 노드 추가](https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/create-cluster-kubeadm/#join-nodes))
+실패하면 preflight·kubelet 로그부터 보고 기존 노드에 무조건 `kubeadm reset`을 실행하지 않는다.
+
 ## 노드 비우기 — Practice Test: OS Upgrades
 
 공식 문서: [Safely Drain a Node — Use `kubectl drain` to remove a node from service](https://kubernetes.io/docs/tasks/administer-cluster/safely-drain-node/#use-kubectl-drain-to-remove-a-node-from-service)

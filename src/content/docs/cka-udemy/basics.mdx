@@ -18,6 +18,23 @@ client dry-run으로 YAML 뼈대를 만든다. 조회와 선언형 작업의 원
 Pod 자체의 생성·상태 판정은 [Pod 생성과 상태 확인](/cka-udemy/pods/),
 출력 파일 문제는 [JSONPath 추출과 정렬](/cka-udemy/jsonpath/)로 분리한다.
 
+## SSH 작업 위치와 제출 위치 확인
+
+제공된 killer.sh 환경은 문제마다 지정 인스턴스로 SSH한다. 다음 인스턴스로 옮길 때는
+`exit`로 시작 터미널까지 돌아온 뒤 문제의 SSH 명령을 실행한다. `sudo -i`로 들어간 root 셸이나
+worker까지 중첩 접속했다면 `exit` 한 번이 시작 터미널 복귀를 뜻하지 않는다.
+
+```bash
+hostname
+whoami
+kubectl config current-context
+```
+
+호스트·사용자·context를 구분해 확인하고 API 명령에는 요구된 `-n`을 붙인다.
+`--kubeconfig`가 주어진 문제는 그 파일이 우선이다. 출력 파일은 **요구된 호스트의 경로**에 있어야
+하므로 worker에서 만든 파일을 제출 호스트로 옮겼는지까지 확인한다. 이 접속 방식은 제공된
+시뮬레이터의 전제이며 실제 시험에서는 각 문제의 접속 지시를 따른다.
+
 ## 네임스페이스 — Practice Test: Namespaces
 
 원본 풀이: [19-Practice-Test-Namespaces.md](https://github.com/kodekloudhub/certified-kubernetes-administrator-course/blob/master/docs/02-Core-Concepts/19-Practice-Test-Namespaces.md)

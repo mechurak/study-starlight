@@ -1,0 +1,87 @@
+---
+title: "Pod에서 Kubernetes API 호출"
+description: "ServiceAccount의 CA와 token으로 API를 호출하고 TLS·인증·RBAC 오류와 응답 저장 위치를 구분한다"
+reviewedAt: 2026-09-19
+---
+
+import { LinkCard } from '@astrojs/starlight/components';
+import Thesis from '../../../components/docs/Thesis.astro';
+
+<Thesis>Pod의 ServiceAccount token으로 호출하고 CA로 서버를 검증하며, 요청 경로에 맞는 RBAC 권한과 응답 파일을 확인한다.</Thesis>
+
+Pod 내부에서 API를 직접 호출하라는 작업은 관리자의 kubectl 권한으로 대신 조회하면 검증되지 않는다.
+Pod에 연결된 ServiceAccount의 신원으로 요청해야 한다. 개념은 [CKA API 접근](/cka/api-access/),
+계정 연결과 권한 부여는 [ServiceAccount 실습](/cka-udemy/service-account/)에서 이어진다.
+
+## 요청 경로와 인가 범위 확인
+
+아래 예제는 `api-lab`의 기존 `api-client` Pod 안에 `sh`·`curl`이 있고 ServiceAccount의
+token·CA가 기본 경로에 마운트되어 있다고 가정한다. Pod·계정·출력 경로는 문제의 값으로 바꾼다.
+
+```bash
+kubectl -n api-lab get pod api-client \
+  -o jsonpath='{.spec.serviceAccountName}{"\n"}'
+kubectl -n api-lab exec api-client -- \
+  ls /var/run/secrets/kubernetes.io/serviceaccount
+```
+
+`automountServiceAccountToken: false`이면 기본 token이 없을 수 있다. 먼저 요구된 계정과
+volume 구성을 확인한다. 토큰 파일 내용을 터미널로 출력할 필요는 없다.
+
+| API 경로 | 필요한 verb·범위 | 인가 확인 예 |
+|---|---|---|
+| `/api/v1/namespaces/api-lab/secrets` | list · api-lab | `kubectl auth can-i list secrets -n api-lab --as=system:serviceaccount:api-lab:reader` |
+| `/api/v1/namespaces/api-lab/secrets/example` | get · 단일 Secret | `kubectl auth can-i get secrets/example -n api-lab --as=system:serviceaccount:api-lab:reader` |
+| `/api/v1/secrets` | list · 전체 namespace | `kubectl auth can-i list secrets -A --as=system:serviceaccount:api-lab:reader` |
+
+표의 `reader`는 실제 `serviceAccountName`으로 바꾼다. HTTP GET이라도 목록 URL은 RBAC에서
+`list`다. `--as` 검사는 impersonation 권한이 있는 관리자용이며, 실제 token 인증의 증거는
+아래 요청이다. ([API 요청의 verb와 범위](https://kubernetes.io/docs/reference/access-authn-authz/authorization/#determine-the-request-verb))
+
+## CA와 Bearer token으로 요청
+
+Pod 안에서 실행할 완성 예다. 권한이 부여된 `api-lab`의 Secret 목록을 읽는다.
+[Accessing the API from a Pod](https://kubernetes.io/docs/tasks/run-application/access-api-from-pod/)의
+`Without using a proxy` 예제에서 CA·token 경로와 curl 헤더를 가져온다.
+
+```bash
+SA_DIR=/var/run/secrets/kubernetes.io/serviceaccount
+TOKEN=$(cat "$SA_DIR/token")
+curl --fail --silent --show-error --max-time 10 \
+  --cacert "$SA_DIR/ca.crt" \
+  -H "Authorization: Bearer $TOKEN" \
+  https://kubernetes.default.svc/api/v1/namespaces/api-lab/secrets
+```
+
+`--cacert`로 API 서버 인증서를 확인한다. `-k`로 검증을 끄는 것을 정상 해법으로 삼지 않는다.
+전체 namespace 목록이 요구되면 URL 끝을 `/api/v1/secrets`로 바꾸고 권한도 전체 범위로 확인한다.
+
+| 실패 | 먼저 볼 곳 |
+|---|---|
+| 이름 해석·timeout | Pod DNS, API Service, 네트워크 정책 |
+| TLS certificate 오류 | CA 경로·호스트 이름·서버 인증서 |
+| 401 Unauthorized | token 누락·만료·잘못된 audience |
+| 403 Forbidden | 응답의 사용자·verb·resource·namespace와 RBAC |
+
+## 지정 호스트에 응답 저장
+
+다음은 **출력 파일을 제출할 호스트**에서 실행한다. `/opt/outputs`는 미리 존재하는 쓰기 가능한
+디렉터리라고 가정한다. 작은따옴표 안의 변수와 파일 읽기는 Pod 내부에서 해석되고,
+따옴표 밖 `>`는 현재 호스트에 파일을 만든다.
+
+```bash
+kubectl -n api-lab exec api-client -- sh -c '
+  SA_DIR=/var/run/secrets/kubernetes.io/serviceaccount
+  TOKEN=$(cat "$SA_DIR/token")
+  curl --fail --silent --show-error --max-time 10 \
+    --cacert "$SA_DIR/ca.crt" \
+    -H "Authorization: Bearer $TOKEN" \
+    https://kubernetes.default.svc/api/v1/namespaces/api-lab/secrets
+' > /opt/outputs/secrets.json
+```
+
+제출 파일은 JSON `kind: SecretList`여야 한다. 명령 성공 여부와 JSON 구조를 확인하고,
+빈 파일이나 403 응답을 정답으로 제출하지 않는다. `-t`를 붙이지 않아 터미널 제어 문자가
+섞이는 것도 피한다. 조회만 했으므로 클러스터 복구는 없으며 연습용 응답 파일은 사용 후 정리한다.
+
+<LinkCard title="RBAC 허용과 거부 검증" href="/cka-udemy/rbac/" />
