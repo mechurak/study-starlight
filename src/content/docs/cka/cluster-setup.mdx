@@ -55,6 +55,22 @@ a -> b -> c -> d -> e -> f -> g -> h
 
 ## 노드 준비 — kubeadm 이전에 해야 할 것
 
+아래 명령은 systemd를 쓰는 Linux의 컨트롤 플레인·워커 노드에서 실행한다.
+`sysctl`은 실행 중인 커널의 설정을 읽고 바꾸는 도구다. Pod 트래픽을 노드가 전달하려면
+네트워크 구현이 요구하는 커널 기능도 켜져 있어야 한다.
+
+| 파라미터 | `1`로 설정했을 때 |
+|---|---|
+| `net.ipv4.ip_forward` | 인터페이스 사이에서 IPv4 패킷 전달을 허용한다 |
+| `net.bridge.bridge-nf-call-iptables` | Linux 브리지를 통과하는 IPv4 패킷에 iptables 규칙을 적용한다 |
+| `net.bridge.bridge-nf-call-ip6tables` | 위 브리지 처리를 IPv6 패킷에 적용한다 |
+
+브리지는 여러 인터페이스를 같은 네트워크로 연결하는 소프트웨어 스위치다.
+[`br_netfilter`](https://docs.kernel.org/networking/bridge.html#netfilter)는 브리지 트래픽을
+IP 필터링 경로로 보내는 커널 모듈이며, 아래에서는 sysctl 설정보다 먼저 로드한다.
+필요한 모듈·파라미터는 [네트워크 구현에 따라 달라지므로](https://kubernetes.io/docs/setup/production-environment/container-runtimes/#network-configuration)
+실습에서는 문제에서 요구한 값을, 실제 설치에서는 선택한 CNI의 요구사항을 따른다.
+
 <Steps>
 
 1. **스왑 끄기** — kubelet의 기본 요구사항
@@ -91,6 +107,24 @@ a -> b -> c -> d -> e -> f -> g -> h
 **스왑이 켜져 있으면 kubelet이 시작을 거부한다.**
 `journalctl -u kubelet`에 그대로 찍힌다. 노드 트러블슈팅에서 자주 나온다.
 :::
+
+### 현재 적용과 재부팅 후 유지
+
+커널의 현재 상태와 부팅 때 읽는 파일은 별개다. 위 예제가 파일 저장과 명령 실행을 함께 하는 이유다.
+
+| 대상 | 지금 적용 | 다음 부팅에도 적용 |
+|---|---|---|
+| 커널 모듈 | `modprobe br_netfilter` | `/etc/modules-load.d/*.conf`에 모듈명 저장 |
+| 커널 파라미터 | `sysctl --system`으로 설정 파일들을 읽어 적용 | `/etc/sysctl.d/*.conf`에 `키 = 값` 저장 |
+
+`sysctl -w net.ipv4.ip_forward=1`만 실행하면 현재 값만 바뀐다. 반대로 파일만 저장하면
+현재 커널 값은 바로 바뀌지 않는다. [Kubernetes의 IPv4 forwarding 예제](https://kubernetes.io/docs/setup/production-environment/container-runtimes/#enable-ipv4-packet-forwarding)도
+파일 저장 뒤 `sysctl --system`을 실행한다. 부팅 시 모듈 로드와 sysctl 적용의 관계는
+[systemd 매뉴얼 원본](https://github.com/systemd/systemd/blob/main/man/sysctl.d.xml)의
+`Configuration Format` 절에서 확인할 수 있다(학습용).
+
+두 IPv4 설정만 요구하는 문제의 최소 명령과 완료 판정은
+[네트워크 파라미터 영구 적용 실습](/cka-udemy/cluster-lifecycle/#네트워크-파라미터-영구-적용)에 있다.
 
 ## 컨테이너 런타임과 kubeadm 설치
 
