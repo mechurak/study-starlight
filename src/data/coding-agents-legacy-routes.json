@@ -27,7 +27,7 @@
       "prd는-현재-제품의-정본이다": "/coding-agents/work-plans/#저장소-문서는-서로-다른-시간을-기억한다",
       "계획-문서는-실행-가능한-계약이다": "/coding-agents/work-plans/#계획-문서는-실행-가능한-계약이다",
       "execplan과-계획-문서": "/coding-agents/work-plans/#execplan과-계획-문서",
-      "한-작업-계획을-여섯-단계로-운영한다": "/coding-agents/execution-and-resume/#자료-조사와-작성의-연결을-확인한다",
+      "한-작업-계획을-여섯-단계로-운영한다": "/coding-agents/execution-and-resume/#자료-조사와-구현의-연결을-확인한다",
       "검증은-완료-조건에-맞춰-끝낸다": "/coding-agents/execution-and-resume/#실패하면-원인을-좁히고-해당-결과를-다시-확인한다",
       "병렬-작업에는-독립적인-질문을-맡긴다": "/coding-agents/execution-and-resume/#권한과-병렬-작업의-경계",
       "프롬프트는-설명서가-아니라-파일을-가리킨다": "/coding-agents/execution-and-resume/#요청은-결과와-경계를-드러낸다",

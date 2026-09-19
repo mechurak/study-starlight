@@ -10,7 +10,7 @@ export default {
     "AGENTS.md",
     "CLAUDE.md"
   ],
-  "description": "두 코딩 에이전트를 같은 저장소에서 쓰는 법 — 지침 계층, 컨텍스트, 작업 요청과 검증 패턴.",
+  "description": "Codex와 Claude Code를 위한 공유 지침 개선, 큰 작업의 계획·검증·세션 간 인계.",
   "category": "tools",
   "tags": [
     "agent"
@@ -34,6 +34,7 @@ export default {
     {
       "label": "선택 심화",
       "pages": [
+        "public-repositories",
         "monorepo-instructions"
       ]
     }
@@ -44,7 +45,7 @@ export default {
       "href": "/coding-agents/project-instructions/",
       "title": "공유 지침",
       "tone": "key",
-      "desc": "단일 저장소의 AGENTS 정본과 CLAUDE 어댑터"
+      "desc": "기존 레포의 명령·제약·문서 연결 개선"
     },
     {
       "label": "탐색",
@@ -58,14 +59,21 @@ export default {
       "href": "/coding-agents/work-plans/",
       "title": "목표와 증거",
       "tone": "ok",
-      "desc": "명시적 생성 요청·네 자리 번호·문서별 상태"
+      "desc": "작업 크기에 맞는 목표·완료 조건·상태 기록"
     },
     {
       "label": "실행",
       "href": "/coding-agents/execution-and-resume/",
       "title": "요청과 재개",
       "tone": "warn",
-      "desc": "작은 덱 요청부터 리뷰·실패 수정·재개까지"
+      "desc": "기능 구현·실패 수정·도구 간 인계와 재개"
+    },
+    {
+      "label": "사례",
+      "href": "/coding-agents/public-repositories/",
+      "title": "공개 레포",
+      "tone": "mute",
+      "desc": "실제 지침·이슈·계획에서 필요한 방식 선택"
     },
     {
       "label": "심화",

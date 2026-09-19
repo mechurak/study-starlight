@@ -1,0 +1,92 @@
+---
+title: "공개 레포에서 고르는 운영 방식"
+description: "tldraw·VS Code·Codex·Superpowers의 실제 지침과 계획을 비교하고 적용할 원칙을 고르는 방법"
+reviewedAt: 2026-09-19
+status: stable
+---
+
+import { LinkCard } from '@astrojs/starlight/components';
+import Thesis from '../../../components/docs/Thesis.astro';
+import TermIntro from '../../../components/docs/TermIntro.astro';
+
+<Thesis>공개 레포의 형식을 통째로 복사하기보다 정본·검증·인계가 연결되는 방식을 가져온다</Thesis>
+
+[공유 지침](/coding-agents/project-instructions/)과 [작업 계획](/coding-agents/work-plans/)을 실제
+프로젝트에 적용하려면 무엇이 공통 원리이고 무엇이 그 팀의 선택인지 구분해야 한다.
+이 페이지는 **공개된 지침·계획에서 어떤 운영 방식을 가져올 수 있는가**에 답한다.
+
+<TermIntro terms={[["커밋 고정 링크", "Permalink", "특정 시점의 파일을 가리키는 링크. 이후 기본 브랜치가 바뀌어도 관찰 근거를 다시 확인할 수 있다."]]} />
+
+2026-09-19에 확인한 파일을 커밋에 고정해 연결했다. 아래는 생산성 순위나 실제 준수율에 대한
+평가가 아니다. 지침·계획의 공개 내용이며 각 프로젝트 전체가 항상 같은 방식으로 일한다는 뜻도 아니다.
+
+## tldraw: 공유 지침과 이슈 중심 작업
+
+[tldraw의 AGENTS](https://github.com/tldraw/tldraw/blob/05ba06d341d4fc7212812c30cb80309c011d428a/AGENTS.md)는
+실제 명령과 변경별 검증 범위를 안내한다.
+[CLAUDE](https://github.com/tldraw/tldraw/blob/05ba06d341d4fc7212812c30cb80309c011d428a/CLAUDE.md)는
+`@AGENTS.md` 한 줄이고, 반복 절차의 정본인 `skills/`도 도구별 경로에서 연결한다.
+같은 내용을 여러 도구에 복사하지 않는 사례다.
+
+[이슈를 수행하는 take 절차](https://github.com/tldraw/tldraw/blob/05ba06d341d4fc7212812c30cb80309c011d428a/skills/take/SKILL.md)는
+이슈·댓글에서 요구와 수용 기준을 확인하고, 구현 체크리스트를 만든 뒤 검증과 PR로 이어진다.
+기존 이슈가 협업의 중심이라면 로컬에 동일한 요구와 상태를 다시 관리할 필요가 없다는 선택지를 보여 준다.
+이 파일만으로 모든 작업의 계획 저장 위치를 단정할 수는 없다.
+
+## VS Code: 이전 대화 없이 이어받는 단계별 계획
+
+[VS Code의 AGENTS](https://github.com/microsoft/vscode/blob/d3c24c3c4d7efab36b37acb1e91d9502c0c35b28/AGENTS.md)는
+상세 Copilot 지침을 가리키는 짧은 진입점이다. 공유 정본의 이름이 반드시 AGENTS일 필요는 없으며,
+다른 도구가 그 문서를 읽는 경로가 명확해야 한다.
+
+Claude 통합 코드 옆의
+[Phase 6 계획](https://github.com/microsoft/vscode/blob/d3c24c3c4d7efab36b37acb1e91d9502c0c35b28/src/vs/platform/agentHost/node/claude/phase6-plan.md)은
+이전 대화가 없는 에이전트를 위한 인계 계획임을 밝히고 목표·제외 범위·종료 조건·수정 파일을 적는다.
+[Phase 19 계획](https://github.com/microsoft/vscode/blob/d3c24c3c4d7efab36b37acb1e91d9502c0c35b28/src/vs/platform/agentHost/node/claude/phase19-plan.md)에는
+작업 의존성, 완료 판단, 결정 이유, 실제 검증과 원래 계획에서 달라진 점이 함께 남아 있다.
+
+가져올 것은 단계 번호나 코드의 상세 분량보다 **계획과 실행 결과를 연결하는 방식**이다.
+이 파일은 일부 진단 항목을 후속으로 남기면서 implemented로 표시한다. 우리 프로젝트에서도
+무엇을 완료 범위로 합의했고 무엇을 제외했는지 분명해야 상태만 보고 오해하지 않는다.
+
+## Codex: 변경 범위에 맞는 검증 계약
+
+[Codex의 AGENTS](https://github.com/openai/codex/blob/78245b47af2a7aafcabe025828ceecca69db4df1/AGENTS.md)는
+Rust 코드 규칙, 변경한 프로젝트의 테스트, 공통 영역 변경 시의 추가 검사, 스냅샷 검토를 안내한다.
+검사 이름만 나열하지 않고 **어떤 변경에서 어떤 검사를 실행하는지** 연결하는 사례다.
+
+이 레포의 명령과 승인 조건을 다른 프로젝트에 복사하지 않는다. 내 프로젝트의 빌드 설정·CI를
+근거로 검증 계약을 적는다. 또한 AGENTS만 읽고 별도의 장기 계획 체계까지 운영한다고 추정하지 않는다.
+
+## Superpowers: 상세 계획과 별도 진행 기록
+
+Superpowers는 에이전트 작업 절차를 제공하는 프레임워크다.
+[계획 작성 지침](https://github.com/obra/superpowers/blob/5bf4e78011075bcfc0dc295f0724994cd123ee71/skills/writing-plans/SKILL.md)은
+명세·작업별 수정 파일·인터페이스·예상 검증을 연결한다.
+[실행 지침](https://github.com/obra/superpowers/blob/5bf4e78011075bcfc0dc295f0724994cd123ee71/skills/executing-plans/SKILL.md)은
+계획별 진행 기록을 읽고 완료한 작업을 반복하지 않도록 한다.
+[자체 개선 계획](https://github.com/obra/superpowers/blob/5bf4e78011075bcfc0dc295f0724994cd123ee71/docs/superpowers/plans/2026-07-30-codex-efficiency-fixes.md)에서도
+변경 대상과 평가 조건의 대응을 볼 수 있다.
+
+작업 경계와 검증 연결은 유용하지만 단계별 상세 코드·테스트 우선 개발·커밋까지 모든 프로젝트에
+강제할 필요는 없다. 이 버전의 진행 기록은 Git에서 제외된 작업 폴더에 있으므로, 다른 기기에
+계획 파일만 전달하면 그 기록까지 공유되지 않는다. 인계에 필요한 상태가 어디 있는지 확인해야 한다.
+
+## 내 프로젝트에서 선택한다
+
+| 상황 | 가져올 방식 | 추가하지 않아도 되는 것 |
+|---|---|---|
+| 두 도구의 규칙이 자주 어긋남 | 공유 정본과 명확한 연결 | 도구별 규칙 복사본 |
+| 이슈가 이미 요구·논의의 중심임 | 이슈와 구현·검증의 연결 | 같은 상태를 가진 별도 장부 |
+| 긴 변경을 새 세션이 이어받음 | 완료 조건·결정·실제 상태·다음 행동 | 모든 명령의 고정 순서 |
+| 검사 비용이 큼 | 변경별 검증 범위 | 매번 전체 검사·전체 UI 순회 |
+
+기본은 기존 문서와 명령을 활용하는 것이다. 적용 후 작은 작업과 재개 작업으로 결과를 확인하고,
+빠진 요구를 줄이지 못하면서 비용만 늘린 절차는 조정한다.
+
+## 이해 확인
+
+유명 레포가 날짜별 계획 파일을 쓰면 우리도 번호 대신 날짜로 바꿔야 할까?
+찾기·인계·검증이 이미 잘된다면 이름을 맞출 이유는 없다. 다음 세션이 같은 상태를 복구할 수 있는지가 기준이다.
+
+<LinkCard title="Monorepo의 지침 경계" description="규칙이 실제로 달라지는 앱과 package에만 하위 지침을 추가한다." href="/coding-agents/monorepo-instructions/" />

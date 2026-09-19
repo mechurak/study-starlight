@@ -1,7 +1,7 @@
 ---
 title: "지침은 어디까지 자동으로 읽히는가"
 description: "Codex와 Claude Code의 시작 위치·하위 지침·import 차이를 확인하고 누락을 진단하는 방법"
-reviewedAt: 2026-09-18
+reviewedAt: 2026-09-19
 status: stable
 ---
 
@@ -18,12 +18,12 @@ import TermIntro from '../../../components/docs/TermIntro.astro';
 
 ## 두 도구는 어디까지 자동으로 읽는가
 
-다음은 2026-09-18 공식 문서에서 확인한 핵심 차이다. 계정별 설정과 실제 세션의 로드 결과를
+다음은 2026-09-19 공식 문서에서 확인한 핵심 차이다. 계정별 설정과 실제 세션의 로드 결과를
 실측한 표는 아니다.
 
 | 항목 | Codex | Claude Code |
 |---|---|---|
-| 기본 프로젝트 지침 | `AGENTS.md` | `CLAUDE.md` |
+| 기본 프로젝트 지침 | `AGENTS.md` | `CLAUDE.md`, 아래 조건에서 `AGENTS.md` |
 | 시작 시 범위 | 프로젝트 루트부터 cwd까지 | cwd와 상위 디렉터리 |
 | cwd 아래의 지침 | 시작 탐색에 포함되지 않음 | 해당 하위 파일을 읽을 때 로드 |
 | 결합 | 가까운 경로 지침이 앞선 지침보다 우선 | 발견한 내용을 결합하므로 상충 규칙을 피한다 |
@@ -34,8 +34,26 @@ Codex의 후보 순서는 같은 폴더에서 `AGENTS.override.md` → `AGENTS.m
 루트에서 시작했는데 `apps/web/AGENTS.md`가 있다는 이유만으로 시작 체인에 들어갔다고 말하면 안 된다.
 
 Claude Code의 상위·하위 로딩과 import는
-[Anthropic memory 문서](https://code.claude.com/docs/en/memory#how-claudemd-files-load)를 따른다.
+[Anthropic memory 문서](https://code.claude.com/docs/en/memory#how-claude-md-files-load)를 따른다.
 단순 검색 결과만 본 모든 경우에 하위 지침이 들어왔다고 가정하지 않는다.
+
+## Claude Code의 AGENTS 직접 로딩 조건
+
+공식 문서는 v2.1.277 이상에서 AGENTS 직접 로딩을 설명한다. 기본 설정에서는 cwd와 상위에
+`CLAUDE.md`·`.claude/CLAUDE.md`·`CLAUDE.local.md`가 없을 때 AGENTS를 읽는다.
+사용자 전역 CLAUDE와 `.claude/rules/`는 이 선택 조건에서 제외된다.
+제공자·feature flag·설정 등에 따라 직접 로딩을 쓸 수 없는 세션도 있으므로
+[현재 조건과 예외](https://code.claude.com/docs/en/memory#agents-md)를 확인한다.
+
+| 레포 구성 | 기본 설정에서의 선택 |
+|---|---|
+| AGENTS만 있고 직접 로딩 지원 조건 충족 | AGENTS 로드 |
+| AGENTS와 프로젝트 CLAUDE가 함께 있음 | CLAUDE 선택. AGENTS는 import 등으로 연결해야 함 |
+| CLAUDE에 `@AGENTS.md`가 있음 | import로 공유 내용 로드 |
+
+두 파일을 함께 읽도록 설정할 수도 있다. 이 덱의 기본 예시는 기존 환경과의 호환을 위해
+import를 사용한다. 루트 CLAUDE가 있는 구성에서 하위 AGENTS도 알아서 읽힐 것이라 가정하지 말고,
+하위 어댑터 또는 공유 지침의 명시적인 읽기 규칙으로 연결한다.
 
 ## 수정 전에 대상 경로를 확인한다
 
@@ -44,13 +62,13 @@ Codex가 시작할 때 자동 로드한 AGENTS.md는 이미 컨텍스트에 들�
 것은 아니고, AGENTS.md에 링크된 작성 지침·`_baseline.md`의 내용도 링크만으로 함께 들어오지 않는다.
 에이전트는 공유 지침에 정한 조건에 따라 필요한 문서를 별도로 읽는다.
 
-이 사이트처럼 읽기 규칙이 정해져 있다면 일반 요청에는 수정 대상·원하는 결과·범위를 쓴다.
+읽기 규칙이 정해진 레포라면 일반 요청에는 수정 대상·원하는 결과·범위를 쓴다.
 다음은 **하위 지침이나 baseline 누락이 의심될 때의 진단 요청**이다.
 
 ```text
-src/content/docs/starlight/ 수정에 적용한 지침의 출처와 규칙을 확인해 줘.
+이번 수정에 적용한 지침의 출처와 규칙을 확인해 줘.
 자동으로 전달된 지침과 작업 중 별도로 읽은 문서를 구분해 줘.
-대상 경로의 하위 AGENTS.md나 _baseline.md를 아직 읽지 않았다면 확인하고,
+대상 경로의 하위 지침이나 필수 참조 문서를 아직 읽지 않았다면 확인하고,
 누락된 규칙이 있었는지 알려 줘.
 ```
 
@@ -71,8 +89,10 @@ Codex 전용 `AGENTS.override.md`를 공유 정본처럼 쓰면 Claude의 `@AGEN
 ## 실제 세션에서 확인한다
 
 Codex에서는 해당 작업 위치에서 활성 지침의 출처와 적용 규칙을 요약하도록 요청한다.
-Claude Code에서는 `/context`의 Memory files 목록과 읽은 규칙을 확인한다.
-[공식 확인 안내](https://code.claude.com/docs/en/memory#set-up-a-project-claudemd)를 따른다.
+Claude Code에서 CLAUDE와 import를 쓰면 `/context`의 Memory files 목록을 확인한다.
+설정으로 직접 로드한 AGENTS는 이 목록에 나타나지 않으므로 기본 설정의 `AGENTS.md loaded`
+안내와 실제 지침 내용을 대조한다.
+[공식 확인 안내](https://code.claude.com/docs/en/memory#where-agents-md-differs-from-claude-md)를 따른다.
 에이전트의 요약만 믿지 말고 실제 파일 내용과 맞는지 대조한다.
 
 지침이 누락됐다면 실행 위치 → 파일명·상대 경로 → 상충 규칙 → 필요한 파일의 직접 읽기 순서로 좁힌다.
@@ -84,4 +104,4 @@ Claude Code에서는 `/context`의 Memory files 목록과 읽은 규칙을 확�
 시작 탐색 범위만으로는 말할 수 없다. 대상 파일을 직접 읽게 하거나 그 폴더를 작업 위치로 시작하고
 적용 규칙을 확인한다. 파일 존재·자동 발견·실제 준수는 각각 다른 관찰이다.
 
-<LinkCard title="작업 계획으로 목표와 증거 남기기" description="명시적으로 요청한 계획의 생성·검색·재개 기준을 정한다." href="/coding-agents/work-plans/" />
+<LinkCard title="작업 계획으로 목표와 증거 남기기" description="작업 크기에 맞는 계획과 다른 세션에 넘길 정보를 정한다." href="/coding-agents/work-plans/" />

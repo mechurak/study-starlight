@@ -1,7 +1,7 @@
 ---
 title: "Monorepo의 지침 경계"
 description: "앱·package마다 명령과 규칙이 달라질 때 공유 정본과 어댑터를 배치하는 선택 심화"
-reviewedAt: 2026-09-18
+reviewedAt: 2026-09-19
 status: stable
 ---
 
@@ -12,7 +12,7 @@ import TermIntro from '../../../components/docs/TermIntro.astro';
 <Thesis>하위 지침은 규칙이 달라지는 경계에만 두고, 상위 내용을 복사하는 대신 그 범위의 차이를 적는다</Thesis>
 
 이 페이지는 여러 앱의 검사 명령이나 의존성 규칙이 달라졌을 때 읽는 심화다.
-단일 사이트는 [루트의 최소 구성](/coding-agents/project-instructions/)으로 시작하면 된다.
+단일 프로젝트는 [루트의 최소 구성](/coding-agents/project-instructions/)으로 시작하면 된다.
 질문은 **폴더가 많을 때 어느 경계에 지침을 추가해야 하는가**다.
 
 <TermIntro terms={[["Monorepo", "", "여러 앱이나 package를 하나의 저장소에서 관리하는 구성. 지침도 실제 작업 경계에 맞춰 나눌 필요가 있다."]]} />
@@ -20,6 +20,7 @@ import TermIntro from '../../../components/docs/TermIntro.astro';
 ## 목표 monorepo 구조
 
 다음은 가상 저장소의 배치 예시다. 이 사이트에 `apps/web`이 있다는 뜻은 아니다.
+CLAUDE import를 쓰기로 선택한 구성이며 두 제품이 항상 이 파일 쌍을 요구하는 것은 아니다.
 
 ```text
 my-workspace/
@@ -55,6 +56,8 @@ my-workspace/
 이 명령은 `web`이라는 package와 `test` script가 있을 때만 실행 가능하다.
 실제 `package.json`의 이름·명령으로 바꾸고, 이 사이트의 `npm run check`와 혼동하지 않는다.
 같은 폴더의 CLAUDE는 다시 `@AGENTS.md` 한 줄이다.
+Claude의 직접 AGENTS 로딩은 루트 CLAUDE의 존재와 설정에 영향을 받으므로
+[탐색 조건](/coding-agents/instruction-discovery/#claude-code의-agents-직접-로딩-조건)을 함께 확인한다.
 
 상충 지침을 피하는 이유는 [도구별 결합 방식](/coding-agents/instruction-discovery/)이 다르기 때문이다.
 우선순위에 기대 상위 규칙을 계속 부정하기보다 공통 규칙과 지역 차이가 함께 성립하게 쓴다.
@@ -81,7 +84,7 @@ codex
 - 상위와 하위 규칙이 충돌하지 않고 검사 명령이 실제 package와 맞는가?
 - 개인 설정이나 도구 전용 기억에만 공유 결정이 남지 않았는가?
 
-반복해서 어댑터가 빠진다면 추적된 AGENTS와 CLAUDE 쌍을 검사하는 작은 스크립트를 고려한다.
+어댑터를 쓰기로 한 레포에서 반복해서 파일이 빠진다면 AGENTS와 CLAUDE 쌍을 검사하는 작은 스크립트를 고려한다.
 처음부터 별도 지침 관리 프레임워크를 만들 필요는 없다. 의미상 중복은 단순 문자열 검사만으로
 판정하기 어려우므로 리뷰를 함께 한다.
 
