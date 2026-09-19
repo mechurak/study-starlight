@@ -312,6 +312,54 @@ kubectl -n alpha get pods
 완료 조건은 PVC의 **`Bound`·`VOLUME=alpha-pv`**와 MySQL Pod의 Ready다.
 계속 Pending이면 Pod·PVC Events를, 컨테이너가 재시작하면 `kubectl -n alpha logs <Pod명> --previous`를 본다.
 
+## app-pvc — PV를 유지하고 accessModes 불일치 수정
+
+Mock Exam의 대상은 `storage-ns/app-pvc`와 클러스터의 `app-pv`다. 제공 솔루션의 원인은
+accessModes 불일치지만, 실제 상태를 먼저 비교한다. [Persistent Volumes의 Binding](https://kubernetes.io/docs/concepts/storage/persistent-volumes/#binding)에서
+요청 조건과 PV 선택을 확인한다.
+
+```bash
+kubectl describe pv app-pv
+kubectl describe pvc app-pvc -n storage-ns
+kubectl get pv app-pv -o yaml > app-pv.before.yaml
+kubectl get pvc app-pvc -n storage-ns -o yaml > app-pvc.before.yaml
+cp app-pvc.before.yaml app-pvc.yaml
+```
+
+PV가 `Available`, PVC가 `Pending`이며 PV의 `accessModes`에 `ReadWriteOnce`가 있는지 확인한다.
+class·요청 용량·volumeMode·selector·volumeName·PV claimRef도 비교한다.
+이 사례의 다른 조건이 맞을 때 **PVC의 accessModes만 `ReadWriteOnce`로 바꾼다.**
+요청 용량을 임의로 `1Gi`로 바꾸거나 PV를 수정하지 않는다.
+
+`vi app-pvc.yaml`에서 편집할 **발췌**는 다음과 같다. 기존 resources 등 나머지 spec은 보존한다.
+
+```yaml
+spec:
+  accessModes:
+  - ReadWriteOnce
+```
+
+accessModes는 기존 PVC에서 수정할 수 없어 재생성이 필요하다. 학습용으로
+[Kubernetes v1.35의 PVC 갱신 검증 코드](https://github.com/kubernetes/kubernetes/blob/v1.35.0/pkg/apis/core/validation/validation.go#L2393-L2395)에서도
+이 제한을 확인할 수 있다. 시험 중에는 API 오류와 기존 명세를 대조한다. 새 파일에서는 `status`와 서버가
+채운 metadata(`uid`, `resourceVersion`, `creationTimestamp`, `managedFields`)를 제거한다.
+재생성 전에 `Used By`가 비었고 아직 바인딩되지 않았는지 다시 확인한다. 사용 중이면 이 단순
+재생성 절차를 적용하지 말고 소비 Pod와 PVC 보호 상태부터 조사한다. **finalizer를 강제로 지우지 않는다.**
+
+```bash
+kubectl delete pvc app-pvc -n storage-ns
+kubectl create -f app-pvc.yaml
+kubectl get pvc app-pvc -n storage-ns -o wide
+kubectl get pv app-pv
+```
+
+완료 조건은 PVC가 `Bound`이고 `VOLUME=app-pv`인 것이다. PV는 사용자가 편집하지 않지만,
+바인딩 컨트롤러가 claimRef·status를 갱신하는 것은 정상이다. 소비 Pod가 주어졌을 때만 아래
+마운트 검증으로 이어 간다. 새 Pod을 임의로 만들 필요는 없다.
+
+Bound 이후 PVC 삭제는 reclaim policy와 데이터에 영향을 줄 수 있으므로 연습을 되돌린다고
+다시 삭제하지 않는다. 재생성이 실패하면 저장한 PVC spec과 오류를 비교해 생성부터 복구한다.
+
 ## 실제 마운트까지 검증한다
 
 `PV=Bound`, `PVC=Bound`는 클래스·access mode·용량 같은 **API 바인딩 조건**을 통과했다는 뜻이다.

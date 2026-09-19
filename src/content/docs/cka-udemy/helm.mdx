@@ -97,7 +97,8 @@ Name to: amaze-surf.*
 helm install amaze-surf bitnami/apache
 ```
 
-`search`와 달리 **install에서는 `저장소/차트` 전체 경로가 필수**다. 설치가 끝나면 두 층을
+등록된 저장소의 차트를 설치할 때는 `저장소/차트`를 쓴다. 로컬 chart 디렉터리를 받는
+[새 release 교체 실습](/cka-udemy/helm-release-replacement/)도 있다. 설치가 끝나면 두 층을
 순서대로 본다 — release가 생겼는가, 그 release의 워크로드가 실제로 떴는가.
 
 ```bash
@@ -283,7 +284,7 @@ kubectl get pods
 ## 이 장에서 남길 것
 
 - 손에 붙일 명령은 `helm repo add/update` · `helm search repo` · `helm install/upgrade/rollback/uninstall` · `helm list`까지다. 설치 스크립트나 세부 플래그는 helm.sh/docs를 연다
-- search는 저장소 접두사가 선택이지만 **install은 `저장소/차트` 전체 경로가 필수**다
+- 등록된 저장소의 chart는 `저장소/차트`, 로컬 chart는 디렉터리 경로로 설치한다
 - CHART VERSION은 패키징, **APP VERSION이 애플리케이션 버전**이다
 - `repo add` 뒤 `repo update`까지가 한 동작 — 검색이 안 되면 update 누락부터 의심한다
 - `helm upgrade RELEASE CHART --version CHART_VERSION` — `--version`은 APP VERSION이 아니다
@@ -292,7 +293,7 @@ kubectl get pods
 - 이미지 풀 실패는 Helm이 아니라 `kubectl describe`의 Events로 진단하고, 수정은 재설치가 아니라 `helm upgrade --set`이다
 
 <LinkCard
-  title="Kustomize 묶기와 환경별 적용"
-  description="공통 base와 overlay를 렌더하고 diff 뒤 적용한다."
-  href="/cka-udemy/kustomize/"
+  title="Helm 새 release로 교체"
+  description="로컬 chart를 lint하고 새 release 설치 확인 뒤 이전 release를 제거한다."
+  href="/cka-udemy/helm-release-replacement/"
 />

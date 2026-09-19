@@ -182,6 +182,33 @@ kubectl get sc local-sc -o yaml
 기본 클래스를 잘못 해제했다면 기록해 둔 원래 클래스의 annotation을 `"true"`로 복구하고,
 잘못 지정한 클래스는 `"false"`로 바꾼 뒤 `get sc`로 확인한다.
 
+## rancher-sc — provisioner와 지연 바인딩 지정
+
+Mock Exam은 `rancher-sc` 생성만 요구한다. 아래를 `rancher-sc.yaml`로 저장한다.
+[Storage Classes](https://kubernetes.io/docs/concepts/storage/storage-classes/)에서
+`provisioner`, `volumeBindingMode`, `allowVolumeExpansion`을 검색해 최상위 필드 위치를 확인한다.
+
+```yaml
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: rancher-sc
+provisioner: rancher.io/local-path
+volumeBindingMode: WaitForFirstConsumer
+allowVolumeExpansion: true
+```
+
+```bash
+kubectl apply -f rancher-sc.yaml
+kubectl get sc rancher-sc \
+  -o custom-columns='NAME:.metadata.name,PROVISIONER:.provisioner,BINDING:.volumeBindingMode,EXPANSION:.allowVolumeExpansion'
+```
+
+출력의 이름과 세 설정이 YAML과 같으면 생성 요구를 충족한다. 기본 클래스 annotation이나
+PVC는 요구하지 않았으므로 추가하지 않는다. 확장 허용은 **설정값**이며 실제 볼륨 확장은
+provisioner·백엔드 지원이 별도로 필요하다. 이 문제에서 실제 확장 성공까지 단정하지 않는다.
+연습 후 정리할 때는 이 클래스를 참조하는 PVC가 없는지 확인하고 `kubectl delete sc rancher-sc`로 제거한다.
+
 ## 동적 프로비저닝은 생성 주체까지 추적한다
 
 동적 프로비저닝은 **StorageClass 오브젝트 자체가 PV를 만드는 것이 아니다.** `provisioner` 필드와 같은

@@ -182,6 +182,19 @@ export default {
 		},
 		{
 			"label": "Workloads와 스케줄링",
+			"title": "PriorityClass 적용과 Pod 재생성",
+			"href": "/cka-udemy/priority-class/",
+			"desc": "클래스 생성 · 기존 설정 보존 · priority 검증",
+			"items": [
+				[
+					"CKA 스케줄링",
+					"/cka/scheduling/"
+				]
+			],
+			"tone": "key"
+		},
+		{
+			"label": "Workloads와 스케줄링",
 			"title": "리소스 제한과 quota",
 			"href": "/cka-udemy/resource-limits/",
 			"desc": "requests/limits · OOMKilled · LimitRange · ResourceQuota",
@@ -472,6 +485,19 @@ export default {
 				]
 			],
 			"tone": "bad"
+		},
+		{
+			"label": "Cluster Architecture",
+			"title": "Helm 새 release로 교체",
+			"href": "/cka-udemy/helm-release-replacement/",
+			"desc": "로컬 chart lint · 새 release 설치 · 이전 release 제거",
+			"items": [
+				[
+					"CKA Helm",
+					"/cka/helm/"
+				]
+			],
+			"tone": "key"
 		},
 		{
 			"label": "Cluster Architecture",

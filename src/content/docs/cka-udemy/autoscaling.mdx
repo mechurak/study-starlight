@@ -1,6 +1,6 @@
 ---
 title: "HPA 설정과 검증"
-description: "제공된 HPA를 CPU·메모리 목표에 맞게 수정하고 metrics·requests·replica 상태를 함께 검증한다"
+description: "HPA의 CPU·메모리·Pod별 사용자 정의 메트릭을 설정하고 선언과 실제 자동 확장의 완료 조건을 구분한다"
 deckGroup: pods
 sidebar:
   order: 1130
@@ -10,18 +10,18 @@ reviewedAt: 2026-09-13
 import { LinkCard } from '@astrojs/starlight/components';
 import Thesis from '../../../components/docs/Thesis.astro';
 
-<Thesis>HPA는 객체 생성만 확인하지 않고 메트릭 API와 대상 Pod의 request를 먼저 확인한 뒤 현재·목표 replica를 읽어야 한다.</Thesis>
+<Thesis>HPA는 메트릭 종류에 맞는 목표를 선언하고, 설정 저장과 메트릭 수집·실제 replica 조정을 구분해 검증한다.</Thesis>
 
 > 짝이 되는 개념 장: [CKA 오토스케일링](/cka/autoscaling/)
 
-이 장의 과제는 제공된 HPA 파일을 요구한 CPU 또는 메모리 목표로 고치고, 실제로 replica를 계산할
+이 장의 과제는 제공된 HPA 파일을 요구한 CPU·메모리 또는 사용자 정의 메트릭 목표로 고치고, 실제로 replica를 계산할
 수 있는 상태인지 확인하는 것이다. HPA는 Deployment 같은 대상의 복제본 수를 조정한다.
 
 리소스 `Utilization`은 현재 사용량을 Pod의 request와 비교한 비율이다. 따라서 metrics API가
 응답하고 대상 컨테이너에 해당 리소스 request가 있어야 한다. `kubectl apply` 성공과 HPA의
 `TARGETS`가 숫자로 나오는 상태를 별도로 판정한다.
 
-## 사전 조건 — 메트릭과 request를 먼저 확인한다
+## 리소스 메트릭의 사전 조건 — metrics와 request
 
 ```bash
 kubectl get apiservice v1beta1.metrics.k8s.io
@@ -121,6 +121,55 @@ kubectl get deploy backend-deployment -n backend \
 Conditions·Events에서 `FailedGetResourceMetric` 같은 수집 오류와 request 누락을 구분한다. target
 Deployment 이름이나 namespace가 틀렸다면 `AbleToScale` 조건에서도 드러난다.
 
+## api-hpa — Pod별 requests_per_second 평균 목표
+
+Mock Exam은 `api` namespace의 기존 `api-deployment`를 Pod당 평균 초당 요청 1000건에 맞춰
+1~20개로 조정하도록 선언한다. CPU 사용률과 달리 `Pods` 메트릭의 절대 평균값이다.
+[HorizontalPodAutoscaler Walkthrough의 다른 메트릭 예제](https://kubernetes.io/docs/tasks/run-application/horizontal-pod-autoscale-walkthrough/#autoscaling-on-multiple-metrics-and-custom-metrics)에서
+`type: Pods` 블록을 가져와 메트릭 이름과 `AverageValue`를 바꾼다.
+
+제공된 `/root/api-hpa.yaml`이 있으면 그 파일을 편집하고, 없으면 아래 완성본으로 만든다.
+
+```yaml
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: api-hpa
+  namespace: api
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: api-deployment
+  minReplicas: 1
+  maxReplicas: 20
+  metrics:
+  - type: Pods
+    pods:
+      metric:
+        name: requests_per_second
+      target:
+        type: AverageValue
+        averageValue: "1000"
+```
+
+```bash
+kubectl get deploy api-deployment -n api
+kubectl apply -f /root/api-hpa.yaml
+kubectl get hpa api-hpa -n api -o yaml
+kubectl describe hpa api-hpa -n api
+```
+
+이 사례는 문제에서 메트릭 미수집 오류를 무시하라고 명시했다. 따라서 대상·namespace·min/max·
+메트릭·목표값이 정확히 저장된 것을 제출 기준으로 하고 실제 자동 확장은 미검증으로 남긴다.
+`<unknown>`이나 `FailedGetPodsMetric`이 나왔다고 CPU 메트릭으로 바꾸지 않는다.
+
+정확히는 metrics-server가 사용자 정의 RPS를 제공하는 구조가 아니다. 실동작에는
+[`custom.metrics.k8s.io`를 제공하는 어댑터](https://kubernetes.io/docs/concepts/workloads/autoscaling/horizontal-pod-autoscale/#support-for-metrics-apis)가
+필요하다. 이 목표에 CPU·메모리 request는 계산 분모가 아니며, 일반 HPA 검증에서는 메트릭 API와
+실제 replica 변화까지 확인한다. 연습을 되돌릴 때 HPA를 삭제해도 이미 바뀐 replicas는 자동 복원되지
+않으므로 시작 전 Deployment 복제본 수를 기록한다.
+
 ## 공식 문서에서 찾을 것
 
 | 검색어 | 가져올 필드·판정 |
@@ -138,7 +187,8 @@ kubectl get deployment kkapp-deploy
 ```
 
 - HPA의 target, metric 종류·목표, min/max와 scaleDown 안정화 값이 문제와 같다.
-- `TARGETS`의 현재값이 `<unknown>`이 아니고 Conditions에서 `AbleToScale=True`다.
+- 실동작 검증에서는 `TARGETS`의 현재값이 `<unknown>`이 아니고 Conditions에서 `AbleToScale=True`다.
+  `api-hpa`처럼 문제에서 수집 오류를 무시하라고 한 경우는 선언값 확인으로 한정한다.
 - 부하가 주어진 문제라면 `desiredReplicas`와 Deployment replicas가 기대 범위로 변했다.
 
 부하가 없는 랩에서는 임의의 큰 부하를 만들지 않고 위 조건과 현재·목표 replica를 제출 증거로 남긴다.

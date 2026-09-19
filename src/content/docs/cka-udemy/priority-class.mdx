@@ -1,0 +1,104 @@
+---
+title: "PriorityClass 적용과 Pod 재생성"
+description: "기존 Pod의 설정을 보존하며 PriorityClass를 연결하고 admission이 계산한 priority를 확인한다"
+deckGroup: pods
+sidebar:
+  order: 1105
+reviewedAt: 2026-09-19
+---
+
+import { LinkCard } from '@astrojs/starlight/components';
+import Thesis from '../../../components/docs/Thesis.astro';
+
+<Thesis>PriorityClass를 먼저 만들고 기존 Pod 설정을 보존해 재생성한 뒤 클래스 이름과 계산된 priority를 확인한다.</Thesis>
+
+PriorityClass는 Pod 사이의 상대적인 중요도를 숫자로 정의한다. Pod 생성 시 admission이
+`priorityClassName`을 읽어 `spec.priority`를 채우므로 기존 Pod의 이름 참조만 즉석에서 바꾸는
+작업으로 끝나지 않는다. 개념은 [CKA 스케줄링](/cka/scheduling/)에서 이어진다.
+
+이 실습은 사용자 제공 Mock Exam의 `low-priority` 클래스(value 50000)를 만들고,
+`low-priority` namespace의 기존 `lp-pod`에 적용하는 작업이다. `kubectl`이 설정된 실습 셸에서
+실행한다. **기존 이미지·컨테이너 이름·명령·볼륨을 새 nginx 예제로 덮어쓰지 않는다.**
+
+## 클래스 생성
+
+[Pod Priority and Preemption의 PriorityClass](https://kubernetes.io/docs/concepts/scheduling-eviction/pod-priority-preemption/#priorityclass)에서
+YAML을 가져와 이름과 value를 바꾼다. 다음을 `pc.yaml`로 저장한다. PriorityClass는 클러스터
+범위이므로 namespace가 없고 `value`도 `spec`으로 감싸지 않는다.
+
+```yaml
+apiVersion: scheduling.k8s.io/v1
+kind: PriorityClass
+metadata:
+  name: low-priority
+value: 50000
+globalDefault: false
+description: "Low priority class"
+```
+
+```bash
+kubectl apply -f pc.yaml
+kubectl get priorityclass low-priority
+```
+
+`low-priority`라는 이름 자체가 낮은 중요도를 보장하지는 않는다. 비교는 숫자로 하며,
+50000은 기본 priority 0보다 높다. `globalDefault: false`로 다른 Pod의 기본값을 바꾸지 않는다.
+
+## 기존 Pod을 기준으로 수정본 준비
+
+```bash
+kubectl get pod lp-pod -n low-priority -o yaml > lp-pod.before.yaml
+cp lp-pod.before.yaml lp-pod.yaml
+vi lp-pod.yaml
+```
+
+먼저 `metadata.ownerReferences`를 확인한다. 아래는 **컨트롤러가 없는 독립 Pod**의 절차다.
+Deployment 등이 관리한다면 [소유자 확인과 template 수정](/cka-udemy/pod-config/)을 따르고,
+개별 Pod만 지워서 원래 설정으로 다시 생성되는 일을 피한다.
+
+재생성용 `lp-pod.yaml`은 다음처럼 정리한다.
+
+- `metadata.name`, `namespace`, 필요한 labels·annotations와 기존 컨테이너·볼륨 설정을 보존한다.
+- `status`와 서버가 채운 metadata의 `uid`, `resourceVersion`, `creationTimestamp`, `managedFields`를 제거한다.
+- 기존 `spec.priority`와 클래스에서 주입된 `spec.preemptionPolicy`는 제거해 새 클래스에서
+  다시 계산하게 한다. 자동 배정된 `spec.nodeName`도
+  제거해 스케줄러가 새 Pod을 배치하게 한다. 문제에서 명시적으로 지정한 노드 조건은 보존한다.
+- `spec.priorityClassName: low-priority`를 추가한다.
+
+아래는 **편집 위치만 보여주는 발췌**다. 이 블록만으로 Pod을 새로 만들지 않는다.
+
+```yaml
+spec:
+  priorityClassName: low-priority
+```
+
+`priorityClassName`은 [Pod update and replacement](https://kubernetes.io/docs/concepts/workloads/pods/#pod-update-and-replacement)의
+기존 Pod 갱신 허용 필드에 포함되지 않는다. `kubectl edit pod`의 저장 실패를 반복하지 않고 수정본을
+준비한 다음 해당 Pod만 재생성한다. `spec.priority: 50000`을 직접 추가하는 방식으로 대신하지 않는다.
+
+## 재생성하고 완료 판정
+
+```bash
+kubectl delete pod lp-pod -n low-priority
+kubectl create -f lp-pod.yaml
+kubectl get pod lp-pod -n low-priority \
+  -o custom-columns='NAME:.metadata.name,CLASS:.spec.priorityClassName,PRIORITY:.spec.priority,NODE:.spec.nodeName'
+kubectl wait -n low-priority --for=condition=Ready pod/lp-pod --timeout=120s
+```
+
+`CLASS=low-priority`, `PRIORITY=50000`이어야 한다. Pod UID가 백업과 다른지, 기존 컨테이너·볼륨이
+유지됐는지도 확인한다. Ready가 안 되면 Events로 자원 부족·taint·이미지 오류를 구분한다.
+
+복구가 필요하면 백업을 같은 재생성 형식으로 정리해 원래 설정의 Pod을 만든다.
+PriorityClass를 삭제하는 것만으로 기존 Pod의 priority가 되돌아가지는 않는다.
+연습 후 클래스를 삭제하려면 이를 사용할 새 Pod이 더 없는지도 확인한다.
+
+**문서 찾기:** `Pod Priority Preemption` → `PriorityClass`, `Pod priority` 절에서 클래스 YAML과
+Pod의 참조 필드를 각각 가져온다. 자기 점검: 이름을 `low-priority`로만 만들고 Pod에 연결하지
+않았다면 이 Pod의 priority는 바뀌는가? 생성 시 참조가 없으므로 바뀌지 않는다.
+
+<LinkCard
+  title="리소스 제한과 quota"
+  description="requests·limits와 네임스페이스 자원 제한을 확인한다."
+  href="/cka-udemy/resource-limits/"
+/>

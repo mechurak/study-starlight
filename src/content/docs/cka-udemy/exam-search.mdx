@@ -22,6 +22,30 @@ import Thesis from '../../../components/docs/Thesis.astro';
 시험 브라우저에서는 허용된 공식 사이트 내부 검색을 사용한다. 설치·업그레이드 문서는 문제의
 Kubernetes 버전으로 바꾸고, KodeKloud·GitHub 예제와 학습 보충은 Quick Reference가 제공한 경우에만 연다.
 
+## Mock Exam 복습 경로
+
+사용자가 제공한 KodeKloud Mock Exam 14개 문제를 작업별 정본으로 연결한다.
+각 절의 이름·namespace·요구값은 해당 사례에만 적용한다. 공식 자료는 풀이 옆에 연결했으며,
+아래 검색어로 예제 블록을 다시 찾을 수 있다. 명령은 랩에서 실행할 절차이고 이 문서 업데이트에서
+클러스터 실행을 검증한 기록은 아니다.
+
+| 제공 문제 | 풀이 위치 | 첫 관찰·도움말 | 공식 검색어 |
+|---|---|---|---|
+| 1 · 네트워크 파라미터 영구 설정 | [sysctl 저장과 적용](/cka-udemy/cluster-lifecycle/#네트워크-파라미터-영구-적용) | `sysctl net.ipv4.ip_forward net.bridge.bridge-nf-call-iptables` | `Container Runtimes ip_forward` |
+| 2 · PV 목록을 읽는 계정과 Pod | [pvviewer](/cka-udemy/service-account/#pvviewer--클러스터-pv-목록-권한과-pod-연결) | `kubectl create clusterrole --help` | `RBAC ClusterRole ServiceAccount` |
+| 3 · StorageClass 생성 | [rancher-sc](/cka-udemy/storage-class/#rancher-sc--provisioner와-지연-바인딩-지정) | `kubectl get sc` | `Storage Classes volumeBindingMode` |
+| 4 · ConfigMap 환경 변수 | [app-config와 cm-webapp](/cka-udemy/configmap-secret/#app-config--기존-deployment에-두-환경-변수-연결) | `kubectl get deploy cm-webapp -n cm-namespace -o yaml` | `kubectl set env --from` |
+| 5 · 기존 Pod 우선순위 | [PriorityClass 적용](/cka-udemy/priority-class/) | `kubectl get pod lp-pod -n low-priority -o yaml` | `Pod Priority Preemption` |
+| 6 · TCP 80 ingress 허용 | [ingress-to-nptest](/cka-udemy/network-policy/#ingress-to-nptest--기존-deny를-두고-tcp-80-허용) | `kubectl get pod np-test-1 -n default --show-labels` | `Network Policies ingress from` |
+| 7 · production taint | [dev-redis와 prod-redis](/cka-udemy/scheduling/#dev-redis와-prod-redis--production-taint-통과) | `kubectl describe node node01` | `Taints Tolerations Dedicated Nodes` |
+| 8 · PV/PVC 바인딩 복구 | [app-pvc](/cka-udemy/storage/#app-pvc--pv를-유지하고-accessmodes-불일치-수정) | `kubectl describe pvc app-pvc -n storage-ns` | `Persistent Volumes Binding` |
+| 9 · kubeconfig 포트 | [super.kubeconfig](/cka-udemy/security/#superkubeconfig--mock-exam의-잘못된-포트) | `kubectl --kubeconfig=/root/CKA/super.kubeconfig cluster-info` | `Troubleshooting kubectl` |
+| 10 · scale 미반영 복구 | [nginx-deploy](/cka-udemy/control-plane-failure/#nginx-deploy--scale-후-실행-파일-오타-복구) | `kubectl get deploy,rs,pods -n default` | `Create static Pods` |
+| 11 · 사용자 정의 메트릭 HPA | [api-hpa](/cka-udemy/autoscaling/#api-hpa--pod별-requests_per_second-평균-목표) | `kubectl get deploy api-deployment -n api` | `HPA walkthrough custom metrics` |
+| 12 · HTTPRoute 트래픽 분배 | [web-route](/cka-udemy/gateway/#web-route--두-service로-80-대-20-분배) | `kubectl get httproute web-route -n default -o yaml` | `HTTP traffic splitting` |
+| 13 · 로컬 Helm chart로 교체 | [새 release 설치 후 이전 release 제거](/cka-udemy/helm-release-replacement/) | `helm list -A` | `helm lint install uninstall` |
+| 14 · 클러스터 Pod CIDR 제출 | [podSubnet 추출](/cka-udemy/network-environment/#kubeadm의-pod-서브넷을-파일로-제출) | `kubectl get cm kubeadm-config -n kube-system -o yaml` | `kubeadm ClusterConfiguration podSubnet` |
+
 ## 기초와 Workloads
 
 | 작업·실습 | 첫 명령 | 공식 문서 검색어 |

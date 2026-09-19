@@ -1,0 +1,83 @@
+---
+title: "Helm 새 release로 교체"
+description: "로컬 chart를 lint하고 새 release의 설치를 확인한 다음 기존 release만 제거한다"
+deckGroup: rbac
+sidebar:
+  order: 1305
+reviewedAt: 2026-09-19
+---
+
+import { LinkCard } from '@astrojs/starlight/components';
+import Thesis from '../../../components/docs/Thesis.astro';
+
+<Thesis>로컬 chart 검증과 새 release 설치·확인을 먼저 끝낸 뒤 기존 release를 제거한다.</Thesis>
+
+같은 애플리케이션의 새 버전이라도 새 release 이름이 요구되면 별도 설치가 필요하다.
+기존 release를 upgrade하면 그 이름은 유지되므로 요구를 충족하지 못한다.
+기본 관계는 [CKA Helm](/cka/helm/)과 [Helm release 관리](/cka-udemy/helm/)에서 복습한다.
+
+이 실습은 사용자 제공 Mock Exam의 `/root/new-version` chart를 `webpage-server-02`로 설치한 뒤
+`webpage-server-01`을 제거하는 작업이다. chart가 있는 실습 노드에서 실행한다.
+아래는 기존 release가 `default`에 있는 경우이며, 다른 namespace라면 조회 결과에 맞춘다.
+
+## 로컬 chart 검증
+
+```bash
+helm list -A
+helm lint /root/new-version
+```
+
+[`helm lint`](https://helm.sh/docs/v3/helm/helm_lint/)의 Synopsis에서 chart 경로를 받는 사용법과
+ERROR·WARNING을 구분한다. ERROR가 있으면 chart를 수정하고 통과한 뒤 설치한다.
+`lint`는 chart를 검사하며 클러스터의 workload Ready를 증명하지 않는다.
+템플릿이나 이름 충돌이 의심될 때만 `helm template webpage-server-02 /root/new-version -n default`로
+렌더된 리소스를 확인한다.
+
+## 새 release 설치와 확인
+
+[`helm install`](https://helm.sh/docs/v3/helm/helm_install/)은 chart 인자로 로컬 디렉터리도 받는다.
+`helm install --help`에서 `RELEASE CHART`, `--namespace`, `--wait`, `--timeout`을 찾는다.
+
+```bash
+helm install webpage-server-02 /root/new-version -n default --wait --timeout 5m
+helm status webpage-server-02 -n default
+helm list -n default
+```
+
+새 release가 `deployed`이고 이전 release도 아직 존재하는지 확인한다.
+`--wait`는 주요 workload의 준비 상태를 기다린다. 앱 동작까지 요구되면 chart의 NOTES와
+`helm get manifest webpage-server-02 -n default`에서 실제 Service·workload 이름을 찾아 응답도 확인한다.
+
+:::caution[설치가 실패하면 이전 release를 먼저 지우지 않는다]
+새 release 이름이 달라도 chart가 고정된 리소스 이름을 사용하면 충돌할 수 있다.
+오류와 chart의 이름 관련 values를 확인한다. 설치 실패·timeout이면 기존 release를 유지하고
+새 release의 Events와 Helm status로 원인을 좁힌다. 두 release가 같은 리소스를 강제로 소유하게
+만드는 옵션은 이 작업의 해결 방법이 아니다.
+:::
+
+## 확인이 끝난 뒤 이전 release 제거
+
+아래 명령은 위 확인이 성공한 뒤에만 실행한다.
+
+```bash
+helm uninstall webpage-server-01 -n default
+helm list -n default
+helm status webpage-server-02 -n default
+```
+
+[`helm uninstall`](https://helm.sh/docs/v3/helm/helm_uninstall/)의 대상은 chart 디렉터리가 아니라
+**release 이름**이다. 완료 조건은 새 release가 `deployed`로 남고 이전 release가 제거된 것이다.
+uninstall이 모든 PVC·CRD·외부 데이터까지 지웠다고 단정하지 않는다.
+
+이전 release를 지우기 전 새 설치를 포기한다면 새 release만 uninstall해 원래 상태를 유지한다.
+이전 release를 삭제한 뒤의 복구에는 원래 chart와 values가 필요하므로, `helm rollback` 한 번으로
+삭제된 release가 돌아온다고 생각하지 않는다.
+
+자기 점검: `helm upgrade webpage-server-01 /root/new-version`이 이 문제의 답인가?
+새 이름 `webpage-server-02`를 만들지 않으므로 아니다.
+
+<LinkCard
+  title="Kustomize 묶기와 환경별 적용"
+  description="다음 설치 도구에서 base·overlay를 렌더하고 적용 범위를 확인한다."
+  href="/cka-udemy/kustomize/"
+/>

@@ -175,6 +175,59 @@ kubectl describe networkpolicy internal-policy -n default
 | internal → 그 밖의 서비스 | 실패 | Egress 격리 후 허용 목록에 없음 |
 | internal → Service 이름 조회 | 성공 | DNS UDP/TCP 53 |
 
+## ingress-to-nptest — 기존 deny를 두고 TCP 80 허용
+
+Mock Exam은 `default`의 `np-test-1`에 모든 출발지의 TCP 80 ingress를 추가 허용한다.
+기존 오브젝트는 삭제하지 않는다. 먼저 **Pod의 실제 라벨과 Service의 targetPort**를 확인한다.
+
+```bash
+kubectl get pod np-test-1 -n default --show-labels
+kubectl get svc np-test-service -n default -o yaml
+kubectl get netpol -n default -o yaml
+```
+
+아래는 `run=np-test-1`이 실제 라벨인 경우의 완성된 `ingress-to-nptest.yaml`이다.
+라벨이 다르면 조회한 라벨로 `matchLabels`를 바꾸고, 그 라벨이 다른 Pod도 선택하는지 확인한다.
+NetworkPolicy는 Pod 이름이나 Service 이름을 직접 selector로 쓰지 않는다.
+
+```yaml
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: ingress-to-nptest
+  namespace: default
+spec:
+  podSelector:
+    matchLabels:
+      run: np-test-1
+  policyTypes:
+  - Ingress
+  ingress:
+  - ports:
+    - protocol: TCP
+      port: 80
+```
+
+`from`을 **생략한 규칙**은 출발지를 제한하지 않고 `ports`만 제한한다.
+`ingress: []`는 허용 규칙이 없는 것, `ingress: [{}]`는 모든 포트도 허용하는 것이므로 구분한다.
+기존 default-deny와 새 허용은 합집합으로 적용된다. 공식 검색어는 `Network Policies`이며
+[동작 원리](https://kubernetes.io/docs/concepts/services-networking/network-policies/#the-networkpolicy-resource)와
+[NetworkPolicy API의 ingress.from](https://kubernetes.io/docs/reference/kubernetes-api/networking/network-policy-v1/)을 확인한다.
+
+```bash
+kubectl apply -f ingress-to-nptest.yaml
+kubectl describe netpol ingress-to-nptest -n default
+kubectl get netpol -n default
+kubectl run test-conn -n default --image=busybox --restart=Never --rm -i \
+  -- wget -qO- -T 5 http://np-test-service
+```
+
+`test-conn`은 같은 이름의 Pod이 없을 때 쓰는 새 테스트 Pod이고 `--rm`은 이것만 정리한다.
+기존 정책은 남아 있고 요청은 성공해야 한다. nginx를 제공하는 랩이면 welcome HTML이 나온다.
+계속 실패하면 EndpointSlice의 Ready 주소·Service targetPort, 테스트 Pod의 egress·DNS를 확인한다.
+새 ingress 허용은 출발지 egress 제한까지 해제하지 않는다. 잘못 만든 정책만 수정하거나,
+연습 종료 시 이번에 추가한 `ingress-to-nptest`만 삭제한다.
+
 ## 공식 문서에서 찾을 것
 
 | 검색어 | 가져올 필드·판정 |

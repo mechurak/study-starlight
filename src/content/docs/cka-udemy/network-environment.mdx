@@ -211,6 +211,38 @@ kubectl get nodes                                       # NotReady였다면 Read
 무관하다. 오퍼레이터 방식은 Pod이 `kube-system`이 아니라 `calico-system`에 뜬다는 것도
 기억해 둔다 — 설치 후 `kube-system`만 보고 "안 깔렸다"고 판단하는 실수가 잦다.
 
+## kubeadm의 Pod 서브넷을 파일로 제출
+
+Mock Exam은 노드별 `spec.podCIDR`가 아니라 `kube-system/kubeadm-config`에 기록된
+클러스터 전체 `networking.podSubnet`을 `/root/pod-cidr.txt`에 한 줄로 저장하라는 요구다.
+이 작업에는 `/root` 쓰기 권한과 클러스터 조회 권한이 있는 실습 셸을 사용한다.
+
+```bash
+kubectl -n kube-system get configmap kubeadm-config \
+  -o jsonpath='{.data.ClusterConfiguration}'
+```
+
+`ClusterConfiguration`은 ConfigMap 안의 **YAML 문자열**이므로 JSONPath로
+`.data.ClusterConfiguration.networking.podSubnet`을 직접 읽을 수 없다.
+출력에서 `podSubnet: 172.17.0.0/16`처럼 단일 IPv4 CIDR인 것을 확인했다면 다음처럼 추출한다.
+
+```bash
+kubectl -n kube-system get configmap kubeadm-config \
+  -o jsonpath='{.data.ClusterConfiguration}' \
+  | awk '$1 == "podSubnet:" {print $2}' > /root/pod-cidr.txt
+cat /root/pod-cidr.txt
+```
+
+파일에는 실제 조회한 CIDR 하나만 있어야 한다. `172.17.0.0/16`은 예시이며 고정 정답이 아니다.
+위 `awk`는 따옴표 없는 단일 값에 대한 간단한 추출이다. 따옴표·주석 등 형식이 다르면 YAML 파서로
+값을 읽거나 확인한 값만 직접 `printf '%s\n' '<실제 CIDR>' > /root/pod-cidr.txt`로 저장한다.
+값이 없으면 임의의 `/16`이나 노드별 CIDR로 대체하지 않는다.
+
+**문서 찾기:** [Reconfiguring a kubeadm cluster](https://kubernetes.io/docs/tasks/administer-cluster/kubeadm/kubeadm-reconfigure/#updating-the-clusterconfiguration)의
+`kubeadm-config`·`ClusterConfiguration` 위치와
+[kubeadm Configuration의 Networking](https://kubernetes.io/docs/reference/config-api/kubeadm-config.v1beta4/#Networking)의
+`podSubnet` 정의를 확인한다. 이 문제는 읽기와 파일 제출만 수행하며 클러스터 설정을 수정하지 않는다.
+
 ## 서비스 네트워킹 — Practice Test: Service Networking
 
 원본 풀이: [18-Practice-Test-Service-Networking.md](https://github.com/kodekloudhub/certified-kubernetes-administrator-course/blob/master/docs/09-Networking/18-Practice-Test-Service-Networking.md)

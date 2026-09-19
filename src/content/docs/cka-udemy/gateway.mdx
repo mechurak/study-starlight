@@ -180,6 +180,62 @@ Gateway가 `Programmed=False`면 선언은 받아들였지만 데이터 플레�
 [Gateway API](https://v1-35.docs.kubernetes.io/docs/concepts/services-networking/gateway/)와
 Gateway API 프로젝트의 [시작 안내](https://gateway-api.sigs.k8s.io/guides/getting-started/introduction/)다.
 
+## web-route — 두 Service로 80 대 20 분배
+
+Mock Exam의 `web-gateway`, `web-service`, `web-service-v2`는 이미 있다. 아래 예제는 모두
+`default`에 있고 Service 포트가 80인 경우다. Route가 이미 있으면 먼저 저장한 뒤 편집한다.
+
+```bash
+kubectl get gateway web-gateway -n default
+kubectl get svc web-service web-service-v2 -n default
+kubectl get httproute web-route -n default -o yaml > web-route.before.yaml
+```
+
+마지막 명령이 `NotFound`면 새로 생성한다. 기존 Route라면 parentRefs·hostnames·matches·filters·
+다른 rules는 유지하고 **해당 규칙의 backendRefs만** 바꾼다. 아래 `web-route.yaml`은 새로 만드는
+경우의 완성본이다.
+
+```yaml
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: web-route
+  namespace: default
+spec:
+  parentRefs:
+  - name: web-gateway
+    namespace: default
+  rules:
+  - matches:
+    - path:
+        type: PathPrefix
+        value: /
+    backendRefs:
+    - name: web-service
+      port: 80
+      weight: 80
+    - name: web-service-v2
+      port: 80
+      weight: 20
+```
+
+[`HTTP traffic splitting`](https://gateway-api.sigs.k8s.io/guides/user-guides/traffic-splitting/)에서
+**Blue-green traffic rollout**의 `backendRefs` 목록을 가져온다. 비율은 각 weight를 합계로 나눈 값이라
+`80:20`과 `4:1`은 같다. 두 Service를 서로 다른 rules에 나누면 이 분배 설정이 되지 않는다.
+`port`는 Service 포트이며 Pod의 targetPort를 적는 자리가 아니다.
+
+```bash
+kubectl apply -f web-route.yaml
+kubectl describe httproute web-route -n default
+kubectl get httproute web-route -n default -o yaml
+```
+
+해당 parent의 `Accepted=True`·`ResolvedRefs=True`, 두 backend와 weight를 확인한다.
+그다음 위 [배포 진단](#배포를-진단하기--api-설치와-구현체를-분리한다)대로 EndpointSlice와 Gateway 주소의
+실제 HTTP 응답을 본다. 충분한 요청의 응답 식별자나 백엔드 로그로 분포를 확인할 수 있지만,
+10번 요청에 정확히 8번·2번을 강제하는 설정은 아니다. 되돌릴 때는 기존 Route의 해당 규칙을
+백업값으로 복원한다. 신규 Route였다면 이번에 만든 Route만 삭제한다.
+
 ## 공식 문서에서 찾을 것
 
 | 검색어 | 가져올 필드·판정 |

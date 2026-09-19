@@ -127,6 +127,61 @@ kubectl get events --field-selector involvedObject.name=placement-check \
 [로그 진단](/cka-udemy/troubleshooting/#증상에-맞는-로그-진입점을-고른다)으로 넘긴다.
 :::
 
+## dev-redis와 prod-redis — production taint 통과
+
+Mock Exam의 `Unschedulable`은 여기서는 주어진 `env_type=production:NoSchedule` taint를
+적용하라는 뜻이다. `kubectl cordon`은 별도의 노드 스케줄 금지 설정이므로 추가하지 않는다.
+명령은 `default` namespace 기준이며 node01의 기존 taint부터 기록한다.
+
+```bash
+kubectl describe node node01
+kubectl taint node node01 env_type=production:NoSchedule
+kubectl run dev-redis -n default --image=redis:alpine
+```
+
+`prod-redis.yaml`은 다음 완성본이다.
+
+```yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: prod-redis
+  namespace: default
+spec:
+  containers:
+  - name: prod-redis
+    image: redis:alpine
+  tolerations:
+  - key: env_type
+    operator: Equal
+    value: production
+    effect: NoSchedule
+```
+
+```bash
+kubectl apply -f prod-redis.yaml
+kubectl get pod dev-redis prod-redis -n default -o wide
+```
+
+`dev-redis`는 node01에 새로 배치되지 않아야 한다. 다른 적격 노드가 없으면 Pending도 가능한
+결과이므로 control-plane taint를 임의로 제거하지 않는다. `prod-redis`는 이 taint를 견디지만
+다른 노드에도 배치될 수 있다. **node01에 실제로 배치하라는 조건까지 있다면** 생성 전에
+`kubectl get node node01 --show-labels`로 확인한 고유 라벨을 `spec.nodeSelector`에 추가한다.
+예를 들어 hostname 라벨 값이 `node01`임을 확인했다면 다음 발췌를 함께 넣는다.
+
+```yaml
+spec:
+  nodeSelector:
+    kubernetes.io/hostname: node01
+```
+
+이때 완료 판정은 `prod-redis`의 `NODE=node01`과 Ready다. 이미 생성했다면
+[Pod 재생성 판단](/cka-udemy/pod-config/)을 따른다.
+[공식 Taints and Tolerations](https://kubernetes.io/docs/concepts/scheduling-eviction/taint-and-toleration/)의
+`NoSchedule`과 `Dedicated Nodes`를 찾아 거부 조건과 노드 선택 조건을 구분한다.
+`NoSchedule`은 이미 실행 중인 Pod을 내보내지 않는다. 연습 후 되돌릴 때만 새 Pod 둘을 지우고
+`kubectl taint node node01 env_type=production:NoSchedule-`로 이번에 추가한 taint를 제거한다.
+
 ## nodeAffinity — Practice Test: Node Affinity
 
 원본 풀이: [10-Practice-Test-Node-Affinity.md](https://github.com/kodekloudhub/certified-kubernetes-administrator-course/blob/master/docs/03-Scheduling/10-Practice-Test-Node-Affinity.md)
@@ -177,7 +232,7 @@ kubectl wait --for=condition=Ready pod/placement-check --timeout=90s
 - Deployment 문제라면 개별 Pod이 아니라 Pod 템플릿에 조건이 남아 있다.
 
 <LinkCard
-  title="리소스 제한과 quota"
-  description="requests·limits를 설정하고 LimitRange 주입과 ResourceQuota 거부를 증명한다."
-  href="/cka-udemy/resource-limits/"
+  title="PriorityClass 적용과 Pod 재생성"
+  description="클래스를 만들고 기존 Pod 설정을 보존하며 우선순위를 적용한다."
+  href="/cka-udemy/priority-class/"
 />
