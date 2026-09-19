@@ -58,11 +58,12 @@ Claude Code의 조건부 AGENTS 직접 로딩을 쓰는 구성도 가능하므�
 ```md title="AGENTS.md — 가상 예시"
 # 작업 규칙
 
-- 서비스 경계를 바꾸면 docs/architecture.md를, DB 스키마를 바꾸면 docs/database.md를 읽는다.
+- 서비스 경계를 바꾸면 docs/design-docs/architecture.md를, DB 스키마를 바꾸면 docs/design-docs/database.md를 읽는다.
+- 제품 요구는 docs/product-specs/가 정본이다. 요구가 바뀌면 그 문서를 함께 고친다.
 - 수정 대상 경로에 아직 읽지 않은 하위 AGENTS.md가 있으면 수정 전에 확인한다.
 - 사용자 변경을 보존하고 요청 범위의 구현·검증·이번 변경으로 생긴 오류 수정까지 마친다.
 - 검증 명령과 환경 조건은 docs/verification.md를 따른다.
-- 계획이 필요하면 docs/plans/README.md의 생성 기준을 따른다. 사용 중인 계획은 진행에 맞춰 갱신한다.
+- 계획이 필요하면 docs/exec-plans/README.md의 생성 기준을 따른다. 진행 중인 계획은 active/에 있고 진행에 맞춰 갱신한다.
 - 필수 검사가 통과하면 마친다. 새 변경·실패·미해결 문제가 있을 때 영향을 받은 검사를 다시 한다.
 - 커밋·푸시·배포는 이 프로젝트에서 사용자가 허용한 범위에 따라 수행한다.
 ```

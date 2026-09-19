@@ -28,9 +28,11 @@
 - OpenAI 장기 작업: <https://developers.openai.com/blog/run-long-horizon-tasks-with-codex>
   (명세·계획·실행 규칙·상태 네 파일. 스펙과 계획 분리의 근거로 인용한다.)
 - OpenAI harness engineering: <https://openai.com/index/harness-engineering/>
-  (약 100줄 AGENTS 목차, `docs/exec-plans/active·completed`에 진행 기록과 함께 체크인.
+  (약 100줄 AGENTS 목차, `docs/product-specs`·`design-docs`·`exec-plans/active·completed`.
   직접 접근이 차단되는 환경이 있어 2차 요약과 검색 결과로 대조했다. 작업 크기 기준은 이 글이 아니라
   ExecPlan cookbook의 AGENTS 문구에서 인용한다.)
+- GitHub spec-kit: <https://github.com/github/spec-kit> (`spec-driven.md`의 기능별 폴더 배치)
+- Kiro specs: <https://kiro.dev/docs/specs/> (`.kiro/specs/<기능>/` 세 파일)
 - Anthropic 장기 작업: <https://www.anthropic.com/engineering/effective-harnesses-for-long-running-agents>
 - Anthropic 후속 실험: <https://www.anthropic.com/engineering/harness-design-long-running-apps>
 - OpenAI ExecPlan: <https://developers.openai.com/cookbook/articles/codex_exec_plans>
@@ -57,6 +59,12 @@
 - 계획은 목표·판단 기준·현재 상태를 전달한다. 모든 클릭·명령·검토 단계의 고정 레시피로 만들지
   않는다. PRD·결정 문서·별도 로그를 일괄 생성하지 않고 기존 정본을 우선한다.
   스펙(무엇·왜·완료 판정)과 계획(순서·의존)은 역할을 구분해 설명하고, 분리는 조건이 있을 때 권한다.
+- 추천 문서 구조는 OpenAI Harness engineering의 이름을 따른 가상 서비스 레포 하나로 work-plans에
+  둔다: `docs/product-specs/`·`design-docs/`·`exec-plans/active·completed/`. 각 층에 생략 조건을
+  붙이고 폴더 이동의 링크 비용을 적는다. 예시 요청의 계획 경로도 이 구조를 쓴다.
+  이 스터디 저장소의 `docs/plans/` 배치는 별개의 기존 정책이며 덱 추천이 그 변경을 뜻하지 않는다.
+  소유자의 개인 레포는 이름으로 인용하지 않는다.
+- 스펙·계획의 배치 비교(기능별 폴더 vs 층별 폴더 vs 없음)는 public-repositories에서 한 번만 한다.
 - 지침은 모델이 읽는 권고이고 강제는 hook·권한·sandbox 설정이 맡는다는 구분을 유지한다.
   설정 항목 전체는 범위 밖이며 공식 문서 링크로 대신한다.
 - 완료 주장 전에 별도 컨텍스트가 계획과 diff를 대조하는 리뷰 단계를 둔다. 정확성·요구 누락만

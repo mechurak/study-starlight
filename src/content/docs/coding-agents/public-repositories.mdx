@@ -1,6 +1,6 @@
 ---
 title: "공개 레포에서 고르는 운영 방식"
-description: "tldraw·VS Code·Codex·Superpowers의 실제 지침과 계획을 비교하고 적용할 원칙을 고르는 방법"
+description: "tldraw·VS Code·Codex·Superpowers의 실제 지침과 계획, 스펙·계획 폴더 배치의 세 갈래를 비교하고 적용할 원칙을 고르는 방법"
 reviewedAt: 2026-09-19
 status: stable
 ---
@@ -72,6 +72,33 @@ Superpowers는 에이전트 작업 절차를 제공하는 프레임워크다.
 강제할 필요는 없다. 이 버전의 진행 기록은 Git에서 제외된 작업 폴더에 있으므로, 다른 기기에
 계획 파일만 전달하면 그 기록까지 공유되지 않는다. 인계에 필요한 상태가 어디 있는지 확인해야 한다.
 
+## 스펙과 계획을 두는 위치의 비교
+
+[작업 계획](/coding-agents/work-plans/#추천하는-문서-구조)의 추천 구조는 아래 첫 줄을 따른 것이다.
+공개된 방식은 크게 세 갈래다. 2026-09-19에 확인한 내용이며 각 도구의 현재 문서로 다시 확인한다.
+
+| 갈래 | 사례 | 스펙 | 계획 |
+|---|---|---|---|
+| 층별 폴더 | OpenAI 내부 레포([Harness engineering](https://openai.com/index/harness-engineering/)) | `docs/product-specs/`, `docs/design-docs/` | `docs/exec-plans/active`·`completed` |
+| 층별 폴더 | [Superpowers](https://github.com/obra/superpowers/blob/5bf4e78011075bcfc0dc295f0724994cd123ee71/skills/brainstorming/SKILL.md) | `docs/superpowers/specs/<날짜>-<주제>-design.md` | `docs/superpowers/plans/<날짜>-<이름>.md` |
+| 기능별 폴더 | [GitHub spec-kit](https://github.com/github/spec-kit/blob/d4229c071c7ea3885b43e8a7739847300f618f13/spec-driven.md) | `specs/<번호>-<기능>/spec.md` | 같은 폴더의 `plan.md`·`tasks.md` |
+| 기능별 폴더 | [Kiro](https://kiro.dev/docs/specs/) | `.kiro/specs/<기능>/requirements.md`·`design.md` | 같은 폴더의 `tasks.md` |
+| 없음 | tldraw·Codex·[ghostty](https://github.com/ghostty-org/ghostty/blob/b32f20f3e8d25bb925ec545c54498e93518e7ced/AGENTS.md)·[opencode](https://github.com/anomalyco/opencode/blob/fee476bb90043a1012abda156dd9af9e5c71b19d/AGENTS.md) | 이슈 또는 없음 | 없음. AGENTS와 검증 명령만 |
+
+**층별 폴더**는 요구 정본이 하나라 여러 계획이 같은 요구를 가리킬 수 있다. 대신 처음부터 폴더와
+ID 체계를 유지하는 비용이 든다. 이 덱은 Harness engineering의 폴더 이름과 `active`·`completed`
+구분을 추천 구조로 가져왔다. 원문에 함께 있는 문서 신선도 CI와 정리 에이전트는 문서가 사람이 훑을 수
+없을 만큼 늘었을 때 고려한다.
+
+**기능별 폴더**는 기능 하나의 스펙·계획·작업이 한 폴더에 닫혀 시작이 쉽고 끝나면 통째로 보관된다.
+요구가 여러 기능에 걸치면 같은 요구가 여러 `spec.md`에 흩어지는 점이 약점이다. spec-kit은
+프로젝트 전체 원칙을 constitution 파일 하나에, Kiro는 `.kiro/steering/`에 두어 이를 보완한다.
+
+**없음**도 실제 관찰이다. ghostty의 AGENTS는 빌드·테스트 명령 위주 250단어 정도이고, opencode는
+의존 방향·코드 스타일을 담은 180줄 정도지만 둘 다 계획 문서 체계를 두지 않는다. 이슈·PR·대화가
+그 역할을 맡는다. 계획 폴더가 없다는 사실이 운영 미숙을 뜻하지 않으며, 세션을 넘겨야 하는 작업이
+실제로 얼마나 있는지가 기준이다.
+
 ## 내 프로젝트에서 선택한다
 
 | 상황 | 가져올 방식 | 추가하지 않아도 되는 것 |
@@ -80,6 +107,8 @@ Superpowers는 에이전트 작업 절차를 제공하는 프레임워크다.
 | 이슈가 이미 요구·논의의 중심임 | 이슈와 구현·검증의 연결 | 같은 상태를 가진 별도 장부 |
 | 긴 변경을 새 세션이 이어받음 | 완료 조건·결정·실제 상태·다음 행동 | 모든 명령의 고정 순서 |
 | 검사 비용이 큼 | 변경별 검증 범위 | 매번 전체 검사·전체 UI 순회 |
+| 같은 요구를 여러 계획이 참조함 | 요구 정본 하나와 ID 참조 | 계획마다 복사한 요구 문단 |
+| 기능이 서로 독립적이고 한 번에 닫힘 | 기능별 폴더 또는 이슈 하나 | 처음부터 세운 층별 문서 체계 |
 
 기본은 기존 문서와 명령을 활용하는 것이다. 적용 후 작은 작업과 재개 작업으로 결과를 확인하고,
 빠진 요구를 줄이지 못하면서 비용만 늘린 절차는 조정한다.
@@ -88,5 +117,8 @@ Superpowers는 에이전트 작업 절차를 제공하는 프레임워크다.
 
 유명 레포가 날짜별 계획 파일을 쓰면 우리도 번호 대신 날짜로 바꿔야 할까?
 찾기·인계·검증이 이미 잘된다면 이름을 맞출 이유는 없다. 다음 세션이 같은 상태를 복구할 수 있는지가 기준이다.
+
+기능별 폴더로 시작한 레포에서 세 번째 기능이 첫 기능의 요구를 다시 적고 있다. 어떻게 할까?
+그 요구를 층별 정본으로 한 번 빼고 두 폴더는 ID로 가리키게 한다. 전체 구조를 한 번에 바꿀 필요는 없다.
 
 <LinkCard title="Monorepo의 지침 경계" description="규칙이 실제로 달라지는 앱과 package에만 하위 지침을 추가한다." href="/coding-agents/monorepo-instructions/" />
