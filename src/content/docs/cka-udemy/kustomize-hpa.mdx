@@ -1,32 +1,35 @@
 ---
 title: "Kustomize로 HPA 전환"
 description: "공통 HPA와 prod 전용 maxReplicas patch를 적용하고 폐기한 ConfigMap의 실제 삭제까지 확인한다"
-reviewedAt: 2026-09-19
+reviewedAt: 2026-09-20
 ---
 
 import { LinkCard } from '@astrojs/starlight/components';
 import Thesis from '../../../components/docs/Thesis.astro';
 
-<Thesis>공통 HPA는 base에, 환경별 차이는 overlay에 두고 렌더 결과와 클러스터의 잔존 리소스를 따로 확인한다.</Thesis>
+<Thesis>원본 Kustomize 설정에 공통 HPA와 환경별 차이를 반영하고, 폐기한 ConfigMap은 클러스터에서도 명시적으로 삭제한다.</Thesis>
 
 외부 autoscaler가 읽던 ConfigMap을 없애고 Kubernetes HPA로 전환하는 작업이다.
 HPA(HorizontalPodAutoscaler)는 관측한 부하로 Deployment의 복제본 수를 조정한다.
 Kustomize는 그 설정을 환경별 YAML로 조합할 뿐 실제 부하를 측정하지 않는다.
+작업은 **원본 수정 → 두 환경의 결과 확인·적용 → 기존 ConfigMap 삭제** 순서다.
 개념은 [CKA 오토스케일링](/cka/autoscaling/), 패치 문법은 [Kustomize patch](/cka-udemy/kustomize-patches/)에 있다.
 
 ## 기존 디렉터리와 요구값 확인
 
 제공된 `api-gateway/` 아래 `base/`, `staging/`, `prod/`가 있고 두 환경이 이미 배포된 랩을 전제로 한다.
 각 환경의 namespace도 존재한다. 앞 페이지의 공통 예제와 별개의 입력이다.
-작업 디렉터리는 문제에서 준 경로로 바꾸고 변경 전 사본을 만든다.
+문제에서 지정한 호스트로 접속한 뒤 제공된 YAML과 `kustomization.yaml`을 직접 수정한다.
+조합한 YAML을 별도 파일로 저장할 필요는 없다.
 
 ```bash
+ssh cka5774
 cd /course/5/api-gateway
-cp -a . ../api-gateway.before-hpa
-kubectl kustomize staging > /tmp/api-gateway-staging-before.yaml
-kubectl kustomize prod > /tmp/api-gateway-prod-before.yaml
 grep -R -n 'horizontal-scaling-config\|replicas:' base staging prod
 ```
+
+복구 연습도 할 경우에만 수정 전에 `cp -a . ../api-gateway.before-hpa`로 원본 사본을 남긴다.
+사본 경로는 아직 존재하지 않는 이름을 쓴다.
 
 | 환경 | namespace | minReplicas | maxReplicas | CPU 평균 사용률 |
 |---|---|---|---|---|
@@ -84,13 +87,33 @@ spec:
 
 ## 이전 ConfigMap의 정의와 참조 제거
 
-`horizontal-scaling-config`를 정의하는 base 문서, 해당 `resources` 항목 또는 generator를 제거한다.
-여러 오브젝트가 들어 있는 YAML이면 ConfigMap 문서만 지운다. staging·prod의 그 ConfigMap 전용
-patch와 patch 등록도 함께 제거해야 `no matches for Id` 같은 오류가 남지 않는다.
+앞의 검색 결과에서 관련 파일만 열어 정리한다. 두 환경이 같은 base의 ConfigMap을 사용한다면
+공통 정의는 base에서 한 번 제거하면 된다.
+
+| 정의·참조 위치 | 수정할 내용 |
+|---|---|
+| ConfigMap만 담은 YAML | 파일과 `kustomization.yaml`의 해당 `resources` 항목 제거 |
+| 여러 리소스를 담은 YAML | `horizontal-scaling-config`의 YAML 문서만 제거하고 다른 리소스 보존 |
+| `configMapGenerator` | 해당 ConfigMap을 생성하는 항목 제거 |
+| staging·prod의 ConfigMap 전용 patch | patch와 `kustomization.yaml`의 해당 patch 등록 제거 |
+
+ConfigMap을 없앤 뒤 전용 patch가 남으면 `no matches for Id` 같은 렌더 오류가 날 수 있다.
 
 Pod의 `envFrom`, `configMapKeyRef`, volume이 이 ConfigMap을 쓰는지도 확인한다.
 참조가 있다면 전환 요구에 맞게 정리한 뒤 적용한다. 외부 autoscaler가 여전히 replicas를 쓰고
 있다면 그것의 중지도 작업 범위에 포함되는지 확인해야 한다.
+
+### 원본 편집을 돕는 명령
+
+[`kubectl kustomize`](https://kubernetes.io/docs/reference/kubectl/generated/kubectl_kustomize/)는
+YAML을 조합해 출력하는 명령이며 `edit` 서브커맨드는 없다. 별도 `kustomize` CLI가 설치되어 있다면
+`base/`에서 `kustomize edit remove resource configmap.yaml`처럼 파일 등록을 제거할 수 있다.
+여기서 `configmap.yaml`은 실제 `resources`에 등록된 ConfigMap 전용 파일명으로 바꾼다.
+이 명령은 현재 디렉터리의 `kustomization.yaml`만 고치며 YAML 파일 자체, 다른 overlay의 patch,
+클러스터 리소스는 삭제하지 않는다. 이 실습은 편집기로 원본을 수정하는 것만으로 충분하다.
+([학습용 공식 CLI 구현](https://github.com/kubernetes-sigs/kustomize/blob/master/kustomize/commands/edit/remove/removeresource.go))
+
+## Deployment의 replica 관리 이관
 
 Deployment의 고정 `spec.replicas`나 Kustomize `replicas` 변환도 HPA와 경쟁할 수 있다.
 계속 적용할 원본에서는 HPA가 값을 관리하도록 정리한다. 기존 apply 소유 필드를 제거하는 첫 적용은
@@ -99,8 +122,8 @@ Deployment의 고정 `spec.replicas`나 Kustomize `replicas` 변환도 HPA와 �
 ## 두 환경을 렌더하고 적용
 
 ```bash
-kubectl kustomize staging > /tmp/api-gateway-staging-after.yaml
-kubectl kustomize prod > /tmp/api-gateway-prod-after.yaml
+kubectl kustomize staging
+kubectl kustomize prod
 kubectl diff -k staging
 kubectl diff -k prod
 ```
@@ -111,25 +134,45 @@ kubectl diff -k prod
 ```bash
 kubectl apply -k staging
 kubectl apply -k prod
-kubectl -n api-gateway-staging delete configmap horizontal-scaling-config --ignore-not-found
-kubectl -n api-gateway-prod delete configmap horizontal-scaling-config --ignore-not-found
-kubectl -n api-gateway-staging get hpa api-gateway
-kubectl -n api-gateway-prod get hpa api-gateway
 ```
 
-일반 `apply`는 입력에서 사라진 오브젝트를 삭제하지 않는다. 그래서 **폐기 대상으로 지정한
-ConfigMap만** 두 namespace에서 명시적으로 지운다. 광범위한 `delete -k`로 Deployment까지
-지우지 않는다. ([선언적 관리의 삭제](https://kubernetes.io/docs/tasks/manage-kubernetes-objects/declarative-config/#how-to-delete-objects))
+`kubectl apply -k staging`은 문제의 `kubectl kustomize staging | kubectl apply -f -`처럼
+조합한 YAML을 클러스터에 적용한다.
+([Kustomize 적용 명령](https://kubernetes.io/docs/tasks/manage-kubernetes-objects/kustomization/#how-to-applyviewdelete-objects-using-kustomize))
+
+## 클러스터에 남은 ConfigMap 삭제
+
+**일반 `apply`는 입력에서 사라진 기존 리소스를 자동으로 삭제하지 않는다.** 원본에서 ConfigMap을
+제거해도 이미 배포된 두 namespace에는 남아 있으므로, 다음 명령으로 명시적으로 삭제한다.
+반대로 클러스터에서만 삭제하고 원본을 남기면 다음 적용 때 다시 생성된다.
+([선언적 관리의 삭제](https://kubernetes.io/docs/tasks/manage-kubernetes-objects/declarative-config/#how-to-delete-objects))
+
+```bash
+kubectl -n api-gateway-staging delete configmap horizontal-scaling-config --ignore-not-found
+kubectl -n api-gateway-prod delete configmap horizontal-scaling-config --ignore-not-found
+```
+
+`--ignore-not-found`는 이미 삭제된 경우에도 명령을 다시 실행할 수 있게 한다.
+`kubectl delete -k staging`은 그 구성에 포함된 Deployment 등도 삭제하므로 이 작업에는 쓰지 않는다.
 
 ## 완료 판정과 복구
+
+```bash
+kubectl -n api-gateway-staging get hpa api-gateway -o yaml
+kubectl -n api-gateway-prod get hpa api-gateway -o yaml
+kubectl -n api-gateway-staging get configmap horizontal-scaling-config
+kubectl -n api-gateway-prod get configmap horizontal-scaling-config
+```
 
 두 환경의 HPA `spec`이 표와 같고, `kubectl get cm horizontal-scaling-config -n <환경>`은
 `NotFound`여야 한다. `kubectl describe hpa api-gateway -n <환경>`에서 metric과 condition을 확인한다.
 `<unknown>`이면 CPU requests와 `kubectl top pods -n <환경>`부터 확인한다. 낮은 부하에서
 복제본이 늘지 않는 것은 정상이다. 실제 부하에 따른 스케일링 검증은 [HPA 실습](/cka-udemy/autoscaling/)을 따른다.
 
-복구가 필요하면 이번에 추가한 HPA를 두 namespace에서 삭제하고, 보관한 이전 디렉터리의
-staging·prod를 각각 `apply -k`한다. 이전 ConfigMap과 Deployment replicas를 재확인하고
+복구가 필요하면 이번에 추가한 HPA를 두 namespace에서 삭제하고 원본 설정을 변경 전으로 되돌린 뒤
+staging·prod를 각각 `apply -k`한다. 수정 전에 사본을 남겼다면 그 사본으로 원본을 복원한다.
+사본 없이 이전 설정을 재구성할 수 없다면 랩에서 제공하는 초기화 절차를 사용한다.
+이전 ConfigMap과 Deployment replicas를 재확인하고
 별도로 중지한 외부 autoscaler가 있다면 원래 운영 방식으로 복구한다.
 
 <LinkCard title="HPA 설정과 검증" href="/cka-udemy/autoscaling/" />
