@@ -17,8 +17,7 @@ export default {
 	"description": "여러 덱에서 다시 쓰는 kind·kubectl·Helm·Docker Compose 환경 준비와 정리 — 운영체제별 설치부터 브라우저 확인·cleanup까지.",
 	"category": "infra",
 	"tags": [
-		"k8s",
-		"hands-on"
+		"k8s"
 	],
 	"termIntro": "required",
 	"groups": [

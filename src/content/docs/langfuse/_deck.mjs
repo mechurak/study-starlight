@@ -16,8 +16,7 @@ export default {
 	"tags": [
 		"llm",
 		"o11y",
-		"k8s",
-		"onprem"
+		"k8s"
 	],
 	"termIntro": "required",
 	"groups": [

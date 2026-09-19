@@ -12,8 +12,7 @@ export default {
 	"description": "요청의 일생, 렌더링 전략, 기술 지형도, 도구 사슬을 통증 중심으로.",
 	"category": "app",
 	"tags": [
-		"frontend",
-		"cloud"
+		"frontend"
 	],
 	"termIntro": "required",
 	"groups": [

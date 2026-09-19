@@ -14,9 +14,7 @@ export default {
 	"description": "KodeKloud 랩을 뼈대로 여러 실습의 실패 진단·완료 검증·복구 패턴을 모은 CKA 연습 덱.",
 	"category": "infra",
 	"tags": [
-		"k8s",
-		"exam",
-		"hands-on"
+		"k8s"
 	],
 	"termIntro": "not-required",
 	"groups": [

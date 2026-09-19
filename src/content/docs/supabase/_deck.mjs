@@ -13,8 +13,7 @@ export default {
 	"category": "app",
 	"tags": [
 		"data",
-		"auth",
-		"cloud"
+		"auth"
 	],
 	"termIntro": "legacy",
 	"groups": [

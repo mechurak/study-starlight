@@ -20,9 +20,7 @@ export default {
 	"tags": [
 		"agent",
 		"k8s",
-		"auth",
-		"onprem",
-		"cloud"
+		"auth"
 	],
 	"termIntro": "required",
 	"groups": [

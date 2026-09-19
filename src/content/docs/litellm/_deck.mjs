@@ -15,8 +15,7 @@ export default {
 	"tags": [
 		"llm",
 		"k8s",
-		"auth",
-		"onprem"
+		"auth"
 	],
 	"termIntro": "required",
 	"groups": [

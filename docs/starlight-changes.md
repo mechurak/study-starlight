@@ -16,7 +16,7 @@
 | 검색 결과에 덱 이름 표시 | `MarkdownContent` 컴포넌트 override | `src/components/layout/MarkdownContent.astro` |
 | 덱 index 별칭 검색 | `_deck.mjs`의 `aliases`를 본문 앞에 표시 | `src/content/docs/*/_deck.mjs` · `MarkdownContent.astro` |
 | 검토 이력 표시 | `reviewedAt` 없는 문서를 안정 상태로 간주하지 않음 | `content.config.ts` · `MarkdownContent.astro` |
-| 랜딩 덱 카탈로그 | 태그 필터 + 카테고리 카드/테이블 전환 + 카테고리·최근 수정일 정렬 + Git 이력으로 수정일 계산 | `scripts/prepare-git-history.mjs` · `src/components/docs/DeckCatalog.astro` |
+| 랜딩 덱 카탈로그 | 태그 필터 + 카테고리 카드/테이블 전환 + 덱 이름·카테고리·최근 수정일 정렬 + Git 이력으로 수정일 계산 | `scripts/prepare-git-history.mjs` · `src/components/docs/DeckCatalog.astro` |
 | 본문 폰트 Pretendard | `customCss` (dynamic subset) | `astro.config.mjs` |
 | 본문 폭 45→55rem | `--sl-content-width` | `src/styles/custom.css` |
 | 검색 덱 라벨 위치·모양 | Pagefind UI 태그 칩 재스타일 | `src/styles/custom.css` |
@@ -121,23 +121,30 @@ Pagefind JS API(`debouncedSearch` → `result.data()` → meta로 그룹핑)로 
 
 랜딩의 보기 전환으로 카테고리 카드와 전체 덱 테이블을 오갈 수 있다. 기본 보기는
 테이블이고 서버 렌더 시점에 최근 수정일 내림차순으로 정렬해 둔다. 선택한 보기는
-`localStorage` 키 `deck-catalog-view`에 저장한다. 테이블은 카테고리와 최근 수정일을 제목행
+`localStorage` 키 `deck-catalog-view`에 저장한다. 테이블은 덱 이름·카테고리·최근 수정일을 제목행
 버튼으로 정렬하며, 한 번 더 누르면 오름차순·내림차순을 바꾼다. 수정일이 없는 덱은
 정렬 방향과 관계없이 마지막에 둔다. 48rem 이하 화면에서는 카테고리·분량 열을 접어
 가로 스크롤 없이 덱·최근 수정일 열만 남긴다.
 
 ## 랜딩 태그 필터
 
-카테고리는 굵은 묶음이고, 카테고리를 가로지르는 축은 태그가 맡는다. 결정한 것들:
+카테고리는 굵은 묶음이고, 카테고리를 가로지르는 주제는 태그가 맡는다.
+태그는 종류 구분 없이 `{ id, label }`로 관리하며, 랜딩의 ‘태그로 찾기’와 덱 라벨에 모두 표시한다.
+실습·시험·온프렘·클라우드 태그는 전역 어휘와 각 덱에서 삭제했다. 기존 URL의 삭제된 태그는
+모르는 id와 동일하게 무시한다. 태그가 없는 덱도 전체 목록과 카테고리에 표시한다.
+여러 태그를 고르면 모두 포함한 덱만 남는다는 안내와 결과 개수를 표시한다.
+‘필터 지우기’는 필터 상단에 항상 두고, 선택이 있으면 강조색 버튼으로 활성화한다.
 
-- **교집합(AND)이다.** 덱 23개에서 합집합은 대부분을 남겨 필터가 아무 일도 안 하는
+결정한 것들:
+
+- **교집합(AND)이다.** 합집합은 대부분의 덱을 남겨 필터가 아무 일도 안 하는
   것처럼 보인다. 대신 AND는 막다른 길이 생기므로, 선택이 바뀔 때마다 남은 덱 기준으로
   칩 개수를 다시 세고 0이 되는 칩은 `aria-disabled`로 흐리게 해 눌리지 않게 한다.
   `disabled` 속성은 쓰지 않는다 — 탭 순서에서 빠지면 어느 칩이 죽었는지 알 수 없다.
   선택된 칩은 흐려지지 않으므로 막다른 길에서도 되돌아 나올 수 있다.
 - **`localStorage`에 저장하지 않는다.** 보기 전환은 "나는 표가 편하다"는 지속되는
   취향이지만 태그 선택은 그때의 질의다. 저장하면 다음에 왔을 때 덱 대부분이 말없이
-  사라진다. 대신 `?tags=k8s,onprem`으로 URL에 남긴다.
+  사라진다. 대신 `?tags=k8s,llm`으로 URL에 남긴다.
 - **`replaceState`다.** `pushState`면 칩을 누른 횟수만큼 뒤로가기가 필요하고,
   `popstate` 리스너를 같이 달지 않으면 Back이 URL만 바꾸고 UI는 그대로인 버그가 난다.
   URL은 `searchParams.set` 대신 직접 조립한다 — 그쪽은 쉼표를 `%2C`로 인코딩해

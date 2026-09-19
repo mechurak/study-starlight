@@ -15,8 +15,7 @@ export default {
 	"category": "ai",
 	"tags": [
 		"agent",
-		"k8s",
-		"hands-on"
+		"k8s"
 	],
 	"termIntro": "not-required",
 	"groups": [

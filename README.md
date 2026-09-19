@@ -75,8 +75,9 @@ npm run preview
    `navOrder`, `catalogOrder`, 사이드바 `groups`, index의 `map`을 정의한다.
 2. `_baseline.md`를 만들어 기준 버전·서술 규칙·범위 경계를 적고, `index.mdx`와 본문 페이지를 만든다.
    index의 구성 절에는 `<DeckMap deck="<덱이름>" />`를 둔다.
-3. `category`(4종 중 하나)와 `tags`(최소 하나)를 붙인다. 정말 새 전역 어휘가 필요할 때만
+3. `category`(4종 중 하나)와 `tags` 목록을 정한다. 정말 새 전역 어휘가 필요할 때만
    `src/data/catalog.mjs`를 고친다. 한 장에서 스치는 주제는 태그로 붙이지 않는다.
+   해당하는 태그가 없으면 `tags: []`로 둔다.
 4. 개념 학습 덱은 `termIntro: 'required'`, 실습·문제풀이 위주 덱은 `not-required`로 정한다.
    `legacy`는 기존 미이관 덱에만 쓴다.
 5. `npm run check`로 설정·파일·링크가 모두 맞는지 확인한다.

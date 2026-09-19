@@ -14,8 +14,7 @@ export default {
 	"category": "infra",
 	"tags": [
 		"o11y",
-		"k8s",
-		"hands-on"
+		"k8s"
 	],
 	"termIntro": "required",
 	"groups": [

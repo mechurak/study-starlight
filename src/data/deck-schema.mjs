@@ -9,9 +9,8 @@ export const catalogSchema = z
 		categories: z.array(
 			z.object({ id: idSchema, title: z.string().min(1), desc: z.string().min(1), tone: toneSchema }).strict(),
 		),
-		tagAxes: z.array(z.object({ id: idSchema, label: z.string().min(1) }).strict()),
 		tags: z.array(
-			z.object({ id: idSchema, label: z.string().min(1), axis: idSchema }).strict(),
+			z.object({ id: idSchema, label: z.string().min(1) }).strict(),
 		),
 	})
 	.strict();
@@ -39,7 +38,7 @@ export const deckConfigSchema = z
 		aliases: z.array(z.string().min(1)).default([]),
 		description: z.string().min(1),
 		category: z.string().min(1),
-		tags: z.array(z.string().min(1)).min(1),
+		tags: z.array(z.string().min(1)),
 		termIntro: z.enum(['required', 'not-required', 'legacy']),
 		reviewIntervalDays: z.number().int().positive().default(180),
 		groups: z

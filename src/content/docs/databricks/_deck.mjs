@@ -15,8 +15,7 @@ export default {
 	"description": "사내 데이터를 AWS lakehouse로 가져온다 — CX/DX, VPC, S3, Unity Catalog와 운영 경계.",
 	"category": "ai",
 	"tags": [
-		"data",
-		"cloud"
+		"data"
 	],
 	"termIntro": "required",
 	"groups": [

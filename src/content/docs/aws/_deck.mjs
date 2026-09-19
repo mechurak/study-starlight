@@ -7,7 +7,7 @@ export default {
 	aliases: ['Amazon Web Services', '아마존 웹 서비스'],
 	description: '서버에서 서비스로 이해하는 AWS — 계정·비용·VPC부터 컴퓨팅·저장소·서버리스·인증·배포와 관측까지.',
 	category: 'infra',
-	tags: ['cloud'],
+	tags: [],
 	termIntro: 'required',
 	reviewIntervalDays: 90,
 	groups: [

@@ -13,8 +13,7 @@ export default {
 	"category": "ai",
 	"tags": [
 		"gpu",
-		"llm",
-		"onprem"
+		"llm"
 	],
 	"termIntro": "required",
 	"groups": [

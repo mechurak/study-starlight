@@ -17,8 +17,7 @@ export default {
 	"category": "infra",
 	"tags": [
 		"auth",
-		"k8s",
-		"onprem"
+		"k8s"
 	],
 	"termIntro": "required",
 	"groups": [

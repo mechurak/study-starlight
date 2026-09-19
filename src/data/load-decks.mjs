@@ -4,7 +4,6 @@ import { pathToFileURL } from 'node:url';
 import { z } from 'astro/zod';
 import {
 	categories as rawCategories,
-	tagAxes as rawTagAxes,
 	tags as rawTags,
 } from './catalog.mjs';
 import { catalogSchema, deckConfigSchema } from './deck-schema.mjs';
@@ -16,12 +15,12 @@ const docsRoot = path.resolve(process.cwd(), 'src/content/docs');
 
 let catalog;
 try {
-	catalog = catalogSchema.parse({ categories: rawCategories, tagAxes: rawTagAxes, tags: rawTags });
+	catalog = catalogSchema.parse({ categories: rawCategories, tags: rawTags });
 } catch (error) {
 	if (error instanceof z.ZodError) throw formatSchemaError('src/data/catalog.mjs', '전역 catalog', error);
 	throw error;
 }
-const { categories, tagAxes, tags } = catalog;
+const { categories, tags } = catalog;
 
 const pageFrontmatterSchema = z.object({
 	deckGroup: z.string().min(1),
@@ -132,15 +131,7 @@ function assertCatalogUnique(items, subject) {
 }
 
 assertCatalogUnique(categories, 'category');
-assertCatalogUnique(tagAxes, 'tag axis');
 assertCatalogUnique(tags, 'tag');
-
-const tagAxisIds = new Set(tagAxes.map((axis) => axis.id));
-for (const tag of tags) {
-	if (!tagAxisIds.has(tag.axis)) {
-		throw new Error(`src/data/catalog.mjs: tag '${tag.id}'의 axis '${tag.axis}'가 없습니다.`);
-	}
-}
 
 const topicRoutes = new Set(
 	loadedDecks.flatMap((deck) => [`/${deck.slug}/`, ...deck.pages.map((page) => `/${page.slug}/`)]),
@@ -194,7 +185,6 @@ export const termIntroDeckSlugs = deckDefinitions
 	.map((deck) => deck.slug);
 
 export const deckCategoryIds = categories.map((category) => category.id);
-export const deckTagAxes = tagAxes;
 
 export const deckTagFacets = tags.map((tag) => ({
 	...tag,

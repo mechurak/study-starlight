@@ -12,8 +12,7 @@ export default {
 	"description": "커리큘럼 5개 도메인을 개념 → 명령 → 함정 순서로 관통하는 시험 대비 정리.",
 	"category": "infra",
 	"tags": [
-		"k8s",
-		"exam"
+		"k8s"
 	],
 	"termIntro": "legacy",
 	"groups": [

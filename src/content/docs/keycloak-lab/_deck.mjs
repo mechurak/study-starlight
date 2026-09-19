@@ -15,8 +15,7 @@ export default {
 	"description": "Docker Compose 한 환경에서 client 로그인·두 앱 SSO·API 권한·Samba LDAP 로그인·외부 group 권한을 순서대로 재현한다.",
 	"category": "infra",
 	"tags": [
-		"auth",
-		"hands-on"
+		"auth"
 	],
 	"termIntro": "not-required",
 	"groups": [

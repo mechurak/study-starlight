@@ -12,8 +12,7 @@ export default {
 	"description": "Ubuntu 24.04 실무 — “이 서버는 무슨 물건인가”부터 상황에서 출발하는 명령 정리.",
 	"category": "infra",
 	"tags": [
-		"linux",
-		"onprem"
+		"linux"
 	],
 	"termIntro": "required",
 	"groups": [

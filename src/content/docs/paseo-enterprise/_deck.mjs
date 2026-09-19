@@ -14,8 +14,7 @@ export default {
 	"description": "Paseo 사내 빌드를 카탈로그 프런트엔드로 쓴다 — upstream 최소 패치, 동봉 plugin, Keycloak, oauth2-proxy와 권한 필터링.",
 	"category": "tools",
 	"tags": [
-		"auth",
-		"onprem"
+		"auth"
 	],
 	"termIntro": "required",
 	"groups": [

@@ -12,8 +12,7 @@ export default {
 	"description": "서비스 사이의 결합을 시간 축에서 끊는 로그 — 도입하는 사람 관점의 모델과 운영.",
 	"category": "infra",
 	"tags": [
-		"data",
-		"onprem"
+		"data"
 	],
 	"termIntro": "required",
 	"groups": [

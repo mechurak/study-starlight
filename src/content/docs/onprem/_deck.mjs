@@ -12,8 +12,7 @@ export default {
 	"description": "클라우드가 대신 해 주던 자리 — LB·인증서·SSO·스토리지·백업 — 를 직접 채우는 운영.",
 	"category": "infra",
 	"tags": [
-		"k8s",
-		"onprem"
+		"k8s"
 	],
 	"termIntro": "required",
 	"groups": [

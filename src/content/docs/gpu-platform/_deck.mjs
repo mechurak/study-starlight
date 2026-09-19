@@ -15,8 +15,7 @@ export default {
 	"tags": [
 		"gpu",
 		"llm",
-		"k8s",
-		"onprem"
+		"k8s"
 	],
 	"termIntro": "required",
 	"groups": [
