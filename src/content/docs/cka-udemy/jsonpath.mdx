@@ -1,7 +1,7 @@
 ---
 title: "JSONPath 추출과 정렬"
 description: "원본 JSON 구조에서 필드 경로를 찾고 추출·필터·정렬·열 구성을 조합해 제출 파일을 만든다"
-reviewedAt: 2026-09-13
+reviewedAt: 2026-09-19
 ---
 
 import { LinkCard } from '@astrojs/starlight/components';
@@ -288,6 +288,73 @@ kubectl get nodes -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}'
 `>>`로 이어 붙이면 이전 오답이나 중복 행이 남을 수 있다.
 :::
 
+
+## 지정 kubeconfig에서 이름과 인증서 꺼내기
+
+앞 절은 kubeconfig에서 이름 하나를 골랐다. 시험 시뮬레이터에서는 **클러스터를 건드리지 않고
+파일 하나만 읽어** context 목록·현재 context·사용자 인증서를 각각 제출하라는 형태로 나온다.
+세 요구는 값의 성격이 달라 쓸 도구도 갈린다.
+
+| 문제의 요구 | 쓸 명령 | 그 명령인 이유 |
+|---|---|---|
+| context 이름 전부, 한 줄에 하나 | `config get-contexts -o name` | 헤더도 `*` 표시도 없이 줄 단위로 나온다 |
+| 현재 context 이름 | `config current-context` | 값 하나만 출력하는 전용 명령 |
+| 특정 사용자의 client certificate | `config view --raw -o jsonpath` + `base64 -d` | 파일에는 base64로 들어 있다 |
+
+대상은 로그인한 클러스터가 아니라 문제에서 준 파일이므로 모든 명령에 `--kubeconfig=`를 붙인다.
+`export KUBECONFIG=<경로>`로 묶어도 되지만 다음 문제까지 영향을 주므로 끝나면 `unset KUBECONFIG`을 한다.
+
+### 이름은 전용 하위 명령이 더 짧다
+
+```bash
+kubectl config get-contexts --kubeconfig=/root/exam-kubeconfig -o name \
+  > /opt/outputs/contexts
+kubectl config current-context --kubeconfig=/root/exam-kubeconfig \
+  > /opt/outputs/current-context
+```
+
+`get-contexts`의 `-o`는 `name`만 받는다. 다른 값을 주면
+`--output yaml is not available in kubectl config get-contexts`로 거절당한다.
+`-o jsonpath='{.contexts[*].name}'`로도 이름을 뽑을 수 있지만 결과가 공백으로 이어진 한 줄이라
+"한 줄에 하나"를 요구하는 문제에는 `range`를 덧붙여야 한다. 전용 명령이 그 자리를 대신한다.
+
+### 인증서는 `--raw` 없이 나오지 않는다
+
+`kubectl config view`는 인증서·키 값을 기본으로 감춘다. 실제 값 대신 `DATA+OMITTED`라는
+문자열이 출력된다. 마스킹을 풀려면 `--raw`를 붙인다.
+
+```bash
+kubectl config view --kubeconfig=/root/exam-kubeconfig --raw \
+  -o jsonpath='{.users[?(@.name=="account-0027")].user.client-certificate-data}' \
+  | base64 -d > /opt/outputs/cert
+```
+
+필터는 앞 절의 `[?(…)]`와 같은 모양이고, 비교할 필드가 `name`, 꺼낼 필드가
+`user.client-certificate-data`로 바뀌었을 뿐이다. 바깥을 작은따옴표로 감쌌으므로
+안쪽 비교 문자열은 큰따옴표를 쓴다.
+
+kubeconfig에 담긴 값은 PEM 인증서를 base64로 한 번 더 감싼 문자열이다. 그래서 문제가
+"base64 디코드해서 제출"을 요구하며, `base64 -d`를 거쳐야 `-----BEGIN CERTIFICATE-----`로
+시작하는 원본이 된다.
+
+:::caution[함정 — `--raw`를 빠뜨리면 오류 없이 쓰레기 파일이 남는다]
+`--raw` 없이 같은 명령을 돌리면 JSONPath는 `DATA+OMITTED`라는 문자열을 정상적으로 찾아 출력하고,
+`base64 -d`는 그 문자열을 그대로 디코드해 9바이트짜리 이진 쓰레기를 만든다.
+종료 코드는 0이고 화면에도 오류가 없다. 파일이 생겼다는 사실은 성공의 증거가 아니다.
+:::
+
+### 인증서 파일의 완료 판정
+
+`cat`으로 눈대중하지 말고 인증서로 읽히는지 확인한다.
+
+```bash
+head -1 /opt/outputs/cert          # -----BEGIN CERTIFICATE-----
+openssl x509 -in /opt/outputs/cert -noout -subject
+```
+
+`subject`의 CN이 문제에서 지정한 사용자와 같아야 한다. 다른 사용자의 블록을 집었어도 디코드는
+성공하므로 이름까지 확인해야 잘못 고른 것을 잡아낸다. `unable to load certificate`가 나오면
+`--raw` 누락이나 값이 잘려 들어간 경우를 의심한다.
 
 ## 공식 문서에서 찾을 것
 

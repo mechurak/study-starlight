@@ -115,7 +115,7 @@ export default {
 			"label": "기초",
 			"title": "JSONPath 추출과 정렬",
 			"href": "/cka-udemy/jsonpath/",
-			"desc": "필드 추출 · 조건 필터 · 정렬 · custom-columns · 파일 제출",
+			"desc": "필드 추출 · 조건 필터 · 정렬 · custom-columns · kubeconfig 원문 · 파일 제출",
 			"items": [
 				[
 					"CKA kubectl — 손 속도가 점수다",
