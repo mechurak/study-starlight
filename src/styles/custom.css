@@ -6,6 +6,26 @@
   --sl-content-width: 55rem;
 }
 
+/* 랜딩은 소개 영역 없이 태그 필터부터 시작한다. hero를 제거하면 Starlight이
+   만드는 제목 패널은 접근성·본문 바로가기용 h1을 남긴 채 시각적으로 숨긴다. */
+main:has([data-deck-catalog]) > .content-panel:has(#_top) {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+main:has([data-deck-catalog]) > .content-panel + .content-panel {
+  padding-top: 1rem;
+}
+
+.sl-markdown-content:has(> [data-deck-catalog]) {
+  margin-top: 0;
+}
+
 /* 헤더 검색 결과의 덱 라벨 — MarkdownContent override가 심은 Pagefind meta("덱").
    기본 UI는 이걸 카드 맨 아래 태그 칩으로 그리므로, 제목 위의 작은 라벨로 올린다.
    (.pagefind-ui__result-inner가 flex column이라 order로 위치만 바꾼다) */

@@ -18,6 +18,9 @@
   태그는 그때의 질의라, 저장하면 다음에 왔을 때 덱 대부분이 말없이 사라진다.
   대신 '?tags=k8s,llm'으로 URL에 남겨 링크가 되게 한다(replaceState).
 
+  태그 영역은 사이트 헤더 아래에 sticky로 둔다. 결과가 줄어도 필터 위치가 유지되도록
+  카탈로그는 최소 한 화면 높이를 확보하고, 숫자 폭과 스크롤 앵커 보정을 고정한다.
+
   sections: 카테고리 하나 = 섹션 하나
     title  카테고리 이름 (h2)
     desc   카테고리 한 줄 설명
@@ -513,8 +516,11 @@ const tagIds = (deck: { tags: Tag[] }) => deck.tags.map((tag) => tag.id).join(' 
 
   .catalog {
     display: grid;
+    align-content: start;
     gap: 1.5rem;
-    margin-top: 1rem;
+    margin-top: 0;
+    min-height: calc(100svh - var(--sl-nav-height) - 2rem);
+    overflow-anchor: none;
   }
 
   /* Markdown 본문의 형제 간 여백이 버튼과 필터 줄에 적용되지 않게 한다.
@@ -543,12 +549,17 @@ const tagIds = (deck: { tags: Tag[] }) => deck.tags.map((tag) => tag.id).join(' 
      선택 상태만 accent를 쓴다. accent 토큰은 테마가 두 모드 모두 정의하므로
      여기엔 [data-theme='dark'] 오버라이드가 필요 없다. */
   .catalog__filter {
+    position: sticky;
+    top: calc(var(--sl-nav-height) + 1rem);
+    z-index: 1;
     display: grid;
     gap: 0.7rem;
     padding: 1rem;
     border: 1px solid var(--sl-color-gray-5);
     border-radius: 0.75rem;
     background: var(--sl-color-gray-7);
+    max-height: calc(100svh - var(--sl-nav-height) - 2rem);
+    overflow-y: auto;
   }
   .filter__header {
     display: flex;
@@ -600,6 +611,10 @@ const tagIds = (deck: { tags: Tag[] }) => deck.tags.map((tag) => tag.id).join(' 
     cursor: default;
   }
   .filter__count {
+    width: 2.5ch;
+    flex-shrink: 0;
+    text-align: center;
+    font-variant-numeric: tabular-nums;
     font-size: 0.68rem;
     font-weight: 500;
     color: var(--sl-color-gray-3);
