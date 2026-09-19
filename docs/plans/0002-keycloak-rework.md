@@ -6,7 +6,7 @@
 실행 범위: 사용자 요청에 따른 D02~D28, D09-L·D16-L·D18-L·D24-L, F01~F04 전체 완료. D19·D20 추가 실행 실습과 Kubernetes OIDC 선택 실습은 제외한다.
 보류: Ubuntu P03 플랫폼 검증 보류 — macOS/Colima 결과를 Ubuntu 결과로 일반화하지 않는다.
 
-> 현재 lab 자산 계약은 [계획 03](03-keycloak-guided-labs.md)을 따른다. 이 문서의 P04 kind 파일 보존
+> 현재 lab 자산 계약은 [계획 03](0003-keycloak-guided-labs.md)을 따른다. 이 문서의 P04 kind 파일 보존
 > 문구와 실행 경로는 당시 이력이며, 추적 자산은 Compose 전용 개편에서 제거됐다.
 
 [계획 관리 규칙](README.md)의 번호·상태·갱신·완료 절차를 따른다.

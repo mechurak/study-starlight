@@ -338,7 +338,7 @@ Coding Agents는 `00-project-instructions→project-instructions`,
 호환 페이지를 두고 검색에서 제외한다. M05에서 모든 대응 목적지와 대표 브라우저 이동을 확인한다.
 템플릿에는 호환 페이지를 이관하지 않는다.
 
-들어오는 파일 참조는 `docs/plans/README.md`, `docs/plans/01-cka-udemy-rework.md`,
+들어오는 파일 참조는 `docs/plans/README.md`, `docs/plans/0001-cka-udemy-rework.md`,
 `docs/deploy.md`, 두 덱 MDX·metadata에서 발견했다. 파일 이동 때 다시 전역 검색한다.
 기존 완료 계획의 실행 내용은 유지하고 깨지는 파일 참조만 갱신한다.
 

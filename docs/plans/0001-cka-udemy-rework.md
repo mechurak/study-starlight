@@ -173,7 +173,7 @@ Kubernetes 문서 내 검색은 가능하지만 외부 검색 결과를 열면 �
 
 ### M0. 이관 계약 확정 — Astra
 
-- [x] 공식 v1.35 PDF 본문 2쪽의 27항목과 두 덱을 대조했다. [커버리지·이관 계약](01-cka-udemy-migration.md)에 부분 실습·미작성 항목을 구분했다.
+- [x] 공식 v1.35 PDF 본문 2쪽의 27항목과 두 덱을 대조했다. [커버리지·이관 계약](0001-cka-udemy-migration.md)에 부분 실습·미작성 항목을 구분했다.
 - [x] 같은 이관 계약에 39개 목적 파일·표시 번호·order와 원본 h2/h3 227개의 목적지를 기록했다.
 - [x] `_baseline.md`에 작성 계약·시험용/학습용 출처와 분할·축약·보존 기준을 반영했다.
 - 검증: 모든 기존 주요 절의 목적지가 있고, 미작성 커리큘럼 항목과 보충 항목이 구분되어 있다.
@@ -247,7 +247,7 @@ Kubernetes 문서 내 검색은 가능하지만 외부 검색 결과를 열면 �
 복사해서 쓸 다음 세션 요청:
 
 ```text
-/goal docs/plans/01-cka-udemy-rework.md의 남은 M2~M8을 Sol Medium으로 완료해 줘.
+/goal docs/plans/0001-cka-udemy-rework.md의 남은 M2~M8을 Sol Medium으로 완료해 줘.
 M0·M1은 완료되어 있으니 이관 계약과 baseline, Kustomize 시범을 먼저 읽어.
 
 각 작업 묶음을 편집 → 검증 → 오류 수정 → 계획 기록 → 커밋한 뒤 다음 묶음으로 계속해.
@@ -267,7 +267,7 @@ M8까지 완료한 뒤 최종 결과와 남은 한계를 보고해.
 검토 세션 요청:
 
 ```text
-docs/plans/01-cka-udemy-rework.md의 현재 완료 묶음과 diff를 검토해 줘.
+docs/plans/0001-cka-udemy-rework.md의 현재 완료 묶음과 diff를 검토해 줘.
 하나의 작업 목표, 쉬운 설명, 시험에서 찾을 수 있는 문서 경로, 명령의 전제와
 완료 판정, 원본의 유용한 정보 보존을 확인해. 범위 안의 오류는 수정·검증하고
 다음 작업 묶음과 남은 불확실성을 같은 계획에 기록해 줘.
@@ -287,7 +287,7 @@ docs/plans/01-cka-udemy-rework.md의 현재 완료 묶음과 diff를 검토해 �
 
 ### M0 확정 근거와 M1 편집 판단
 
-[이관 계약](01-cka-udemy-migration.md)이 원본 절과 번호의 정본이다. 파일명은 유지하고
+[이관 계약](0001-cka-udemy-migration.md)이 원본 절과 번호의 정본이다. 파일명은 유지하고
 완성 페이지의 order를 1010~1390에 예약해 미개편 페이지의 기존 order와 충돌하지 않게 했다.
 분할 기준은 줄 수보다 작업 대상·입력·성공 판정의 차이다. 반복 명령·요약은 합치되 서로 다른
 실패 원인·선택 범위·복구 조건·학습용 출처는 보존한다. 영구 규칙은 baseline에 함께 반영했다.
@@ -327,7 +327,7 @@ M0 묶음은 이 기록과 함께 커밋한다. 다음 작업은 M1a다.
 Components를 학습 보충으로 옮기고 34장/order 1340을 활성화했다. M1 네 페이지의
 공통 base·경로를 연결하고 반복 설명을 줄였다. 최종 252 / 174 / 223 / 174줄(총 823줄)이며
 원본 864줄보다 41줄 줄었다. 완전한 공통 Deployment 입력을 추가한 분량도 포함한다.
-정보 보존 판단은 [이관 계약의 M1 검토](01-cka-udemy-migration.md)에, 영구 기준은 baseline에 남겼다.
+정보 보존 판단은 [이관 계약의 M1 검토](0001-cka-udemy-migration.md)에, 영구 기준은 baseline에 남겼다.
 
 개념 원본 `cka/16-helm-kustomize`의 Kustomize 절도 대조했다. generator가 갱신하는 것은
 Deployment 자체 이름이 아니라 내부 ConfigMap 참조 이름임을 바로잡고 기본 적용·patch 링크를 추가했다.
@@ -341,7 +341,7 @@ prod 미포함, 선택 해제 후 생성 YAML에서 리소스·참조 제거, `l
 
 ### Sol Medium 인계 — M2부터 시작
 
-1. `AGENTS.md`, 이 계획의 머리·M2, 두 baseline과 [이관 계약](01-cka-udemy-migration.md)을 읽는다.
+1. `AGENTS.md`, 이 계획의 머리·M2, 두 baseline과 [이관 계약](0001-cka-udemy-migration.md)을 읽는다.
    M0·M1을 다시 수행하지 않는다. 모델은 후속 사용자 선택인 **Sol Medium**이다.
 2. 대표 기준은 `12-kustomize`의 공통 입력·완료 검증, `kustomize-patches`의 수정·삭제 조건,
    `kustomize-components`의 선택·미선택·해제 판정이다. 먼저 두 문단으로 할 일이 드러나는지 읽는다.

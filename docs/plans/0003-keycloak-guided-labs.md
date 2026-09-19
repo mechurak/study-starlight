@@ -85,7 +85,7 @@
 | 실제 결과 확인 | [lab 검증 기록](../../labs/keycloak/verification.md)의 해당 항목과 최신 후속 결과 |
 | 콘텐츠 | [콘텐츠 작성 규칙](../content-authoring.md), [덱 메타데이터](../../src/content/docs/keycloak/_deck.mjs), 수정할 본문 |
 | D2를 실제로 수정할 때만 | [D2 작성 규칙](../d2-authoring.md) |
-| 기존 작업과 관계 확인 | [계획 02](02-keycloak-rework.md)의 머리와 마지막 차단/재개 조건. 전체 과거 로그를 매번 읽지 않는다. |
+| 기존 작업과 관계 확인 | [계획 02](0002-keycloak-rework.md)의 머리와 마지막 차단/재개 조건. 전체 과거 로그를 매번 읽지 않는다. |
 
 콘솔 메뉴·Admin REST 필드·라이브러리 동작을 새로 설명할 때는 구현 시점에 아래 공식 문서와 현재
 고정 버전의 소스를 확인한다. 이 계획의 설계안을 공식 제품 동작을 검증한 결과로 간주하지 않는다.
@@ -302,7 +302,7 @@ README/본문의 실행 명령, 계획 02의 현재 재개 명령.
    ```bash
    git status --short
    rg -n 'verify-|prepare-|seed-|lifecycle-common|script_directory|lab_directory' labs/keycloak
-   rg -n 'labs/keycloak|scripts/verify-|P0[3-9]|P1[01]|D09|D16|D18' src/content/docs/keycloak docs/plans/02-keycloak-rework.md
+   rg -n 'labs/keycloak|scripts/verify-|P0[3-9]|P1[01]|D09|D16|D18' src/content/docs/keycloak docs/plans/0002-keycloak-rework.md
    ```
 
 2. `.state`의 비밀값을 읽지 않는다. 실행을 요청받은 세션에서는 Docker runtime·자원·정확한 project
@@ -715,7 +715,7 @@ index/wrapup/glossary/troubleshooting, MFA/Brokering/Service Account/backup/dire
 
 | 작업 | 상태 | 결정·변경 파일 | 검증 결과·미해결 사항 | 다음 행동 |
 |---|---|---|---|---|
-| 계획 작성 | done | `03-keycloak-guided-labs.md`, 목록 README. 같은 레포 유지, 공개 설정/내부 코드 분리, guided+ready와 5개 적용 단계 설계 | 코드·본문·규칙 읽기 완료. 계획 diff와 참조 경로 검증 완료. 컨테이너·사이트 검사는 계획 문서만 변경하므로 미실행 | 후속 구현 요청 시 M01 |
+| 계획 작성 | done | `0003-keycloak-guided-labs.md`, 목록 README. 같은 레포 유지, 공개 설정/내부 코드 분리, guided+ready와 5개 적용 단계 설계 | 코드·본문·규칙 읽기 완료. 계획 diff와 참조 경로 검증 완료. 컨테이너·사이트 검사는 계획 문서만 변경하므로 미실행 | 후속 구현 요청 시 M01 |
 | Compose 전용 범위 수정 | done | 사용자 요청에 따라 kind/Kubernetes 자산 보존 방침 폐기. M01-C에 8개 파일 삭제·P04 의존성/보존 검사·현재 안내 정리 추가 | 계획만 수정. 실행 자산·환경은 아직 변경하지 않음. 과거 이력은 보존하고 `.state/tools`의 Compose 용도 유지 | 후속 구현 요청 시 M01 → M01-C |
 | M01 | done | `compose.yaml`, `app/Dockerfile`, `scripts/`, `keycloak/`, `app/seed-*`, 현재 README·본문 호출자, 이 문서 | 추적된 kind/Kubernetes 삭제 대상 8개 확인. 공개 lifecycle 6개는 `scripts/` 유지, prepare/helper·seed·상세 verify는 `internal/`로 이동하고 Compose mount/entrypoint를 함께 바꿔야 함. `app-b`의 API health 의존 확인. 현재 Colima의 `keycloak-lab` 6개 service와 두 named volume은 healthy/존재하며 mode·stage·in-progress marker는 없음: metadata 없는 기존 ready 호환 검증에 사용 가능. `timeline` Supabase workload와 `.state` 비밀값은 조회·변경하지 않음. 과거 상세 검증은 evidence 선행 조건이 있고 새 guided 검사는 별도 구현해야 함 | M01-C |
 | M01-C | done | 추적된 `kind.yaml`, `kind/`, `k8s/` 8개 삭제. reset과 P05~P11의 P04 선행·fingerprint·보존 예외 제거. README/baseline/계획 02에 Compose 전용 현재 계약 반영 | 삭제 파일은 Git에서 복구 가능. 남은 실행 코드의 kind/kubectl 호출과 P04 선행 조건 0건(과거 결과의 `kind_or_kubectl=not_used` 문구만 유지). reset dry-run은 명시한 Compose 디렉터리만 출력하고 무확인 호출 exit 2. `.state` 과거 산출물과 실제 `kind` network는 변경하지 않음 | M02 |
@@ -736,17 +736,17 @@ index/wrapup/glossary/troubleshooting, MFA/Brokering/Service Account/backup/dire
 
 한 작업만 맡길 때:
 
-> `docs/plans/03-keycloak-guided-labs.md`의 M01을 수행해줘. 현재 작업 트리와 관련 지침을 확인하고,
+> `docs/plans/0003-keycloak-guided-labs.md`의 M01을 수행해줘. 현재 작업 트리와 관련 지침을 확인하고,
 > 호출·삭제·이동표와 검증 환경 조건을 구체화한 뒤 계획에 기록해줘. 구현은 M01-C부터이므로 이번에는 하지 마.
 
 작업 범위를 지정할 때:
 
-> `docs/plans/03-keycloak-guided-labs.md`를 읽고 M01-C~M05를 구현·검증·기록해줘. 선행 작업의 실제 완료를
+> `docs/plans/0003-keycloak-guided-labs.md`를 읽고 M01-C~M05를 구현·검증·기록해줘. 선행 작업의 실제 완료를
 > 확인하고 순서대로 진행해. 기존 실습 데이터는 보존하고, 실행하지 못한 검증은 이유와 재개 방법을 남겨줘.
 
 전체 구현을 맡길 때:
 
-> `docs/plans/03-keycloak-guided-labs.md`의 미완료 작업을 의존 순서대로 구현·검증·기록해줘. 파일 이동과
+> `docs/plans/0003-keycloak-guided-labs.md`의 미완료 작업을 의존 순서대로 구현·검증·기록해줘. 파일 이동과
 > 실제 학습 흐름까지 끝내고, 기존 데이터 보존과 공개 명령 호환 계약을 지켜줘. 필요한 새 권한/환경이
 > 있으면 독립 작업을 마친 뒤 정확한 대상과 필요한 조치를 알려줘. 커밋·푸시는 하지 마.
 

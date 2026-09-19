@@ -58,7 +58,7 @@ export default {
       "href": "/coding-agents/work-plans/",
       "title": "목표와 증거",
       "tone": "ok",
-      "desc": "실행 범위·현재 위치·검증 기록"
+      "desc": "명시적 생성 요청·네 자리 번호·문서별 상태"
     },
     {
       "label": "실행",
