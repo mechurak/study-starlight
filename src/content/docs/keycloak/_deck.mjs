@@ -1,4 +1,4 @@
-// 덱 단위 metadata와 구조. 페이지 소속·순서는 각 MDX frontmatter에 있다.
+// 덱 단위 metadata와 구조. 페이지 소속·순서는 sidebar 배열에 있다.
 export default {
 	"navOrder": 800,
 	"catalogOrder": 600,
@@ -20,34 +20,68 @@ export default {
 		"k8s"
 	],
 	"termIntro": "required",
-	"groups": [
+	"sidebar": [
 		{
-			"id": "foundations",
-			"label": "기초"
+			"label": "기초",
+			"pages": [
+				"authentication-landscape",
+				"keycloak-overview",
+				"realm-and-users"
+			]
 		},
 		{
-			"id": "login",
-			"label": "로그인과 토큰"
+			"label": "로그인과 토큰",
+			"pages": [
+				"oauth-oidc",
+				"clients-and-sso",
+				"token-validation"
+			]
 		},
 		{
-			"id": "access",
-			"label": "접근 제어"
+			"label": "접근 제어",
+			"pages": [
+				"groups-and-roles",
+				"scopes-and-mappers",
+				"authentication-flows",
+				"sessions-and-logout"
+			]
 		},
 		{
-			"id": "directory",
-			"label": "외부 디렉터리"
+			"label": "외부 디렉터리",
+			"pages": [
+				"ad-and-ldap",
+				"ldap-federation",
+				"directory-group-mapping",
+				"directory-changes"
+			]
 		},
 		{
-			"id": "integrations",
-			"label": "연동"
+			"label": "연동",
+			"pages": [
+				"identity-brokering",
+				"saml",
+				"service-accounts",
+				"oauth2-proxy",
+				"kubernetes-oidc"
+			]
 		},
 		{
-			"id": "operations",
-			"label": "운영"
+			"label": "운영",
+			"pages": [
+				"deployment",
+				"storage-and-availability",
+				"observability",
+				"backup-and-upgrade",
+				"administration-and-keys"
+			]
 		},
 		{
-			"id": "reference",
-			"label": "문제 해결과 마무리"
+			"label": "문제 해결과 마무리",
+			"pages": [
+				"troubleshooting",
+				"glossary",
+				"wrapup"
+			]
 		}
 	],
 	"map": [

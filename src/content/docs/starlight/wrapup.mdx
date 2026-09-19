@@ -2,9 +2,6 @@
 title: "마무리 — 지식베이스 설계와 치트시트"
 description: "Starlight로 학습 지식베이스를 설계할 때의 판단, 새 덱 추가 절차, 명령 치트시트, 빌드가 못 잡는 함정 목록"
 aliases: [개인 지식베이스, 학습 노트 구조, PKM]
-deckGroup: wrapup
-sidebar:
-  order: 100
 reviewedAt: 2026-09-18
 status: stable
 ---
@@ -31,17 +28,17 @@ import Thesis from '../../../components/docs/Thesis.astro';
 
 | 커졌을 때 보이는 통증 | 도입할 구조 원칙 | 이 레포의 구현 |
 |---|---|---|
-| 사이드바·랜딩·장 수가 서로 다르다 | 같은 가까운 원본에서 모든 보기를 파생한다 | `_deck.mjs`와 MDX를 `load-decks.mjs`가 합성 |
-| 중앙 manifest가 수백 줄의 콘텐츠 목록이 된다 | 정보 소유권을 덱·페이지 가까이 옮긴다 | 덱 정보는 `_deck.mjs`, 그룹·순서는 각 MDX |
+| 사이드바와 랜딩의 덱 정보가 서로 다르다 | 같은 가까운 원본에서 모든 보기를 파생한다 | `_deck.mjs`와 MDX를 `load-decks.mjs`가 합성 |
+| 중앙 manifest가 수백 줄의 콘텐츠 목록이 된다 | 정보 소유권을 덱·페이지 가까이 옮긴다 | 덱 정보·목차는 `_deck.mjs`, 제목·설명은 각 MDX |
 | 컴포넌트를 어디서 고칠지 모르겠다 | 역할로 디렉터리를 나눈다 | `layout/` · `docs/` · `demos/` |
 | 예전 이름이나 약어로 검색하면 안 나온다 | 검색용 동의어를 본문 HTML에 남긴다 | 페이지 frontmatter·덱 `_deck.mjs`의 `aliases`를 렌더 |
-| 오래된 글인지 판단할 수 없다 | 수정일과 **내용 검토일**을 구분하고 미검토를 숨기지 않는다 | `reviewedAt` + `status` + `npm run report:content` |
+| 오래된 글인지 판단할 수 없다 | 수정일과 **내용 검토일**을 구분한다. 페이지에는 검토 날짜·명시적 경고를 표시하고 기록 누락은 보고서에서 관리한다 | `reviewedAt` + `status` + `npm run report:content` |
 | 작업 규칙 파일이 길어 아무도 안 읽는다 | 루트 규칙은 **지도**, 세부는 목적별 문서로 둔다 | `AGENTS.md` → 작성·D2·검증·배포 문서 |
 | 빌드는 되는데 페이지·anchor가 빠지거나 중복된다 | 프레임워크 밖의 프로젝트 불변식을 검사한다 | content → build → 렌더된 내부 링크를 `npm run check`로 묶음 |
 | 로컬에서는 고쳤는데 다음 변경에서 다시 깨진다 | 같은 검사를 CI에서도 반복한다 | push·pull request마다 `npm run check` |
 
 여기서 핵심은 특정 manifest가 아니라 **한 사실에 편집 지점을 하나만 두는 것**이다.
-전역 어휘는 `catalog.mjs`, 덱 정보는 그 덱의 `_deck.mjs`, 페이지 소속·순서는 그 MDX가 소유한다.
+전역 어휘는 `catalog.mjs`, 덱 정보·목차는 그 덱의 `_deck.mjs`, 페이지 제목·설명은 그 MDX가 소유한다.
 같은 목록을 사이드바와 랜딩에 다시 적지 않고 파생하며, 파생할 수 없는 규칙만 한 문서를 원본으로 둔다.
 
 ### 페이지는 검색 결과 한 건의 크기로
@@ -93,7 +90,7 @@ import Thesis from '../../../components/docs/Thesis.astro';
 1. `src/content/docs/<덱이름>/`을 만들고 `_deck.mjs`를 둔다
 
    가까운 성격의 덱 설정을 복사해 `navOrder` · `catalogOrder` · metadata · `category` · `tags` ·
-   `termIntro` · `groups` · `map`을 정한다. 이 파일이 있으면 loader가 덱을 자동 발견한다.
+   `termIntro` · `sidebar` · `map`을 정한다. 이 파일이 있으면 loader가 덱을 자동 발견한다.
 
 2. 같은 폴더에 `_baseline.md`와 `index.mdx`를 만든다
 
@@ -103,7 +100,7 @@ import Thesis from '../../../components/docs/Thesis.astro';
 3. 본문 페이지를 넣는다
 
    파일명은 `intro.mdx`처럼 번호 없는 개념·작업 이름으로 짓고 `.mdx`로 만든다. 각 페이지에
-   `deckGroup`과 겹치지 않는 `sidebar.order`를 적으면 사이드바와 장 수에 자동 반영된다.
+   frontmatter에 `title`·`description`을 적고 덱 `sidebar[].pages`의 원하는 위치에 파일 이름을 추가한다.
    새 장은 `<Thesis>`를 두고, 개념 학습 덱이면 규칙에 맞춰 `<TermIntro>`도 둔다.
 
 4. `npm run check`로 설정·본문·빌드·내부 링크를 판정하고, 소스의 그룹·순서·DeckMap 목적지를 대조한다. 완성 예제는 [첫 덱 작성](/starlight/first-deck/)에 있다

@@ -1,4 +1,4 @@
-// 덱 단위 metadata와 구조. 페이지 소속·순서는 각 MDX frontmatter에 있다.
+// 덱 단위 metadata와 구조. 페이지 소속·순서는 sidebar 배열에 있다.
 export default {
 	"navOrder": 1900,
 	"catalogOrder": 1200,
@@ -23,38 +23,67 @@ export default {
 		"auth"
 	],
 	"termIntro": "required",
-	"groups": [
+	"sidebar": [
 		{
-			"id": "position",
-			"label": "큰 그림"
+			"label": "큰 그림",
+			"pages": [
+				"00-position",
+				"01-planes"
+			]
 		},
 		{
-			"id": "agent-types",
-			"label": "제품 밖의 계약"
+			"label": "제품 밖의 계약",
+			"pages": [
+				"02-agent-types",
+				"03-domain-model",
+				"04-lifecycle",
+				"05-authorization",
+				"06-adapter-contract",
+				"07-user-mcp"
+			]
 		},
 		{
-			"id": "kagent-architecture",
-			"label": "kagent — 온프렘 실행 어댑터"
+			"label": "kagent — 온프렘 실행 어댑터",
+			"pages": [
+				"08-kagent-architecture",
+				"09-kagent-resources",
+				"10-kagent-integration",
+				"11-kagent-adapter"
+			]
 		},
 		{
-			"id": "durable-execution",
-			"label": "보류한 결정"
+			"label": "보류한 결정",
+			"pages": [
+				"12-durable-execution"
+			]
 		},
 		{
-			"id": "agentcore",
-			"label": "AWS 실행 어댑터"
+			"label": "AWS 실행 어댑터",
+			"pages": [
+				"13-agentcore"
+			]
 		},
 		{
-			"id": "hybrid",
-			"label": "하이브리드 운영"
+			"label": "하이브리드 운영",
+			"pages": [
+				"14-hybrid",
+				"15-operations"
+			]
 		},
 		{
-			"id": "agentgateway",
-			"label": "생태계의 인접 층"
+			"label": "생태계의 인접 층",
+			"pages": [
+				"16-agentgateway",
+				"17-agentregistry"
+			]
 		},
 		{
-			"id": "adoption",
-			"label": "도입과 마무리"
+			"label": "도입과 마무리",
+			"pages": [
+				"18-adoption",
+				"reference-glossary",
+				"19-wrapup"
+			]
 		}
 	],
 	"map": [

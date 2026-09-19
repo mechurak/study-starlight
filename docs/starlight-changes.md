@@ -15,7 +15,7 @@
 | Markdown 프로세서 | 이미지 확대 호환을 위해 `unified()` 명시 | `astro.config.mjs` |
 | 검색 결과에 덱 이름 표시 | `MarkdownContent` 컴포넌트 override | `src/components/layout/MarkdownContent.astro` |
 | 덱 index 별칭 검색 | `_deck.mjs`의 `aliases`를 본문 앞에 표시 | `src/content/docs/*/_deck.mjs` · `MarkdownContent.astro` |
-| 검토 이력 표시 | `reviewedAt` 없는 문서를 안정 상태로 간주하지 않음 | `content.config.ts` · `MarkdownContent.astro` |
+| 검토 이력 표시 | 검토 날짜·명시적 경고만 표시하고 기록 누락은 보고서에서 관리 | `content.config.ts` · `MarkdownContent.astro` · `scripts/report-content-health.mjs` |
 | 랜딩 덱 카탈로그 | 태그 필터 + 카테고리 카드/테이블 전환 + 덱 이름·카테고리·최근 수정일 정렬 + Git 이력으로 수정일 계산 | `scripts/prepare-git-history.mjs` · `src/components/docs/DeckCatalog.astro` |
 | 본문 폰트 Pretendard | `customCss` (dynamic subset) | `astro.config.mjs` |
 | 본문 폭 45→55rem | `--sl-content-width` | `src/styles/custom.css` |
@@ -27,16 +27,18 @@
 
 ## 덱 데이터와 자동 사이드바
 
-덱과 장이 늘면서 모든 slug·그룹·index 구성도를 중앙 배열 하나에 적는 방식은 변경 충돌과 누락을
-만들기 쉬워졌다. 지금은 정보의 소유 위치를 다음처럼 나누고 `load-decks.mjs`가 최종 데이터를 만든다.
+덱별 목차를 한눈에 편집하도록 `_deck.mjs`의 배열에 그룹·페이지 순서를 모았다.
+정보의 소유 위치는 다음과 같고 `load-decks.mjs`가 최종 데이터를 만든다.
 
 - `src/data/catalog.mjs`: 모든 덱이 공유하는 category·tag 통제 어휘
-- `src/content/docs/<덱>/_deck.mjs`: 덱 메타데이터, topic·랜딩 순서, 그룹 정의, index `DeckMap`
-- 각 본문 MDX: `deckGroup`과 `sidebar.order`
+- `src/content/docs/<덱>/_deck.mjs`: 덱 메타데이터, topic·랜딩 순서, `sidebar` 목록, index `DeckMap`
+- 각 본문 MDX: 제목·설명·검색 별칭·검토 기록
 
-loader는 `_deck.mjs`가 있는 폴더를 덱으로 발견하고 MDX를 순회한다. 그룹·순서·slug·map 링크·전역
-어휘를 검증한 뒤 topic 사이드바와 랜딩 카탈로그, 장 수를 파생한다. 따라서 **새 장은 그 MDX 하나만
-추가하면 되고**, index의 구성도도 `<DeckMap deck="…" />`가 같은 폴더 설정을 읽으므로 복제되지 않는다.
+loader는 `_deck.mjs`가 있는 폴더를 덱으로 발견하고 `sidebar: [{ label, pages }]`를 실제 MDX와
+대조한다. 누락·중복·없는 파일 참조·빈 그룹·map 링크·전역 어휘를 검증한 뒤 topic 사이드바와
+랜딩 카탈로그를 파생한다. **새 장은 MDX를 만들고 그 덱의 `pages` 목록에 추가한다.**
+배열 순서가 읽는 순서이며 `index.mdx`는 자동으로 맨 앞에 붙인다.
+index의 구성도는 `<DeckMap deck="…" />`가 같은 폴더의 `map`을 읽는다.
 `src/data/decks.mjs`는 기존 컴포넌트 import를 유지하기 위한 re-export다.
 
 새 파일 추가·이름 변경을 실행 중 dev 서버가 즉시 config 변경으로 인식하지 못할 수 있으므로 이때는
@@ -123,7 +125,7 @@ Pagefind JS API(`debouncedSearch` → `result.data()` → meta로 그룹핑)로 
 테이블이고 서버 렌더 시점에 최근 수정일 내림차순으로 정렬해 둔다. 선택한 보기는
 `localStorage` 키 `deck-catalog-view`에 저장한다. 테이블은 덱 이름·카테고리·최근 수정일을 제목행
 버튼으로 정렬하며, 한 번 더 누르면 오름차순·내림차순을 바꾼다. 수정일이 없는 덱은
-정렬 방향과 관계없이 마지막에 둔다. 48rem 이하 화면에서는 카테고리·분량 열을 접어
+정렬 방향과 관계없이 마지막에 둔다. 48rem 이하 화면에서는 카테고리 열을 접어
 가로 스크롤 없이 덱·최근 수정일 열만 남긴다.
 
 ## 랜딩 태그 필터
@@ -187,8 +189,8 @@ Pagefind JS API(`debouncedSearch` → `result.data()` → meta로 그룹핑)로 
 `reviewedAt`은 수정일이 아니라 내용을 실제로 재확인한 날짜다. 날짜가 없는데 schema 기본값으로
 `stable`을 넣으면 미검토 문서가 안정된 문서처럼 보이므로 기본값을 없앴다. 표시 규칙은 다음과 같다.
 
-- 날짜와 status 모두 없음: `검토 이력 없음`
-- 날짜만 있음: `stable`로 해석하고 별도 경고는 표시하지 않음
+- 날짜와 status 모두 없음 또는 `status: unreviewed`: 검토 관련 문구를 표시하지 않음. 보고서에서는 이력 없음으로 집계
+- 날짜만 있음: `stable`로 해석하고 `내용 검토: 날짜`만 표시
 - 날짜 + `review` 또는 `stale`: `검토 필요` 또는 `오래된 내용`
 
 덱별 기본 검토 주기는 `_deck.mjs`의 `reviewIntervalDays`(생략 시 180일)이며,
@@ -206,7 +208,7 @@ URL에 언어 프리픽스가 없고, Starlight UI 문구(검색 버튼, 목차 
 
 - **검색은 Pagefind 기본 UI 그대로** — 위의 meta 주입만 얹었다.
   `Search` 컴포넌트를 교체하지 않았으므로 업그레이드 영향이 없다
-- 기본 프론트매터에 덱 파생용 `deckGroup`, 점진적 이관용 `legacyThesis`, 검색·현재성용
+- 기본 프론트매터에 점진적 이관용 `legacyThesis`, 검색·현재성용
   `aliases` · `reviewedAt` · `status`를 확장했다
   (쓰는 방식의 규칙은 [content-authoring.md](content-authoring.md))
 - 패키지 관리자는 npm이다. 예전 pnpm 구성(`pnpm-workspace.yaml`의 빌드 스크립트 허용)은 2026-09에 제거했다

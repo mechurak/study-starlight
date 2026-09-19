@@ -1,4 +1,4 @@
-// 덱 단위 metadata와 구조. 페이지 소속·순서는 각 MDX frontmatter에 있다.
+// 덱 단위 metadata와 구조. 페이지 소속·순서는 sidebar 배열에 있다.
 export default {
 	"navOrder": 600,
 	"catalogOrder": 1700,
@@ -15,30 +15,59 @@ export default {
 		"frontend"
 	],
 	"termIntro": "legacy",
-	"groups": [
+	"sidebar": [
 		{
-			"id": "intro",
-			"label": "시작"
+			"label": "시작",
+			"pages": [
+				"00-intro",
+				"01-landscape"
+			]
 		},
 		{
-			"id": "rsc",
-			"label": "Next.js — 실행 환경"
+			"label": "Next.js — 실행 환경",
+			"pages": [
+				"02-rsc",
+				"03-routing",
+				"04-boundary",
+				"05-data",
+				"06-cache",
+				"07-mutation",
+				"08-performance",
+				"next-runtime-config"
+			]
 		},
 		{
-			"id": "css-history",
-			"label": "Tailwind CSS — 스타일 언어"
+			"label": "Tailwind CSS — 스타일 언어",
+			"pages": [
+				"09-css-history",
+				"10-tailwind",
+				"11-tailwind-practice",
+				"12-tokens"
+			]
 		},
 		{
-			"id": "shadcn",
-			"label": "shadcn/ui — 컴포넌트"
+			"label": "shadcn/ui — 컴포넌트",
+			"pages": [
+				"13-shadcn",
+				"14-shadcn-setup",
+				"15-component-anatomy",
+				"16-asset"
+			]
 		},
 		{
-			"id": "design-system",
-			"label": "시스템으로 만들기"
+			"label": "시스템으로 만들기",
+			"pages": [
+				"17-design-system",
+				"18-a11y",
+				"19-forms-state"
+			]
 		},
 		{
-			"id": "patterns",
-			"label": "마무리"
+			"label": "마무리",
+			"pages": [
+				"20-patterns",
+				"21-wrapup"
+			]
 		}
 	],
 	"map": [

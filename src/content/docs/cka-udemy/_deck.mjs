@@ -1,4 +1,4 @@
-// 덱 단위 metadata와 구조. 페이지 소속·순서는 각 MDX frontmatter에 있다.
+// 덱 단위 metadata와 구조. 페이지 소속·순서는 sidebar 배열에 있다.
 export default {
 	"navOrder": 100,
 	"catalogOrder": 100,
@@ -17,34 +17,84 @@ export default {
 		"k8s"
 	],
 	"termIntro": "not-required",
-	"groups": [
+	"sidebar": [
 		{
-			"id": "architecture",
-			"label": "기초"
+			"label": "기초",
+			"pages": [
+				"basics",
+				"jsonpath"
+			]
 		},
 		{
-			"id": "pods",
-			"label": "Workloads와 스케줄링"
+			"label": "Workloads와 스케줄링",
+			"pages": [
+				"pods",
+				"workloads",
+				"jobs",
+				"pod-config",
+				"configmap-secret",
+				"init-sidecar",
+				"security-context",
+				"scheduling",
+				"priority-class",
+				"resource-limits",
+				"daemonset-static-pod",
+				"autoscaling",
+				"vpa"
+			]
 		},
 		{
-			"id": "services",
-			"label": "네트워킹"
+			"label": "네트워킹",
+			"pages": [
+				"services-dns",
+				"dns",
+				"network-environment",
+				"ingress-netpol",
+				"gateway",
+				"network-policy"
+			]
 		},
 		{
-			"id": "storage",
-			"label": "스토리지"
+			"label": "스토리지",
+			"pages": [
+				"storage",
+				"storage-class"
+			]
 		},
 		{
-			"id": "rbac",
-			"label": "Cluster Architecture"
+			"label": "Cluster Architecture",
+			"pages": [
+				"security",
+				"rbac",
+				"service-account",
+				"image-pull-secrets",
+				"admission",
+				"custom-resource",
+				"cluster-lifecycle",
+				"cluster-upgrade",
+				"etcd-backup-restore",
+				"helm",
+				"helm-release-replacement",
+				"kustomize",
+				"kustomize-transformers",
+				"kustomize-patches",
+				"kustomize-components"
+			]
 		},
 		{
-			"id": "troubleshooting",
-			"label": "Troubleshooting"
+			"label": "Troubleshooting",
+			"pages": [
+				"troubleshooting",
+				"control-plane-failure",
+				"worker-failure",
+				"network-failure"
+			]
 		},
 		{
-			"id": "exam-strategy",
-			"label": "시험 대비"
+			"label": "시험 대비",
+			"pages": [
+				"exam-search"
+			]
 		}
 	],
 	"map": [

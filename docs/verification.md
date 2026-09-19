@@ -6,11 +6,14 @@
 npm run check
 ```
 
-`check:content`가 `_deck.mjs`와 MDX에서 파생한 slug·순서·그룹, `category`·`tag` 어휘,
+`check:content`가 `_deck.mjs`의 sidebar와 실제 MDX를 대조해 누락·중복·없는 페이지·빈 그룹, `category`·`tag` 어휘,
 필수 baseline, 프론트매터, h4, 미지원 펜스 언어(promql·logql·traceql → `text`), 덱 index
 컴포넌트, `<Thesis>` 이관 표시, 필수 `<TermIntro>`, 검토 날짜 정합성을 검사한다. 이어서 Astro
 빌드와 Pagefind 인덱스를 만들고, `check:links`가 **렌더된 HTML의 내부 페이지·파일·anchor**를 검사한다.
 외부 URL의 생존 여부는 네트워크 상태와 rate limit 영향을 받으므로 기본 검사를 막지 않는다.
+
+`check:content`는 먼저 `scripts/deck-sidebar.test.mjs`로 목차 순서 보존과 잘못된 등록의 거부를 확인한다.
+옛 페이지 필드 `deckGroup`·`sidebar.order`가 남아 있어도 콘텐츠 검사가 실패한다.
 
 `AGENTS.md`·`README.md`·`docs/`·`_baseline.md`처럼 빌드에 포함되지 않는 지침·계획 문서만
 바꿨다면 `git diff --check`, 수정 diff, 변경한 참조 경로만 확인한다. 빌드·브라우저는 실행하지 않는다.

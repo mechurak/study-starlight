@@ -1,9 +1,6 @@
 ---
 title: "빌드와 검증"
 description: "프로젝트 검사·정적 빌드·검색 색인과 배포 전 설정을 구분하고 변경별 최소 검증을 고른다"
-deckGroup: writing
-sidebar:
-  order: 90
 reviewedAt: 2026-09-18
 status: stable
 ---
@@ -45,7 +42,7 @@ config에서 파생한 사이드바를 다시 읽는다. 일반 `npm run dev`는
 
 | 판정 대상 | 확인 수단 |
 |---|---|
-| 필수 metadata·그룹·순서·baseline | check:content와 loader |
+| 필수 metadata·목차 등록·baseline | check:content와 loader |
 | MDX 문법·import·D2 생성 | Astro 빌드 |
 | 렌더된 내부 페이지·파일·절 링크 | check:links |
 | TypeScript 타입 | 일반 build와 별개. 이 프로젝트 check가 타입 검사를 포함한다고 가정하지 않음 |

@@ -34,7 +34,7 @@
 문서 종류에 맞는 작은 예를 기준으로 삼는다.
 
 - **개념:** “왜 페이지 순서는 파일명에 넣지 않는가?”에 삽입 시 URL 변경 문제를 설명하고,
-  `sidebar.order`만 바꾸는 대안을 보여 준다. “중간에 페이지를 넣으면 기존 URL도 바뀌는가?”의
+  덱 `sidebar` 배열의 위치만 바꾸는 대안을 보여 준다. “중간에 페이지를 넣으면 기존 URL도 바뀌는가?”의
   답은 파일 경로가 유지되므로 바뀌지 않는다는 원리로 확인한다.
 - **실습:** 임시 덱을 어느 폴더에 만들고 어떤 파일이 필요한지 보여 준다. 검사 성공과 자동 등록을
   관찰하고, 임시 폴더를 제거하는 복구 방법까지 둔다.
@@ -139,28 +139,20 @@ import SourceFigure from '../../../components/docs/SourceFigure.astro';
 
 ## 프론트매터
 
-덱 본문 페이지는 자기 소속과 순서를 frontmatter에 함께 둔다. 새 `.mdx`를 만들면 이 정보만으로
-사이드바·랜딩 분량·검색 대상에 자동으로 들어가며, 중앙 목록 파일을 따로 고치지 않는다.
+모든 페이지의 필수 frontmatter는 `title`과 `description`이다. 페이지 소속·읽는 순서는
+같은 덱의 `_deck.mjs`에서 관리하며 본문에는 적지 않는다.
 
 ```yaml
 title: "요청 경로"
 description: 요청이 각 구성 요소를 지나는 순서
-deckGroup: architecture
-sidebar:
-  order: 30
 ```
 
-- `deckGroup`은 같은 폴더의 `_deck.mjs`에 선언한 `groups[].id` 중 하나다.
-- 빈 그룹은 허용하지 않는다. 단계적 이관을 위해 페이지보다 그룹을 먼저 선언해야 할 때만
-  `allowEmpty: true`를 붙이고, 그 그룹의 첫 페이지를 추가할 때 제거한다.
-- `sidebar.order`는 덱 전체에서 겹치지 않는 숫자다. 사이에 장을 끼워 넣기 쉽도록 보통 10 단위로 둔다.
 - 사이드바 라벨은 `title`에서 온다. 제목·파일명·URL에는 페이지 순서 번호를 붙이지 않는다.
   예: `ServiceAccount — Pod의 신원`, `service-account.mdx`, `/cka/service-account/`.
 - 본문 참조·LinkCard·DeckMap에는 페이지 이름과 링크를 쓰고, 요약 절 제목은 `요약`으로 둔다.
-  `sidebar.order`는 내부 정렬값이며 표시 번호나 파일명과 맞출 필요가 없다.
 - 기존 번호 페이지의 일괄 이름 변경은 별도 개편 범위에서 한다. 해당 개편에서는 들어오는 링크와
   옛 URL·절 북마크의 연결도 함께 처리한다. 새 페이지 때문에 주변 페이지를 다시 번호 매기지 않는다.
-- 덱 `index.mdx`에는 `deckGroup`과 `sidebar`가 필요 없다.
+- `deckGroup`·`sidebar.order`는 사용하지 않는다. 기존 형식을 남기면 콘텐츠 검사가 실패한다.
 
 새 본문 페이지에는 `<Thesis>`를 둔다. `legacyThesis: true`는 이 규칙을 도입하기 전에 생긴 페이지를
 점진적으로 이관하기 위한 표시일 뿐 새 페이지에 쓰지 않는다. 기존 페이지에 `<Thesis>`를 추가하면
@@ -178,11 +170,36 @@ status: review # stable | review | stale
 `_deck.mjs`의 `aliases`에 둔다. `reviewedAt`은 단순 수정일이 아니라 내용의 현재성을 실제로
 확인한 날짜다. 확신 없이 오늘 날짜를 넣지 않는다.
 
-`status`를 생략하고 `reviewedAt`만 두면 `stable`로 본다. `reviewedAt`이 없으면 예전처럼 암묵적으로
-안정 상태가 되지 않고 **검토 이력 없음**으로 표시된다. 검토가 필요하거나 이미 낡았음을 명시할 때만
-`review`·`stale`을 쓴다. `stable`·`review`·`stale`에는 `reviewedAt`이 반드시 있어야 한다.
+`status`를 생략하고 `reviewedAt`만 두면 `stable`로 보고 본문 앞에 검토 날짜만 표시한다.
+날짜와 상태가 없거나 `status: unreviewed`이면 검토 관련 문구를 표시하지 않는다.
+기록 누락을 안정 상태로 간주하지는 않으며, `npm run report:content`에서 이력 없음으로 집계한다.
+검토가 필요하거나 이미 낡았음을 명시할 때만 `review`·`stale`을 써서 경고를 표시한다.
+`stable`·`review`·`stale`에는 `reviewedAt`이 반드시 있어야 한다.
 
 ## 덱 메타데이터
+
+`_deck.mjs`의 `sidebar`에 그룹 이름과 페이지 목록을 적는다. 다음은 목차 부분만 발췌한 예다.
+
+```js
+sidebar: [
+  {
+    label: '구조 이해',
+    pages: ['overview', 'request-flow', 'components'],
+  },
+  {
+    label: '운영',
+    pages: ['deployment', 'troubleshooting'],
+  },
+],
+```
+
+- 그룹은 `sidebar` 배열 순서, 그룹 안 페이지는 `pages` 배열 순서로 표시한다. 별도 ID·정렬 숫자는 없다.
+- `pages`에는 `.mdx`를 뺀 덱 상대 파일 경로를 쓴다. `request-flow.mdx`는 `request-flow`,
+  하위 폴더의 `advanced/setup.mdx`는 `advanced/setup`이다.
+- 모든 본문은 정확히 한 번 등록한다. 누락·중복·없는 파일 참조·빈 그룹은 검사에서 실패한다.
+- 덱 `index.mdx`는 맨 앞에 자동으로 추가되므로 목록에 적지 않는다.
+- 페이지를 추가·삭제·이동할 때 목록도 함께 고친다. 순서만 바꾸면 URL은 유지된다.
+  파일명을 바꾸면 `sidebar`·`map`·본문 링크를 함께 확인한다.
 
 덱마다 `category`(4종) 하나와 `tags` 목록을 정한다. 카테고리는 "어디부터 볼지" 고르는
 굵은 묶음이고, 카테고리를 가로지르는 주제(쿠버네티스·LLM·인증 같은)는 태그가 맡는다.
@@ -277,7 +294,7 @@ label은 정확히 `macOS`, `Ubuntu`로 맞춘다 — label이 다르면 동기�
 - JSX 안의 마크다운은 들여쓰기하지 않는다. `<Card>`·`<TabItem>` 태그와 내용을 0칸에 두고 빈 줄로 띄운다.
 - `<Steps>` 안 번호 목록에 딸린 코드 블록만 3칸 들여쓴다.
 - 제목에 `<Badge>`를 붙일 때 공백 없이 쓴다. 공백이 있으면 앵커 slug 끝에 `-`가 붙는다.
-- 덱 안의 새 본문 페이지는 `deckGroup`과 `sidebar.order`를 넣으면 자동 등록된다. 덱 밖 페이지만
+- 덱 안의 새 본문 페이지는 `_deck.mjs`의 `sidebar[].pages`에 등록한다. 덱 밖 페이지만
   topic plugin의 `exclude`에 추가한다.
 - 코드 펜스 언어는 하이라이터가 지원하는 이름만 쓴다. 전용 문법이 없으면 `text`를 쓴다.
 

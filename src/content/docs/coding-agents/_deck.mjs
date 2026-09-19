@@ -16,18 +16,26 @@ export default {
     "agent"
   ],
   "termIntro": "required",
-  "groups": [
+  "sidebar": [
     {
-      "id": "project-instructions",
-      "label": "프로젝트 지침"
+      "label": "프로젝트 지침",
+      "pages": [
+        "project-instructions",
+        "instruction-discovery"
+      ]
     },
     {
-      "id": "development-process",
-      "label": "작업 프로세스"
+      "label": "작업 프로세스",
+      "pages": [
+        "work-plans",
+        "execution-and-resume"
+      ]
     },
     {
-      "id": "advanced",
-      "label": "선택 심화"
+      "label": "선택 심화",
+      "pages": [
+        "monorepo-instructions"
+      ]
     }
   ],
   "map": [

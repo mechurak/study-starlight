@@ -7,7 +7,7 @@
   기본 보기는 테이블이고 최근 수정일 내림차순으로 렌더한다 — "최근에 뭘 봤지"가
   이 사이트의 첫 질문이라서다. 테이블의 덱 이름·카테고리·최근 수정일 제목행은 버튼이며,
   누를 때마다 오름차순과 내림차순을 바꾼다. 현재 보기는 localStorage에 저장한다.
-  좁은 화면에서는 카테고리·분량 열을 접어 가로 스크롤 없이 덱과 최근 수정일만 남긴다.
+  좁은 화면에서는 카테고리 열을 접어 가로 스크롤 없이 덱과 최근 수정일만 남긴다.
 
   카테고리는 굵은 묶음이고, 랜딩에는 덱에 붙은 모든 태그를 표시한다.
   필터는 교집합(AND)이다 — 합집합은 대부분의 덱을 남겨
@@ -28,7 +28,6 @@
       icon      Starlight 아이콘 이름 — `_deck.mjs`에서 파생된 topic과 같은 값
       title     덱 이름
       desc      한 줄 소개 (평문 — 서식 처리 없음)
-      chapters  장 수 — 카드 오른쪽 위 분량 표시
       tags      해석된 {id, label} — 카드·행의 라벨이자 필터 대상
   facets: 필터 칩 — sections의 태그와 같은 어휘에 전체 기준 count가 붙은 것
 
@@ -55,7 +54,6 @@ interface Deck {
   icon: string;
   title: string;
   desc: string;
-  chapters: number;
   tags: Tag[];
 }
 
@@ -178,10 +176,7 @@ const tagIds = (deck: { tags: Tag[] }) => deck.tags.map((tag) => tag.id).join(' 
                 <Icon name={deck.icon as any} size="1.25rem" />
               </span>
               <span class="deck__body">
-                <span class="deck__row">
-                  <span class="deck__name">{deck.title}</span>
-                  <span class="deck__meta">{deck.chapters}장</span>
-                </span>
+                <span class="deck__name">{deck.title}</span>
                 <span class="deck__blurb">{deck.desc}</span>
                 {deck.updatedAt && (
                   <span class="deck__updated">
@@ -223,7 +218,6 @@ const tagIds = (deck: { tags: Tag[] }) => deck.tags.map((tag) => tag.id).join(' 
               <span class="catalog-table__sort-icon" aria-hidden="true">↕</span>
             </button>
           </th>
-          <th scope="col">분량</th>
           {/* 초기 행 순서(서버 정렬)와 같은 상태로 시작한다 — 첫 클릭은 오름차순이 된다 */}
           <th scope="col" data-sort-header="updated" aria-sort="descending">
             <button class="catalog-table__sort" type="button" data-sort="updated">
@@ -262,7 +256,6 @@ const tagIds = (deck: { tags: Tag[] }) => deck.tags.map((tag) => tag.id).join(' 
               </a>
             </th>
             <td><span class="catalog-table__category" data-tone={deck.tone}>{deck.category}</span></td>
-            <td class="catalog-table__chapters">{deck.chapters}장</td>
             <td class="catalog-table__date">
               {deck.updatedAt ? (
                 <time datetime={deck.updatedAt.toISOString()}>{formatDate(deck.updatedAt)}</time>
@@ -781,11 +774,6 @@ const tagIds = (deck: { tags: Tag[] }) => deck.tags.map((tag) => tag.id).join(' 
     gap: 0.3rem;
     min-width: 0;
   }
-  .deck__row {
-    display: flex;
-    align-items: baseline;
-    gap: 0.5rem;
-  }
   .deck__name {
     font-weight: 600;
     font-size: 0.98rem;
@@ -794,17 +782,6 @@ const tagIds = (deck: { tags: Tag[] }) => deck.tags.map((tag) => tag.id).join(' 
   }
   .deck:hover .deck__name {
     color: var(--dc-line);
-  }
-  .deck__meta {
-    flex: none;
-    margin-inline-start: auto;
-    font-size: 0.72rem;
-    font-weight: 600;
-    padding: 0.05rem 0.4rem;
-    border-radius: 0.9rem;
-    border: 1px solid var(--sl-color-gray-5);
-    color: var(--sl-color-gray-3);
-    white-space: nowrap;
   }
   .deck__blurb {
     font-size: 0.85rem;
@@ -881,14 +858,11 @@ const tagIds = (deck: { tags: Tag[] }) => deck.tags.map((tag) => tag.id).join(' 
     font-weight: 650;
     white-space: nowrap;
   }
-  /* 덱 열은 남은 폭을 쓰고, 비교에 필요한 세 열은 내용에 맞는 폭을 확보한다. */
+  /* 덱 열은 남은 폭을 쓰고, 카테고리·수정일 열은 내용에 맞는 폭을 확보한다. */
   .catalog-table thead th:nth-child(2) {
     width: 9rem;
   }
   .catalog-table thead th:nth-child(3) {
-    width: 4.5rem;
-  }
-  .catalog-table thead th:nth-child(4) {
     width: 7.5rem;
   }
   .catalog-table tbody tr:hover {
@@ -999,7 +973,6 @@ const tagIds = (deck: { tags: Tag[] }) => deck.tags.map((tag) => tag.id).join(' 
     font-weight: 600;
     white-space: nowrap;
   }
-  .catalog-table__chapters,
   .catalog-table__date {
     color: var(--sl-color-gray-2);
     white-space: nowrap;
@@ -1017,15 +990,14 @@ const tagIds = (deck: { tags: Tag[] }) => deck.tags.map((tag) => tag.id).join(' 
     border: 0;
   }
 
-  /* 콘텐츠 폭이 좁아지는 구간부터는 가로 스크롤 대신 카테고리·분량 열을 접는다
+  /* 콘텐츠 폭이 좁아지는 구간부터는 가로 스크롤 대신 카테고리 열을 접는다
      — 최근 수정일이 항상 남는다.
-     카테고리는 덱 아이콘의 tone 색이, 분량은 덱 페이지가 대신 말해 준다. */
+     카테고리는 덱 아이콘의 tone 색이 대신 말해 준다. */
   @media (max-width: 48rem) {
     .catalog-table {
       min-width: 0;
     }
-    .catalog-table tr > :nth-child(2),
-    .catalog-table tr > :nth-child(3) {
+    .catalog-table tr > :nth-child(2) {
       display: none;
     }
   }

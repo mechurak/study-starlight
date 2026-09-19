@@ -1,4 +1,4 @@
-// 덱 단위 metadata와 구조. 페이지 소속·순서는 각 MDX frontmatter에 있다.
+// 덱 단위 metadata와 구조. 페이지 소속·순서는 sidebar 배열에 있다.
 export default {
 	"navOrder": 0,
 	"catalogOrder": 0,
@@ -15,38 +15,86 @@ export default {
 		"k8s"
 	],
 	"termIntro": "legacy",
-	"groups": [
+	"sidebar": [
 		{
-			"id": "intro",
-			"label": "시험 소개"
+			"label": "시험 소개",
+			"pages": [
+				"intro",
+				"exam"
+			]
 		},
 		{
-			"id": "architecture",
-			"label": "기초"
+			"label": "기초",
+			"pages": [
+				"architecture",
+				"kubectl"
+			]
 		},
 		{
-			"id": "pods",
-			"label": "Workloads & Scheduling (15%)"
+			"label": "Workloads & Scheduling (15%)",
+			"pages": [
+				"pods",
+				"workloads",
+				"config",
+				"scheduling",
+				"autoscaling"
+			]
 		},
 		{
-			"id": "services",
-			"label": "Services & Networking (20%)"
+			"label": "Services & Networking (20%)",
+			"pages": [
+				"services",
+				"dns",
+				"ingress-gateway",
+				"networkpolicy"
+			]
 		},
 		{
-			"id": "storage",
-			"label": "Storage (10%)"
+			"label": "Storage (10%)",
+			"pages": [
+				"storage",
+				"pod-volumes",
+				"persistent-volumes",
+				"volume-lifecycle",
+				"storage-class",
+				"statefulset-storage",
+				"csi",
+				"storage-troubleshooting"
+			]
 		},
 		{
-			"id": "cluster-architecture",
-			"label": "Cluster Architecture (25%)"
+			"label": "Cluster Architecture (25%)",
+			"pages": [
+				"api-access",
+				"user-authentication",
+				"service-account",
+				"rbac",
+				"admission",
+				"cluster-setup",
+				"node-maintenance",
+				"cluster-upgrade",
+				"certificates",
+				"etcd-backup",
+				"high-availability",
+				"helm",
+				"kustomize",
+				"extensions",
+				"crd",
+				"operator"
+			]
 		},
 		{
-			"id": "troubleshooting",
-			"label": "Troubleshooting (30%)"
+			"label": "Troubleshooting (30%)",
+			"pages": [
+				"troubleshooting"
+			]
 		},
 		{
-			"id": "exam-strategy",
-			"label": "시험 대비"
+			"label": "시험 대비",
+			"pages": [
+				"exam-strategy",
+				"wrapup"
+			]
 		}
 	],
 	"map": [

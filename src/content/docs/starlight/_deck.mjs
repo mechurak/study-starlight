@@ -13,30 +13,50 @@ export default {
     "frontend"
   ],
   "termIntro": "required",
-  "groups": [
+  "sidebar": [
     {
-      "id": "intro",
-      "label": "시작"
+      "label": "시작",
+      "pages": [
+        "intro",
+        "first-deck",
+        "landscape"
+      ]
     },
     {
-      "id": "astro",
-      "label": "기반"
+      "label": "기반",
+      "pages": [
+        "astro",
+        "structure"
+      ]
     },
     {
-      "id": "mdx",
-      "label": "콘텐츠"
+      "label": "콘텐츠",
+      "pages": [
+        "mdx",
+        "components",
+        "custom"
+      ]
     },
     {
-      "id": "writing",
-      "label": "글쓰기와 운영"
+      "label": "글쓰기와 운영",
+      "pages": [
+        "writing",
+        "pipeline"
+      ]
     },
     {
-      "id": "deploy",
-      "label": "배포"
+      "label": "배포",
+      "pages": [
+        "github-pages",
+        "vercel",
+        "cloudflare-pages"
+      ]
     },
     {
-      "id": "wrapup",
-      "label": "마무리"
+      "label": "마무리",
+      "pages": [
+        "wrapup"
+      ]
     }
   ],
   "map": [

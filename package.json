@@ -8,7 +8,7 @@
   "scripts": {
     "dev": "astro dev",
     "start": "astro dev",
-    "check:content": "node scripts/check-content.mjs",
+    "check:content": "node --test scripts/deck-sidebar.test.mjs && node scripts/check-content.mjs",
     "check:links": "node scripts/check-links.mjs",
     "report:content": "node scripts/report-content-health.mjs",
     "check": "npm run check:content && astro build && npm run check:links",

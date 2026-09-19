@@ -22,14 +22,13 @@ const deck = deckDefinitions.find((candidate) => candidate.slug === entry.id);
 const aliases = [...new Set([...(deck?.aliases ?? []), ...(data.aliases ?? [])])];
 // 랜딩처럼 topic 밖에 있는 표지는 콘텐츠 현재성 대상이 아니다.
 const status = topic ? (data.status ?? (data.reviewedAt ? 'stable' : 'unreviewed')) : undefined;
+// 검토 기록 누락은 report:content에서 관리하고, 본문에는 명시적인 경고만 표시한다.
 const statusLabel =
-	status === 'unreviewed'
-		? '검토 이력 없음'
-		: status === 'review'
-			? '검토 필요'
-			: status === 'stale'
-				? '오래된 내용'
-				: undefined;
+	status === 'review'
+		? '검토 필요'
+		: status === 'stale'
+			? '오래된 내용'
+			: undefined;
 const reviewedAt = data.reviewedAt?.toLocaleDateString('ko-KR', {
 	year: 'numeric',
 	month: '2-digit',
@@ -66,10 +65,6 @@ const reviewedAt = data.reviewedAt?.toLocaleDateString('ko-KR', {
 
 	.content-status--review {
 		color: var(--sl-color-orange-high, #d97706);
-	}
-
-	.content-status--unreviewed {
-		color: var(--sl-color-gray-3);
 	}
 
 	.content-status--stale {

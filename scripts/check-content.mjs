@@ -93,6 +93,10 @@ for (const file of mdxFiles) {
 	const deck = deckBySlug.get(deckSlug);
 	if (!deck) continue;
 
+	if ('deckGroup' in frontmatter || Object.hasOwn(frontmatter.sidebar ?? {}, 'order')) {
+		errors.push(`${relative(file)}: 페이지 소속·순서는 _deck.mjs의 sidebar 배열에서 관리합니다. deckGroup·sidebar.order를 제거하세요.`);
+	}
+
 	const reviewedAt = frontmatter.reviewedAt ? new Date(frontmatter.reviewedAt) : undefined;
 	if (frontmatter.reviewedAt && (!reviewedAt || !Number.isFinite(reviewedAt.getTime()))) {
 		errors.push(`${relative(file)}: reviewedAt이 올바른 날짜가 아닙니다.`);
@@ -159,9 +163,6 @@ for (const deck of deckDefinitions) {
 		errors.push(`${relative(indexFile)}: <DeckMap deck="${deck.slug}" />가 없습니다.`);
 	}
 	if (frontmatter.aliases) errors.push(`${relative(indexFile)}: 덱 alias는 _deck.mjs에 둔다.`);
-	for (const group of deck.groups) {
-		if (group.items.length === 0 && !group.allowEmpty) errors.push(`${relative(path.join(docsRoot, deck.slug, '_deck.mjs'))}: '${group.id}' 그룹이 비어 있습니다.`);
-	}
 }
 
 if (errors.length > 0) {

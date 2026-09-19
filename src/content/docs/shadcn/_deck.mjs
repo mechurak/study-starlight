@@ -1,4 +1,4 @@
-// 덱 단위 metadata와 구조. 페이지 소속·순서는 각 MDX frontmatter에 있다.
+// 덱 단위 metadata와 구조. 페이지 소속·순서는 sidebar 배열에 있다.
 export default {
 	"navOrder": 700,
 	"catalogOrder": 1800,
@@ -15,26 +15,45 @@ export default {
 		"frontend"
 	],
 	"termIntro": "required",
-	"groups": [
+	"sidebar": [
 		{
-			"id": "intro",
-			"label": "준비"
+			"label": "준비",
+			"pages": [
+				"00-intro",
+				"01-what-is-shadcn"
+			]
 		},
 		{
-			"id": "theme",
-			"label": "테마라는 그릇"
+			"label": "테마라는 그릇",
+			"pages": [
+				"02-theme",
+				"03-setup"
+			]
 		},
 		{
-			"id": "color",
-			"label": "리소스 하나씩"
+			"label": "리소스 하나씩",
+			"pages": [
+				"04-color",
+				"05-shape",
+				"06-typography",
+				"07-component",
+				"08-icon-font"
+			]
 		},
 		{
-			"id": "dark",
-			"label": "테마 다루기"
+			"label": "테마 다루기",
+			"pages": [
+				"09-dark",
+				"10-make-theme",
+				"11-registry"
+			]
 		},
 		{
-			"id": "glossary",
-			"label": "마무리"
+			"label": "마무리",
+			"pages": [
+				"12-glossary",
+				"13-wrapup"
+			]
 		}
 	],
 	"map": [

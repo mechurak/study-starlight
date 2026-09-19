@@ -1,4 +1,4 @@
-// 덱 단위 metadata와 구조. 페이지 소속·순서는 각 MDX frontmatter에 있다.
+// 덱 단위 metadata와 구조. 페이지 소속·순서는 sidebar 배열에 있다.
 export default {
 	"navOrder": 1000,
 	"catalogOrder": 400,
@@ -15,34 +15,58 @@ export default {
 		"linux"
 	],
 	"termIntro": "required",
-	"groups": [
+	"sidebar": [
 		{
-			"id": "intro",
-			"label": "준비"
+			"label": "준비",
+			"pages": [
+				"00-intro",
+				"01-shell"
+			]
 		},
 		{
-			"id": "hardware",
-			"label": "이 서버는 무엇인가"
+			"label": "이 서버는 무엇인가",
+			"pages": [
+				"02-hardware",
+				"03-storage",
+				"04-process"
+			]
 		},
 		{
-			"id": "systemd",
-			"label": "서비스와 로그"
+			"label": "서비스와 로그",
+			"pages": [
+				"05-systemd",
+				"06-logs"
+			]
 		},
 		{
-			"id": "network",
-			"label": "네트워크"
+			"label": "네트워크",
+			"pages": [
+				"07-network",
+				"08-connectivity",
+				"09-proxy"
+			]
 		},
 		{
-			"id": "users",
-			"label": "사용자와 접근"
+			"label": "사용자와 접근",
+			"pages": [
+				"10-users",
+				"11-audit"
+			]
 		},
 		{
-			"id": "packages",
-			"label": "운영과 보안"
+			"label": "운영과 보안",
+			"pages": [
+				"12-packages",
+				"13-security"
+			]
 		},
 		{
-			"id": "playbook",
-			"label": "마무리"
+			"label": "마무리",
+			"pages": [
+				"14-playbook",
+				"15-glossary",
+				"16-wrapup"
+			]
 		}
 	],
 	"map": [

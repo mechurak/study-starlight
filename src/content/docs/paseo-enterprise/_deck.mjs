@@ -1,4 +1,4 @@
-// 덱 단위 metadata와 구조. 페이지 소속·순서는 각 MDX frontmatter에 있다.
+// 덱 단위 metadata와 구조. 페이지 소속·순서는 sidebar 배열에 있다.
 export default {
 	"navOrder": 2200,
 	"catalogOrder": 2200,
@@ -17,26 +17,44 @@ export default {
 		"auth"
 	],
 	"termIntro": "required",
-	"groups": [
+	"sidebar": [
 		{
-			"id": "decision",
-			"label": "큰 그림"
+			"label": "큰 그림",
+			"pages": [
+				"00-decision",
+				"01-internal-build",
+				"02-architecture"
+			]
 		},
 		{
-			"id": "keycloak-login",
-			"label": "인증과 인가"
+			"label": "인증과 인가",
+			"pages": [
+				"03-keycloak-login",
+				"04-oauth2-proxy",
+				"05-authorization"
+			]
 		},
 		{
-			"id": "catalog-types",
-			"label": "카탈로그와 구현"
+			"label": "카탈로그와 구현",
+			"pages": [
+				"06-catalog-types",
+				"07-plugin-implementation"
+			]
 		},
 		{
-			"id": "windows-installer",
-			"label": "운영과 도입"
+			"label": "운영과 도입",
+			"pages": [
+				"08-windows-installer",
+				"09-operations",
+				"10-wrapup"
+			]
 		},
 		{
-			"id": "desktop-plugin-management",
-			"label": "대안 검토"
+			"label": "대안 검토",
+			"pages": [
+				"desktop-plugin-management",
+				"enterprise-capability-store"
+			]
 		}
 	],
 	"map": [

@@ -1,4 +1,4 @@
-// 덱 단위 metadata와 구조. 페이지 소속·순서는 각 MDX frontmatter에 있다.
+// 덱 단위 metadata와 구조. 페이지 소속·순서는 sidebar 배열에 있다.
 export default {
 	"navOrder": 1100,
 	"catalogOrder": 1900,
@@ -16,34 +16,63 @@ export default {
 		"auth"
 	],
 	"termIntro": "legacy",
-	"groups": [
+	"sidebar": [
 		{
-			"id": "intro",
-			"label": "시작"
+			"label": "시작",
+			"pages": [
+				"00-intro",
+				"01-why"
+			]
 		},
 		{
-			"id": "architecture",
-			"label": "기반 — Postgres와 개발 환경"
+			"label": "기반 — Postgres와 개발 환경",
+			"pages": [
+				"02-architecture",
+				"03-start",
+				"03-local-cli",
+				"03-remote-cli",
+				"04-postgres"
+			]
 		},
 		{
-			"id": "data-api",
-			"label": "핵심 — 데이터와 권한"
+			"label": "핵심 — 데이터와 권한",
+			"pages": [
+				"05-data-api",
+				"06-auth",
+				"06-auth-reference",
+				"07-rls"
+			]
 		},
 		{
-			"id": "storage",
-			"label": "주변 제품"
+			"label": "주변 제품",
+			"pages": [
+				"08-storage",
+				"09-realtime",
+				"10-edge-functions",
+				"11-extensions"
+			]
 		},
 		{
-			"id": "vercel",
-			"label": "애플리케이션 통합"
+			"label": "애플리케이션 통합",
+			"pages": [
+				"12-vercel",
+				"12-deploy-guide",
+				"13-nextjs"
+			]
 		},
 		{
-			"id": "ops",
-			"label": "운영과 규모"
+			"label": "운영과 규모",
+			"pages": [
+				"14-ops",
+				"15-perf-cost"
+			]
 		},
 		{
-			"id": "patterns",
-			"label": "마무리"
+			"label": "마무리",
+			"pages": [
+				"16-patterns",
+				"17-wrapup"
+			]
 		}
 	],
 	"map": [

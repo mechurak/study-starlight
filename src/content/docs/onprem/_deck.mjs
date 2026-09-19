@@ -1,4 +1,4 @@
-// 덱 단위 metadata와 구조. 페이지 소속·순서는 각 MDX frontmatter에 있다.
+// 덱 단위 metadata와 구조. 페이지 소속·순서는 sidebar 배열에 있다.
 export default {
 	"navOrder": 300,
 	"catalogOrder": 300,
@@ -15,38 +15,63 @@ export default {
 		"k8s"
 	],
 	"termIntro": "required",
-	"groups": [
+	"sidebar": [
 		{
-			"id": "intro",
-			"label": "시작"
+			"label": "시작",
+			"pages": [
+				"00-intro",
+				"01-why"
+			]
 		},
 		{
-			"id": "foundation",
-			"label": "기반"
+			"label": "기반",
+			"pages": [
+				"02-foundation"
+			]
 		},
 		{
-			"id": "gateway",
-			"label": "바깥으로 여는 길"
+			"label": "바깥으로 여는 길",
+			"pages": [
+				"03-gateway",
+				"04-tls-dns",
+				"05-identity"
+			]
 		},
 		{
-			"id": "minio",
-			"label": "상태를 맡는 것들"
+			"label": "상태를 맡는 것들",
+			"pages": [
+				"06-minio",
+				"07-cnpg"
+			]
 		},
 		{
-			"id": "observability",
-			"label": "관측"
+			"label": "관측",
+			"pages": [
+				"08-observability"
+			]
 		},
 		{
-			"id": "gitops",
-			"label": "배포와 복구"
+			"label": "배포와 복구",
+			"pages": [
+				"09-gitops",
+				"10-secrets",
+				"sealed-secrets",
+				"vault-vso",
+				"11-backup"
+			]
 		},
 		{
-			"id": "ops",
-			"label": "운영"
+			"label": "운영",
+			"pages": [
+				"12-ops"
+			]
 		},
 		{
-			"id": "glossary",
-			"label": "마무리"
+			"label": "마무리",
+			"pages": [
+				"13-glossary",
+				"14-wrapup"
+			]
 		}
 	],
 	"map": [

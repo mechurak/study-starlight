@@ -1,9 +1,6 @@
 ---
 title: 첫 덱 작성과 자동 등록 확인
 description: baseline·덱 설정·개요·본문 네 파일로 작은 덱을 만들고 순서 변경·검증·복구까지 확인한다
-deckGroup: intro
-sidebar:
-  order: 15
 reviewedAt: 2026-09-18
 status: stable
 ---
@@ -12,7 +9,7 @@ import { LinkCard } from '@astrojs/starlight/components';
 import Thesis from '../../../components/docs/Thesis.astro';
 import TermIntro from '../../../components/docs/TermIntro.astro';
 
-<Thesis>덱 설정과 페이지 frontmatter를 각자 가까운 파일에 두면 loader가 사이드바·랜딩·장 수를 파생한다</Thesis>
+<Thesis>덱의 sidebar 배열에 페이지 이름을 적으면 loader가 파일과 대조해 사이드바·랜딩을 만든다</Thesis>
 
 [시작하기](/starlight/intro/)의 설치를 마친 저장소에서 **작은 덱을 만들고 무엇이 자동으로 등록되는지**
 확인한다. 이 예제는 학습용 `sample-notes` 폴더만 추가하며 기존 덱을 고치지 않는다.
@@ -20,7 +17,7 @@ import TermIntro from '../../../components/docs/TermIntro.astro';
 
 <TermIntro terms={[
   ['metadata', '', '덱의 이름·분류·그룹처럼 본문이 아닌 설명 데이터.'],
-  ['frontmatter', '', 'MDX 맨 위의 --- 사이에 쓰는 페이지 속성. 소속과 순서는 페이지가 소유한다.'],
+  ['frontmatter', '', 'MDX 맨 위의 --- 사이에 쓰는 페이지 속성. 제목·설명·검토 기록을 담고, 목차는 덱 설정이 소유한다.'],
 ]} />
 
 ## 네 파일은 서로 다른 질문에 답한다
@@ -28,7 +25,7 @@ import TermIntro from '../../../components/docs/TermIntro.astro';
 | 파일 | 답하는 질문 |
 |---|---|
 | `_baseline.md` | 누구에게 무엇을 어느 범위까지 설명하는가 |
-| `_deck.mjs` | 어떤 덱이며 어떤 그룹으로 묶는가 |
+| `_deck.mjs` | 어떤 덱이며 페이지를 어떤 그룹·순서로 읽는가 |
 | `index.mdx` | 왜 읽고 어디서 시작하는가 |
 | `page-order.mdx` | 페이지 순서를 어떻게 바꾸는가 |
 
@@ -44,7 +41,7 @@ import TermIntro from '../../../components/docs/TermIntro.astro';
 독자: Markdown과 파일 편집을 아는 사이트 작성자.
 선행 지식: MDX frontmatter, 저장소에서 명령 실행.
 학습 결과: 페이지 이름과 읽는 순서를 분리하고 기존 URL을 유지하며 순서를 바꾼다.
-범위: 이 저장소의 덱 loader와 sidebar.order. 라우터 커스터마이즈는 다루지 않는다.
+범위: 이 저장소의 덱 loader와 sidebar 배열. 라우터 커스터마이즈는 다루지 않는다.
 기준: 현재 저장소의 load-decks.mjs와 content-authoring.md.
 서술 규칙: 이름·URL에는 순서 번호를 넣지 않고 예제의 관찰 결과를 설명한다.
 ```
@@ -62,19 +59,20 @@ export default {
   category: 'tools',
   tags: ['frontend'],
   termIntro: 'required',
-  groups: [{ id: 'basics', label: '기본' }],
+  sidebar: [{ label: '기본', pages: ['page-order'] }],
   map: [{
     label: '적용',
     title: '페이지 순서',
     href: '/sample-notes/page-order/',
-    desc: '주소를 유지하면서 정렬값 바꾸기',
+    desc: '주소를 유지하면서 목록 순서 바꾸기',
     tone: 'key',
   }],
 };
 ```
 
-이 파일이 있으면 loader가 폴더를 덱으로 발견한다. 본문 그룹은 `basics`로 연결하고 구성도는
-`map`의 현재 페이지 링크를 사용한다. 중앙 덱 목록을 따로 추가하지 않는다.
+이 파일이 있으면 loader가 폴더를 덱으로 발견한다. `page-order.mdx`는 `pages`에 적힌 위치에
+들어가며 구성도는 `map`의 현재 페이지 링크를 사용한다. `index.mdx`는 목록에 적지 않고,
+사이트 전체의 중앙 덱 목록도 따로 추가하지 않는다.
 
 ## 개요와 본문을 만든다
 
@@ -88,10 +86,10 @@ import { LinkButton } from '@astrojs/starlight/components';
 import Thesis from '../../../components/docs/Thesis.astro';
 import DeckMap from '../../../components/docs/DeckMap.astro';
 
-<Thesis>페이지 주소는 이름이, 읽는 순서는 정렬값이 맡는다</Thesis>
+<Thesis>페이지 주소는 이름이, 읽는 순서는 목차 배열이 맡는다</Thesis>
 
 새 페이지를 중간에 넣을 때 기존 주소까지 바꾸면 북마크가 깨질 수 있다.
-이 덱은 파일 이름을 유지하고 frontmatter의 정렬값만 바꾸는 방법을 설명한다.
+이 덱은 파일 이름을 유지하고 덱 설정의 목록 순서만 바꾸는 방법을 설명한다.
 
 <LinkButton href="/sample-notes/page-order/" icon="right-arrow">페이지 순서 연습</LinkButton>
 
@@ -103,38 +101,41 @@ import DeckMap from '../../../components/docs/DeckMap.astro';
 ```mdx title="src/content/docs/sample-notes/page-order.mdx"
 ---
 title: 페이지 순서
-description: 파일명을 유지하고 sidebar.order로 읽는 순서를 바꾼다
-deckGroup: basics
-sidebar:
-  order: 10
+description: 파일명을 유지하고 덱의 sidebar 배열로 읽는 순서를 바꾼다
 ---
 
 import Thesis from '../../../components/docs/Thesis.astro';
 import TermIntro from '../../../components/docs/TermIntro.astro';
 
-<Thesis>순서를 바꿀 때 파일명 대신 sidebar.order를 고친다</Thesis>
+<Thesis>순서를 바꿀 때 파일명 대신 덱 설정의 pages 배열에서 위치를 옮긴다</Thesis>
 
 페이지를 중간에 넣어도 기존 주소는 유지하고 싶다. 이름과 순서를 다른 값으로 관리하면 가능하다.
 
 <TermIntro terms={[
-  ['정렬값', 'sidebar.order', '덱 안에서 페이지가 나타날 순서를 정하는 숫자. 작은 값이 먼저다.'],
+  ['목차', 'sidebar', '그룹 이름과 페이지 목록을 담은 배열. 앞에 적은 그룹·페이지가 먼저 나온다.'],
 ]} />
 
 ## 주소와 순서를 나눈다
 
-이 파일의 주소는 `/sample-notes/page-order/`다. frontmatter의 order를 10에서 20으로 바꿔도
-파일명은 그대로이므로 주소는 유지된다. 본문이 하나뿐이면 화면 순서는 그대로 보인다.
-둘째 페이지가 order 15로 같은 그룹에 있으면 10일 때는 그 앞, 20일 때는 그 뒤에 놓인다.
+이 파일의 주소는 `/sample-notes/page-order/`다. 덱 설정의 pages 목록에서 위치를 옮겨도
+파일명이 같으면 주소는 유지된다. 본문이 하나뿐이면 앞뒤 순서 변화를 볼 수 없으므로
+아래에서는 둘째 페이지를 만들어 확인한다.
 
 ## 적용하고 확인한다
 
-이 파일의 order만 20으로 바꾸고 저장소 루트에서 `npm run check`를 실행한다.
-예상 결과는 검사 통과와 같은 페이지 URL이다. 실습 후 order를 10으로 되돌린다.
-다른 페이지와 정렬값이 겹치면 loader가 실패하므로 덱 안에서 유일한 값을 쓴다.
+1. 이 파일을 같은 폴더의 `practice.mdx`로 복사하고, title을 `순서 확인`, description을
+   `두 페이지의 목록 위치를 바꾸어 순서와 주소를 확인한다`로 고친다. 나머지 본문·컴포넌트는 유지한다.
+2. `_deck.mjs`의 pages를 `['page-order', 'practice']`로 바꾼다.
+3. 두 이름의 위치를 바꾸어 `['practice', 'page-order']`로 저장하고 저장소 루트에서
+   `npm run check`를 실행한다.
+4. 예상 결과는 검사 통과와 기본 그룹의 `순서 확인 → 페이지 순서` 순서다.
+   `/sample-notes/page-order/` 주소는 유지된다. 실행 중 dev 서버는 재시작한다.
+5. 실습 후 pages를 `['page-order']`로 되돌리고 이번에 복사한 `practice.mdx`만 제거한다.
+   최종 상태에서 `npm run check`를 실행해 원래 목차로 돌아왔는지 확인한다.
 
 ## 이해 확인
 
-중간 삽입 때문에 기존 파일명을 바꿔야 할까? 아니다. 순서는 정렬값이 맡고 주소는 파일 경로가 맡는다.
+중간 삽입 때문에 기존 파일명을 바꿔야 할까? 아니다. 순서는 목록의 위치가 맡고 주소는 파일 경로가 맡는다.
 ```
 
 ## 검증하고 결과를 읽는다
@@ -148,24 +149,25 @@ node --input-type=module -e "import { topicPageSlugs } from './src/data/decks.mj
 
 예상 결과는 검사 성공과 `sample-notes`, `sample-notes/page-order` 두 slug다.
 `dist/sample-notes/index.html`과 `dist/sample-notes/page-order/index.html`이 생성되고,
-덱 메뉴·랜딩 데이터·사이드바·장 수가 같은 원본에서 파생된다. 구성도 링크는 `_deck.mjs`의 map을 따른다.
+덱 메뉴·랜딩 데이터·사이드바가 같은 원본에서 파생된다. 구성도 링크는 `_deck.mjs`의 map을 따른다.
 실행 중 dev 서버가 있다면 재시작해야 새 덱 설정을 읽는다.
 
 | 실패 | 볼 곳 |
 |---|---|
 | 덱이 발견되지 않음 | 폴더의 `_deck.mjs`, ASCII 소문자 slug |
-| 그룹 오류 | 본문의 deckGroup과 groups id 일치 여부 |
-| 순서 중복 | 덱 전체 본문의 sidebar.order |
+| 페이지 누락·중복 | sidebar의 pages 목록에 각 본문이 정확히 한 번 있는지 |
+| 없는 파일·빈 그룹 | pages의 이름과 실제 MDX, 그룹별 페이지 목록 |
 | 필수 컴포넌트 누락 | index의 LinkButton·DeckMap, 본문의 Thesis·TermIntro |
 | 구성도 링크 실패 | map의 href와 실제 파일 경로 |
 
-자동 성공 뒤에도 예제의 원리·관찰·답이 연결되는지 읽는다. 위 본문에서 페이지 하나만으로는
-앞뒤 순서 변화를 눈으로 볼 수 없다는 제한을 숨기지 않는 것도 의미 리뷰다.
+자동 성공 뒤에도 예제의 원리·관찰·답이 연결되는지 읽는다. 위 본문의 순서 변경 연습은
+둘째 페이지가 있어야 변화를 볼 수 있고, 파일명은 유지하므로 기존 URL도 유지된다.
 
 ## 실습 파일을 복구한다
 
 계속 쓸 덱이라면 이름·독자·주제·근거를 실제 목적에 맞게 고친다. 연습만 했다면 이번에 만든
-`src/content/docs/sample-notes/` 네 파일과 폴더를 제거한다. 기존 폴더를 수정했다면 전체를 지우지
+`src/content/docs/sample-notes/` 네 파일과 폴더를 제거한다. 순서 연습 중 만든 `practice.mdx`가
+남아 있으면 함께 제거한다. 기존 폴더를 수정했다면 전체를 지우지
 말고 이번 변경만 복구한다. 제거도 사이트 결과를 바꾸므로 최종 상태에서 `npm run check`를 실행한다.
 
 <LinkCard title="문서답게 쓰기" description="형식이 맞는 덱을 독자가 적용할 수 있는 설명으로 다듬는다." href="/starlight/writing/" />

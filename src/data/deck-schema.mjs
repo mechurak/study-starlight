@@ -41,13 +41,12 @@ export const deckConfigSchema = z
 		tags: z.array(z.string().min(1)),
 		termIntro: z.enum(['required', 'not-required', 'legacy']),
 		reviewIntervalDays: z.number().int().positive().default(180),
-		groups: z
+		sidebar: z
 			.array(
 				z
 					.object({
-						id: idSchema,
 						label: z.string().min(1),
-						allowEmpty: z.literal(true).optional(),
+						pages: z.array(z.string().regex(/^[a-z0-9-]+(?:\/[a-z0-9-]+)*$/u)).min(1),
 					})
 					.strict(),
 			)

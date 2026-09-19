@@ -7,7 +7,7 @@ import {
 	tags as rawTags,
 } from './catalog.mjs';
 import { catalogSchema, deckConfigSchema } from './deck-schema.mjs';
-import { readFrontmatter } from './frontmatter.mjs';
+import { resolveDeckSidebar } from './deck-sidebar.mjs';
 
 // Astro가 이 module을 prerender bundle에 넣어도 cwd는 저장소 root를 유지한다.
 // import.meta.url을 쓰면 dist/.prerender 기준으로 바뀌므로 source tree를 찾지 못한다.
@@ -21,11 +21,6 @@ try {
 	throw error;
 }
 const { categories, tags } = catalog;
-
-const pageFrontmatterSchema = z.object({
-	deckGroup: z.string().min(1),
-	sidebar: z.object({ order: z.number() }).passthrough(),
-});
 
 function walkMdx(directory) {
 	return fs.readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
@@ -71,47 +66,21 @@ const loadedDecks = await Promise.all(
 			throw error;
 		}
 
-		const groupIds = config.groups.map((group) => group.id);
-		if (new Set(groupIds).size !== groupIds.length) {
-			throw new Error(`${configFile}: 중복된 group id가 있습니다.`);
-		}
-
-		const pages = walkMdx(directory)
-			.filter((file) => file !== path.join(directory, 'index.mdx'))
-			.map((file) => {
-				const frontmatter = readFrontmatter(file);
-				let page;
-				try {
-					page = pageFrontmatterSchema.parse(frontmatter);
-				} catch (error) {
-					if (error instanceof z.ZodError) throw formatSchemaError(file, '페이지 frontmatter', error);
-					throw error;
-				}
-				if (!groupIds.includes(page.deckGroup)) {
-					throw new Error(`${file}: deckGroup '${page.deckGroup}'이 ${configFile}에 없습니다.`);
-				}
-				return {
-					slug: slugFor(file),
-					group: page.deckGroup,
-					order: page.sidebar.order,
-					file,
-				};
-			})
-			.sort((a, b) => a.order - b.order || a.slug.localeCompare(b.slug));
-
-		const orders = pages.map((page) => page.order);
-		if (new Set(orders).size !== orders.length) {
-			throw new Error(`${configFile}: sidebar.order가 중복된 페이지가 있습니다.`);
-		}
+		const pagesByName = new Map(
+			walkMdx(directory)
+				.filter((file) => file !== path.join(directory, 'index.mdx'))
+				.map((file) => [
+					path.relative(directory, file).replace(/\.mdx$/u, '').split(path.sep).join('/'),
+					{ slug: slugFor(file), file },
+				]),
+		);
+		const { pages, navigation } = resolveDeckSidebar(config.sidebar, pagesByName, configFile);
 
 		return {
 			...config,
 			slug,
 			pages,
-			groups: config.groups.map((group) => ({
-				...group,
-				items: pages.filter((page) => page.group === group.id).map((page) => page.slug),
-			})),
+			navigation,
 		};
 	}),
 );
@@ -171,7 +140,7 @@ export const topics = [...loadedDecks]
 		icon: deck.icon,
 		items: [
 			deck.slug,
-			...deck.groups.map(({ label, items }) => ({ label, items })),
+			...deck.navigation,
 		],
 	}));
 
@@ -203,7 +172,6 @@ export const deckCatalogSections = categories.map((category) => ({
 			icon: deck.icon,
 			title: deck.title,
 			desc: deck.description,
-			chapters: deck.pages.length,
 			tags: deck.tags.map((id) => tags.find((tag) => tag.id === id)).filter(Boolean),
 		})),
 }));

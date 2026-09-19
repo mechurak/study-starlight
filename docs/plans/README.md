@@ -16,6 +16,7 @@
 | 02 | [Keycloak 덱 재구성](02-keycloak-rework.md) | 차단 |
 | 03 | [Keycloak 실습 학습 경로와 코드 구조 개편](03-keycloak-guided-labs.md) | 완료 |
 | 04 | [학습 콘텐츠 품질 정비와 Starlight 템플릿 분리](04-starlight-book-template.md) | 완료 |
+| 05 | [덱별 사이드바 목록으로 통합](05-deck-sidebar.md) | 완료 |
 
 ## 번호와 파일명
 

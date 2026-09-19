@@ -1,4 +1,4 @@
-// 덱 단위 metadata와 구조. 페이지 소속·순서는 각 MDX frontmatter에 있다.
+// 덱 단위 metadata와 구조. 페이지 소속·순서는 sidebar 배열에 있다.
 export default {
 	"navOrder": 1500,
 	"catalogOrder": 900,
@@ -18,30 +18,45 @@ export default {
 		"k8s"
 	],
 	"termIntro": "required",
-	"groups": [
+	"sidebar": [
 		{
-			"id": "decision",
-			"label": "시작"
+			"label": "시작",
+			"pages": [
+				"00-decision",
+				"01-fleet"
+			]
 		},
 		{
-			"id": "gpu-foundation",
-			"label": "GPU 기반"
+			"label": "GPU 기반",
+			"pages": [
+				"02-gpu-foundation"
+			]
 		},
 		{
-			"id": "kserve",
-			"label": "추론 평면"
+			"label": "추론 평면",
+			"pages": [
+				"03-kserve",
+				"04-serving",
+				"05-serving-operations"
+			]
 		},
 		{
-			"id": "data-network",
-			"label": "데이터와 연결"
+			"label": "데이터와 연결",
+			"pages": [
+				"06-data-network"
+			]
 		},
 		{
-			"id": "migration",
-			"label": "전환"
+			"label": "전환",
+			"pages": [
+				"07-migration"
+			]
 		},
 		{
-			"id": "wrapup",
-			"label": "마무리"
+			"label": "마무리",
+			"pages": [
+				"08-wrapup"
+			]
 		}
 	],
 	"map": [

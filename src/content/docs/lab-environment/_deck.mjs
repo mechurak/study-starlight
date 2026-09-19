@@ -1,4 +1,4 @@
-// 덱 단위 metadata와 구조. 페이지 소속·순서는 각 MDX frontmatter에 있다.
+// 덱 단위 metadata와 구조. 페이지 소속·순서는 sidebar 배열에 있다.
 export default {
 	"navOrder": 200,
 	"catalogOrder": 200,
@@ -20,14 +20,20 @@ export default {
 		"k8s"
 	],
 	"termIntro": "required",
-	"groups": [
+	"sidebar": [
 		{
-			"id": "kind",
-			"label": "Kubernetes"
+			"label": "Kubernetes",
+			"pages": [
+				"01-kind",
+				"02-helm"
+			]
 		},
 		{
-			"id": "compose",
-			"label": "Docker Compose"
+			"label": "Docker Compose",
+			"pages": [
+				"docker-compose",
+				"local-https-browser"
+			]
 		}
 	],
 	"map": [

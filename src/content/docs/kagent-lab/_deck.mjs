@@ -1,4 +1,4 @@
-// 덱 단위 metadata와 구조. 페이지 소속·순서는 각 MDX frontmatter에 있다.
+// 덱 단위 metadata와 구조. 페이지 소속·순서는 sidebar 배열에 있다.
 export default {
 	"navOrder": 2000,
 	"catalogOrder": 1300,
@@ -18,34 +18,56 @@ export default {
 		"k8s"
 	],
 	"termIntro": "not-required",
-	"groups": [
+	"sidebar": [
 		{
-			"id": "lab-map",
-			"label": "준비와 설치"
+			"label": "준비와 설치",
+			"pages": [
+				"00-lab-map",
+				"01-install"
+			]
 		},
 		{
-			"id": "first-agent",
-			"label": "Agent와 tool"
+			"label": "Agent와 tool",
+			"pages": [
+				"02-first-agent",
+				"03-declarative-agent",
+				"04-mcp-tool"
+			]
 		},
 		{
-			"id": "a2a-invoke",
-			"label": "호출과 진단"
+			"label": "호출과 진단",
+			"pages": [
+				"05-a2a-invoke",
+				"06-observe-debug"
+			]
 		},
 		{
-			"id": "backend-walking-skeleton",
-			"label": "Backend 연동과 권한"
+			"label": "Backend 연동과 권한",
+			"pages": [
+				"07-backend-walking-skeleton",
+				"08-security-boundary"
+			]
 		},
 		{
-			"id": "byo-agent",
-			"label": "코드형과 온프렘 승격"
+			"label": "코드형과 온프렘 승격",
+			"pages": [
+				"09-byo-agent",
+				"10-onprem-staging"
+			]
 		},
 		{
-			"id": "substrate-install",
-			"label": "Agent Substrate"
+			"label": "Agent Substrate",
+			"pages": [
+				"11-substrate-install",
+				"12-substrate-compare"
+			]
 		},
 		{
-			"id": "adoption-decision",
-			"label": "판정과 정리"
+			"label": "판정과 정리",
+			"pages": [
+				"13-adoption-decision",
+				"14-cleanup"
+			]
 		}
 	],
 	"map": [

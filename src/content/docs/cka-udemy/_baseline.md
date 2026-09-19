@@ -57,7 +57,7 @@
 
 ## 최종 구조를 유지하는 법
 
-- 제목·파일명·URL에 페이지 번호를 붙이지 않는다. 학습 순서는 `deckGroup`·`sidebar.order`로
+- 제목·파일명·URL에 페이지 번호를 붙이지 않는다. 학습 순서는 `_deck.mjs`의 `sidebar` 배열로
   관리한다. 페이지 추가·삭제 시 관련 `_deck.mjs`·LinkCard·작업 색인을 갱신한다.
 - 기존 번호 주소는 `src/data/cka-udemy-legacy-routes.json`과
   `src/pages/cka-udemy/[legacy].astro`가 새 주소로 연결하며, 절 북마크를 유지한다.

@@ -49,7 +49,7 @@ Astro Starlight 기반 개인 스터디 노트 사이트. 슬라이드가 아니
 검사 통과나 필수 컴포넌트의 존재만으로 내용 검토를 대신하지 않는다.
 
 - 페이지 제목·파일명·URL에는 순서를 나타내는 번호를 넣지 않는다. 개념·작업 이름을 쓰고,
-  읽는 순서는 `deckGroup`·`sidebar.order`로 관리한다. 본문 참조와 구성도에도 페이지 번호 대신 이름과 링크를 쓴다.
+  읽는 순서는 덱 `_deck.mjs`의 `sidebar` 배열로 관리한다. 본문 참조와 구성도에도 페이지 번호 대신 이름과 링크를 쓴다.
 - 기존 번호 페이지는 별도 개편 범위에서 정리한다. 새 페이지를 끼우거나 삭제할 때 주변 페이지 번호를 다시 매기지 않는다.
 - 문서는 나중에 AI가 찾고 확인하기 쉬워야 하지만, **소유자가 쉽게 이해하는 것**을 더 우선한다.
 - 많은 내용을 담기보다 주제의 핵심과 실제로 필요한 내용을 확실히 설명한다. 드문 예외나 구석진
@@ -64,12 +64,12 @@ Astro Starlight 기반 개인 스터디 노트 사이트. 슬라이드가 아니
 덱 정보는 사용하는 곳과 가까운 세 원본으로 나뉜다.
 
 - 전역 `category`·`tag` 어휘: `src/data/catalog.mjs`
-- 덱 메타데이터·사이드바 그룹·index 구성도: `src/content/docs/<덱>/_deck.mjs`
-- 페이지 소속 그룹·순서: 각 본문 MDX의 `deckGroup`·`sidebar.order`
+- 덱 메타데이터·사이드바 그룹과 페이지 순서·index 구성도: `src/content/docs/<덱>/_deck.mjs`
+- 페이지 제목·설명·검토 기록: 각 MDX의 frontmatter
 
-`src/data/load-decks.mjs`가 이 원본들을 읽어 덱 목록·topic 사이드바·랜딩 카드·장 수를 파생한다.
-`src/data/decks.mjs`는 기존 import를 유지하는 re-export일 뿐 직접 편집하지 않는다. 새 페이지는 MDX
-하나만 만들면 자동 등록되고, 새 덱은 폴더 안에 `_deck.mjs`를 두면 자동 발견된다.
+`src/data/load-decks.mjs`가 이 원본들을 읽어 덱 목록·topic 사이드바·랜딩 카드를 파생한다.
+`src/data/decks.mjs`는 기존 import를 유지하는 re-export일 뿐 직접 편집하지 않는다. 새 페이지는 MDX를
+만들고 해당 덱의 `sidebar[].pages`에 확장자 없는 상대 경로를 추가한다. 새 덱은 `_deck.mjs`로 자동 발견된다.
 
 `_baseline.md`에는 기준 버전, 덱 전용 서술 규칙, 범위 경계를 둔다. `_`로 시작하는 파일은
 콘텐츠 컬렉션에서 제외되어 빌드·검색·사이드바에 나오지 않는다. 모든 덱에 baseline이 있어야 하며
@@ -81,8 +81,8 @@ Astro Starlight 기반 개인 스터디 노트 사이트. 슬라이드가 아니
 ## 절대 깨뜨리면 안 되는 것
 
 - `astro.config.mjs`에서 `astroD2()`가 `starlight()`보다 먼저 와야 한다.
-- 본문 MDX의 `deckGroup`은 같은 폴더 `_deck.mjs`의 group id여야 하고, `sidebar.order`는 덱 안에서
-  중복되면 안 된다. 파일명을 바꾸면 `_deck.mjs`의 `map` 링크와 본문 링크도 함께 확인한다.
+- 모든 본문 MDX는 같은 폴더 `_deck.mjs`의 `sidebar[].pages`에 정확히 한 번 등록한다. 그룹·페이지는
+  배열 순서대로 표시하고 덱 `index.mdx`는 목록에 넣지 않는다. 파일명을 바꾸면 `sidebar`·`map`·본문 링크를 함께 확인한다.
 - 랜딩(`/`)은 어느 topic에도 속하지 않는다. topic 밖 페이지는 plugin `exclude`에 추가한다.
 - 사이드바 UI는 `src/components/layout/`의 `Sidebar`·`SiteTitle`·`SidebarToggle` override 세트다.
   실제 접힘 레이아웃은 `src/styles/custom.css`의 전역 규칙이다.

@@ -1,4 +1,4 @@
-// 덱 단위 metadata와 구조. 페이지 소속·순서는 각 MDX frontmatter에 있다.
+// 덱 단위 metadata와 구조. 페이지 소속·순서는 sidebar 배열에 있다.
 export default {
 	"navOrder": 1200,
 	"catalogOrder": 1400,
@@ -15,34 +15,61 @@ export default {
 		"rl"
 	],
 	"termIntro": "required",
-	"groups": [
+	"sidebar": [
 		{
-			"id": "intro",
-			"label": "시작"
+			"label": "시작",
+			"pages": [
+				"00-intro",
+				"01-why"
+			]
 		},
 		{
-			"id": "mdp",
-			"label": "문제를 세우기"
+			"label": "문제를 세우기",
+			"pages": [
+				"02-mdp",
+				"03-value"
+			]
 		},
 		{
-			"id": "value-based",
-			"label": "알고리즘"
+			"label": "알고리즘",
+			"pages": [
+				"04-value-based",
+				"05-policy-gradient",
+				"06-ppo-sac",
+				"07-offline-model"
+			]
 		},
 		{
-			"id": "reward",
-			"label": "실전 공통"
+			"label": "실전 공통",
+			"pages": [
+				"08-reward",
+				"09-training",
+				"10-evaluation"
+			]
 		},
 		{
-			"id": "market",
-			"label": "시스템 트레이딩"
+			"label": "시스템 트레이딩",
+			"pages": [
+				"11-market",
+				"12-trading-design",
+				"13-trading-practice"
+			]
 		},
 		{
-			"id": "robot",
-			"label": "피지컬 AI — 로봇"
+			"label": "피지컬 AI — 로봇",
+			"pages": [
+				"14-robot",
+				"15-robot-stack",
+				"16-imitation-vla"
+			]
 		},
 		{
-			"id": "career",
-			"label": "마무리"
+			"label": "마무리",
+			"pages": [
+				"17-career",
+				"18-glossary",
+				"19-wrapup"
+			]
 		}
 	],
 	"map": [

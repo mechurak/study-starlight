@@ -10,12 +10,44 @@ export default {
 	tags: [],
 	termIntro: 'required',
 	reviewIntervalDays: 90,
-	groups: [
-		{ id: 'foundations', label: '큰 그림' },
-		{ id: 'account', label: '계정 운영의 기본' },
-		{ id: 'network', label: '네트워크' },
-		{ id: 'application', label: '앱을 구성하는 서비스' },
-		{ id: 'operations', label: '배포와 운영' },
+	"sidebar": [
+		{
+			"label": "큰 그림",
+			"pages": [
+				"foundations"
+			]
+		},
+		{
+			"label": "계정 운영의 기본",
+			"pages": [
+				"iam",
+				"billing"
+			]
+		},
+		{
+			"label": "네트워크",
+			"pages": [
+				"vpc"
+			]
+		},
+		{
+			"label": "앱을 구성하는 서비스",
+			"pages": [
+				"compute",
+				"storage",
+				"serverless",
+				"cognito"
+			]
+		},
+		{
+			"label": "배포와 운영",
+			"pages": [
+				"operations",
+				"high-availability-lab",
+				"serverless-lab",
+				"cloudfront-lab"
+			]
+		}
 	],
 	map: [
 		{
